@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beaumont High School Cougars | Boys Varsity Soccer</title>
+  <meta name="description" content="Official web platform for Beaumont High School (CA) Cougars Soccer. Featuring player rosters, schedules, and Coach Command Center powered by Anson Dorrance's Competitive Matrix.">
+  
+  <link rel="stylesheet" href="./index.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+  <!-- Top Notification & Ticker Bar -->
+  <div class="top-banner">
+    <div class="banner-left">
+      <span class="badge badge-win">GAME DAY</span>
+      <span>Next Match: <strong>BHS Cougars vs Yucaipa Thunderbirds</strong> (Aug 12, 6:30 PM)</span>
+    </div>
+    <div class="banner-right">
+      <span class="text-muted" style="font-size: 0.8rem;">Citrus Belt League • Beaumont, CA</span>
+    </div>
+  </div>
+
+  <!-- Header Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-brand" onclick="app.switchView('home')">
+      <img src="./assets/bhs_cougars_logo.png" alt="Beaumont Cougars Emblem" />
+      <div class="brand-text">
+        <h1>BEAUMONT COUGARS</h1>
+        <p>HIGH SCHOOL SOCCER</p>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li class="nav-item active" data-view="home">⚽ Home</li>
+      <li class="nav-item" data-view="roster">👥 Roster & Bios</li>
+      <li class="nav-item" data-view="schedule">📅 Schedule & Results</li>
+      <li class="nav-item" data-view="matrix">🏆 Anson Dorrance Matrix</li>
+      <li class="nav-item" data-view="planner">📋 Coach Planner</li>
+    </ul>
+
+    <div class="auth-controls">
+      <div style="text-align: right; line-height: 1.2;">
+        <div id="navUserName" style="font-weight: 700; font-size: 0.85rem; color: #FFF;">Coach Bob</div>
+        <span id="navUserBadge" class="badge badge-coach">COACH</span>
+      </div>
+      <button id="authSwitchBtn" class="btn btn-secondary">🔑 Switch Role</button>
+    </div>
+  </header>
+
+  <!-- Main View Render Target -->
+  <main id="mainAppContainer">
+    <!-- Dynamic Content Rendered by app.js -->
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="./assets/bhs_cougars_logo.png" style="height: 36px;" />
+        <div style="text-align: left;">
+          <strong style="color: #FFF; display: block;">Beaumont High School Soccer Program</strong>
+          <span style="color: var(--text-muted); font-size: 0.75rem;">39139 Cherry Valley Blvd, Beaumont, CA 92223</span>
+        </div>
+      </div>
+      <div>
+        <p>&copy; 2026 Beaumont High School Athletics. Anson Dorrance Practice Rating Matrix Integration.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Auth Role Switcher Modal -->
+  <div id="authRoleModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>SELECT USER ROLE / DEMO ACCOUNT</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <p class="text-muted" style="margin-bottom: 20px; font-size: 0.85rem;">
+        Test the multi-tenant role-based permissions system by switching between accounts:
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="role-switch-card drill-item" data-userid="user_coach_bob" style="cursor: pointer;">
+          <div>
+            <strong style="color: #FFF; display: block;">Coach Bob (Head Coach - Beaumont)</strong>
+            <span class="badge badge-coach">COACH ROLE</span> - Full access to Matrix, Practice Planner, Roster Ratings
+          </div>
+        </div>
+
+        <div class="role-switch-card drill-item" data-userid="user_player_alex" style="cursor: pointer;">
+          <div>
+            <strong style="color: #FFF; display: block;">Alex Rivera (#10 - Senior Forward)</strong>
+            <span class="badge badge-role">PLAYER ROLE</span> - Can view team Matrix ranks, personal evaluations, announcements
+          </div>
+        </div>
+
+        <div class="role-switch-card drill-item" data-userid="user_admin_sam" style="cursor: pointer;">
+          <div>
+            <strong style="color: #FFF; display: block;">Admin Sam (Athletic Director)</strong>
+            <span class="badge badge-admin">ADMIN ROLE</span> - Full global control across school teams & coaches
+          </div>
+        </div>
+
+        <div class="role-switch-card drill-item" data-userid="user_guest" style="cursor: pointer;">
+          <div>
+            <strong style="color: #FFF; display: block;">Public Visitor (Parent / Fan)</strong>
+            <span class="badge badge-win">GUEST ROLE</span> - Public schedule, roster, game recaps (Ratings 🔒 Protected)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player Detail Modal -->
+  <div id="playerDetailModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>PLAYER PROFILE</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div id="playerDetailContent">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Practice Drill Score Modal (Coach Only) -->
+  <div id="addDrillScoreModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>RECORD ANSON DORRANCE DRILL SCORE</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); alert('Practice drill score logged successfully! Matrix leaderboard updated.'); app.closeModals();">
+        <div class="form-group">
+          <label>Select Practice Drill</label>
+          <select class="form-control">
+            <option>Anson 1v1 Gauntlet (Continuous)</option>
+            <option>2v2 Flying Scrimmage with Bumpers</option>
+            <option>Finishing under High Pressure</option>
+            <option>12-Minute Cooper Fitness Test</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Winning Player / Pair</label>
+          <select class="form-control">
+            <option>Alex Rivera (#10)</option>
+            <option>Marcus Vance (#7)</option>
+            <option>Ethan Thorne (#4)</option>
+            <option>Mateo Sandoval (#1)</option>
+            <option>Lucas Sterling (#6)</option>
+            <option>Jordan Brooks (#9)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Points Earned</label>
+          <input type="number" class="form-control" value="3" min="1" max="10" />
+        </div>
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Update Practice Matrix Ranks</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Drill to Plan Modal -->
+  <div id="addPlanDrillModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>ADD DRILL TO PRACTICE PLAN</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.addPlanDrill(document.getElementById('newDrillTime').value, document.getElementById('newDrillName').value, document.getElementById('newDrillDuration').value, document.getElementById('newDrillNotes').value);">
+        <div class="form-group">
+          <label>Time Slot (e.g. 1:00 - 1:20)</label>
+          <input type="text" id="newDrillTime" class="form-control" placeholder="1:00 - 1:20" required />
+        </div>
+        <div class="form-group">
+          <label>Drill Name / Description</label>
+          <input type="text" id="newDrillName" class="form-control" placeholder="e.g., 3v2 Counter Attack Drill" required />
+        </div>
+        <div class="form-group">
+          <label>Duration</label>
+          <div style="display: flex; gap: 10px;">
+            <select id="newDrillDurationSelect" class="form-control" style="flex: 1;" onchange="if(this.value !== 'custom') document.getElementById('newDrillDuration').value = this.value;">
+              <option value="">-- Select 5-min Preset --</option>
+              <option value="5 min">5 min</option>
+              <option value="10 min">10 min</option>
+              <option value="15 min">15 min</option>
+              <option value="20 min">20 min</option>
+              <option value="25 min">25 min</option>
+              <option value="30 min">30 min</option>
+              <option value="35 min">35 min</option>
+              <option value="40 min">40 min</option>
+              <option value="45 min">45 min</option>
+              <option value="50 min">50 min</option>
+              <option value="55 min">55 min</option>
+              <option value="60 min">60 min (1 Hr)</option>
+              <option value="75 min">75 min</option>
+              <option value="90 min">90 min</option>
+              <option value="custom">Custom value below...</option>
+            </select>
+            <input type="text" id="newDrillDuration" class="form-control" style="flex: 1;" placeholder="Or type custom (e.g. 12 min)" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Coach Key Focus & Detailed Notes</label>
+          <textarea id="newDrillNotes" class="form-control" rows="4" placeholder="e.g. Key tactical focus, coaching points, progression rules, and player rotation..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">➕ Add to Today's Plan</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Practice Drill Modal -->
+  <div id="editPlanDrillModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>EDIT PRACTICE DRILL</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.saveEditPlanDrill(parseInt(document.getElementById('editDrillIndex').value), document.getElementById('editDrillTime').value, document.getElementById('editDrillName').value, document.getElementById('editDrillDuration').value, document.getElementById('editDrillNotes').value);">
+        <input type="hidden" id="editDrillIndex" />
+        <div class="form-group">
+          <label>Time Slot</label>
+          <input type="text" id="editDrillTime" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label>Drill Name</label>
+          <input type="text" id="editDrillName" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label>Duration</label>
+          <div style="display: flex; gap: 10px;">
+            <select id="editDrillDurationSelect" class="form-control" style="flex: 1;" onchange="if(this.value !== 'custom') document.getElementById('editDrillDuration').value = this.value;">
+              <option value="">-- Select 5-min Preset --</option>
+              <option value="5 min">5 min</option>
+              <option value="10 min">10 min</option>
+              <option value="15 min">15 min</option>
+              <option value="20 min">20 min</option>
+              <option value="25 min">25 min</option>
+              <option value="30 min">30 min</option>
+              <option value="35 min">35 min</option>
+              <option value="40 min">40 min</option>
+              <option value="45 min">45 min</option>
+              <option value="50 min">50 min</option>
+              <option value="55 min">55 min</option>
+              <option value="60 min">60 min (1 Hr)</option>
+              <option value="75 min">75 min</option>
+              <option value="90 min">90 min</option>
+              <option value="custom">Custom value below...</option>
+            </select>
+            <input type="text" id="editDrillDuration" class="form-control" style="flex: 1;" placeholder="Or type custom" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Coach Focus & Detailed Notes</label>
+          <textarea id="editDrillNotes" class="form-control" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Save Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5-Minute Increment Duration Presets Datalist -->
+  <datalist id="durationPresets">
+    <option value="5 min">5 Minutes</option>
+    <option value="10 min">10 Minutes</option>
+    <option value="15 min">15 Minutes</option>
+    <option value="20 min">20 Minutes</option>
+    <option value="25 min">25 Minutes</option>
+    <option value="30 min">30 Minutes</option>
+    <option value="35 min">35 Minutes</option>
+    <option value="40 min">40 Minutes</option>
+    <option value="45 min">45 Minutes</option>
+    <option value="50 min">50 Minutes</option>
+    <option value="55 min">55 Minutes</option>
+    <option value="60 min">60 Minutes (1 Hr)</option>
+    <option value="75 min">75 Minutes</option>
+    <option value="90 min">90 Minutes (Full Session)</option>
+  </datalist>
+
+  <!-- Add New Player Modal -->
+  <div id="addPlayerModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3>ADD NEW PLAYER TO ROSTER</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.addPlayer({
+        number: document.getElementById('newPlayerNumber').value,
+        name: document.getElementById('newPlayerName').value,
+        position: document.getElementById('newPlayerPosition').value,
+        classYear: document.getElementById('newPlayerClass').value,
+        height: document.getElementById('newPlayerHeight').value,
+        photo: document.getElementById('newPlayerPhoto').value,
+        stat1: document.getElementById('newPlayerStat1').value,
+        stat2: document.getElementById('newPlayerStat2').value,
+        tech: document.getElementById('newPlayerTech').value,
+        tact: document.getElementById('newPlayerTact').value,
+        phys: document.getElementById('newPlayerPhys').value,
+        ment: document.getElementById('newPlayerMent').value
+      });">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+          <div class="form-group">
+            <label>Jersey #</label>
+            <input type="number" id="newPlayerNumber" class="form-control" placeholder="10" required />
+          </div>
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="newPlayerName" class="form-control" placeholder="Player Name" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Position</label>
+            <select id="newPlayerPosition" class="form-control" required>
+              <option value="Forward / CAM">Forward / CAM</option>
+              <option value="Winger">Winger</option>
+              <option value="Center Midfield">Center Midfield</option>
+              <option value="Defensive Mid">Defensive Mid</option>
+              <option value="Center Back">Center Back</option>
+              <option value="Full Back">Full Back</option>
+              <option value="Goalkeeper">Goalkeeper</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Class Year</label>
+            <select id="newPlayerClass" class="form-control" required>
+              <option value="Senior (2027)">Senior (2027)</option>
+              <option value="Junior (2028)">Junior (2028)</option>
+              <option value="Sophomore (2029)">Sophomore (2029)</option>
+              <option value="Freshman (2030)">Freshman (2030)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+          <div class="form-group">
+            <label>Height</label>
+            <input type="text" id="newPlayerHeight" class="form-control" placeholder="5'11&quot;" />
+          </div>
+          <div class="form-group">
+            <label>Photo URL</label>
+            <input type="url" id="newPlayerPhoto" class="form-control" placeholder="https://..." />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Goals / Saves</label>
+            <input type="number" id="newPlayerStat1" class="form-control" value="0" />
+          </div>
+          <div class="form-group">
+            <label>Assists / Clean Sheets</label>
+            <input type="number" id="newPlayerStat2" class="form-control" value="0" />
+          </div>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <label style="color: var(--bhs-gold-accent); font-weight: 700; display: block; margin-bottom: 8px;">Coach Evaluation Ratings (0-100)</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
+            <div><label style="font-size:0.75rem;">Technical</label><input type="number" id="newPlayerTech" class="form-control" value="80" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Tactical</label><input type="number" id="newPlayerTact" class="form-control" value="80" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Physical</label><input type="number" id="newPlayerPhys" class="form-control" value="80" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Mental</label><input type="number" id="newPlayerMent" class="form-control" value="80" max="100" /></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">➕ Save & Add to Roster</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Player Modal -->
+  <div id="editPlayerModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3>EDIT PLAYER PROFILE</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.saveEditPlayer(document.getElementById('editPlayerId').value, {
+        number: document.getElementById('editPlayerNumber').value,
+        name: document.getElementById('editPlayerName').value,
+        position: document.getElementById('editPlayerPosition').value,
+        classYear: document.getElementById('editPlayerClass').value,
+        height: document.getElementById('editPlayerHeight').value,
+        photo: document.getElementById('editPlayerPhoto').value,
+        stat1: document.getElementById('editPlayerStat1').value,
+        stat2: document.getElementById('editPlayerStat2').value,
+        tech: document.getElementById('editPlayerTech').value,
+        tact: document.getElementById('editPlayerTact').value,
+        phys: document.getElementById('editPlayerPhys').value,
+        ment: document.getElementById('editPlayerMent').value
+      });">
+        <input type="hidden" id="editPlayerId" />
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+          <div class="form-group">
+            <label>Jersey #</label>
+            <input type="number" id="editPlayerNumber" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="editPlayerName" class="form-control" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Position</label>
+            <select id="editPlayerPosition" class="form-control" required>
+              <option value="Forward / CAM">Forward / CAM</option>
+              <option value="Winger">Winger</option>
+              <option value="Center Midfield">Center Midfield</option>
+              <option value="Defensive Mid">Defensive Mid</option>
+              <option value="Center Back">Center Back</option>
+              <option value="Full Back">Full Back</option>
+              <option value="Goalkeeper">Goalkeeper</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Class Year</label>
+            <select id="editPlayerClass" class="form-control" required>
+              <option value="Senior (2027)">Senior (2027)</option>
+              <option value="Junior (2028)">Junior (2028)</option>
+              <option value="Sophomore (2029)">Sophomore (2029)</option>
+              <option value="Freshman (2030)">Freshman (2030)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+          <div class="form-group">
+            <label>Height</label>
+            <input type="text" id="editPlayerHeight" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Photo URL</label>
+            <input type="url" id="editPlayerPhoto" class="form-control" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Goals / Saves</label>
+            <input type="number" id="editPlayerStat1" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Assists / Clean Sheets</label>
+            <input type="number" id="editPlayerStat2" class="form-control" />
+          </div>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <label style="color: var(--bhs-gold-accent); font-weight: 700; display: block; margin-bottom: 8px;">Coach Evaluation Ratings (0-100)</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
+            <div><label style="font-size:0.75rem;">Technical</label><input type="number" id="editPlayerTech" class="form-control" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Tactical</label><input type="number" id="editPlayerTact" class="form-control" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Physical</label><input type="number" id="editPlayerPhys" class="form-control" max="100" /></div>
+            <div><label style="font-size:0.75rem;">Mental</label><input type="number" id="editPlayerMent" class="form-control" max="100" /></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Save Player Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./supabaseClient.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

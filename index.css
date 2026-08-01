@@ -1,0 +1,89 @@
+/* Beaumont High School Cougars Soccer Design System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@500;600;700&display=swap');
+
+:root {
+  /* Brand Colors - Beaumont High Royal Blue & White */
+  --bhs-blue-primary: #0047AB;
+  --bhs-blue-dark: #002D62;
+  --bhs-navy-bg: #0A1428;
+  --bhs-navy-card: #112240;
+  --bhs-navy-border: #233554;
+  --bhs-blue-electric: #1E90FF;
+  --bhs-cyan-accent: #00F0FF;
+  --bhs-gold-accent: #FFD700;
+  --bhs-silver: #E2E8F0;
+  
+  /* Status Colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  
+  /* Text */
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dark: #0F172A;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(17, 34, 64, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+  /* Fonts */
+  --font-heading: 'Oswald', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bhs-navy-bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bhs-navy-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bhs-navy-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bhs-blue-electric);
+}
+
+/* Typography Helpers */
+h1, h2, h3, h4, .brand-font {
+  font-family: var(--font-heading);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #FFFFFF 0%, var(--bhs-blue-electric) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gold {
+  color: var(--bhs-gold-accent);
+}
+
+.text-cyan {
+  color: var(--bhs-cyan-accent);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
