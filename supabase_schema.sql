@@ -124,3 +124,8 @@ CREATE POLICY "Coaches manage matrix logs" ON public.matrix_logs FOR ALL
 
 CREATE POLICY "Coaches & Players view practice plans" ON public.practice_plans FOR SELECT 
   USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('player', 'coach', 'admin')));
+
+-- 3. Players table write access (anon allowed since app uses its own role system, not Supabase Auth)
+CREATE POLICY "Allow anon insert players" ON public.players FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update players" ON public.players FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon delete players" ON public.players FOR DELETE USING (true);

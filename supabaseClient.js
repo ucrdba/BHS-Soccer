@@ -114,11 +114,19 @@ class SupabaseService {
 
   async deletePlayer(playerId) {
     if (!this.isConfigured()) return null;
-    const { error } = await this.client
+    const { data, error } = await this.client
       .from('players')
       .update({ is_deleted: true })
-      .eq('id', playerId);
-    if (error) console.error('Supabase soft deletePlayer error:', error);
+      .eq('id', playerId)
+      .select();
+    if (error) {
+      console.error('Supabase soft deletePlayer error:', error);
+    } else if (!data || data.length === 0) {
+      console.warn('Supabase deletePlayer: no rows updated for id:', playerId, '— likely blocked by RLS policy. Run the fix SQL in Supabase Dashboard.');
+    } else {
+      console.log('Supabase deletePlayer: soft-deleted player', playerId, data);
+    }
+    return data;
   }
 }
 

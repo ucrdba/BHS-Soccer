@@ -927,7 +927,10 @@ class BHSSoccerApp {
   }
 
   closeModals() {
-    document.querySelectorAll('.modal-overlay').forEach(modal => modal.classList.remove('active'));
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    });
   }
 
   attachDynamicListeners() {
