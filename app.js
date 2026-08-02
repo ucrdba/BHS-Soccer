@@ -236,13 +236,55 @@ class BHSSoccerApp {
 
       const dbPlans = await window.supabaseService.fetchPracticePlans('bhs');
       if (dbPlans && dbPlans.length > 0) {
-        this.data.currentPracticePlan = dbPlans.map(plan => ({
-          id: plan.id,
-          time: plan.time_slot,
-          name: plan.name,
-          duration: plan.duration,
-          coachNotes: plan.coach_notes
-        }));
+        const timelineDrills = [];
+        const planMap = {};
+
+        dbPlans.forEach(plan => {
+          const notes = plan.coach_notes || '';
+          const match = notes.match(/^\[Plan:\s*([^\]]+)\]\s*(.*)/i);
+          if (match) {
+            const planName = match[1].trim();
+            const cleanNotes = match[2].trim();
+            if (!planMap[planName]) {
+              planMap[planName] = {
+                id: 'plan_db_' + planName.replace(/\s+/g, '_'),
+                name: planName,
+                date: new Date(plan.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
+                drills: []
+              };
+            }
+            planMap[planName].drills.push({
+              id: plan.id,
+              time: plan.time_slot,
+              name: plan.name,
+              duration: plan.duration,
+              coachNotes: cleanNotes
+            });
+          } else {
+            timelineDrills.push({
+              id: plan.id,
+              time: plan.time_slot,
+              name: plan.name,
+              duration: plan.duration,
+              coachNotes: notes
+            });
+          }
+        });
+
+        if (timelineDrills.length > 0) {
+          this.data.currentPracticePlan = timelineDrills;
+        }
+
+        // Merge DB saved plans into local savedPlans
+        Object.values(planMap).forEach(dbPlan => {
+          if (!this.data.savedPlans) this.data.savedPlans = [];
+          const idx = this.data.savedPlans.findIndex(sp => sp.name.toLowerCase() === dbPlan.name.toLowerCase());
+          if (idx !== -1) {
+            this.data.savedPlans[idx] = dbPlan;
+          } else {
+            this.data.savedPlans.push(dbPlan);
+          }
+        });
       }
 
       console.log('⚡ Successfully loaded live data from Supabase Cloud!');
@@ -945,6 +987,8 @@ class BHSSoccerApp {
             <button class="btn btn-gold" onclick="app.openAddPlanDrillModal()">+ Add Drill to Plan</button>
             <button class="btn btn-gold" onclick="app.openSavePlanModal()">💾 Save Practice Plan</button>
             <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Saved Plans Database (${savedCount})</button>
+            <button class="btn btn-primary" onclick="app.printPracticePlan()">🖨️ Print Practice Plan</button>
+            <button class="btn btn-secondary" onclick="app.downloadPracticePlan('html')">📥 Save/Download Plan File</button>
             <button class="btn btn-secondary" onclick="app.openImportExportModal()">📂 Import / Export</button>
           </div>
         </div>
@@ -1008,12 +1052,13 @@ class BHSSoccerApp {
     const input = document.getElementById('savePlanNameInput');
     if (input) {
       input.value = this.data.activePlanName || `Practice Plan - ${new Date().toLocaleDateString()}`;
+      setTimeout(() => { input.focus(); input.select(); }, 150);
     }
     const modal = document.getElementById('savePlanModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
-  async savePracticePlan(planName) {
+  async savePracticePlan(planName, triggerDownload = true) {
     if (!planName || !planName.trim()) {
       alert('Please enter a valid name for the practice plan.');
       return;
@@ -1044,7 +1089,13 @@ class BHSSoccerApp {
 
     this.renderCurrentView();
     this.closeModals();
-    alert(`✅ Practice Plan "${cleanName}" saved to database successfully!`);
+
+    if (triggerDownload) {
+      // Trigger native browser File Save dialog with Filename Box prefilled with cleanName
+      this.downloadPracticePlan('html');
+    } else {
+      alert(`✅ Practice Plan "${cleanName}" saved to database successfully!`);
+    }
   }
 
   openLoadPlanModal() {
@@ -1110,6 +1161,232 @@ class BHSSoccerApp {
       this.saveData();
       this.openLoadPlanModal();
     }
+  }
+
+  printPracticePlan() {
+    const activeName = this.data.activePlanName || 'Standard Practice Session';
+    const plan = this.data.currentPracticePlan || [];
+
+    if (plan.length === 0) {
+      alert('Your current practice timeline is empty. Add at least one drill to the plan before printing.');
+      return;
+    }
+
+    let totalMinutes = 0;
+    plan.forEach(p => {
+      const match = (p.duration || '').match(/(\d+)/);
+      if (match) totalMinutes += parseInt(match[1]);
+    });
+
+    let totalTimeStr = `${totalMinutes} min`;
+    if (totalMinutes >= 60) {
+      const hrs = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      totalTimeStr = `${totalMinutes} min (${hrs} hr${hrs > 1 ? 's' : ''}${mins > 0 ? ` ${mins} min` : ''})`;
+    }
+
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${activeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #111827; line-height: 1.5; }
+    .header { border-bottom: 3px solid #0047AB; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header h1 { margin: 0; font-size: 20px; color: #0047AB; letter-spacing: 0.5px; }
+    .header h2 { margin: 4px 0 0 0; font-size: 15px; color: #374151; font-weight: 600; }
+    .meta { font-size: 12px; color: #4B5563; text-align: right; }
+    .summary-bar { background: #F3F4F6; border: 1px solid #E5E7EB; padding: 10px 16px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #1F2937; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #0047AB; color: #FFFFFF; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px 10px; border-bottom: 1px solid #E5E7EB; vertical-align: top; font-size: 13px; }
+    tr:nth-child(even) { background: #F9FAFB; }
+    .time-col { width: 120px; font-weight: bold; color: #0047AB; }
+    .dur-col { width: 90px; font-weight: bold; text-align: center; color: #111827; }
+    .notes { margin-top: 6px; color: #374151; font-size: 12px; white-space: pre-wrap; background: #FFF; padding: 6px 8px; border-left: 3px solid #0047AB; }
+    .footer { margin-top: 35px; border-top: 1px solid #E5E7EB; padding-top: 10px; font-size: 11px; color: #6B7280; text-align: center; }
+    @media print {
+      body { margin: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>BEAUMONT HIGH SCHOOL COUGARS SOCCER</h1>
+      <h2>OFFICIAL PRACTICE TIMELINE & DRILL PLAN</h2>
+    </div>
+    <div class="meta">
+      <div><strong>Date:</strong> ${dateStr}</div>
+      <div><strong>Plan Name:</strong> "${activeName}"</div>
+    </div>
+  </div>
+
+  <div class="summary-bar">
+    <div>⏱️ Total Time: ${totalTimeStr}</div>
+    <div>⚽ Total Drills: ${plan.length}</div>
+    <div>📍 Location: Cougar Stadium Practice Field</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="time-col">TIME SLOT</th>
+        <th>DRILL NAME & COACH FOCUS NOTES</th>
+        <th class="dur-col">DURATION</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${plan.map(d => `
+        <tr>
+          <td class="time-col">${d.time || ''}</td>
+          <td>
+            <strong>${d.name}</strong>
+            ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus & Notes:</strong><br/>${d.coachNotes}</div>` : ''}
+          </td>
+          <td class="dur-col">${d.duration}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Beaumont High School Athletics &bull; Boys Varsity Soccer Command Center
+  </div>
+
+  <script>
+    document.title = ${JSON.stringify(activeName)};
+    window.onload = function() {
+      document.title = ${JSON.stringify(activeName)};
+      setTimeout(function() {
+        document.title = ${JSON.stringify(activeName)};
+        window.print();
+      }, 300);
+    };
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const printWin = window.open(url, '_blank', 'width=850,height=950');
+
+    if (!printWin) {
+      const origTitle = document.title;
+      document.title = activeName;
+      window.print();
+      setTimeout(() => { document.title = origTitle; }, 3000);
+    }
+  }
+
+  downloadPracticePlan(format = 'html') {
+    const activeName = this.data.activePlanName || 'Standard Practice Session';
+    const plan = this.data.currentPracticePlan || [];
+
+    if (plan.length === 0) {
+      alert('Your current practice timeline is empty. Add at least one drill to the plan before downloading.');
+      return;
+    }
+
+    const safeFileName = activeName.replace(/[/\\?%*:|"<>]/g, '_');
+
+    if (format === 'xlsx') {
+      this.exportXLSX('plan');
+      return;
+    }
+
+    let totalMinutes = 0;
+    plan.forEach(p => {
+      const match = (p.duration || '').match(/(\d+)/);
+      if (match) totalMinutes += parseInt(match[1]);
+    });
+
+    let totalTimeStr = `${totalMinutes} min`;
+    if (totalMinutes >= 60) {
+      const hrs = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      totalTimeStr = `${totalMinutes} min (${hrs} hr${hrs > 1 ? 's' : ''}${mins > 0 ? ` ${mins} min` : ''})`;
+    }
+
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${activeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #111827; line-height: 1.5; }
+    .header { border-bottom: 3px solid #0047AB; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header h1 { margin: 0; font-size: 20px; color: #0047AB; letter-spacing: 0.5px; }
+    .header h2 { margin: 4px 0 0 0; font-size: 15px; color: #374151; font-weight: 600; }
+    .meta { font-size: 12px; color: #4B5563; text-align: right; }
+    .summary-bar { background: #F3F4F6; border: 1px solid #E5E7EB; padding: 10px 16px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #1F2937; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #0047AB; color: #FFFFFF; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px 10px; border-bottom: 1px solid #E5E7EB; vertical-align: top; font-size: 13px; }
+    tr:nth-child(even) { background: #F9FAFB; }
+    .time-col { width: 120px; font-weight: bold; color: #0047AB; }
+    .dur-col { width: 90px; font-weight: bold; text-align: center; color: #111827; }
+    .notes { margin-top: 6px; color: #374151; font-size: 12px; white-space: pre-wrap; background: #FFF; padding: 6px 8px; border-left: 3px solid #0047AB; }
+    .footer { margin-top: 35px; border-top: 1px solid #E5E7EB; padding-top: 10px; font-size: 11px; color: #6B7280; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>BEAUMONT HIGH SCHOOL COUGARS SOCCER</h1>
+      <h2>OFFICIAL PRACTICE TIMELINE & DRILL PLAN</h2>
+    </div>
+    <div class="meta">
+      <div><strong>Date:</strong> ${dateStr}</div>
+      <div><strong>Plan Name:</strong> "${activeName}"</div>
+    </div>
+  </div>
+
+  <div class="summary-bar">
+    <div>⏱️ Total Time: ${totalTimeStr}</div>
+    <div>⚽ Total Drills: ${plan.length}</div>
+    <div>📍 Location: Cougar Stadium Practice Field</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="time-col">TIME SLOT</th>
+        <th>DRILL NAME & COACH FOCUS NOTES</th>
+        <th class="dur-col">DURATION</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${plan.map(d => `
+        <tr>
+          <td class="time-col">${d.time || ''}</td>
+          <td>
+            <strong>${d.name}</strong>
+            ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus & Notes:</strong><br/>${d.coachNotes}</div>` : ''}
+          </td>
+          <td class="dur-col">${d.duration}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Beaumont High School Athletics &bull; Boys Varsity Soccer Command Center
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${safeFileName}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   formatDuration(val) {
@@ -1314,9 +1591,10 @@ class BHSSoccerApp {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'PracticePlan');
     }
 
+    const planNameClean = (this.data.activePlanName || 'PracticePlan').replace(/[/\\?%*:|"<>]/g, '_');
     const fileName = type === 'all' ? 'BHS_Soccer_AllData.xlsx' :
       type === 'players' ? 'BHS_Roster.xlsx' :
-      type === 'schedule' ? 'BHS_Schedule.xlsx' : 'BHS_PracticePlan.xlsx';
+      type === 'schedule' ? 'BHS_Schedule.xlsx' : `${planNameClean}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   }
@@ -1362,15 +1640,17 @@ class BHSSoccerApp {
           rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
         }
 
+        const toStr = (v) => String(v ?? '').trim();
         let count = 0;
+
         if (target === 'players') {
           const imported = rows.filter(r => r.Name).map(r => ({
             id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
             number: parseInt(r.Number) || 0,
-            name: r.Name, position: r.Position || 'Midfielder',
-            classYear: r.Class || '', height: r.Height || "5'10\"",
-            photo: r.Photo || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-            seasonStats: r.Position?.includes('Goalkeeper')
+            name: toStr(r.Name), position: toStr(r.Position) || 'Midfielder',
+            classYear: toStr(r.Class) || 'Junior', height: toStr(r.Height) || "5'10\"",
+            photo: toStr(r.Photo) || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+            seasonStats: toStr(r.Position).includes('Goalkeeper')
               ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
               : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
             ratings: { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 },
@@ -1384,11 +1664,13 @@ class BHSSoccerApp {
         } else if (target === 'schedule') {
           const imported = rows.filter(r => r.Opponent).map(r => ({
             id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-            date: (r.Date || '').toUpperCase(), time: r.Time || '6:00 PM',
-            opponent: r.Opponent, location: r.Location || '',
-            isHome: (r.Home || '').toLowerCase() !== 'away',
-            status: (r.Status || 'UPCOMING').toUpperCase(),
-            score: r.Score || null
+            date: toStr(r.Date).toUpperCase(),
+            time: toStr(r.Time) || '6:00 PM',
+            opponent: toStr(r.Opponent),
+            location: toStr(r.Location) || 'Home - Cougar Stadium',
+            isHome: toStr(r.Home).toLowerCase() !== 'away',
+            status: (toStr(r.Status) || 'UPCOMING').toUpperCase(),
+            score: toStr(r.Score) || null
           }));
           this.data.schedule.push(...imported);
           count = imported.length;
@@ -1396,9 +1678,12 @@ class BHSSoccerApp {
             for (const m of imported) await window.supabaseService.upsertMatch('bhs', m);
           }
         } else if (target === 'plan') {
-          const imported = rows.filter(r => r.DrillName).map(r => ({
-            id: null, time: r.TimeSlot || '', name: r.DrillName,
-            duration: r.Duration || '15 min', coachNotes: r.CoachNotes || ''
+          const imported = rows.filter(r => r.DrillName || r.name).map(r => ({
+            id: null,
+            time: toStr(r.TimeSlot || r.time),
+            name: toStr(r.DrillName || r.name),
+            duration: toStr(r.Duration || r.duration) || '15 min',
+            coachNotes: toStr(r.CoachNotes || r.coachNotes)
           }));
           this.data.currentPracticePlan.push(...imported);
           count = imported.length;

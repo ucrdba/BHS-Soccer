@@ -287,15 +287,18 @@
         <h3>💾 SAVE PRACTICE PLAN</h3>
         <button class="close-btn">&times;</button>
       </div>
-      <form onsubmit="event.preventDefault(); app.savePracticePlan(document.getElementById('savePlanNameInput').value);">
+      <form onsubmit="event.preventDefault(); app.savePracticePlan(document.getElementById('savePlanNameInput').value, true);">
         <div class="form-group">
           <label>Practice Plan Name</label>
-          <input type="text" id="savePlanNameInput" class="form-control" placeholder="e.g. Pre-Game Tactical &amp; 1v1 High Intensity" required />
+          <input type="text" id="savePlanNameInput" class="form-control" placeholder="e.g. Short Varsity 60-Min High Intensity" required />
         </div>
         <p class="text-muted" style="font-size:0.85rem; margin-bottom:15px;">
           This will save all drills currently in today's timeline under this plan name so you can reload it anytime.
         </p>
-        <button type="submit" class="btn btn-gold" style="width:100%;">💾 Save Practice Plan to Database</button>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button type="submit" class="btn btn-gold" style="width:100%;">💾 Save Plan &amp; Open File Download Dialog</button>
+          <button type="button" class="btn btn-primary" style="width:100%;" onclick="app.savePracticePlan(document.getElementById('savePlanNameInput').value, false);">💾 Save Plan to Database Only</button>
+        </div>
       </form>
     </div>
   </div>

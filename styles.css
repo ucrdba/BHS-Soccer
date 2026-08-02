@@ -762,3 +762,44 @@ footer {
   font-size: 0.85rem;
   margin-top: 60px;
 }
+
+/* --- Print Styles --- */
+@media print {
+  body {
+    background: #FFF !important;
+    color: #000 !important;
+  }
+  .top-banner, .navbar, footer, .btn, .modal-overlay, .filters-bar {
+    display: none !important;
+  }
+  .container, .planner-card {
+    background: #FFF !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .portal-header {
+    background: #FFF !important;
+    color: #000 !important;
+    border-bottom: 2px solid #0047AB !important;
+    padding: 10px 0 !important;
+  }
+  .portal-title h2, h3, h4 {
+    color: #0047AB !important;
+  }
+  .drill-item {
+    border-bottom: 1px solid #CCC !important;
+    padding: 12px 0 !important;
+    color: #000 !important;
+  }
+  .drill-info p {
+    color: #333 !important;
+  }
+  .drill-duration {
+    color: #0047AB !important;
+    font-weight: bold !important;
+  }
+}
+
