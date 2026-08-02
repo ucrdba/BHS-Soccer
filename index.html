@@ -130,7 +130,7 @@
   <div id="addDrillScoreModal" class="modal-overlay">
     <div class="modal-window">
       <div class="modal-header">
-        <h3>RECORD ANSON DORRANCE DRILL SCORE</h3>
+        <h3>RECORD DRILL SCORE</h3>
         <button class="close-btn">&times;</button>
       </div>
       <form onsubmit="event.preventDefault(); alert('Practice drill score logged successfully! Matrix leaderboard updated.'); app.closeModals();">
@@ -567,8 +567,65 @@
     </div>
   </div>
 
+
+  <!-- Import / Export Modal -->
+  <div id="importExportModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>📂 IMPORT / EXPORT DATA</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px;">⬇️ Export to Excel (.xlsx)</h4>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="btn btn-primary" onclick="app.exportXLSX('players')" style="text-align:left;">
+            👥 Export Roster (Players)
+          </button>
+          <button class="btn btn-primary" onclick="app.exportXLSX('schedule')" style="text-align:left;">
+            📅 Export Schedule &amp; Results
+          </button>
+          <button class="btn btn-primary" onclick="app.exportXLSX('plan')" style="text-align:left;">
+            📋 Export Practice Plan
+          </button>
+          <button class="btn btn-gold" onclick="app.exportXLSX('all')" style="text-align:left;">
+            📦 Export All Data (Single Workbook)
+          </button>
+        </div>
+      </div>
+
+      <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
+
+      <div>
+        <h4 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">⬆️ Import from CSV or Excel</h4>
+        <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 14px;">
+          Download a template first, fill it in, then upload. Column headers must match exactly.
+        </p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button class="btn btn-secondary" onclick="app.downloadTemplate('players')">📥 Player Template</button>
+          <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')">📥 Schedule Template</button>
+        </div>
+        <div style="margin-top: 14px;">
+          <label style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-bottom: 6px;">Select file to import:</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="importTarget" class="form-control" style="flex:1;">
+              <option value="players">Players / Roster</option>
+              <option value="schedule">Schedule &amp; Results</option>
+              <option value="plan">Practice Plan</option>
+            </select>
+            <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()">📂 Choose File</button>
+          </div>
+          <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" style="display:none;"
+            onchange="app.handleImportFile(this.files[0], document.getElementById('importTarget').value); this.value='';" />
+          <div id="importStatus" style="margin-top:10px; font-size:0.85rem; color: var(--color-success);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="./supabaseClient.js"></script>
   <script src="./auth.js"></script>
   <script src="./app.js"></script>

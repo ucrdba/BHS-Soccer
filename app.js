@@ -325,6 +325,32 @@ class BHSSoccerApp {
   }
 
   renderHomeView() {
+    // --- Compute season stats from completed schedule entries ---
+    const completed = this.data.schedule.filter(m => m.status === 'COMPLETED' && m.score);
+    let wins = 0, draws = 0, losses = 0, goalsFor = 0, cleanSheets = 0;
+
+    completed.forEach(m => {
+      // Parse score strings like "BHS 3 – 1", "BHS 2-0", "3:1" etc.
+      const raw = (m.score || '').replace(/BHS\s*/i, '').replace(/–|-|:/g, ' ');
+      const nums = raw.match(/\d+/g);
+      if (nums && nums.length >= 2) {
+        const gf = parseInt(nums[0]);
+        const ga = parseInt(nums[1]);
+        goalsFor += gf;
+        if (ga === 0) cleanSheets++;
+        if (gf > ga) wins++;
+        else if (gf === ga) draws++;
+        else losses++;
+      }
+    });
+
+    const gamesPlayed = completed.length;
+    const goalsPerGame = gamesPlayed > 0 ? (goalsFor / gamesPlayed).toFixed(2) : '0.00';
+    const recordStr = `${wins} - ${losses} - ${draws}`;
+
+    // Next upcoming match
+    const nextMatch = this.data.schedule.find(m => m.status !== 'COMPLETED');
+
     return `
       <!-- Hero Section -->
       <section class="hero-section">
@@ -335,13 +361,18 @@ class BHSSoccerApp {
           
           <div class="countdown-box">
             <div class="match-info">
-              <h4>NEXT MATCH vs YUCAIPA</h4>
-              <p>Home • Cougar Stadium | Aug 12, 6:30 PM</p>
+              ${nextMatch ? `
+                <h4>NEXT MATCH vs ${nextMatch.opponent.toUpperCase()}</h4>
+                <p>${nextMatch.isHome ? 'Home' : 'Away'} • ${nextMatch.location} | ${nextMatch.date}, ${nextMatch.time}</p>
+              ` : `
+                <h4>SEASON COMPLETE</h4>
+                <p>All scheduled matches have been played. Final record: ${recordStr}</p>
+              `}
             </div>
             <div class="timer-digits">
-              <div class="timer-unit"><div class="timer-num" id="cdDays">08</div><div class="timer-label">Days</div></div>
-              <div class="timer-unit"><div class="timer-num" id="cdHours">14</div><div class="timer-label">Hrs</div></div>
-              <div class="timer-unit"><div class="timer-num" id="cdMins">32</div><div class="timer-label">Min</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdDays">--</div><div class="timer-label">Days</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdHours">--</div><div class="timer-label">Hrs</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdMins">--</div><div class="timer-label">Min</div></div>
             </div>
           </div>
         </div>
@@ -354,25 +385,26 @@ class BHSSoccerApp {
             <h2 class="section-title">SEASON SPOTLIGHT</h2>
             <p class="text-muted">Beaumont Cougars 2026 Campaign Record</p>
           </div>
-          <button class="btn btn-primary" onclick="app.switchView('schedule')">Full Fixtures & Results</button>
+          <button class="btn btn-primary" onclick="app.switchView('schedule')">Full Fixtures &amp; Results</button>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 50px;">
           <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--bhs-gold-accent); font-size: 2.8rem;" class="brand-font">9 - 1 - 2</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Overall Season Record</p>
+            <h3 style="color: var(--bhs-gold-accent); font-size: 2.8rem;" class="brand-font">${recordStr}</h3>
+            <p class="text-muted" style="font-size: 0.9rem;">Overall Season Record (W-L-D)</p>
+            <p class="text-muted" style="font-size: 0.75rem; margin-top:4px;">${gamesPlayed} games played</p>
           </div>
           <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--bhs-cyan-accent); font-size: 2.8rem;" class="brand-font">32</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Goals Scored (2.67 / Game)</p>
+            <h3 style="color: var(--bhs-cyan-accent); font-size: 2.8rem;" class="brand-font">${goalsFor}</h3>
+            <p class="text-muted" style="font-size: 0.9rem;">Goals Scored (${goalsPerGame} / Game)</p>
           </div>
           <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--color-success); font-size: 2.8rem;" class="brand-font">7</h3>
+            <h3 style="color: var(--color-success); font-size: 2.8rem;" class="brand-font">${cleanSheets}</h3>
             <p class="text-muted" style="font-size: 0.9rem;">Clean Sheets Recorded</p>
           </div>
           <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: #FFF; font-size: 2.8rem;" class="brand-font">#1</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Citrus Belt League Standing</p>
+            <h3 style="color: #FFF; font-size: 2.8rem;" class="brand-font">${this.data.schedule.filter(m => m.status === 'UPCOMING').length}</h3>
+            <p class="text-muted" style="font-size: 0.9rem;">Upcoming Matches</p>
           </div>
         </div>
 
@@ -380,7 +412,7 @@ class BHSSoccerApp {
         ${window.auth.canAccessRatings() ? `
           <div class="portal-header" style="margin-bottom: 0;">
             <div class="portal-title">
-              <h2>⚡ ANSON DORRANCE PRACTICE COMPETITOR OF THE WEEK</h2>
+              <h2>⚡ PRACTICE COMPETITOR OF THE WEEK</h2>
               <p>Top overall competitor ranked by practice wins, 1v1 performance, and training matrix index.</p>
             </div>
             <button class="btn btn-gold" onclick="app.switchView('matrix')">View Full Matrix Board</button>
@@ -871,6 +903,7 @@ class BHSSoccerApp {
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="btn btn-gold" onclick="app.openAddPlanDrillModal()">+ Add Drill to Plan</button>
             <button class="btn btn-primary" onclick="alert('Practice plan exported for printing.')">🖨️ Print / Save Plan</button>
+            <button class="btn btn-secondary" onclick="app.openImportExportModal()">📂 Import / Export</button>
           </div>
         </div>
 
@@ -1057,6 +1090,154 @@ class BHSSoccerApp {
   openAddDrillModal() {
     const modal = document.getElementById('addDrillScoreModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  // ─── Import / Export ─────────────────────────────────────────────────────
+
+  openImportExportModal() {
+    const modal = document.getElementById('importExportModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+    const status = document.getElementById('importStatus');
+    if (status) status.textContent = '';
+  }
+
+  exportXLSX(type) {
+    if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
+    const wb = XLSX.utils.book_new();
+
+    if (type === 'players' || type === 'all') {
+      const rows = this.data.players.map(p => ({
+        Number: p.number, Name: p.name, Position: p.position,
+        Class: p.classYear, Height: p.height || '',
+        Goals: p.seasonStats.goals ?? '', Assists: p.seasonStats.assists ?? '',
+        Saves: p.seasonStats.saves ?? '', CleanSheets: p.seasonStats.cleanSheets ?? '',
+        Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '',
+        Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '',
+        Photo: p.photo || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Players');
+    }
+
+    if (type === 'schedule' || type === 'all') {
+      const rows = this.data.schedule.map(m => ({
+        Date: m.date, Time: m.time, Opponent: m.opponent,
+        Location: m.location, Home: m.isHome ? 'Home' : 'Away',
+        Status: m.status, Score: m.score || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Schedule');
+    }
+
+    if (type === 'plan' || type === 'all') {
+      const rows = this.data.currentPracticePlan.map(d => ({
+        TimeSlot: d.time, DrillName: d.name, Duration: d.duration, CoachNotes: d.coachNotes
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'PracticePlan');
+    }
+
+    const fileName = type === 'all' ? 'BHS_Soccer_AllData.xlsx' :
+      type === 'players' ? 'BHS_Roster.xlsx' :
+      type === 'schedule' ? 'BHS_Schedule.xlsx' : 'BHS_PracticePlan.xlsx';
+
+    XLSX.writeFile(wb, fileName);
+  }
+
+  downloadTemplate(type) {
+    if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
+    const wb = XLSX.utils.book_new();
+    if (type === 'players') {
+      const headers = [{ Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
+      XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
+    } else if (type === 'schedule') {
+      const headers = [{ Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
+      XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
+    }
+  }
+
+  async handleImportFile(file, target) {
+    if (!file) return;
+    const status = document.getElementById('importStatus');
+    if (status) status.textContent = '⏳ Reading file...';
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        let rows = [];
+        if (file.name.endsWith('.csv')) {
+          const text = e.target.result;
+          const lines = text.trim().split('\n');
+          const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+          rows = lines.slice(1).map(line => {
+            const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+            const obj = {};
+            headers.forEach((h, i) => obj[h] = vals[i] || '');
+            return obj;
+          });
+        } else {
+          if (typeof XLSX === 'undefined') throw new Error('SheetJS not loaded');
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        }
+
+        let count = 0;
+        if (target === 'players') {
+          const imported = rows.filter(r => r.Name).map(r => ({
+            id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+            number: parseInt(r.Number) || 0,
+            name: r.Name, position: r.Position || 'Midfielder',
+            classYear: r.Class || '', height: r.Height || "5'10\"",
+            photo: r.Photo || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+            seasonStats: r.Position?.includes('Goalkeeper')
+              ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
+              : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
+            ratings: { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 },
+            matrixStats: { wins: 0, losses: 0, points: 0, rank: 99, drillScore: 0 }
+          }));
+          this.data.players.push(...imported);
+          count = imported.length;
+          if (window.supabaseService?.isConfigured()) {
+            for (const p of imported) await window.supabaseService.upsertPlayer('bhs', p);
+          }
+        } else if (target === 'schedule') {
+          const imported = rows.filter(r => r.Opponent).map(r => ({
+            id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+            date: (r.Date || '').toUpperCase(), time: r.Time || '6:00 PM',
+            opponent: r.Opponent, location: r.Location || '',
+            isHome: (r.Home || '').toLowerCase() !== 'away',
+            status: (r.Status || 'UPCOMING').toUpperCase(),
+            score: r.Score || null
+          }));
+          this.data.schedule.push(...imported);
+          count = imported.length;
+          if (window.supabaseService?.isConfigured()) {
+            for (const m of imported) await window.supabaseService.upsertMatch('bhs', m);
+          }
+        } else if (target === 'plan') {
+          const imported = rows.filter(r => r.DrillName).map(r => ({
+            id: null, time: r.TimeSlot || '', name: r.DrillName,
+            duration: r.Duration || '15 min', coachNotes: r.CoachNotes || ''
+          }));
+          this.data.currentPracticePlan.push(...imported);
+          count = imported.length;
+        }
+
+        this.saveData();
+        this.renderCurrentView();
+        if (status) status.textContent = `✅ Successfully imported ${count} ${target} records!`;
+      } catch (err) {
+        console.error('Import error:', err);
+        if (status) status.textContent = `❌ Import failed: ${err.message}`;
+      }
+    };
+
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   }
 
   closeModals() {
