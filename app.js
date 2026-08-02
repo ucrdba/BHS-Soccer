@@ -515,14 +515,19 @@ class BHSSoccerApp {
           <div class="player-card" style="padding: 24px; background: linear-gradient(145deg, rgba(0, 71, 171, 0.25), rgba(15, 23, 42, 0.85)); border: 1px solid var(--bhs-gold-accent); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
-                <h3 style="color: var(--bhs-gold-accent); margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                <h3 style="color: var(--bhs-gold-accent); margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
                   <span>💡</span> COACH'S DAILY THOUGHTS
                 </h3>
                 ${(window.auth.isCoach() || window.auth.isAdmin()) ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="app.openManageThoughtsModal()">⚙️ Manage</button>` : ''}
               </div>
-              <p style="color: #FFF; font-size: 0.93rem; line-height: 1.65; white-space: pre-wrap; margin: 0;">${activeThought.text}</p>
+              <div style="max-height: 140px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin; margin-bottom: 14px;">
+                <p style="color: #FFF; font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; margin: 0;">${activeThought.text}</p>
+              </div>
+              <div>
+                <button class="btn btn-gold" style="width: 100%; padding: 8px 14px; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.openTakeQuizModal()">📝 Take Quiz</button>
+              </div>
             </div>
-            <div style="margin-top: 20px; pt-10; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+            <div style="margin-top: 14px; pt-8; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
               <span>— ${activeThought.coachName || 'Coach Bob Miller'}</span>
               <span class="badge badge-coach">HEAD COACH</span>
             </div>
@@ -1240,24 +1245,35 @@ class BHSSoccerApp {
 
     this.saveData();
 
+    let cloudResult = null;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      if (isActive) {
-        await window.supabaseService.setActiveDailyThought('bhs', targetThought.id);
-      }
-      await window.supabaseService.upsertDailyThought('bhs', {
+      cloudResult = await window.supabaseService.upsertDailyThought('bhs', {
         id: targetThought.id,
         coachId: coachId,
         coachName: coachName,
         text: text,
         isActive: isActive
       });
+
+      if (cloudResult && cloudResult.data && cloudResult.data.id) {
+        targetThought.id = cloudResult.data.id;
+        if (isActive) {
+          await window.supabaseService.setActiveDailyThought('bhs', cloudResult.data.id);
+        }
+      }
     }
 
+    this.saveData();
     this.renderThoughtsList();
     this.renderCurrentView();
     const formModal = document.getElementById('editThoughtFormModal');
     if (formModal) { formModal.style.display = 'none'; formModal.classList.remove('active'); }
-    alert('✅ Daily thought saved successfully!');
+
+    if (cloudResult && cloudResult.error) {
+      alert(`⚠️ Saved locally, but Supabase Cloud error:\n${cloudResult.error}\n\nMake sure the "daily_thoughts" table exists in your Supabase SQL Editor!`);
+    } else {
+      alert('✅ Daily thought saved to Supabase Cloud & Local Storage successfully!');
+    }
   }
 
   async setActiveThought(thoughtId) {
@@ -1290,6 +1306,93 @@ class BHSSoccerApp {
 
     this.renderThoughtsList();
     this.renderCurrentView();
+  }
+
+  openTakeQuizModal() {
+    const activeThought = this.getActiveThought();
+    const container = document.getElementById('quizModalContent');
+    if (!container) return;
+
+    const modal = document.getElementById('takeQuizModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+
+    container.innerHTML = `
+      <div style="background: rgba(0, 71, 171, 0.2); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 18px;">
+        <div style="font-size: 0.8rem; color: var(--bhs-gold-accent); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+          📌 Today's Tactical Focus (${activeThought.coachName || 'Coach Bob Miller'})
+        </div>
+        <div style="font-size: 0.9rem; color: #FFF; font-style: italic; line-height: 1.4;">
+          "${activeThought.text}"
+        </div>
+      </div>
+
+      <form id="dailyQuizForm" onsubmit="event.preventDefault(); app.submitQuizAnswer();">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block;">
+            1. What is the primary tactical objective emphasized in Coach's Daily Thoughts?
+          </label>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+              <input type="radio" name="quizQ1" value="wrong1" required /> Drop back into low-block passive defense
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+              <input type="radio" name="quizQ1" value="correct" required /> High intensity pressing &amp; quick 2-touch passing transitions
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+              <input type="radio" name="quizQ1" value="wrong2" required /> Dribble individually without passing options
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block;">
+            2. How should players handle possession under pressure according to today's focus?
+          </label>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+              <input type="radio" name="quizQ2" value="correct" required /> Make the simple, quick pass as first option
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+              <input type="radio" name="quizQ2" value="wrong1" required /> Hold the ball until surrounded by defenders
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+              <input type="radio" name="quizQ2" value="wrong2" required /> Kick the ball out of bounds
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700;">🎯 Submit Quiz Answers</button>
+      </form>
+      <div id="quizScoreResult" style="margin-top: 14px; text-align: center;"></div>
+    `;
+  }
+
+  submitQuizAnswer() {
+    const q1 = document.querySelector('input[name="quizQ1"]:checked');
+    const q2 = document.querySelector('input[name="quizQ2"]:checked');
+    const resultDiv = document.getElementById('quizScoreResult');
+
+    let score = 0;
+    if (q1 && q1.value === 'correct') score += 50;
+    if (q2 && q2.value === 'correct') score += 50;
+
+    if (resultDiv) {
+      if (score === 100) {
+        resultDiv.innerHTML = `
+          <div style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--color-success); padding: 12px; border-radius: 8px; color: #FFF;">
+            🌟 <strong>100% PERFECT SCORE! (100/100)</strong><br/>
+            Awesome job! You are 100% dialed in on Coach Bob's daily tactical focus.
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div style="background: rgba(234, 179, 8, 0.2); border: 1px solid var(--bhs-gold-accent); padding: 12px; border-radius: 8px; color: #FFF;">
+            🎯 <strong>SCORE: ${score}/100</strong><br/>
+            Review the daily thought message carefully and try again to get 100%!
+          </div>
+        `;
+      }
+    }
   }
 
   renderCoachesView() {
@@ -1955,6 +2058,7 @@ class BHSSoccerApp {
               <option value="schedule">📅 Schedule &amp; Results</option>
               <option value="plan">📋 Practice Plan</option>
               <option value="coaches">👔 Coaching Staff</option>
+              <option value="thoughts">💡 Coach Daily Thoughts</option>
               <option value="all">📦 All Data (Single Workbook)</option>
             </select>
             <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
@@ -1968,9 +2072,10 @@ class BHSSoccerApp {
             Download a template first, fill in your data, then upload.
           </p>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
-            <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.8rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
-            <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.8rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+            <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
+            <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
+            <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts Template</button>
           </div>
 
           <div style="display: flex; gap: 10px; align-items: center;">
@@ -1978,6 +2083,8 @@ class BHSSoccerApp {
               <option value="players">👥 Players / Roster</option>
               <option value="schedule">📅 Schedule &amp; Results</option>
               <option value="plan">📋 Practice Plan</option>
+              <option value="coaches">👔 Coaching Staff</option>
+              <option value="thoughts">💡 Coach Daily Thoughts</option>
             </select>
             <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
           </div>
@@ -2117,11 +2224,22 @@ class BHSSoccerApp {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Coaches');
     }
 
+    if (type === 'thoughts' || type === 'all') {
+      const rows = (this.data.dailyThoughts || []).map(t => ({
+        CoachName: t.coachName || 'Coach Bob Miller',
+        ThoughtsText: t.text || '',
+        IsActive: t.isActive ? 'YES' : 'NO',
+        CreatedAt: t.createdAt || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'DailyThoughts');
+    }
+
     const planNameClean = (this.data.activePlanName || 'PracticePlan').replace(/[/\\?%*:|"<>]/g, '_');
     const fileName = type === 'all' ? 'BHS_Soccer_AllData.xlsx' :
       type === 'players' ? 'BHS_Roster.xlsx' :
       type === 'schedule' ? 'BHS_Schedule.xlsx' :
-      type === 'coaches' ? 'BHS_Coaching_Staff.xlsx' : `${planNameClean}.xlsx`;
+      type === 'coaches' ? 'BHS_Coaching_Staff.xlsx' :
+      type === 'thoughts' ? 'BHS_Coach_Daily_Thoughts.xlsx' : `${planNameClean}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   }
@@ -2137,6 +2255,10 @@ class BHSSoccerApp {
       const headers = [{ Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
       XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
+    } else if (type === 'thoughts') {
+      const headers = [{ CoachName:'Coach Bob Miller', ThoughtsText:'Enter daily focus message here...', IsActive:'YES or NO', CreatedAt:'AUG 2, 2026' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'DailyThoughts');
+      XLSX.writeFile(wb, 'BHS_Daily_Thoughts_Template.xlsx');
     }
   }
 
@@ -2214,6 +2336,34 @@ class BHSSoccerApp {
           }));
           this.data.currentPracticePlan.push(...imported);
           count = imported.length;
+        } else if (target === 'thoughts') {
+          const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
+            id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+            coachId: 'c1',
+            coachName: toStr(r.CoachName || r.coachName) || 'Coach Bob Miller',
+            text: toStr(r.ThoughtsText || r.text),
+            isActive: toStr(r.IsActive || r.isActive).toLowerCase() === 'yes' || toStr(r.IsActive || r.isActive).toLowerCase() === 'true',
+            createdAt: toStr(r.CreatedAt || r.createdAt) || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+          }));
+
+          if (imported.some(t => t.isActive)) {
+            (this.data.dailyThoughts || []).forEach(t => t.isActive = false);
+          }
+          if (!this.data.dailyThoughts) this.data.dailyThoughts = [];
+          this.data.dailyThoughts.unshift(...imported);
+          count = imported.length;
+
+          if (window.supabaseService?.isConfigured()) {
+            for (const t of imported) {
+              await window.supabaseService.upsertDailyThought('bhs', {
+                id: t.id,
+                coachId: t.coachId,
+                coachName: t.coachName,
+                text: t.text,
+                isActive: t.isActive
+              });
+            }
+          }
         }
 
         this.saveData();

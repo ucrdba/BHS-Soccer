@@ -111,8 +111,8 @@ CREATE TABLE IF NOT EXISTS public.coaches (
 -- 9. DAILY THOUGHTS TABLE
 CREATE TABLE IF NOT EXISTS public.daily_thoughts (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  school_id TEXT REFERENCES public.schools(id) DEFAULT 'bhs',
-  coach_id TEXT REFERENCES public.coaches(id) DEFAULT 'c1',
+  school_id TEXT DEFAULT 'bhs',
+  coach_id TEXT DEFAULT 'c1',
   coach_name TEXT NOT NULL DEFAULT 'Coach Bob Miller',
   thoughts_text TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
@@ -163,8 +163,33 @@ CREATE POLICY "Allow anon insert coaches" ON public.coaches FOR INSERT WITH CHEC
 CREATE POLICY "Allow anon update coaches" ON public.coaches FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon delete coaches" ON public.coaches FOR DELETE USING (true);
 
-CREATE POLICY "Allow anon insert daily thoughts" ON public.daily_thoughts FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update daily thoughts" ON public.daily_thoughts FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY "Allow anon delete daily thoughts" ON public.daily_thoughts FOR DELETE USING (true);
+-- Daily Thoughts Permissions & RLS Policies (SELECT, INSERT, UPDATE, DELETE)
+GRANT ALL ON TABLE public.daily_thoughts TO anon, authenticated, service_role;
+
+DROP POLICY IF EXISTS "Public read for daily thoughts" ON public.daily_thoughts;
+DROP POLICY IF EXISTS "Allow anon insert daily thoughts" ON public.daily_thoughts;
+DROP POLICY IF EXISTS "Allow anon update daily thoughts" ON public.daily_thoughts;
+DROP POLICY IF EXISTS "Allow anon delete daily thoughts" ON public.daily_thoughts;
+DROP POLICY IF EXISTS "Allow full access for daily_thoughts" ON public.daily_thoughts;
+
+CREATE POLICY "Public read for daily thoughts" 
+ON public.daily_thoughts FOR SELECT 
+TO public, anon, authenticated 
+USING (true);
+
+CREATE POLICY "Allow anon insert daily thoughts" 
+ON public.daily_thoughts FOR INSERT 
+TO public, anon, authenticated 
+WITH CHECK (true);
+
+CREATE POLICY "Allow anon update daily thoughts" 
+ON public.daily_thoughts FOR UPDATE 
+TO public, anon, authenticated 
+USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow anon delete daily thoughts" 
+ON public.daily_thoughts FOR DELETE 
+TO public, anon, authenticated 
+USING (true);
 
 

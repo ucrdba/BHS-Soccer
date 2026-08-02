@@ -264,7 +264,8 @@ class SupabaseService {
   }
 
   async upsertDailyThought(schoolId = 'bhs', thought = {}) {
-    if (!this.isConfigured()) return null;
+    if (!this.isConfigured()) return { error: 'Supabase client is not configured' };
+
     const payload = {
       school_id: schoolId,
       coach_id: thought.coachId || 'c1',
@@ -272,14 +273,41 @@ class SupabaseService {
       thoughts_text: thought.text || '',
       is_active: thought.isActive !== false
     };
-    if (thought.id && !thought.id.startsWith('dt_temp')) payload.id = thought.id;
 
-    const { data, error } = await this.client
+    const isClientTempId = !thought.id || thought.id.startsWith('dt_') || thought.id.startsWith('temp_');
+
+    // 1. Try explicit UPDATE if an existing database ID is provided
+    if (thought.id && !isClientTempId) {
+      const { data: updData, error: updErr } = await this.client
+        .from('daily_thoughts')
+        .update(payload)
+        .eq('id', thought.id)
+        .select();
+
+      if (!updErr && updData && updData.length > 0) {
+        console.log('⚡ Updated existing daily_thought in Supabase:', updData[0].id);
+        return { data: updData[0] };
+      } else if (updErr) {
+        console.warn('Supabase updateDailyThought notice:', updErr.message);
+      }
+    }
+
+    // 2. Perform clean INSERT for new records (let Supabase generate primary key id)
+    const { data: insData, error: insErr } = await this.client
       .from('daily_thoughts')
-      .upsert([payload])
+      .insert([payload])
       .select();
-    if (error) console.error('Supabase upsertDailyThought error:', error);
-    return data ? data[0] : null;
+
+    if (insErr) {
+      console.error('Supabase insertDailyThought error:', insErr.message || insErr);
+      return { error: insErr.message };
+    }
+
+    if (insData && insData.length > 0) {
+      console.log('⚡ Inserted new daily_thought in Supabase:', insData[0].id);
+      return { data: insData[0] };
+    }
+    return { error: 'No data returned from Supabase insert' };
   }
 
   async deleteDailyThought(thoughtId) {
@@ -292,9 +320,18 @@ class SupabaseService {
   }
 
   async setActiveDailyThought(schoolId = 'bhs', activeId) {
-    if (!this.isConfigured()) return null;
-    await this.client.from('daily_thoughts').update({ is_active: false }).eq('school_id', schoolId);
-    await this.client.from('daily_thoughts').update({ is_active: true }).eq('id', activeId);
+    if (!this.isConfigured() || !activeId) return null;
+    const { error: err1 } = await this.client
+      .from('daily_thoughts')
+      .update({ is_active: false })
+      .eq('school_id', schoolId);
+    if (err1) console.error('Supabase setActiveDailyThought reset error:', err1);
+
+    const { error: err2 } = await this.client
+      .from('daily_thoughts')
+      .update({ is_active: true })
+      .eq('id', activeId);
+    if (err2) console.error('Supabase setActiveDailyThought set error:', err2);
   }
 }
 
