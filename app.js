@@ -1732,21 +1732,26 @@ class BHSSoccerApp {
           </div>
         ` : ''}
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
-          <button class="btn btn-primary" onclick="app.exportXLSX('players')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
-            👥 Export Roster
-          </button>
-          <button class="btn btn-primary" onclick="app.exportXLSX('schedule')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
-            📅 Export Schedule
-          </button>
-          <button class="btn btn-primary" onclick="app.exportXLSX('plan')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
-            📋 Export Practice Plan
-          </button>
-          <button class="btn btn-gold" onclick="app.exportXLSX('all')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
-            📦 Export All Data
-          </button>
+        <!-- Export Data Card with Dropdown -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
+          <h5 style="color: var(--bhs-gold-accent); margin-bottom: 8px;">📊 Export Data to Excel (.xlsx)</h5>
+          <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
+            Select data table or full workbook to generate Excel file download.
+          </p>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="exportTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+              <option value="players">👥 Players / Roster</option>
+              <option value="schedule">📅 Schedule &amp; Results</option>
+              <option value="plan">📋 Practice Plan</option>
+              <option value="coaches">👔 Coaching Staff</option>
+              <option value="all">📦 All Data (Single Workbook)</option>
+            </select>
+            <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
+          </div>
         </div>
 
+        <!-- Import Data Card with Dropdown -->
         <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
           <h5 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">📥 Import Data from CSV or Excel</h5>
           <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
@@ -1760,9 +1765,9 @@ class BHSSoccerApp {
 
           <div style="display: flex; gap: 10px; align-items: center;">
             <select id="importTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
-              <option value="players">Players / Roster</option>
-              <option value="schedule">Schedule &amp; Results</option>
-              <option value="plan">Practice Plan</option>
+              <option value="players">👥 Players / Roster</option>
+              <option value="schedule">📅 Schedule &amp; Results</option>
+              <option value="plan">📋 Practice Plan</option>
             </select>
             <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
           </div>
@@ -1894,10 +1899,19 @@ class BHSSoccerApp {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'PracticePlan');
     }
 
+    if (type === 'coaches' || type === 'all') {
+      const rows = (this.data.coaches || []).map(c => ({
+        Name: c.name, Level: c.level, Phone: c.phone || '',
+        Email: c.email || '', Address: c.address || '', Bio: c.bio || '', Photo: c.photo || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Coaches');
+    }
+
     const planNameClean = (this.data.activePlanName || 'PracticePlan').replace(/[/\\?%*:|"<>]/g, '_');
     const fileName = type === 'all' ? 'BHS_Soccer_AllData.xlsx' :
       type === 'players' ? 'BHS_Roster.xlsx' :
-      type === 'schedule' ? 'BHS_Schedule.xlsx' : `${planNameClean}.xlsx`;
+      type === 'schedule' ? 'BHS_Schedule.xlsx' :
+      type === 'coaches' ? 'BHS_Coaching_Staff.xlsx' : `${planNameClean}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   }
