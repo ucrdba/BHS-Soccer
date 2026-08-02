@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.practice_plans (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. ANSON DORRANCE MATRIX LOGS TABLE
+-- 7. COMPETITIVE MATRIX LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.matrix_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   school_id TEXT REFERENCES public.schools(id),

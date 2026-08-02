@@ -1,6 +1,6 @@
 /**
  * Beaumont High School Cougars Soccer - Core Application Engine
- * Includes Public Roster/Schedule, Anson Dorrance Competitive Matrix, & Practice Planner
+ * Includes Public Roster/Schedule, Competitive Matrix, & Practice Planner
  */
 
 // Initial Sample Data for Beaumont High School
@@ -128,7 +128,7 @@ const DEFAULT_BHS_DATA = {
     }
   ],
   drillsBank: [
-    { id: 'd1', name: 'Anson 1v1 Gauntlet (Continuous)', duration: '20 min', category: 'Competitive Matrix 1v1', points: 3 },
+    { id: 'd1', name: '1v1 Gauntlet (Continuous)', duration: '20 min', category: 'Competitive Matrix 1v1', points: 3 },
     { id: 'd2', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', category: 'Small Sided', points: 3 },
     { id: 'd3', name: 'Finishing under High Pressure', duration: '15 min', category: 'Technical / Shooting', points: 2 },
     { id: 'd4', name: '12-Minute Cooper Fitness Test', duration: '15 min', category: 'Physical Conditioning', points: 5 },
@@ -136,11 +136,26 @@ const DEFAULT_BHS_DATA = {
   ],
   currentPracticePlan: [
     { time: '0:00 - 0:15', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
-    { time: '0:15 - 0:35', name: 'Anson 1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
+    { time: '0:15 - 0:35', name: '1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
     { time: '0:35 - 1:00', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', coachNotes: 'High intensity transition' },
     { time: '1:00 - 1:25', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers' },
     { time: '1:25 - 1:30', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
-  ]
+  ],
+  savedPlans: [
+    {
+      id: 'plan_default_1',
+      name: 'Standard Varsity 90-Min High Intensity',
+      date: 'AUG 1, 2026',
+      drills: [
+        { time: '0:00 - 0:15', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
+        { time: '0:15 - 0:35', name: '1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
+        { time: '0:35 - 1:00', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', coachNotes: 'High intensity transition' },
+        { time: '1:00 - 1:25', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers' },
+        { time: '1:25 - 1:30', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
+      ]
+    }
+  ],
+  activePlanName: 'Standard Varsity 90-Min High Intensity'
 };
 
 class BHSSoccerApp {
@@ -152,11 +167,14 @@ class BHSSoccerApp {
   }
 
   loadData() {
+    let data = DEFAULT_BHS_DATA;
     const saved = localStorage.getItem('bhs_soccer_app_data');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return DEFAULT_BHS_DATA; }
+      try { data = JSON.parse(saved); } catch (e) { data = DEFAULT_BHS_DATA; }
     }
-    return DEFAULT_BHS_DATA;
+    if (!data.savedPlans) data.savedPlans = DEFAULT_BHS_DATA.savedPlans;
+    if (!data.activePlanName) data.activePlanName = DEFAULT_BHS_DATA.activePlanName;
+    return data;
   }
 
   saveData() {
@@ -348,8 +366,12 @@ class BHSSoccerApp {
     const goalsPerGame = gamesPlayed > 0 ? (goalsFor / gamesPlayed).toFixed(2) : '0.00';
     const recordStr = `${wins} - ${losses} - ${draws}`;
 
-    // Next upcoming match
+    // Next upcoming match & countdown
     const nextMatch = this.data.schedule.find(m => m.status !== 'COMPLETED');
+    const countdown = this.getNextMatchCountdown();
+    const cdDaysStr = countdown ? countdown.days : '00';
+    const cdHoursStr = countdown ? countdown.hours : '00';
+    const cdMinsStr = countdown ? countdown.mins : '00';
 
     return `
       <!-- Hero Section -->
@@ -370,9 +392,9 @@ class BHSSoccerApp {
               `}
             </div>
             <div class="timer-digits">
-              <div class="timer-unit"><div class="timer-num" id="cdDays">--</div><div class="timer-label">Days</div></div>
-              <div class="timer-unit"><div class="timer-num" id="cdHours">--</div><div class="timer-label">Hrs</div></div>
-              <div class="timer-unit"><div class="timer-num" id="cdMins">--</div><div class="timer-label">Min</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdDays">${cdDaysStr}</div><div class="timer-label">Days</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdHours">${cdHoursStr}</div><div class="timer-label">Hrs</div></div>
+              <div class="timer-unit"><div class="timer-num" id="cdMins">${cdMinsStr}</div><div class="timer-label">Min</div></div>
             </div>
           </div>
         </div>
@@ -813,8 +835,8 @@ class BHSSoccerApp {
       <div class="container">
         <div class="portal-header">
           <div class="portal-title">
-            <h2>🏆 ANSON DORRANCE COMPETITIVE MATRIX</h2>
-            <p>Objective practice competition tracker modeling UNC legend Anson Dorrance's competitive rating system.</p>
+            <h2>🏆 COMPETITIVE RATING MATRIX</h2>
+            <p>Objective practice competition tracker modeling competitive player performance ratings and rankings.</p>
           </div>
           ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddDrillModal()">+ Record Practice Drill Scores</button>` : ''}
         </div>
@@ -893,27 +915,73 @@ class BHSSoccerApp {
   }
 
   renderPlannerView() {
+    const savedCount = (this.data.savedPlans || []).length;
+    const activeName = this.data.activePlanName || 'Standard Practice Session';
+
+    // Compute total session duration in minutes
+    let totalMinutes = 0;
+    (this.data.currentPracticePlan || []).forEach(p => {
+      const match = (p.duration || '').match(/(\d+)/);
+      if (match) {
+        totalMinutes += parseInt(match[1]);
+      }
+    });
+
+    let totalTimeStr = `${totalMinutes} min`;
+    if (totalMinutes >= 60) {
+      const hrs = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      totalTimeStr = `${totalMinutes} min (${hrs} hr${hrs > 1 ? 's' : ''}${mins > 0 ? ` ${mins} min` : ''})`;
+    }
+
     return `
       <div class="container">
         <div class="portal-header">
           <div class="portal-title">
             <h2>📋 COACH PRACTICE PLANNER</h2>
-            <p>Design structured 90-minute high-intensity practice sessions with timed competitive drills.</p>
+            <p>Design practice sessions, prompt &amp; save named plans to database, and reload past sessions anytime.</p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="btn btn-gold" onclick="app.openAddPlanDrillModal()">+ Add Drill to Plan</button>
-            <button class="btn btn-primary" onclick="alert('Practice plan exported for printing.')">🖨️ Print / Save Plan</button>
+            <button class="btn btn-gold" onclick="app.openSavePlanModal()">💾 Save Practice Plan</button>
+            <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Saved Plans Database (${savedCount})</button>
             <button class="btn btn-secondary" onclick="app.openImportExportModal()">📂 Import / Export</button>
           </div>
         </div>
 
         <div class="planner-card">
-          <h3 style="color: #FFF; margin-bottom: 16px;">TODAY'S PRACTICE TIMELINE</h3>
-          ${this.data.currentPracticePlan.map((p, idx) => `
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 14px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                <h3 style="color: #FFF; margin: 0;">TODAY'S PRACTICE TIMELINE</h3>
+                <span class="badge badge-coach">ACTIVE PLAN</span>
+              </div>
+              <div style="color: var(--bhs-gold-accent); font-size: 0.95rem; font-weight: 700;">
+                "${activeName}"
+              </div>
+            </div>
+            <div style="display: flex; gap: 16px; align-items: center; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--bhs-navy-border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
+              <div>
+                <span class="text-muted" style="font-size:0.72rem; display:block;">TOTAL SESSION TIME</span>
+                <strong style="color: var(--bhs-cyan-accent); font-size: 1.05rem;">⏱️ ${totalTimeStr}</strong>
+              </div>
+              <div style="border-left: 1px solid var(--bhs-navy-border); padding-left: 16px;">
+                <span class="text-muted" style="font-size:0.72rem; display:block;">TOTAL DRILLS</span>
+                <strong style="color: #FFF; font-size: 1.05rem;">⚽ ${this.data.currentPracticePlan.length} Drills</strong>
+              </div>
+            </div>
+          </div>
+
+          ${this.data.currentPracticePlan.length === 0 ? `
+            <div style="text-align:center; padding:30px; color:var(--text-muted);">
+              <p style="font-size:1rem; margin-bottom:8px;">Today's practice timeline is currently empty.</p>
+              <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Saved Plans Database</strong> to load a session.</p>
+            </div>
+          ` : this.data.currentPracticePlan.map((p, idx) => `
             <div class="drill-item">
               <div class="drill-info" style="flex: 1; padding-right: 20px;">
                 <h4>${p.name}</h4>
-                <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus & Notes:</strong>\n${p.coachNotes}</p>
+                <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
               </div>
               <div style="display: flex; align-items: center; gap: 15px;">
                 <div style="text-align: right;">
@@ -930,6 +998,118 @@ class BHSSoccerApp {
         </div>
       </div>
     `;
+  }
+
+  openSavePlanModal() {
+    if (!this.data.currentPracticePlan || this.data.currentPracticePlan.length === 0) {
+      alert('Your current practice timeline is empty. Add at least one drill to the plan before saving.');
+      return;
+    }
+    const input = document.getElementById('savePlanNameInput');
+    if (input) {
+      input.value = this.data.activePlanName || `Practice Plan - ${new Date().toLocaleDateString()}`;
+    }
+    const modal = document.getElementById('savePlanModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async savePracticePlan(planName) {
+    if (!planName || !planName.trim()) {
+      alert('Please enter a valid name for the practice plan.');
+      return;
+    }
+    const cleanName = planName.trim();
+    if (!this.data.savedPlans) this.data.savedPlans = [];
+    const existingIndex = this.data.savedPlans.findIndex(p => p.name.toLowerCase() === cleanName.toLowerCase());
+
+    const planObj = {
+      id: existingIndex !== -1 ? this.data.savedPlans[existingIndex].id : 'plan_' + Date.now(),
+      name: cleanName,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
+      drills: JSON.parse(JSON.stringify(this.data.currentPracticePlan))
+    };
+
+    if (existingIndex !== -1) {
+      this.data.savedPlans[existingIndex] = planObj;
+    } else {
+      this.data.savedPlans.push(planObj);
+    }
+
+    this.data.activePlanName = cleanName;
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.saveFullPracticePlan('bhs', cleanName, planObj.drills);
+    }
+
+    this.renderCurrentView();
+    this.closeModals();
+    alert(`✅ Practice Plan "${cleanName}" saved to database successfully!`);
+  }
+
+  openLoadPlanModal() {
+    const container = document.getElementById('savedPlansContainer');
+    const saved = this.data.savedPlans || [];
+
+    if (container) {
+      if (saved.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:30px; color:var(--text-muted);">
+            <p style="font-size:1.1rem; margin-bottom:8px;">No saved practice plans found.</p>
+            <p style="font-size:0.85rem;">Add drills to today's timeline and click <strong>💾 Save Practice Plan</strong> to record custom plans here.</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:12px; max-height:420px; overflow-y:auto; padding-right:4px;">
+            ${saved.map(p => `
+              <div style="background:var(--bhs-navy-card); border:1px solid var(--bhs-navy-border); border-radius:10px; padding:16px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
+                <div>
+                  <h4 style="color:#FFF; margin-bottom:4px;">${p.name}</h4>
+                  <div style="font-size:0.8rem; color:var(--text-muted);">
+                    📅 Saved: ${p.date || 'Recently'} &nbsp;·&nbsp; ⚽ Drills: <strong>${p.drills ? p.drills.length : 0}</strong>
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--bhs-cyan-accent); margin-top:4px;">
+                    ${(p.drills || []).map(d => d.name).slice(0, 3).join(', ')}${(p.drills || []).length > 3 ? '...' : ''}
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-gold" style="padding:6px 12px; font-size:0.82rem;" onclick="app.loadPracticePlan('${p.id}')">⚡ Load Plan</button>
+                  <button class="btn btn-secondary" style="padding:6px 10px; font-size:0.82rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger); border-color:var(--color-danger);" onclick="app.deleteSavedPlan('${p.id}')">🗑️</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    const modal = document.getElementById('loadPlanModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  loadPracticePlan(planId) {
+    const plan = (this.data.savedPlans || []).find(p => p.id === planId);
+    if (!plan) return;
+
+    if (confirm(`Load practice plan "${plan.name}"? This will replace today's practice timeline with the ${plan.drills.length} drills from this plan.`)) {
+      this.data.currentPracticePlan = JSON.parse(JSON.stringify(plan.drills));
+      this.data.activePlanName = plan.name;
+      this.saveData();
+      this.renderCurrentView();
+      this.closeModals();
+    }
+  }
+
+  deleteSavedPlan(planId) {
+    const plan = (this.data.savedPlans || []).find(p => p.id === planId);
+    if (!plan) return;
+
+    if (confirm(`Are you sure you want to delete the saved plan "${plan.name}"?`)) {
+      this.data.savedPlans = (this.data.savedPlans || []).filter(p => p.id !== planId);
+      this.saveData();
+      this.openLoadPlanModal();
+    }
   }
 
   formatDuration(val) {
@@ -1258,15 +1438,90 @@ class BHSSoccerApp {
     });
   }
 
-  startCountdownTimer() {
-    setInterval(() => {
-      const minsEl = document.getElementById('cdMins');
-      if (minsEl) {
-        let current = parseInt(minsEl.textContent) || 30;
-        current = current > 0 ? current - 1 : 59;
-        minsEl.textContent = current < 10 ? '0' + current : current;
+  parseMatchDateTime(dateStr, timeStr) {
+    if (!dateStr) return null;
+    const combined = `${dateStr} ${timeStr || ''}`.trim();
+    const parsed = new Date(combined);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    try {
+      const months = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
+      const parts = dateStr.replace(/,/g, '').split(/\s+/);
+      if (parts.length >= 3) {
+        const monthIndex = months[parts[0].substring(0,3).toUpperCase()];
+        const day = parseInt(parts[1]);
+        const year = parseInt(parts[2]);
+        
+        let hours = 18, minutes = 0;
+        if (timeStr) {
+          const timeMatch = timeStr.match(/(\d+):?(\d+)?\s*(AM|PM)?/i);
+          if (timeMatch) {
+            hours = parseInt(timeMatch[1]);
+            minutes = parseInt(timeMatch[2] || 0);
+            const ampm = (timeMatch[3] || '').toUpperCase();
+            if (ampm === 'PM' && hours < 12) hours += 12;
+            if (ampm === 'AM' && hours === 12) hours = 0;
+          }
+        }
+        if (monthIndex !== undefined && !isNaN(day) && !isNaN(year)) {
+          return new Date(year, monthIndex, day, hours, minutes);
+        }
       }
-    }, 60000);
+    } catch(e) {}
+    return null;
+  }
+
+  getNextMatchCountdown() {
+    const nextMatch = this.data.schedule.find(m => m.status !== 'COMPLETED');
+    if (!nextMatch) return null;
+
+    const targetDate = this.parseMatchDateTime(nextMatch.date, nextMatch.time);
+    if (!targetDate) return null;
+
+    const now = new Date();
+    const diffMs = targetDate - now;
+
+    if (diffMs <= 0) {
+      return { days: '00', hours: '00', mins: '00' };
+    }
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / (3600 * 24));
+    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+
+    return {
+      days: String(days).padStart(2, '0'),
+      hours: String(hours).padStart(2, '0'),
+      mins: String(mins).padStart(2, '0')
+    };
+  }
+
+  updateCountdownUI() {
+    const daysEl = document.getElementById('cdDays');
+    const hoursEl = document.getElementById('cdHours');
+    const minsEl = document.getElementById('cdMins');
+
+    if (daysEl && hoursEl && minsEl) {
+      const countdown = this.getNextMatchCountdown();
+      if (countdown) {
+        daysEl.textContent = countdown.days;
+        hoursEl.textContent = countdown.hours;
+        minsEl.textContent = countdown.mins;
+      } else {
+        daysEl.textContent = '00';
+        hoursEl.textContent = '00';
+        minsEl.textContent = '00';
+      }
+    }
+  }
+
+  startCountdownTimer() {
+    this.updateCountdownUI();
+    setInterval(() => {
+      this.updateCountdownUI();
+    }, 10000);
   }
 }
 

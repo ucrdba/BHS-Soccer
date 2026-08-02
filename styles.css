@@ -506,7 +506,7 @@
 .result-loss { background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border: 1px solid var(--color-danger); }
 .result-upcoming { background: rgba(30, 144, 255, 0.15); color: var(--bhs-blue-electric); border: 1px solid var(--bhs-blue-electric); }
 
-/* Coach Portal & Anson Dorrance Matrix */
+/* Coach Portal & Competitive Matrix */
 .portal-header {
   background: linear-gradient(135deg, #001F4D 0%, var(--bhs-blue-dark) 100%);
   border: 1px solid var(--bhs-blue-primary);

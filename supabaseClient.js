@@ -95,6 +95,23 @@ class SupabaseService {
     return data;
   }
 
+  async saveFullPracticePlan(schoolId = 'bhs', planName, drills) {
+    if (!this.isConfigured() || !drills || drills.length === 0) return null;
+    const rows = drills.map(d => ({
+      school_id: schoolId,
+      time_slot: d.time || '',
+      name: d.name || '',
+      duration: d.duration || '',
+      coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim()
+    }));
+    const { data, error } = await this.client
+      .from('practice_plans')
+      .insert(rows)
+      .select();
+    if (error) console.error('Supabase saveFullPracticePlan error:', error);
+    return data;
+  }
+
   async savePracticePlanItem(schoolId, planItem) {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client

@@ -77,18 +77,16 @@ VALUES
 -- 4. SEED DRILLS BANK
 INSERT INTO public.drills_bank (id, school_id, name, duration, category, points)
 VALUES
-('d1', 'bhs', 'Anson 1v1 Gauntlet (Continuous)', '20 min', 'Competitive Matrix 1v1', 3),
+('d1', 'bhs', '1v1 Gauntlet (Continuous)', '20 min', 'Competitive Matrix 1v1', 3),
 ('d2', 'bhs', '2v2 Flying Scrimmage with Bumpers', '25 min', 'Small Sided', 3),
 ('d3', 'bhs', 'Finishing under High Pressure', '15 min', 'Technical / Shooting', 2),
 ('d4', 'bhs', '12-Minute Cooper Fitness Test', '15 min', 'Physical Conditioning', 5),
-('d5', 'bhs', '7v7 Tactical Match Play', '30 min', 'Full Scrimmage', 3)
-ON CONFLICT (id) DO NOTHING;
+('d5', 'bhs', '7v7 Tactical Match Play', '30 min', 'Full Scrimmage', 3);
 
--- 5. SEED PRACTICE PLAN TIMELINE
-INSERT INTO public.practice_plans (school_id, time_slot, name, duration, coach_notes)
-VALUES
-('bhs', '0:00 - 0:15', 'Dynamic Warmup & Rondo (5v2)', '15 min', 'Phase 1: 5v2 possession 1-touch. Phase 2: Transition on loss within 3 seconds.'),
-('bhs', '0:15 - 0:35', 'Anson 1v1 Gauntlet (Continuous)', '20 min', 'Log 1v1 win/loss scores into Matrix'),
+-- Seed Initial Practice Plan
+INSERT INTO public.practice_plans (school_id, time_slot, name, duration, coach_notes) VALUES
+('bhs', '0:00 - 0:15', 'Dynamic Warmup & Rondo (5v2)', '15 min', 'Focus on 1-touch speed & communication'),
+('bhs', '0:15 - 0:35', '1v1 Gauntlet (Continuous)', '20 min', 'Log 1v1 win/loss scores into Matrix'),
 ('bhs', '0:35 - 1:00', '2v2 Flying Scrimmage with Bumpers', '25 min', 'High intensity transition'),
 ('bhs', '1:00 - 1:25', '7v7 Tactical Match Play', '25 min', 'Applying press triggers'),
 ('bhs', '1:25 - 1:30', 'Cool Down & Matrix Leaderboard Review', '5 min', 'Announce Competitor of the Day');

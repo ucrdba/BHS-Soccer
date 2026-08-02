@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Beaumont High School Cougars | Boys Varsity Soccer</title>
-  <meta name="description" content="Official web platform for Beaumont High School (CA) Cougars Soccer. Featuring player rosters, schedules, and Coach Command Center powered by Anson Dorrance's Competitive Matrix.">
+  <meta name="description" content="Official web platform for Beaumont High School (CA) Cougars Soccer. Featuring player rosters, schedules, and Coach Command Center powered by the Competitive Matrix.">
   
   <link rel="stylesheet" href="./index.css">
   <link rel="stylesheet" href="./styles.css">
@@ -65,7 +65,7 @@
         </div>
       </div>
       <div>
-        <p>&copy; 2026 Beaumont High School Athletics. Anson Dorrance Practice Rating Matrix Integration.</p>
+        <p>&copy; 2026 Beaumont High School Athletics. Practice Rating Matrix Integration.</p>
       </div>
     </div>
   </footer>
@@ -137,7 +137,7 @@
         <div class="form-group">
           <label>Select Practice Drill</label>
           <select class="form-control">
-            <option>Anson 1v1 Gauntlet (Continuous)</option>
+            <option>1v1 Gauntlet (Continuous)</option>
             <option>2v2 Flying Scrimmage with Bumpers</option>
             <option>Finishing under High Pressure</option>
             <option>12-Minute Cooper Fitness Test</option>
@@ -279,6 +279,39 @@
     <option value="75 min">75 Minutes</option>
     <option value="90 min">90 Minutes (Full Session)</option>
   </datalist>
+
+  <!-- Save Practice Plan Modal -->
+  <div id="savePlanModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>💾 SAVE PRACTICE PLAN</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.savePracticePlan(document.getElementById('savePlanNameInput').value);">
+        <div class="form-group">
+          <label>Practice Plan Name</label>
+          <input type="text" id="savePlanNameInput" class="form-control" placeholder="e.g. Pre-Game Tactical &amp; 1v1 High Intensity" required />
+        </div>
+        <p class="text-muted" style="font-size:0.85rem; margin-bottom:15px;">
+          This will save all drills currently in today's timeline under this plan name so you can reload it anytime.
+        </p>
+        <button type="submit" class="btn btn-gold" style="width:100%;">💾 Save Practice Plan to Database</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Load Practice Plan Modal -->
+  <div id="loadPlanModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3>📂 SAVED PRACTICE PLANS DATABASE</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div id="savedPlansContainer">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
 
   <!-- Add New Match Modal -->
   <div id="addMatchModal" class="modal-overlay" style="display:none;">
