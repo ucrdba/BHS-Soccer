@@ -94,6 +94,20 @@ CREATE TABLE IF NOT EXISTS public.matrix_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 8. COACHES TABLE
+CREATE TABLE IF NOT EXISTS public.coaches (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id TEXT REFERENCES public.schools(id) DEFAULT 'bhs',
+  name TEXT NOT NULL,
+  level TEXT NOT NULL,
+  phone TEXT,
+  address TEXT,
+  email TEXT,
+  photo_url TEXT,
+  bio TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -------------------------------------------------------------
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -------------------------------------------------------------
@@ -106,11 +120,13 @@ ALTER TABLE public.schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.drills_bank ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.practice_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matrix_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coaches ENABLE ROW LEVEL SECURITY;
 
--- 1. Public Read Access for Schools & Schedule
+-- 1. Public Read Access for Schools & Schedule & Coaches
 CREATE POLICY "Public read for schools" ON public.schools FOR SELECT USING (true);
 CREATE POLICY "Public read for schedule" ON public.schedule FOR SELECT USING (true);
 CREATE POLICY "Public read basic player info" ON public.players FOR SELECT USING (true);
+CREATE POLICY "Public read for coaches" ON public.coaches FOR SELECT USING (true);
 
 -- 2. Coach & Admin Full Manage Permissions
 CREATE POLICY "Coaches manage schedule" ON public.schedule FOR ALL 
@@ -125,7 +141,12 @@ CREATE POLICY "Coaches manage matrix logs" ON public.matrix_logs FOR ALL
 CREATE POLICY "Coaches & Players view practice plans" ON public.practice_plans FOR SELECT 
   USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('player', 'coach', 'admin')));
 
--- 3. Players table write access (anon allowed since app uses its own role system, not Supabase Auth)
+-- 3. Players and Coaches table write access (anon allowed since app uses custom role system)
 CREATE POLICY "Allow anon insert players" ON public.players FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anon update players" ON public.players FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon delete players" ON public.players FOR DELETE USING (true);
+
+CREATE POLICY "Allow anon insert coaches" ON public.coaches FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update coaches" ON public.coaches FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon delete coaches" ON public.coaches FOR DELETE USING (true);
+

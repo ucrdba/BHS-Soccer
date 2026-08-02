@@ -90,3 +90,15 @@ INSERT INTO public.practice_plans (school_id, time_slot, name, duration, coach_n
 ('bhs', '0:35 - 1:00', '2v2 Flying Scrimmage with Bumpers', '25 min', 'High intensity transition'),
 ('bhs', '1:00 - 1:25', '7v7 Tactical Match Play', '25 min', 'Applying press triggers'),
 ('bhs', '1:25 - 1:30', 'Cool Down & Matrix Leaderboard Review', '5 min', 'Announce Competitor of the Day');
+
+-- 6. SEED COACHES TABLE
+INSERT INTO public.coaches (id, school_id, name, level, phone, address, email, photo_url, bio)
+VALUES
+(
+  'c1', 'bhs', 'Coach Bob Miller', 'Boys Varsity Head Coach', '(951) 555-0199', '39139 Cherry Valley Blvd, Beaumont, CA 92223', 'bob.miller@bhs-cougars.org', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', 'Head Varsity Soccer Coach entering 8th season at Beaumont High School.'
+),
+(
+  'c2', 'bhs', 'Coach Dave Ramirez', 'JV Head Coach / Assistant Varsity', '(951) 555-0188', '39139 Cherry Valley Blvd, Beaumont, CA 92223', 'dave.ramirez@bhs-cougars.org', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80', 'JV Head Coach focusing on tactical development, pressing triggers, and player progression.'
+)
+ON CONFLICT (id) DO NOTHING;
+

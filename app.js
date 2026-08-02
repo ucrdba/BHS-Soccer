@@ -155,7 +155,29 @@ const DEFAULT_BHS_DATA = {
       ]
     }
   ],
-  activePlanName: 'Standard Varsity 90-Min High Intensity'
+  activePlanName: 'Standard Varsity 90-Min High Intensity',
+  coaches: [
+    {
+      id: 'c1',
+      name: 'Coach Bob Miller',
+      level: 'Boys Varsity Head Coach',
+      phone: '(951) 555-0199',
+      address: '39139 Cherry Valley Blvd, Beaumont, CA 92223',
+      email: 'bob.miller@bhs-cougars.org',
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      bio: 'Head Varsity Soccer Coach entering 8th season at Beaumont High School.'
+    },
+    {
+      id: 'c2',
+      name: 'Coach Dave Ramirez',
+      level: 'JV Head Coach / Assistant Varsity',
+      phone: '(951) 555-0188',
+      address: '39139 Cherry Valley Blvd, Beaumont, CA 92223',
+      email: 'dave.ramirez@bhs-cougars.org',
+      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+      bio: 'JV Head Coach focusing on tactical development, pressing triggers, and player progression.'
+    }
+  ]
 };
 
 class BHSSoccerApp {
@@ -174,6 +196,7 @@ class BHSSoccerApp {
     }
     if (!data.savedPlans) data.savedPlans = DEFAULT_BHS_DATA.savedPlans;
     if (!data.activePlanName) data.activePlanName = DEFAULT_BHS_DATA.activePlanName;
+    if (!data.coaches || !Array.isArray(data.coaches) || data.coaches.length === 0) data.coaches = DEFAULT_BHS_DATA.coaches;
     return data;
   }
 
@@ -287,6 +310,20 @@ class BHSSoccerApp {
         });
       }
 
+      const dbCoaches = await window.supabaseService.fetchCoaches('bhs');
+      if (dbCoaches && dbCoaches.length > 0) {
+        this.data.coaches = dbCoaches.map(c => ({
+          id: c.id,
+          name: c.name,
+          level: c.level,
+          phone: c.phone,
+          address: c.address,
+          email: c.email,
+          photo: c.photo_url,
+          bio: c.bio
+        }));
+      }
+
       console.log('⚡ Successfully loaded live data from Supabase Cloud!');
       this.renderCurrentView();
     } catch (e) {
@@ -379,6 +416,8 @@ class BHSSoccerApp {
       } else {
         container.innerHTML = this.renderPlannerView();
       }
+    } else if (this.currentView === 'coaches') {
+      container.innerHTML = this.renderCoachesView();
     }
     
     this.attachDynamicListeners();
@@ -1042,6 +1081,148 @@ class BHSSoccerApp {
         </div>
       </div>
     `;
+  }
+
+  renderCoachesView() {
+    const isCoach = window.auth.isCoach();
+    const coaches = this.data.coaches || [];
+
+    return `
+      <div class="container">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">BEAUMONT COUGARS COACHING STAFF</h2>
+            <p class="text-muted">Leadership, tactical direction &amp; player development team</p>
+          </div>
+          ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddCoachModal()">+ Add New Coach</button>` : ''}
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+          ${coaches.map(c => `
+            <div class="player-card" style="padding: 24px; position: relative;">
+              ${isCoach ? `
+                <div style="position: absolute; top: 15px; right: 15px; display: flex; gap: 6px;">
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="app.openEditCoachModal('${c.id}')">✏️ Edit</button>
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="app.deleteCoach('${c.id}')">🗑️</button>
+                </div>
+              ` : ''}
+
+              <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                <img src="${c.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--bhs-gold-accent); object-fit: cover;" alt="${c.name}" />
+                <div>
+                  <h3 style="color: #FFF; font-size: 1.25rem; margin-bottom: 4px;">${c.name}</h3>
+                  <span class="badge badge-coach">${c.level}</span>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; color: var(--bhs-silver); margin-bottom: 16px;">
+                <div>📞 <strong>Phone:</strong> <a href="tel:${c.phone}" style="color: var(--bhs-cyan-accent); text-decoration: none;">${c.phone}</a></div>
+                <div>✉️ <strong>Email:</strong> <a href="mailto:${c.email}" style="color: var(--bhs-cyan-accent); text-decoration: none;">${c.email}</a></div>
+                <div>📍 <strong>Address / Location:</strong> ${c.address}</div>
+              </div>
+
+              ${c.bio ? `
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 12px; border-radius: 8px; font-size: 0.83rem; color: var(--text-muted); line-height: 1.5;">
+                  📝 <strong>Bio:</strong> ${c.bio}
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  openAddCoachModal() {
+    const modal = document.getElementById('addCoachModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async addCoach(data) {
+    const newCoach = {
+      id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      name: data.name.trim(),
+      level: data.level.trim(),
+      phone: data.phone.trim(),
+      address: data.address.trim(),
+      email: data.email.trim(),
+      photo: data.photo?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      bio: data.bio?.trim() || ''
+    };
+
+    if (!this.data.coaches) this.data.coaches = [];
+    this.data.coaches.push(newCoach);
+    this.saveData();
+
+    if (window.supabaseService?.isConfigured()) {
+      const saved = await window.supabaseService.upsertCoach('bhs', newCoach);
+      if (saved && saved.id) newCoach.id = saved.id;
+    }
+
+    this.renderCurrentView();
+    this.closeModals();
+    alert(`✅ Coach "${newCoach.name}" added to coaching staff successfully!`);
+  }
+
+  openEditCoachModal(coachId) {
+    const coach = (this.data.coaches || []).find(c => c.id === coachId);
+    if (!coach) return;
+
+    document.getElementById('editCoachId').value = coach.id;
+    document.getElementById('editCoachName').value = coach.name;
+    document.getElementById('editCoachLevel').value = coach.level;
+    document.getElementById('editCoachPhone').value = coach.phone;
+    document.getElementById('editCoachEmail').value = coach.email;
+    document.getElementById('editCoachAddress').value = coach.address;
+    document.getElementById('editCoachPhoto').value = coach.photo;
+    document.getElementById('editCoachBio').value = coach.bio || '';
+
+    const modal = document.getElementById('editCoachModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async submitEditCoach() {
+    const id = document.getElementById('editCoachId').value;
+    const index = (this.data.coaches || []).findIndex(c => c.id === id);
+    if (index === -1) return;
+
+    const updated = {
+      ...this.data.coaches[index],
+      name: document.getElementById('editCoachName').value.trim(),
+      level: document.getElementById('editCoachLevel').value.trim(),
+      phone: document.getElementById('editCoachPhone').value.trim(),
+      email: document.getElementById('editCoachEmail').value.trim(),
+      address: document.getElementById('editCoachAddress').value.trim(),
+      photo: document.getElementById('editCoachPhoto').value.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      bio: document.getElementById('editCoachBio').value.trim()
+    };
+
+    this.data.coaches[index] = updated;
+    this.saveData();
+
+    if (window.supabaseService?.isConfigured()) {
+      await window.supabaseService.upsertCoach('bhs', updated);
+    }
+
+    this.renderCurrentView();
+    this.closeModals();
+    alert(`✅ Coach profile updated for "${updated.name}"!`);
+  }
+
+  async deleteCoach(coachId) {
+    const coach = (this.data.coaches || []).find(c => c.id === coachId);
+    if (!coach) return;
+
+    if (confirm(`Are you sure you want to remove "${coach.name}" from the coaching staff?`)) {
+      this.data.coaches = (this.data.coaches || []).filter(c => c.id !== coachId);
+      this.saveData();
+
+      if (window.supabaseService?.isConfigured()) {
+        await window.supabaseService.deleteCoach(coachId);
+      }
+
+      this.renderCurrentView();
+    }
   }
 
   openSavePlanModal() {
@@ -1810,6 +1991,14 @@ class BHSSoccerApp {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.app = new BHSSoccerApp();
-});
+function initApp() {
+  if (!window.app) {
+    window.app = new BHSSoccerApp();
+  }
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  initApp();
+} else {
+  document.addEventListener('DOMContentLoaded', initApp);
+}

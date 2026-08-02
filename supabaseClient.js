@@ -196,6 +196,48 @@ class SupabaseService {
     }
     return data;
   }
+
+  async fetchCoaches(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client
+      .from('coaches')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('Supabase fetchCoaches error:', error); return null; }
+    return data;
+  }
+
+  async upsertCoach(schoolId, coach) {
+    if (!this.isConfigured()) return null;
+    const payload = {
+      school_id: schoolId,
+      name: coach.name,
+      level: coach.level,
+      phone: coach.phone || '',
+      address: coach.address || '',
+      email: coach.email || '',
+      photo_url: coach.photo || '',
+      bio: coach.bio || ''
+    };
+    if (coach.id && !coach.id.startsWith('c_')) payload.id = coach.id;
+
+    const { data, error } = await this.client
+      .from('coaches')
+      .upsert([payload])
+      .select();
+    if (error) console.error('Supabase upsertCoach error:', error);
+    return data ? data[0] : null;
+  }
+
+  async deleteCoach(coachId) {
+    if (!this.isConfigured()) return null;
+    const { error } = await this.client
+      .from('coaches')
+      .delete()
+      .eq('id', coachId);
+    if (error) console.error('Supabase deleteCoach error:', error);
+  }
 }
 
 window.supabaseService = new SupabaseService();
