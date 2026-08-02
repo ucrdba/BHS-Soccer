@@ -53,6 +53,37 @@ class SupabaseService {
     return data;
   }
 
+  async upsertMatch(schoolId, match) {
+    if (!this.isConfigured()) return null;
+    const payload = {
+      school_id: schoolId,
+      opponent: match.opponent,
+      date: match.date,
+      time: match.time,
+      location: match.location,
+      is_home: match.isHome,
+      status: match.status,
+      score: match.score || null,
+      result: match.result || null
+    };
+    if (match.id && !match.id.startsWith('m_')) payload.id = match.id; // only set UUID ids, not temp ones
+    const { data, error } = await this.client
+      .from('schedule')
+      .upsert([payload])
+      .select();
+    if (error) console.error('Supabase upsertMatch error:', error);
+    return data ? data[0] : null;
+  }
+
+  async deleteMatch(matchId) {
+    if (!this.isConfigured()) return null;
+    const { error } = await this.client
+      .from('schedule')
+      .delete()
+      .eq('id', matchId);
+    if (error) console.error('Supabase deleteMatch error:', error);
+  }
+
   async fetchPracticePlans(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client

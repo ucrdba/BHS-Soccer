@@ -616,6 +616,7 @@ class BHSSoccerApp {
   }
 
   renderScheduleView() {
+    const isCoach = window.auth.isCoach();
     return `
       <div class="container">
         <div class="section-header">
@@ -623,7 +624,7 @@ class BHSSoccerApp {
             <h2 class="section-title">SCHEDULE & GAME RESULTS</h2>
             <p class="text-muted">Beaumont High School Cougars Fall 2026 Fixtures</p>
           </div>
-          ${window.auth.isCoach() ? `<button class="btn btn-primary" onclick="alert('Coach Fixture Editor feature ready.')">+ Add New Match</button>` : ''}
+          ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddMatchModal()">+ Add New Match</button>` : ''}
         </div>
 
         <div class="schedule-list">
@@ -644,16 +645,133 @@ class BHSSoccerApp {
               </div>
               <div>
                 ${m.status === 'COMPLETED' ? `
-                  <div class="result-badge result-win">FINAL: ${m.score}</div>
+                  <div class="result-badge result-win">FINAL: ${m.score || ''}</div>
                 ` : `
                   <div class="result-badge result-upcoming">UPCOMING</div>
                 `}
               </div>
+              ${isCoach ? `
+                <div style="display:flex; gap:6px; margin-left: auto;">
+                  <button class="btn-card-edit" style="padding:4px 10px; font-size:0.78rem;" onclick="app.openEditMatchModal('${m.id}')">✏️ Edit</button>
+                  <button class="btn-card-delete" style="padding:4px 10px; font-size:0.78rem;" onclick="app.deleteMatch('${m.id}')">🗑️</button>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
       </div>
     `;
+  }
+
+  openAddMatchModal() {
+    // Clear form
+    ['newMatchDate','newMatchTime','newMatchOpponent','newMatchLocation','newMatchScore'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const statusEl = document.getElementById('newMatchStatus');
+    if (statusEl) statusEl.value = 'UPCOMING';
+    const homeEl = document.getElementById('newMatchIsHome');
+    if (homeEl) homeEl.value = 'true';
+
+    const modal = document.getElementById('addMatchModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async addMatch(matchData) {
+    const newMatch = {
+      id: 'm_' + Date.now(),
+      date: matchData.date.toUpperCase(),
+      time: matchData.time,
+      opponent: matchData.opponent,
+      location: matchData.location,
+      status: matchData.status,
+      isHome: matchData.isHome === 'true',
+      score: matchData.score || null,
+      result: matchData.status === 'COMPLETED' ? (matchData.score || '') : null
+    };
+
+    this.data.schedule.push(newMatch);
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.upsertMatch('bhs', newMatch);
+    }
+
+    this.renderCurrentView();
+    this.closeModals();
+  }
+
+  openEditMatchModal(matchId) {
+    const match = this.data.schedule.find(m => m.id === matchId);
+    if (!match) return;
+
+    document.getElementById('editMatchId').value = match.id;
+    document.getElementById('editMatchDate').value = match.date;
+    document.getElementById('editMatchTime').value = match.time;
+    document.getElementById('editMatchOpponent').value = match.opponent;
+    document.getElementById('editMatchLocation').value = match.location;
+    document.getElementById('editMatchStatus').value = match.status;
+    document.getElementById('editMatchIsHome').value = String(match.isHome);
+    document.getElementById('editMatchScore').value = match.score || '';
+
+    const modal = document.getElementById('editMatchModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async saveEditMatch(matchData) {
+    const idx = this.data.schedule.findIndex(m => m.id === matchData.id);
+    if (idx !== -1) {
+      const updated = {
+        ...this.data.schedule[idx],
+        date: matchData.date.toUpperCase(),
+        time: matchData.time,
+        opponent: matchData.opponent,
+        location: matchData.location,
+        status: matchData.status,
+        isHome: matchData.isHome === 'true',
+        score: matchData.score || null,
+        result: matchData.status === 'COMPLETED' ? (matchData.score || '') : null
+      };
+      this.data.schedule[idx] = updated;
+      this.saveData();
+
+      if (window.supabaseService && window.supabaseService.isConfigured()) {
+        await window.supabaseService.upsertMatch('bhs', updated);
+      }
+
+      this.renderCurrentView();
+      this.closeModals();
+    }
+  }
+
+  submitEditMatch() {
+    const matchData = {
+      id: document.getElementById('editMatchId').value,
+      date: document.getElementById('editMatchDate').value,
+      time: document.getElementById('editMatchTime').value,
+      opponent: document.getElementById('editMatchOpponent').value,
+      location: document.getElementById('editMatchLocation').value,
+      status: document.getElementById('editMatchStatus').value,
+      isHome: document.getElementById('editMatchIsHome').value,
+      score: document.getElementById('editMatchScore').value
+    };
+    this.saveEditMatch(matchData);
+  }
+
+  async deleteMatch(matchId) {
+    const match = this.data.schedule.find(m => m.id === matchId);
+    if (!match) return;
+    if (confirm(`Delete match vs ${match.opponent} on ${match.date}?`)) {
+      this.data.schedule = this.data.schedule.filter(m => m.id !== matchId);
+      this.saveData();
+
+      if (window.supabaseService && window.supabaseService.isConfigured()) {
+        await window.supabaseService.deleteMatch(matchId);
+      }
+
+      this.renderCurrentView();
+    }
   }
 
   renderMatrixView() {
@@ -724,12 +842,14 @@ class BHSSoccerApp {
 
             <div class="planner-card">
               <h3 style="color: var(--bhs-cyan-accent); margin-bottom: 12px;">⚽ DRILLS IN CURRENT MATRIX</h3>
-              ${this.data.drillsBank.map(d => `
+              ${this.data.currentPracticePlan.length === 0 ? `
+                <p style="color:var(--text-muted); font-size:0.85rem;">No drills in today's practice plan yet. Add drills in the Coach Practice Planner.</p>
+              ` : this.data.currentPracticePlan.map(d => `
                 <div style="border-bottom: 1px solid var(--bhs-navy-border); padding: 8px 0;">
                   <strong style="color:#FFF">${d.name}</strong>
-                  <div style="display:flex; justify-between; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
-                    <span>Category: ${d.category}</span>
-                    <span class="text-gold">+${d.points} Pts</span>
+                  <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                    <span>⏱ ${d.time || ''} &nbsp;·&nbsp; ${d.duration}</span>
+                    <span style="color:var(--bhs-cyan-accent);">${d.coachNotes ? '📝 ' + d.coachNotes.substring(0, 40) + (d.coachNotes.length > 40 ? '…' : '') : ''}</span>
                   </div>
                 </div>
               `).join('')}

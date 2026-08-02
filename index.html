@@ -280,6 +280,105 @@
     <option value="90 min">90 Minutes (Full Session)</option>
   </datalist>
 
+  <!-- Add New Match Modal -->
+  <div id="addMatchModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>ADD NEW MATCH</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.addMatch({ date: document.getElementById('newMatchDate').value, time: document.getElementById('newMatchTime').value, opponent: document.getElementById('newMatchOpponent').value, location: document.getElementById('newMatchLocation').value, isHome: document.getElementById('newMatchIsHome').value, status: document.getElementById('newMatchStatus').value, score: document.getElementById('newMatchScore').value });">
+        <div class="form-group">
+          <label>Date (e.g. AUG 12, 2026)</label>
+          <input type="text" id="newMatchDate" class="form-control" placeholder="AUG 12, 2026" required />
+        </div>
+        <div class="form-group">
+          <label>Kickoff Time</label>
+          <input type="text" id="newMatchTime" class="form-control" placeholder="6:30 PM" required />
+        </div>
+        <div class="form-group">
+          <label>Opponent</label>
+          <input type="text" id="newMatchOpponent" class="form-control" placeholder="Yucaipa Thunderbirds" required />
+        </div>
+        <div class="form-group">
+          <label>Location / Venue</label>
+          <input type="text" id="newMatchLocation" class="form-control" placeholder="Home - Cougar Stadium" required />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>Home / Away</label>
+            <select id="newMatchIsHome" class="form-control">
+              <option value="true">Home</option>
+              <option value="false">Away</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="newMatchStatus" class="form-control">
+              <option value="UPCOMING">Upcoming</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Final Score (if completed, e.g. BHS 3 – 1)</label>
+          <input type="text" id="newMatchScore" class="form-control" placeholder="BHS 3 – 1" />
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%; margin-top:10px;">📅 Add Match to Schedule</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Match Modal -->
+  <div id="editMatchModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>EDIT MATCH</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.submitEditMatch();">
+        <input type="hidden" id="editMatchId" />
+        <div class="form-group">
+          <label>Date (e.g. AUG 12, 2026)</label>
+          <input type="text" id="editMatchDate" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label>Kickoff Time</label>
+          <input type="text" id="editMatchTime" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label>Opponent</label>
+          <input type="text" id="editMatchOpponent" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label>Location / Venue</label>
+          <input type="text" id="editMatchLocation" class="form-control" required />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>Home / Away</label>
+            <select id="editMatchIsHome" class="form-control">
+              <option value="true">Home</option>
+              <option value="false">Away</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editMatchStatus" class="form-control">
+              <option value="UPCOMING">Upcoming</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Final Score (e.g. BHS 3 – 1)</label>
+          <input type="text" id="editMatchScore" class="form-control" placeholder="BHS 3 – 1" />
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%; margin-top:10px;">💾 Save Match Changes</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Add New Player Modal -->
   <div id="addPlayerModal" class="modal-overlay" style="display:none;">
     <div class="modal-window" style="max-width: 580px;">
