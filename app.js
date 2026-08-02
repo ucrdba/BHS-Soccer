@@ -1028,7 +1028,6 @@ class BHSSoccerApp {
             <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Saved Plans Database (${savedCount})</button>
             <button class="btn btn-primary" onclick="app.printPracticePlan()">🖨️ Print Practice Plan</button>
             <button class="btn btn-secondary" onclick="app.downloadPracticePlan('html')">📥 Save/Download Plan File</button>
-            <button class="btn btn-secondary" onclick="app.openImportExportModal()">📂 Import / Export</button>
           </div>
         </div>
 
@@ -1679,8 +1678,131 @@ class BHSSoccerApp {
   }
 
   openAuthModal() {
-    const modal = document.getElementById('authRoleModal');
+    this.openAdminModal();
+  }
+
+  renderAdminModalContent() {
+    const currentUser = window.auth.getCurrentUser();
+
+    const sampleUsers = [
+      { id: 'user_coach_bob', name: 'Coach Bob', role: 'Coach', icon: '👔', desc: 'Head Coach: full practice planning, match crud, roster & ratings' },
+      { id: 'user_admin_sam', name: 'Admin Sam', role: 'Admin', icon: '⚡', desc: 'Athletic Director: full system & administrative control' },
+      { id: 'user_player_alex', name: 'Alex Rivera (#10)', role: 'Player', icon: '⚽', desc: 'Varsity Player: roster viewing, schedule & ratings matrix' },
+      { id: 'user_guest', name: 'Public Visitor', role: 'Guest', icon: '👤', desc: 'Fan / Public: public matches, schedule & basic team bios' }
+    ];
+
+    const container = document.getElementById('adminModalContent');
+    if (!container) return;
+
+    const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
+
+    container.innerHTML = `
+      <!-- Section 1: Role Switcher -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
+          <span>🔑</span> SWITCH ACTIVE ROLE / USER ACCOUNT
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          ${sampleUsers.map(u => {
+            const isActive = currentUser && currentUser.id === u.id;
+            return `
+              <div onclick="app.switchUserRole('${u.id}')" style="cursor: pointer; background: ${isActive ? 'rgba(0, 71, 171, 0.35)' : 'rgba(0, 0, 0, 0.25)'}; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; border-radius: 8px; padding: 12px; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <strong style="color: #FFF; font-size: 0.95rem;">${u.icon} ${u.name}</strong>
+                  ${isActive ? `<span class="badge badge-gold">ACTIVE</span>` : `<span class="badge badge-secondary" style="font-size:0.7rem;">SWITCH</span>`}
+                </div>
+                <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">${u.desc}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
+
+      <!-- Section 2: Import & Export Data -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
+          <span>📂</span> IMPORT &amp; EXPORT DATA (CSV / EXCEL)
+        </h4>
+
+        ${!isCoachOrAdmin ? `
+          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #FFF; margin-bottom: 12px;">
+            🔒 File import/export actions are reserved for Coach and Admin roles. Switch to <strong>Coach Bob</strong> or <strong>Admin Sam</strong> above to enable full import/export functions.
+          </div>
+        ` : ''}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <button class="btn btn-primary" onclick="app.exportXLSX('players')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
+            👥 Export Roster
+          </button>
+          <button class="btn btn-primary" onclick="app.exportXLSX('schedule')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
+            📅 Export Schedule
+          </button>
+          <button class="btn btn-primary" onclick="app.exportXLSX('plan')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
+            📋 Export Practice Plan
+          </button>
+          <button class="btn btn-gold" onclick="app.exportXLSX('all')" style="text-align:left;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>
+            📦 Export All Data
+          </button>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
+          <h5 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">📥 Import Data from CSV or Excel</h5>
+          <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
+            Download a template first, fill in your data, then upload.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+            <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.8rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
+            <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.8rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="importTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+              <option value="players">Players / Roster</option>
+              <option value="schedule">Schedule &amp; Results</option>
+              <option value="plan">Practice Plan</option>
+            </select>
+            <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
+          </div>
+          <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" style="display:none;"
+            onchange="app.handleImportFile(this.files[0], document.getElementById('importTarget').value); this.value='';" />
+          <div id="importStatus" style="margin-top:10px; font-size:0.85rem; color: var(--color-success);"></div>
+        </div>
+      </div>
+
+      <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
+
+      <!-- Section 3: System & Cloud Database Controls -->
+      <div>
+        <h4 style="color: var(--bhs-cyan-accent); margin-bottom: 10px; display:flex; align-items:center; gap:8px;">
+          <span>⚡</span> SYSTEM &amp; CLOUD DATABASE
+        </h4>
+        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding:10px 14px; border-radius:6px; font-size:0.85rem;">
+          <div>
+            <strong>Cloud Sync Status:</strong> <span style="color: var(--color-success);">Connected to Supabase</span>
+          </div>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
+        </div>
+      </div>
+    `;
+  }
+
+  switchUserRole(userId) {
+    window.auth.switchRole(userId);
+    this.renderAdminModalContent();
+    this.renderCurrentView();
+  }
+
+  openAdminModal() {
+    this.renderAdminModalContent();
+    const modal = document.getElementById('adminModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  openImportExportModal() {
+    this.openAdminModal();
   }
 
   openPlayerModal(playerId) {
