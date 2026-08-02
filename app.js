@@ -177,6 +177,16 @@ const DEFAULT_BHS_DATA = {
       photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
       bio: 'JV Head Coach focusing on tactical development, pressing triggers, and player progression.'
     }
+  ],
+  dailyThoughts: [
+    {
+      id: 'dt1',
+      coachId: 'c1',
+      coachName: 'Coach Bob Miller',
+      text: 'Focus on high-intensity transition, quick 1-touch ball circulation, and aggressive pressing triggers ahead of our upcoming Citrus Belt League match. Hydrate well and bring maximum energy to practice today!',
+      isActive: true,
+      createdAt: 'AUG 2, 2026'
+    }
   ]
 };
 
@@ -197,6 +207,9 @@ class BHSSoccerApp {
     if (!data.savedPlans) data.savedPlans = DEFAULT_BHS_DATA.savedPlans;
     if (!data.activePlanName) data.activePlanName = DEFAULT_BHS_DATA.activePlanName;
     if (!data.coaches || !Array.isArray(data.coaches) || data.coaches.length === 0) data.coaches = DEFAULT_BHS_DATA.coaches;
+    if (!data.dailyThoughts || !Array.isArray(data.dailyThoughts) || data.dailyThoughts.length === 0) {
+      data.dailyThoughts = DEFAULT_BHS_DATA.dailyThoughts;
+    }
     return data;
   }
 
@@ -321,6 +334,18 @@ class BHSSoccerApp {
           email: c.email,
           photo: c.photo_url,
           bio: c.bio
+        }));
+      }
+
+      const dbThoughts = await window.supabaseService.fetchDailyThoughts('bhs');
+      if (dbThoughts && dbThoughts.length > 0) {
+        this.data.dailyThoughts = dbThoughts.map(t => ({
+          id: t.id,
+          coachId: t.coach_id,
+          coachName: t.coach_name || 'Coach Bob Miller',
+          text: t.thoughts_text,
+          isActive: !!t.is_active,
+          createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
         }));
       }
 
@@ -454,6 +479,8 @@ class BHSSoccerApp {
     const cdHoursStr = countdown ? countdown.hours : '00';
     const cdMinsStr = countdown ? countdown.mins : '00';
 
+    const activeThought = this.getActiveThought();
+
     return `
       <!-- Hero Section -->
       <section class="hero-section">
@@ -481,33 +508,55 @@ class BHSSoccerApp {
         </div>
       </section>
 
-      <div class="container">
-        <!-- Highlights & Quick Stats -->
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">SEASON SPOTLIGHT</h2>
-            <p class="text-muted">Beaumont Cougars 2026 Campaign Record</p>
+      <div class="container" style="margin-top: 30px;">
+        <!-- Side-by-Side: Coach's Daily Thoughts (Left) & Season Spotlight (Right) -->
+        <div style="display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 24px; margin-bottom: 50px; align-items: stretch;">
+          <!-- Left Column: Coach's Thoughts For The Day -->
+          <div class="player-card" style="padding: 24px; background: linear-gradient(145deg, rgba(0, 71, 171, 0.25), rgba(15, 23, 42, 0.85)); border: 1px solid var(--bhs-gold-accent); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
+                <h3 style="color: var(--bhs-gold-accent); margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                  <span>💡</span> COACH'S DAILY THOUGHTS
+                </h3>
+                ${(window.auth.isCoach() || window.auth.isAdmin()) ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="app.openManageThoughtsModal()">⚙️ Manage</button>` : ''}
+              </div>
+              <p style="color: #FFF; font-size: 0.93rem; line-height: 1.65; white-space: pre-wrap; margin: 0;">${activeThought.text}</p>
+            </div>
+            <div style="margin-top: 20px; pt-10; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+              <span>— ${activeThought.coachName || 'Coach Bob Miller'}</span>
+              <span class="badge badge-coach">HEAD COACH</span>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="app.switchView('schedule')">Full Fixtures &amp; Results</button>
-        </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 50px;">
-          <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--bhs-gold-accent); font-size: 2.8rem;" class="brand-font">${recordStr}</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Overall Season Record (W-L-D)</p>
-            <p class="text-muted" style="font-size: 0.75rem; margin-top:4px;">${gamesPlayed} games played</p>
-          </div>
-          <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--bhs-cyan-accent); font-size: 2.8rem;" class="brand-font">${goalsFor}</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Goals Scored (${goalsPerGame} / Game)</p>
-          </div>
-          <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: var(--color-success); font-size: 2.8rem;" class="brand-font">${cleanSheets}</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Clean Sheets Recorded</p>
-          </div>
-          <div class="player-card" style="padding: 24px; text-align: center;">
-            <h3 style="color: #FFF; font-size: 2.8rem;" class="brand-font">${this.data.schedule.filter(m => m.status === 'UPCOMING').length}</h3>
-            <p class="text-muted" style="font-size: 0.9rem;">Upcoming Matches</p>
+          <!-- Right Column: Season Spotlight Stats Grid -->
+          <div>
+            <div class="section-header" style="margin-bottom: 16px;">
+              <div>
+                <h2 class="section-title">SEASON SPOTLIGHT</h2>
+                <p class="text-muted">Beaumont Cougars 2026 Campaign Record</p>
+              </div>
+              <button class="btn btn-primary" onclick="app.switchView('schedule')">Full Fixtures &amp; Results</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+              <div class="player-card" style="padding: 20px; text-align: center;">
+                <h3 style="color: var(--bhs-gold-accent); font-size: 2.5rem; margin-bottom: 4px;" class="brand-font">${recordStr}</h3>
+                <p class="text-muted" style="font-size: 0.85rem; margin: 0;">Overall Record (W-L-D)</p>
+                <p class="text-muted" style="font-size: 0.72rem; margin-top:4px;">${gamesPlayed} games played</p>
+              </div>
+              <div class="player-card" style="padding: 20px; text-align: center;">
+                <h3 style="color: var(--bhs-cyan-accent); font-size: 2.5rem; margin-bottom: 4px;" class="brand-font">${goalsFor}</h3>
+                <p class="text-muted" style="font-size: 0.85rem; margin: 0;">Goals Scored (${goalsPerGame} / Game)</p>
+              </div>
+              <div class="player-card" style="padding: 20px; text-align: center;">
+                <h3 style="color: var(--color-success); font-size: 2.5rem; margin-bottom: 4px;" class="brand-font">${cleanSheets}</h3>
+                <p class="text-muted" style="font-size: 0.85rem; margin: 0;">Clean Sheets Recorded</p>
+              </div>
+              <div class="player-card" style="padding: 20px; text-align: center;">
+                <h3 style="color: #FFF; font-size: 2.5rem; margin-bottom: 4px;" class="brand-font">${this.data.schedule.filter(m => m.status === 'UPCOMING').length}</h3>
+                <p class="text-muted" style="font-size: 0.85rem; margin: 0;">Upcoming Matches</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1077,9 +1126,170 @@ class BHSSoccerApp {
               </div>
             </div>
           `).join('')}
-        </div>
       </div>
     `;
+  }
+
+  getActiveThought() {
+    const thoughts = this.data.dailyThoughts || [];
+    return thoughts.find(t => t.isActive) || thoughts[0] || {
+      id: 'dt_default',
+      coachId: 'c1',
+      coachName: 'Coach Bob Miller',
+      text: 'No coach thoughts entered for today.',
+      isActive: true
+    };
+  }
+
+  openManageThoughtsModal() {
+    this.renderThoughtsList();
+    const modal = document.getElementById('manageThoughtsModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  renderThoughtsList() {
+    const container = document.getElementById('thoughtsListContainer');
+    if (!container) return;
+
+    const thoughts = this.data.dailyThoughts || [];
+    if (thoughts.length === 0) {
+      container.innerHTML = `<p class="text-muted" style="text-align: center; padding: 20px;">No daily thoughts recorded yet. Click <strong>+ Add New Thought</strong> above to create one!</p>`;
+      return;
+    }
+
+    container.innerHTML = thoughts.map(t => `
+      <div style="background: rgba(0,0,0,0.3); border: ${t.isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; border-radius: 8px; padding: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <strong style="color: #FFF;">— ${t.coachName || 'Coach Bob Miller'}</strong>
+            ${t.isActive ? '<span class="badge badge-gold">🟢 ACTIVE</span>' : '<span class="badge badge-secondary" style="font-size:0.7rem;">ARCHIVED</span>'}
+          </div>
+          <div style="display:flex; gap:6px;">
+            ${!t.isActive ? `<button class="btn btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setActiveThought('${t.id}')">⭐ Set Active</button>` : ''}
+            <button class="btn btn-primary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.openEditThoughtFormModal('${t.id}')">✏️ Edit</button>
+            <button class="btn btn-secondary" style="padding:3px 8px; font-size:0.75rem; background:rgba(239,68,68,0.2); color:var(--color-danger); border-color:var(--color-danger);" onclick="app.deleteThought('${t.id}')">🗑️ Delete</button>
+          </div>
+        </div>
+        <p style="color: #DDD; font-size: 0.88rem; line-height: 1.5; margin: 0; white-space: pre-wrap;">${t.text}</p>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">Posted: ${t.createdAt || 'Recent'}</div>
+      </div>
+    `).join('');
+  }
+
+  openAddThoughtModal() {
+    const currentUser = window.auth.getCurrentUser();
+    document.getElementById('thoughtEditId').value = '';
+    document.getElementById('thoughtFormModalTitle').textContent = '➕ ADD NEW DAILY THOUGHT';
+    document.getElementById('thoughtCoachNameInput').value = (currentUser && currentUser.name) ? currentUser.name : 'Coach Bob Miller';
+    document.getElementById('thoughtTextInput').value = '';
+    document.getElementById('thoughtIsActiveInput').checked = true;
+
+    const modal = document.getElementById('editThoughtFormModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  openEditThoughtFormModal(thoughtId) {
+    const thought = (this.data.dailyThoughts || []).find(t => t.id === thoughtId);
+    if (!thought) return;
+
+    document.getElementById('thoughtEditId').value = thought.id;
+    document.getElementById('thoughtFormModalTitle').textContent = '✏️ EDIT DAILY THOUGHT';
+    document.getElementById('thoughtCoachNameInput').value = thought.coachName || 'Coach Bob Miller';
+    document.getElementById('thoughtTextInput').value = thought.text || '';
+    document.getElementById('thoughtIsActiveInput').checked = !!thought.isActive;
+
+    const modal = document.getElementById('editThoughtFormModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async submitThoughtForm() {
+    const id = document.getElementById('thoughtEditId').value;
+    const coachName = document.getElementById('thoughtCoachNameInput').value.trim() || 'Coach Bob Miller';
+    const text = document.getElementById('thoughtTextInput').value.trim();
+    const isActive = document.getElementById('thoughtIsActiveInput').checked;
+
+    if (!text) { alert('Please enter daily thoughts text.'); return; }
+
+    const currentUser = window.auth.getCurrentUser();
+    const coachId = (currentUser && currentUser.id) ? currentUser.id : 'c1';
+
+    if (isActive) {
+      (this.data.dailyThoughts || []).forEach(t => t.isActive = false);
+    }
+
+    let targetThought = null;
+    if (id) {
+      targetThought = (this.data.dailyThoughts || []).find(t => t.id === id);
+      if (targetThought) {
+        targetThought.coachName = coachName;
+        targetThought.text = text;
+        targetThought.isActive = isActive;
+      }
+    } else {
+      targetThought = {
+        id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        coachId: coachId,
+        coachName: coachName,
+        text: text,
+        isActive: isActive,
+        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+      };
+      if (!this.data.dailyThoughts) this.data.dailyThoughts = [];
+      this.data.dailyThoughts.unshift(targetThought);
+    }
+
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      if (isActive) {
+        await window.supabaseService.setActiveDailyThought('bhs', targetThought.id);
+      }
+      await window.supabaseService.upsertDailyThought('bhs', {
+        id: targetThought.id,
+        coachId: coachId,
+        coachName: coachName,
+        text: text,
+        isActive: isActive
+      });
+    }
+
+    this.renderThoughtsList();
+    this.renderCurrentView();
+    const formModal = document.getElementById('editThoughtFormModal');
+    if (formModal) { formModal.style.display = 'none'; formModal.classList.remove('active'); }
+    alert('✅ Daily thought saved successfully!');
+  }
+
+  async setActiveThought(thoughtId) {
+    (this.data.dailyThoughts || []).forEach(t => {
+      t.isActive = (t.id === thoughtId);
+    });
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.setActiveDailyThought('bhs', thoughtId);
+    }
+
+    this.renderThoughtsList();
+    this.renderCurrentView();
+  }
+
+  async deleteThought(thoughtId) {
+    if (!confirm('Are you sure you want to delete this daily thought entry?')) return;
+
+    this.data.dailyThoughts = (this.data.dailyThoughts || []).filter(t => t.id !== thoughtId);
+    if (this.data.dailyThoughts.length > 0 && !this.data.dailyThoughts.some(t => t.isActive)) {
+      this.data.dailyThoughts[0].isActive = true;
+    }
+
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.deleteDailyThought(thoughtId);
+    }
+
+    this.renderThoughtsList();
+    this.renderCurrentView();
   }
 
   renderCoachesView() {

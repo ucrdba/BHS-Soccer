@@ -238,6 +238,64 @@ class SupabaseService {
       .eq('id', coachId);
     if (error) console.error('Supabase deleteCoach error:', error);
   }
+
+  async fetchDailyThoughts(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client
+      .from('daily_thoughts')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('Supabase fetchDailyThoughts error:', error); return null; }
+    return data;
+  }
+
+  async fetchLatestDailyThoughts(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client
+      .from('daily_thoughts')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) { console.error('Supabase fetchLatestDailyThoughts error:', error); return null; }
+    return data && data.length > 0 ? data[0] : null;
+  }
+
+  async upsertDailyThought(schoolId = 'bhs', thought = {}) {
+    if (!this.isConfigured()) return null;
+    const payload = {
+      school_id: schoolId,
+      coach_id: thought.coachId || 'c1',
+      coach_name: thought.coachName || 'Coach Bob Miller',
+      thoughts_text: thought.text || '',
+      is_active: thought.isActive !== false
+    };
+    if (thought.id && !thought.id.startsWith('dt_temp')) payload.id = thought.id;
+
+    const { data, error } = await this.client
+      .from('daily_thoughts')
+      .upsert([payload])
+      .select();
+    if (error) console.error('Supabase upsertDailyThought error:', error);
+    return data ? data[0] : null;
+  }
+
+  async deleteDailyThought(thoughtId) {
+    if (!this.isConfigured()) return null;
+    const { error } = await this.client
+      .from('daily_thoughts')
+      .delete()
+      .eq('id', thoughtId);
+    if (error) console.error('Supabase deleteDailyThought error:', error);
+  }
+
+  async setActiveDailyThought(schoolId = 'bhs', activeId) {
+    if (!this.isConfigured()) return null;
+    await this.client.from('daily_thoughts').update({ is_active: false }).eq('school_id', schoolId);
+    await this.client.from('daily_thoughts').update({ is_active: true }).eq('id', activeId);
+  }
 }
 
 window.supabaseService = new SupabaseService();

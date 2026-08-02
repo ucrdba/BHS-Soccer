@@ -102,3 +102,14 @@ VALUES
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- 7. SEED DAILY THOUGHTS TABLE
+INSERT INTO public.daily_thoughts (id, school_id, coach_id, coach_name, thoughts_text, is_active)
+VALUES
+(
+  'dt1', 'bhs', 'c1', 'Coach Bob Miller',
+  'High intensity pressing today! Prepare for tactical 7v7 scrimmage against quick transitions. Stay sharp!',
+  true
+)
+ON CONFLICT (id) DO NOTHING;
+
+

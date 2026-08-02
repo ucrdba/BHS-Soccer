@@ -108,6 +108,17 @@ CREATE TABLE IF NOT EXISTS public.coaches (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 9. DAILY THOUGHTS TABLE
+CREATE TABLE IF NOT EXISTS public.daily_thoughts (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id TEXT REFERENCES public.schools(id) DEFAULT 'bhs',
+  coach_id TEXT REFERENCES public.coaches(id) DEFAULT 'c1',
+  coach_name TEXT NOT NULL DEFAULT 'Coach Bob Miller',
+  thoughts_text TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -------------------------------------------------------------
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -------------------------------------------------------------
@@ -121,12 +132,14 @@ ALTER TABLE public.drills_bank ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.practice_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matrix_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coaches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.daily_thoughts ENABLE ROW LEVEL SECURITY;
 
--- 1. Public Read Access for Schools & Schedule & Coaches
+-- 1. Public Read Access for Schools & Schedule & Coaches & Daily Thoughts
 CREATE POLICY "Public read for schools" ON public.schools FOR SELECT USING (true);
 CREATE POLICY "Public read for schedule" ON public.schedule FOR SELECT USING (true);
 CREATE POLICY "Public read basic player info" ON public.players FOR SELECT USING (true);
 CREATE POLICY "Public read for coaches" ON public.coaches FOR SELECT USING (true);
+CREATE POLICY "Public read for daily thoughts" ON public.daily_thoughts FOR SELECT USING (true);
 
 -- 2. Coach & Admin Full Manage Permissions
 CREATE POLICY "Coaches manage schedule" ON public.schedule FOR ALL 
@@ -141,7 +154,7 @@ CREATE POLICY "Coaches manage matrix logs" ON public.matrix_logs FOR ALL
 CREATE POLICY "Coaches & Players view practice plans" ON public.practice_plans FOR SELECT 
   USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('player', 'coach', 'admin')));
 
--- 3. Players and Coaches table write access (anon allowed since app uses custom role system)
+-- 3. Anonymous/App role write access (anon allowed since app uses custom role system)
 CREATE POLICY "Allow anon insert players" ON public.players FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anon update players" ON public.players FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon delete players" ON public.players FOR DELETE USING (true);
@@ -149,4 +162,9 @@ CREATE POLICY "Allow anon delete players" ON public.players FOR DELETE USING (tr
 CREATE POLICY "Allow anon insert coaches" ON public.coaches FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anon update coaches" ON public.coaches FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon delete coaches" ON public.coaches FOR DELETE USING (true);
+
+CREATE POLICY "Allow anon insert daily thoughts" ON public.daily_thoughts FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update daily thoughts" ON public.daily_thoughts FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon delete daily thoughts" ON public.daily_thoughts FOR DELETE USING (true);
+
 
