@@ -36,7 +36,7 @@
       <li class="nav-item active" data-view="home">⚽ Home</li>
       <li class="nav-item" data-view="roster">👥 Roster & Bios</li>
       <li class="nav-item" data-view="schedule">📅 Schedule & Results</li>
-      <li class="nav-item" data-view="matrix">🏆 Anson Dorrance Matrix</li>
+      <li class="nav-item" data-view="matrix">🏆 Player Ratings</li>
       <li class="nav-item" data-view="planner">📋 Coach Planner</li>
     </ul>
 
@@ -219,7 +219,7 @@
         <h3>EDIT PRACTICE DRILL</h3>
         <button class="close-btn">&times;</button>
       </div>
-      <form onsubmit="event.preventDefault(); app.saveEditPlanDrill(parseInt(document.getElementById('editDrillIndex').value), document.getElementById('editDrillTime').value, document.getElementById('editDrillName').value, document.getElementById('editDrillDuration').value, document.getElementById('editDrillNotes').value);">
+      <form onsubmit="event.preventDefault(); app.submitEditPlanDrill();">
         <input type="hidden" id="editDrillIndex" />
         <div class="form-group">
           <label>Time Slot</label>

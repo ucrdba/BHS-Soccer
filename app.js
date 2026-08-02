@@ -309,7 +309,7 @@ class BHSSoccerApp {
       container.innerHTML = this.renderScheduleView();
     } else if (this.currentView === 'matrix') {
       if (!canAccessRatings) {
-        container.innerHTML = this.renderRestrictedAccess('Anson Dorrance Practice Matrix', 'Coaches and players are the only team members authorized to view practice ratings and rankings.');
+        container.innerHTML = this.renderRestrictedAccess('Player Ratings', 'Coaches and players are the only team members authorized to view practice ratings and rankings.');
       } else {
         container.innerHTML = this.renderMatrixView();
       }
@@ -485,18 +485,7 @@ class BHSSoccerApp {
 
   openAddPlayerModal() {
     const modal = document.getElementById('addPlayerModal');
-    if (modal) {
-      modal.style.display = 'flex';
-      modal.style.position = 'fixed';
-      modal.style.top = '0';
-      modal.style.left = '0';
-      modal.style.width = '100%';
-      modal.style.height = '100%';
-      modal.style.background = 'rgba(0,0,0,0.85)';
-      modal.style.zIndex = '9999';
-      modal.style.alignItems = 'center';
-      modal.style.justifyContent = 'center';
-    }
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
   async addPlayer(playerData) {
@@ -565,17 +554,9 @@ class BHSSoccerApp {
 
     const modal = document.getElementById('editPlayerModal');
     if (modal) {
-      modal.style.display = 'flex';
-      modal.style.position = 'fixed';
-      modal.style.top = '0';
-      modal.style.left = '0';
-      modal.style.width = '100%';
-      modal.style.height = '100%';
-      modal.style.background = 'rgba(0,0,0,0.85)';
-      modal.style.zIndex = '9999';
-      modal.style.alignItems = 'center';
-      modal.style.justifyContent = 'center';
-      console.log('[BHS] Edit modal opened (display:flex set directly)');
+      modal.style.display = '';
+      modal.classList.add('active');
+      console.log('[BHS] Edit modal opened');
     } else {
       console.error('[BHS] editPlayerModal element NOT found in DOM!');
     }
@@ -810,12 +791,20 @@ class BHSSoccerApp {
 
   openAddPlanDrillModal() {
     const modal = document.getElementById('addPlanDrillModal');
-    if (modal) modal.classList.add('active');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
-  addPlanDrill(time, name, duration, coachNotes) {
+  async addPlanDrill(time, name, duration, coachNotes) {
     const formattedDuration = this.formatDuration(duration);
-    this.data.currentPracticePlan.push({ time, name, duration: formattedDuration, coachNotes });
+    const newDrill = { time, name, duration: formattedDuration, coachNotes };
+
+    // Save to Supabase first to get the DB-assigned id
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      const saved = await window.supabaseService.savePracticePlanItem('bhs', newDrill);
+      if (saved && saved.id) newDrill.id = saved.id;
+    }
+
+    this.data.currentPracticePlan.push(newDrill);
     this.saveData();
     this.renderCurrentView();
     this.closeModals();
@@ -840,23 +829,46 @@ class BHSSoccerApp {
     document.getElementById('editDrillNotes').value = drill.coachNotes;
 
     const modal = document.getElementById('editPlanDrillModal');
-    if (modal) modal.classList.add('active');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
-  saveEditPlanDrill(index, time, name, duration, coachNotes) {
+  submitEditPlanDrill() {
+    const index = parseInt(document.getElementById('editDrillIndex').value);
+    const time = document.getElementById('editDrillTime').value;
+    const name = document.getElementById('editDrillName').value;
+    const duration = document.getElementById('editDrillDuration').value;
+    const coachNotes = document.getElementById('editDrillNotes').value;
+    this.saveEditPlanDrill(index, time, name, duration, coachNotes);
+  }
+
+  async saveEditPlanDrill(index, time, name, duration, coachNotes) {
     if (this.data.currentPracticePlan[index]) {
       const formattedDuration = this.formatDuration(duration);
-      this.data.currentPracticePlan[index] = { time, name, duration: formattedDuration, coachNotes };
+      const updated = { ...this.data.currentPracticePlan[index], time, name, duration: formattedDuration, coachNotes };
+      this.data.currentPracticePlan[index] = updated;
       this.saveData();
+
+      // Upsert to Supabase (uses existing id if present)
+      if (window.supabaseService && window.supabaseService.isConfigured()) {
+        await window.supabaseService.upsertPracticePlanItem('bhs', updated);
+      }
+
       this.renderCurrentView();
       this.closeModals();
     }
   }
 
-  deletePlanDrill(index) {
+  async deletePlanDrill(index) {
     if (confirm('Are you sure you want to delete this drill from today\'s practice plan?')) {
+      const drill = this.data.currentPracticePlan[index];
       this.data.currentPracticePlan.splice(index, 1);
       this.saveData();
+
+      // Delete from Supabase using the drill's db id
+      if (drill && drill.id && window.supabaseService && window.supabaseService.isConfigured()) {
+        await window.supabaseService.deletePracticePlanItem(drill.id);
+      }
+
       this.renderCurrentView();
     }
   }
@@ -877,7 +889,7 @@ class BHSSoccerApp {
 
   openAuthModal() {
     const modal = document.getElementById('authRoleModal');
-    if (modal) modal.classList.add('active');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
   openPlayerModal(playerId) {
@@ -918,18 +930,19 @@ class BHSSoccerApp {
       `}
     `;
 
+    modal.style.display = '';
     modal.classList.add('active');
   }
 
   openAddDrillModal() {
     const modal = document.getElementById('addDrillScoreModal');
-    if (modal) modal.classList.add('active');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
   closeModals() {
     document.querySelectorAll('.modal-overlay').forEach(modal => {
       modal.classList.remove('active');
-      modal.style.display = 'none';
+      modal.style.display = '';
     });
   }
 

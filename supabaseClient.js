@@ -74,9 +74,29 @@ class SupabaseService {
         name: planItem.name,
         duration: planItem.duration,
         coach_notes: planItem.coachNotes
-      }]);
+      }])
+      .select();
     if (error) console.error('Supabase savePracticePlanItem error:', error);
-    return data;
+    return data ? data[0] : null;
+  }
+
+  async upsertPracticePlanItem(schoolId, planItem) {
+    if (!this.isConfigured()) return null;
+    const payload = {
+      school_id: schoolId,
+      time_slot: planItem.time,
+      name: planItem.name,
+      duration: planItem.duration,
+      coach_notes: planItem.coachNotes
+    };
+    if (planItem.id) payload.id = planItem.id;
+
+    const { data, error } = await this.client
+      .from('practice_plans')
+      .upsert([payload])
+      .select();
+    if (error) console.error('Supabase upsertPracticePlanItem error:', error);
+    return data ? data[0] : null;
   }
 
   async deletePracticePlanItem(planId) {
