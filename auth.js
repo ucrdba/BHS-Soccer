@@ -56,8 +56,23 @@ const SAMPLE_USERS = [
 
 class AuthManager {
   constructor() {
-    this.currentUser = this.loadUser() || SAMPLE_USERS[0]; // Default to Coach Bob for full features
+    this.registeredUsers = this.loadRegisteredUsers();
+    // Default to Public Visitor (Guest) if no active user session exists
+    const guestUser = SAMPLE_USERS.find(u => u.role === ROLES.GUEST);
+    this.currentUser = this.loadUser() || guestUser;
     this.subscribers = [];
+  }
+
+  loadRegisteredUsers() {
+    const saved = localStorage.getItem('bhs_soccer_registered_users');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [];
+  }
+
+  saveRegisteredUsers() {
+    localStorage.setItem('bhs_soccer_registered_users', JSON.stringify(this.registeredUsers));
   }
 
   loadUser() {
@@ -74,8 +89,66 @@ class AuthManager {
     this.notifySubscribers();
   }
 
+  loginUser(email, password) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
+    const found = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+
+    if (found) {
+      this.saveUser(found);
+      return { success: true, user: found };
+    }
+    return { success: false, message: 'User account not found with this email address. Please register a new account.' };
+  }
+
+  registerUser({ name, email, password, role }) {
+    const cleanName = String(name || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const roleValue = (role || ROLES.GUEST).toLowerCase();
+
+    if (!cleanName || !cleanEmail) {
+      return { success: false, message: 'Please provide both Name and Email.' };
+    }
+
+    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
+    const existing = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      this.saveUser(existing);
+      return { success: true, user: existing, isExisting: true };
+    }
+
+    const newUser = {
+      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      name: cleanName,
+      email: cleanEmail,
+      role: roleValue,
+      schoolId: 'bhs',
+      schoolName: 'Beaumont High School',
+      teamLevel: roleValue === ROLES.COACH ? 'Boys Varsity Staff' : roleValue === ROLES.PLAYER ? 'Boys Varsity Player' : 'Fan / Public',
+      avatar: 'assets/bhs_cougars_logo.png'
+    };
+
+    this.registeredUsers.unshift(newUser);
+    this.saveRegisteredUsers();
+    this.saveUser(newUser);
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      window.supabaseService.upsertProfile('bhs', newUser);
+    }
+
+    return { success: true, user: newUser };
+  }
+
+  logout() {
+    const guestUser = SAMPLE_USERS.find(u => u.role === ROLES.GUEST) || {
+      id: 'user_guest', name: 'Public Visitor', email: 'guest@cougars-fan.com', role: ROLES.GUEST
+    };
+    this.saveUser(guestUser);
+  }
+
   switchRole(userId) {
-    const found = SAMPLE_USERS.find(u => u.id === userId);
+    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
+    const found = allUsers.find(u => u.id === userId);
     if (found) {
       this.saveUser(found);
       return found;
@@ -91,6 +164,10 @@ class AuthManager {
     return this.currentUser ? this.currentUser.role : ROLES.GUEST;
   }
 
+  isLoggedIn() {
+    return this.currentUser && this.currentUser.role !== ROLES.GUEST;
+  }
+
   isCoach() {
     return this.getRole() === ROLES.COACH || this.getRole() === ROLES.ADMIN;
   }
@@ -104,7 +181,6 @@ class AuthManager {
   }
 
   canAccessRatings() {
-    // User requirement: "Coaches and players will be the only ones with access to ratings."
     return this.getRole() === ROLES.COACH || this.getRole() === ROLES.PLAYER || this.getRole() === ROLES.ADMIN;
   }
 

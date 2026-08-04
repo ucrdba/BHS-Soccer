@@ -190,11 +190,387 @@ const DEFAULT_BHS_DATA = {
   ]
 };
 
+class SoccerTacticalBoard {
+  constructor(appInstance) {
+    this.app = appInstance;
+    this.canvas = null;
+    this.ctx = null;
+    this.pitchType = 'full';
+    this.activeTool = 'attacker';
+    this.activeColor = '#0047AB';
+    this.elements = [];
+    this.drawings = [];
+    this.history = [];
+    this.redoStack = [];
+    this.isDrawing = false;
+    this.currentPath = null;
+    this.draggedElement = null;
+    this.dragOffset = { x: 0, y: 0 };
+    this.hasAttached = false;
+  }
+
+  init(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+
+    const wrapper = this.canvas.parentElement;
+    const w = Math.min(840, (wrapper ? wrapper.clientWidth : 800) - 20 || 800);
+    const h = Math.round(w * 0.6);
+    this.canvas.width = w;
+    this.canvas.height = h;
+
+    this.attachEvents();
+    this.render();
+    this.updateToolbarUI();
+  }
+
+  setPitchType(type) {
+    this.pitchType = type;
+    this.saveState();
+    this.render();
+    this.updateToolbarUI();
+  }
+
+  setTool(tool) {
+    this.activeTool = tool;
+    this.updateToolbarUI();
+  }
+
+  updateToolbarUI() {
+    document.querySelectorAll('.diagrammer-toolbar .tool-btn').forEach(btn => {
+      const tool = btn.getAttribute('data-tool');
+      const pitch = btn.getAttribute('data-pitch');
+      if (tool) {
+        if (tool === this.activeTool) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+      if (pitch) {
+        if (pitch === this.pitchType) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+  }
+
+  saveState() {
+    this.history.push({
+      elements: JSON.parse(JSON.stringify(this.elements)),
+      drawings: JSON.parse(JSON.stringify(this.drawings)),
+      pitchType: this.pitchType
+    });
+    if (this.history.length > 30) this.history.shift();
+    this.redoStack = [];
+  }
+
+  undo() {
+    if (this.history.length === 0) return;
+    this.redoStack.push({
+      elements: JSON.parse(JSON.stringify(this.elements)),
+      drawings: JSON.parse(JSON.stringify(this.drawings)),
+      pitchType: this.pitchType
+    });
+    const state = this.history.pop();
+    this.elements = state.elements;
+    this.drawings = state.drawings;
+    this.pitchType = state.pitchType || 'full';
+    this.render();
+  }
+
+  clear() {
+    this.saveState();
+    this.elements = [];
+    this.drawings = [];
+    this.render();
+  }
+
+  getPos(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (this.canvas.width / rect.width),
+      y: (clientY - rect.top) * (this.canvas.height / rect.height)
+    };
+  }
+
+  attachEvents() {
+    if (!this.canvas || this.boundCanvas === this.canvas) return;
+    this.boundCanvas = this.canvas;
+
+    const start = (e) => {
+      if (!this.canvas) return;
+      const pos = this.getPos(e);
+
+      if (['attacker', 'defender', 'gk', 'ball', 'cone', 'goal'].includes(this.activeTool)) {
+        this.saveState();
+        let num = '';
+        if (this.activeTool === 'attacker') {
+          const count = this.elements.filter(el => el.type === 'attacker').length;
+          num = String(count + 1);
+        } else if (this.activeTool === 'defender') {
+          const count = this.elements.filter(el => el.type === 'defender').length;
+          num = String(count + 1);
+        }
+
+        this.elements.push({
+          id: Date.now() + Math.random(),
+          type: this.activeTool,
+          x: pos.x,
+          y: pos.y,
+          color: this.activeTool === 'attacker' ? '#0047AB' : this.activeTool === 'defender' ? '#EF4444' : this.activeTool === 'gk' ? '#FFD700' : '#FF8C00',
+          number: num
+        });
+        this.render();
+      } else if (this.activeTool === 'select' || this.activeTool === 'eraser') {
+        const idx = this.elements.findIndex(el => Math.hypot(el.x - pos.x, el.y - pos.y) < 22);
+        if (idx !== -1) {
+          this.saveState();
+          if (this.activeTool === 'eraser') {
+            this.elements.splice(idx, 1);
+            this.render();
+          } else {
+            this.draggedElement = this.elements[idx];
+            this.dragOffset = { x: pos.x - this.draggedElement.x, y: pos.y - this.draggedElement.y };
+          }
+        }
+      } else if (['line_solid', 'line_arrow', 'line_dribble', 'line_dashed'].includes(this.activeTool)) {
+        this.saveState();
+        this.isDrawing = true;
+        this.currentPath = {
+          tool: this.activeTool,
+          color: this.activeTool === 'line_dashed' ? '#FFD700' : this.activeTool === 'line_dribble' ? '#10B981' : '#FFFFFF',
+          width: 3,
+          points: [pos]
+        };
+        this.drawings.push(this.currentPath);
+      }
+    };
+
+    const move = (e) => {
+      if (!this.canvas) return;
+      const pos = this.getPos(e);
+      if (this.draggedElement) {
+        this.draggedElement.x = pos.x - this.dragOffset.x;
+        this.draggedElement.y = pos.y - this.dragOffset.y;
+        this.render();
+      } else if (this.isDrawing && this.currentPath) {
+        this.currentPath.points.push(pos);
+        this.render();
+      }
+    };
+
+    const end = () => {
+      this.isDrawing = false;
+      this.currentPath = null;
+      this.draggedElement = null;
+    };
+
+    this.canvas.addEventListener('mousedown', start);
+    this.canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+
+    this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); });
+    this.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); });
+    window.addEventListener('touchend', end);
+  }
+
+  render() {
+    if (!this.ctx || !this.canvas) return;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    this.drawPitch(w, h);
+    this.drawings.forEach(d => this.drawPath(d));
+    this.elements.forEach(el => this.drawElement(el));
+  }
+
+  drawPitch(w, h) {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#163d16';
+    ctx.fillRect(0, 0, w, h);
+
+    const stripeW = w / 10;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    for (let i = 0; i < 10; i += 2) {
+      ctx.fillRect(i * stripeW, 0, stripeW, h);
+    }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.lineWidth = 2.5;
+
+    const pad = 16;
+    const fw = w - pad * 2;
+    const fh = h - pad * 2;
+
+    ctx.strokeRect(pad, pad, fw, fh);
+
+    if (this.pitchType === 'full') {
+      ctx.beginPath();
+      ctx.moveTo(w / 2, pad);
+      ctx.lineTo(w / 2, h - pad);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, fh * 0.22, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFF';
+      ctx.fill();
+
+      const boxH = fh * 0.55;
+      const boxW = fw * 0.18;
+      const boxY = pad + (fh - boxH) / 2;
+
+      ctx.strokeRect(pad, boxY, boxW, boxH);
+      ctx.strokeRect(w - pad - boxW, boxY, boxW, boxH);
+
+      const gboxH = fh * 0.28;
+      const gboxW = fw * 0.07;
+      const gboxY = pad + (fh - gboxH) / 2;
+
+      ctx.strokeRect(pad, gboxY, gboxW, gboxH);
+      ctx.strokeRect(w - pad - gboxW, gboxY, gboxW, gboxH);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(pad - 6, pad + (fh - gboxH * 0.7) / 2, 6, gboxH * 0.7);
+      ctx.fillRect(w - pad, pad + (fh - gboxH * 0.7) / 2, 6, gboxH * 0.7);
+    } else if (this.pitchType === 'half') {
+      ctx.beginPath();
+      ctx.arc(w / 2, pad, fh * 0.3, 0, Math.PI);
+      ctx.stroke();
+
+      const boxH = fh * 0.6;
+      const boxW = fw * 0.5;
+      const boxX = pad + (fw - boxW) / 2;
+      const boxY = h - pad - boxH;
+
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+      const gboxH = fh * 0.25;
+      const gboxW = fw * 0.22;
+      const gboxX = pad + (fw - gboxW) / 2;
+      ctx.strokeRect(gboxX, h - pad - gboxH, gboxW, gboxH);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(gboxX + (gboxW - 60) / 2, h - pad, 60, 6);
+    }
+  }
+
+  drawPath(d) {
+    if (!d.points || d.points.length < 2) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = d.color || '#FFF';
+    ctx.lineWidth = d.width || 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (d.tool === 'line_dashed') {
+      ctx.setLineDash([8, 6]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(d.points[0].x, d.points[0].y);
+
+    if (d.tool === 'line_dribble') {
+      for (let i = 1; i < d.points.length; i++) {
+        const p = d.points[i];
+        const offset = (i % 2 === 0 ? 4 : -4);
+        ctx.lineTo(p.x + offset, p.y + offset);
+      }
+    } else {
+      for (let i = 1; i < d.points.length; i++) {
+        ctx.lineTo(d.points[i].x, d.points[i].y);
+      }
+    }
+    ctx.stroke();
+
+    if (d.tool === 'line_arrow' || d.tool === 'line_dashed') {
+      const p1 = d.points[d.points.length - 2];
+      const p2 = d.points[d.points.length - 1];
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const headLen = 14;
+
+      ctx.fillStyle = d.color || '#FFF';
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - headLen * Math.cos(angle - Math.PI / 6), p2.y - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(p2.x - headLen * Math.cos(angle + Math.PI / 6), p2.y - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawElement(el) {
+    const ctx = this.ctx;
+    ctx.save();
+
+    if (el.type === 'attacker' || el.type === 'defender' || el.type === 'gk') {
+      const radius = 14;
+      ctx.beginPath();
+      ctx.arc(el.x, el.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = el.color;
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(el.type === 'gk' ? 'GK' : (el.number || '10'), el.x, el.y);
+    } else if (el.type === 'ball') {
+      ctx.beginPath();
+      ctx.arc(el.x, el.y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#000';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚽', el.x, el.y + 1);
+    } else if (el.type === 'cone') {
+      ctx.beginPath();
+      ctx.moveTo(el.x, el.y - 12);
+      ctx.lineTo(el.x + 10, el.y + 8);
+      ctx.lineTo(el.x - 10, el.y + 8);
+      ctx.closePath();
+      ctx.fillStyle = el.color || '#FF8C00';
+      ctx.fill();
+      ctx.strokeStyle = '#FFF';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else if (el.type === 'goal') {
+      ctx.strokeStyle = '#FFF';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(el.x - 16, el.y - 10, 32, 20);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(el.x - 16, el.y - 10, 32, 20);
+    }
+    ctx.restore();
+  }
+
+  exportImage() {
+    return this.canvas ? this.canvas.toDataURL('image/png') : null;
+  }
+}
+
 class BHSSoccerApp {
   constructor() {
     this.data = this.loadData();
     this.currentView = 'home';
     this.activeFilter = 'ALL';
+    this.diagrammer = new SoccerTacticalBoard(this);
     this.init();
   }
 
@@ -400,19 +776,59 @@ class BHSSoccerApp {
 
   updateAuthUI() {
     const currentUser = window.auth.getCurrentUser();
+    const isGuest = !currentUser || currentUser.role === 'guest';
+    const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
+    const canAccessRatings = window.auth.canAccessRatings();
+
     const roleBadge = document.getElementById('navUserBadge');
     const roleName = document.getElementById('navUserName');
     
     if (roleBadge && roleName) {
-      roleName.textContent = currentUser.name;
-      roleBadge.textContent = currentUser.role.toUpperCase();
+      roleName.textContent = currentUser ? currentUser.name : 'Public Visitor';
+      roleBadge.textContent = currentUser ? currentUser.role.toUpperCase() : 'GUEST';
       
-      // Update badge class
       roleBadge.className = 'badge ';
-      if (currentUser.role === 'coach') roleBadge.classList.add('badge-coach');
-      else if (currentUser.role === 'admin') roleBadge.classList.add('badge-admin');
-      else if (currentUser.role === 'player') roleBadge.classList.add('badge-role');
+      if (currentUser && currentUser.role === 'coach') roleBadge.classList.add('badge-coach');
+      else if (currentUser && currentUser.role === 'admin') roleBadge.classList.add('badge-admin');
+      else if (currentUser && currentUser.role === 'player') roleBadge.classList.add('badge-role');
       else roleBadge.classList.add('badge-win');
+    }
+
+    // Hide / Show Navigation Items based on Public Access vs Authenticated Role
+    document.querySelectorAll('.nav-item').forEach(item => {
+      const view = item.getAttribute('data-view');
+      if (view === 'matrix') {
+        item.style.display = canAccessRatings ? '' : 'none';
+      } else if (view === 'planner') {
+        item.style.display = isCoachOrAdmin ? '' : 'none';
+      } else if (view === 'coaches') {
+        item.style.display = isCoachOrAdmin ? '' : 'none';
+      } else {
+        item.style.display = '';
+      }
+    });
+
+    // Single Primary Auth / Admin Control Button
+    const adminBtn = document.getElementById('adminBtn');
+    if (adminBtn) {
+      if (isGuest) {
+        adminBtn.innerHTML = '🔑 Sign In / Register';
+        adminBtn.className = 'btn btn-gold';
+        adminBtn.onclick = () => this.openLoginModal();
+      } else if (isCoachOrAdmin) {
+        adminBtn.innerHTML = '⚙️ Admin Center';
+        adminBtn.className = 'btn btn-gold';
+        adminBtn.onclick = () => this.openAdminModal();
+      } else {
+        adminBtn.innerHTML = '👤 My Account';
+        adminBtn.className = 'btn btn-secondary';
+        adminBtn.onclick = () => this.openAdminModal();
+      }
+    }
+
+    // Fallback to Home if guest attempts to view a restricted tab
+    if (isGuest && (this.currentView === 'matrix' || this.currentView === 'planner' || this.currentView === 'coaches')) {
+      this.switchView('home');
     }
   }
 
@@ -440,6 +856,9 @@ class BHSSoccerApp {
         container.innerHTML = this.renderRestrictedAccess('Coach Practice Planner', 'Access to practice planning tools is restricted to Head Coaches and Coaching Staff.');
       } else {
         container.innerHTML = this.renderPlannerView();
+        setTimeout(() => {
+          if (this.diagrammer) this.diagrammer.init('soccerBoardCanvas');
+        }, 80);
       }
     } else if (this.currentView === 'coaches') {
       container.innerHTML = this.renderCoachesView();
@@ -479,6 +898,8 @@ class BHSSoccerApp {
     const cdHoursStr = countdown ? countdown.hours : '00';
     const cdMinsStr = countdown ? countdown.mins : '00';
 
+    const currentUser = window.auth.getCurrentUser();
+    const isPublicGuest = !currentUser || currentUser.role === 'guest';
     const activeThought = this.getActiveThought();
 
     return `
@@ -509,29 +930,32 @@ class BHSSoccerApp {
       </section>
 
       <div class="container" style="margin-top: 30px;">
-        <!-- Side-by-Side: Coach's Daily Thoughts (Left) & Season Spotlight (Right) -->
-        <div style="display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 24px; margin-bottom: 50px; align-items: stretch;">
-          <!-- Left Column: Coach's Thoughts For The Day -->
-          <div class="player-card" style="padding: 24px; background: linear-gradient(145deg, rgba(0, 71, 171, 0.25), rgba(15, 23, 42, 0.85)); border: 1px solid var(--bhs-gold-accent); display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
-                <h3 style="color: var(--bhs-gold-accent); margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
-                  <span>💡</span> COACH'S DAILY THOUGHTS
-                </h3>
-                ${(window.auth.isCoach() || window.auth.isAdmin()) ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="app.openManageThoughtsModal()">⚙️ Manage</button>` : ''}
-              </div>
-              <div style="max-height: 140px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin; margin-bottom: 14px;">
-                <p style="color: #FFF; font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; margin: 0;">${activeThought.text}</p>
-              </div>
+        <!-- Side-by-Side (Team Members) or Full Width (Public Guest) -->
+        <div style="display: grid; grid-template-columns: ${!isPublicGuest ? 'minmax(300px, 360px) 1fr' : '1fr'}; gap: 24px; margin-bottom: 50px; align-items: stretch;">
+          
+          ${!isPublicGuest ? `
+            <!-- Left Column: Coach's Thoughts For The Day (Team Members Only) -->
+            <div class="player-card" style="padding: 24px; background: linear-gradient(145deg, rgba(0, 71, 171, 0.25), rgba(15, 23, 42, 0.85)); border: 1px solid var(--bhs-gold-accent); display: flex; flex-direction: column; justify-content: space-between;">
               <div>
-                <button class="btn btn-gold" style="width: 100%; padding: 8px 14px; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.openTakeQuizModal()">📝 Take Quiz</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
+                  <h3 style="color: var(--bhs-gold-accent); margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+                    <span>💡</span> COACH'S DAILY THOUGHTS
+                  </h3>
+                  ${(window.auth.isCoach() || window.auth.isAdmin()) ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="app.openManageThoughtsModal()">⚙️ Manage</button>` : ''}
+                </div>
+                <div style="max-height: 140px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin; margin-bottom: 14px;">
+                  <p style="color: #FFF; font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; margin: 0;">${activeThought.text}</p>
+                </div>
+                <div>
+                  <button class="btn btn-gold" style="width: 100%; padding: 8px 14px; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="app.openTakeQuizModal()">📝 Take Quiz</button>
+                </div>
+              </div>
+              <div style="margin-top: 14px; pt-8; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                <span>— ${activeThought.coachName || 'Coach Bob Miller'}</span>
+                <span class="badge badge-coach">HEAD COACH</span>
               </div>
             </div>
-            <div style="margin-top: 14px; pt-8; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
-              <span>— ${activeThought.coachName || 'Coach Bob Miller'}</span>
-              <span class="badge badge-coach">HEAD COACH</span>
-            </div>
-          </div>
+          ` : ''}
 
           <!-- Right Column: Season Spotlight Stats Grid -->
           <div>
@@ -1108,31 +1532,153 @@ class BHSSoccerApp {
             </div>
           </div>
 
-          ${this.data.currentPracticePlan.length === 0 ? `
-            <div style="text-align:center; padding:30px; color:var(--text-muted);">
-              <p style="font-size:1rem; margin-bottom:8px;">Today's practice timeline is currently empty.</p>
-              <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Saved Plans Database</strong> to load a session.</p>
-            </div>
-          ` : this.data.currentPracticePlan.map((p, idx) => `
-            <div class="drill-item">
-              <div class="drill-info" style="flex: 1; padding-right: 20px;">
-                <h4>${p.name}</h4>
-                <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
+            ${this.data.currentPracticePlan.length === 0 ? `
+              <div style="text-align:center; padding:30px; color:var(--text-muted);">
+                <p style="font-size:1rem; margin-bottom:8px;">Today's practice timeline is currently empty.</p>
+                <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Saved Plans Database</strong> to load a session.</p>
               </div>
-              <div style="display: flex; align-items: center; gap: 15px;">
-                <div style="text-align: right;">
-                  <div class="drill-duration">${p.duration}</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">${p.time}</div>
+            ` : this.data.currentPracticePlan.map((p, idx) => `
+              <div class="drill-item" style="flex-direction: column; align-items: stretch;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                  <div class="drill-info" style="flex: 1; padding-right: 20px;">
+                    <h4>${p.name}</h4>
+                    <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="text-align: right;">
+                      <div class="drill-duration">${p.duration}</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted);">${p.time}</div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="app.openEditPlanDrillModal(${idx})">✏️ Edit</button>
+                      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="app.deletePlanDrill(${idx})">🗑️</button>
+                    </div>
+                  </div>
                 </div>
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="app.openEditPlanDrillModal(${idx})">✏️ Edit</button>
-                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="app.deletePlanDrill(${idx})">🗑️</button>
-                </div>
+
+                ${p.diagramImage ? `
+                  <div style="margin-top: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px; border-radius: 8px; text-align: left;">
+                    <div style="font-size: 0.75rem; color: var(--bhs-gold-accent); margin-bottom: 6px; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
+                      <span>🎨 DIAGRAMMED DRILL TACTICS &amp; MOVEMENT</span>
+                      <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: var(--color-danger);" onclick="app.removeDrillDiagram(${idx})">🗑️ Remove Diagram</button>
+                    </div>
+                    <img src="${p.diagramImage}" style="max-width: 100%; max-height: 260px; border-radius: 6px; object-fit: contain; background: #163d16; border: 1px solid var(--bhs-gold-accent);" />
+                  </div>
+                ` : ''}
               </div>
+            `).join('')}
+        </div>
+
+        <!-- Interactive Tactical Drill Diagrammer Card -->
+        <div class="diagrammer-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 12px;">
+            <div>
+              <h3 style="color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>🎨</span> TACTICAL SOCCER DRILL DIAGRAMMER
+              </h3>
+              <p class="text-muted" style="font-size: 0.82rem; margin-top: 4px; margin-bottom: 0;">
+                Draw out custom practice drills, place attackers/defenders/cones, draw movement &amp; pass arrows, and attach diagrams directly to your practice timeline.
+              </p>
             </div>
-          `).join('')}
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-gold" onclick="app.attachDiagramToDrill()">💾 Attach Diagram to Drill</button>
+              <button class="btn btn-secondary" onclick="app.downloadDiagramPNG()">📥 Download PNG</button>
+            </div>
+          </div>
+
+          <!-- Diagrammer Toolbar -->
+          <div class="diagrammer-toolbar">
+            <div class="tool-group">
+              <span class="tool-group-label">Pitch View:</span>
+              <button class="tool-btn active" data-pitch="full" onclick="app.diagrammer.setPitchType('full')">🏟️ Full Field</button>
+              <button class="tool-btn" data-pitch="half" onclick="app.diagrammer.setPitchType('half')">⚽ Half Field</button>
+            </div>
+
+            <div class="tool-group">
+              <span class="tool-group-label">Stamps / Items:</span>
+              <button class="tool-btn active" data-tool="attacker" onclick="app.setDiagramTool('attacker')">🔵 Attacker</button>
+              <button class="tool-btn" data-tool="defender" onclick="app.setDiagramTool('defender')">🔴 Defender</button>
+              <button class="tool-btn" data-tool="gk" onclick="app.setDiagramTool('gk')">🟡 GK</button>
+              <button class="tool-btn" data-tool="ball" onclick="app.setDiagramTool('ball')">⚽ Ball</button>
+              <button class="tool-btn" data-tool="cone" onclick="app.setDiagramTool('cone')">🦺 Cone</button>
+              <button class="tool-btn" data-tool="goal" onclick="app.setDiagramTool('goal')">🥅 Goal</button>
+            </div>
+
+            <div class="tool-group">
+              <span class="tool-group-label">Drawing Tools:</span>
+              <button class="tool-btn" data-tool="line_arrow" onclick="app.setDiagramTool('line_arrow')">➡️ Arrow / Pass</button>
+              <button class="tool-btn" data-tool="line_dashed" onclick="app.setDiagramTool('line_dashed')">⚡ Run / Sprint</button>
+              <button class="tool-btn" data-tool="line_dribble" onclick="app.setDiagramTool('line_dribble')">〰️ Dribble</button>
+              <button class="tool-btn" data-tool="line_solid" onclick="app.setDiagramTool('line_solid')">✏️ Pen</button>
+            </div>
+
+            <div class="tool-group">
+              <span class="tool-group-label">Actions:</span>
+              <button class="tool-btn" data-tool="select" onclick="app.setDiagramTool('select')">🖐️ Move Item</button>
+              <button class="tool-btn" data-tool="eraser" onclick="app.setDiagramTool('eraser')">🧽 Delete</button>
+              <button class="tool-btn" onclick="app.diagrammer.undo()">↩️ Undo</button>
+              <button class="tool-btn" onclick="app.diagrammer.clear()">🧹 Clear Field</button>
+            </div>
+          </div>
+
+          <!-- Pitch Canvas Wrapper -->
+          <div class="canvas-wrapper">
+            <canvas id="soccerBoardCanvas" width="800" height="500"></canvas>
+          </div>
+        </div>
       </div>
     `;
+  }
+
+  setDiagramTool(tool) {
+    if (this.diagrammer) {
+      this.diagrammer.setTool(tool);
+    }
+  }
+
+  attachDiagramToDrill() {
+    if (!this.diagrammer) return;
+    const dataUrl = this.diagrammer.exportImage();
+    if (!dataUrl) return;
+
+    if (!this.data.currentPracticePlan || this.data.currentPracticePlan.length === 0) {
+      alert('Please add at least one drill to today\'s practice timeline first using "+ Add Drill to Plan" above!');
+      return;
+    }
+
+    const options = this.data.currentPracticePlan.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
+    const selectedIdxStr = prompt(`Select practice drill number to attach this tactical diagram to:\n\n${options}`, '1');
+
+    if (!selectedIdxStr) return;
+    const selectedIdx = parseInt(selectedIdxStr) - 1;
+
+    if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= this.data.currentPracticePlan.length) {
+      alert('Invalid drill selection.');
+      return;
+    }
+
+    this.data.currentPracticePlan[selectedIdx].diagramImage = dataUrl;
+    this.saveData();
+    this.renderCurrentView();
+    alert(`🎉 Tactical drill diagram successfully attached to "${this.data.currentPracticePlan[selectedIdx].name}"!`);
+  }
+
+  removeDrillDiagram(idx) {
+    if (this.data.currentPracticePlan && this.data.currentPracticePlan[idx]) {
+      delete this.data.currentPracticePlan[idx].diagramImage;
+      this.saveData();
+      this.renderCurrentView();
+    }
+  }
+
+  downloadDiagramPNG() {
+    if (!this.diagrammer) return;
+    const dataUrl = this.diagrammer.exportImage();
+    if (!dataUrl) return;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `bhs_cougars_drill_diagram_${Date.now()}.png`;
+    a.click();
   }
 
   getActiveThought() {
@@ -1308,91 +1854,260 @@ class BHSSoccerApp {
     this.renderCurrentView();
   }
 
-  openTakeQuizModal() {
+  openTakeQuizModal(tab = 'quiz') {
     const activeThought = this.getActiveThought();
     const container = document.getElementById('quizModalContent');
     if (!container) return;
 
+    const currentUser = window.auth.getCurrentUser() || { name: 'Alex Rivera (#10)', id: 'p_guest' };
     const modal = document.getElementById('takeQuizModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
 
+    const isLeaderboard = tab === 'leaderboard';
+
     container.innerHTML = `
-      <div style="background: rgba(0, 71, 171, 0.2); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 18px;">
-        <div style="font-size: 0.8rem; color: var(--bhs-gold-accent); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
-          📌 Today's Tactical Focus (${activeThought.coachName || 'Coach Bob Miller'})
-        </div>
-        <div style="font-size: 0.9rem; color: #FFF; font-style: italic; line-height: 1.4;">
-          "${activeThought.text}"
-        </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
+        <button class="btn ${!isLeaderboard ? 'btn-gold' : 'btn-secondary'}" onclick="app.openTakeQuizModal('quiz')" style="font-size: 0.82rem; font-weight: 700;">📝 Take 5-Question Quiz</button>
+        <button class="btn ${isLeaderboard ? 'btn-gold' : 'btn-secondary'}" onclick="app.openTakeQuizModal('leaderboard')" style="font-size: 0.82rem; font-weight: 700;">🏆 Quiz Results Leaderboard</button>
       </div>
 
-      <form id="dailyQuizForm" onsubmit="event.preventDefault(); app.submitQuizAnswer();">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block;">
-            1. What is the primary tactical objective emphasized in Coach's Daily Thoughts?
-          </label>
-          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-              <input type="radio" name="quizQ1" value="wrong1" required /> Drop back into low-block passive defense
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-              <input type="radio" name="quizQ1" value="correct" required /> High intensity pressing &amp; quick 2-touch passing transitions
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-              <input type="radio" name="quizQ1" value="wrong2" required /> Dribble individually without passing options
-            </label>
+      ${isLeaderboard ? this.renderQuizLeaderboardHTML() : `
+        <div style="background: rgba(0, 71, 171, 0.2); border: 1px solid var(--bhs-navy-border); padding: 12px 14px; border-radius: 8px; margin-bottom: 16px;">
+          <div style="font-size: 0.78rem; color: var(--bhs-gold-accent); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+            📌 Today's Tactical Focus (${activeThought.coachName || 'Coach Bob Miller'})
+          </div>
+          <div style="font-size: 0.86rem; color: #FFF; font-style: italic; line-height: 1.4; max-height: 75px; overflow-y: auto;">
+            "${activeThought.text}"
           </div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 20px;">
-          <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block;">
-            2. How should players handle possession under pressure according to today's focus?
-          </label>
-          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-              <input type="radio" name="quizQ2" value="correct" required /> Make the simple, quick pass as first option
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-              <input type="radio" name="quizQ2" value="wrong1" required /> Hold the ball until surrounded by defenders
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-              <input type="radio" name="quizQ2" value="wrong2" required /> Kick the ball out of bounds
-            </label>
+        <form id="dailyQuizForm" onsubmit="event.preventDefault(); app.submitQuizAnswer();" style="max-height: 440px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin;">
+          <!-- Player Identity Header -->
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Player Taking Quiz:</span>
+            <strong style="color: var(--bhs-gold-accent); font-size: 0.95rem;">⚽ ${currentUser.name}</strong>
           </div>
-        </div>
 
-        <button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700;">🎯 Submit Quiz Answers</button>
-      </form>
-      <div id="quizScoreResult" style="margin-top: 14px; text-align: center;"></div>
+          <!-- Question 1 -->
+          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
+            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
+              1. What is the primary tactical objective emphasized in Coach's Daily Thoughts?
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q1" value="A" required /> A) Drop back into low-block passive defense
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+                <input type="radio" name="q1" value="B" required /> B) High intensity pressing &amp; quick 2-touch passing transitions
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q1" value="C" required /> C) Dribble individually without passing options
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q1" value="D" required /> D) Long high balls into penalty box only
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 2 -->
+          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-cyan-accent);">
+            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
+              2. How should players handle possession under pressure according to today's focus?
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+                <input type="radio" name="q2" value="A" required /> A) Make the simple, quick pass as first option
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q2" value="B" required /> B) Hold the ball until surrounded by defenders
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q2" value="C" required /> C) Turn around and kick the ball out of bounds
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q2" value="D" required /> D) Stop moving completely and wait for whistle
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 3 -->
+          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
+            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
+              3. According to Coach's Daily Focus, what is faster than any dribble on the pitch?
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+                <input type="radio" name="q3" value="A" required /> A) A passing ball moving twenty yards
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q3" value="B" required /> B) Juggling in place
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q3" value="C" required /> C) Throw-ins from sideline
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q3" value="D" required /> D) Running backwards
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 4 -->
+          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-cyan-accent);">
+            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
+              4. What is the primary tactical formation for Beaumont Varsity 11v11 matches?
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q4" value="A" required /> A) 5-4-1 Ultra Defensive Park-the-Bus
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+                <input type="radio" name="q4" value="B" required /> B) 4-3-3 High Press / Attack-Minded
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q4" value="C" required /> C) 2-2-6 All-Out Attack
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q4" value="D" required /> D) No tactical formation
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 5 -->
+          <div class="form-group" style="margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
+            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
+              5. What is the minimum practice participation requirement for starting lineup consideration?
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q5" value="A" required /> A) 25%
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q5" value="B" required /> B) 50%
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
+                <input type="radio" name="q5" value="C" required /> C) 90%+ Match Readiness &amp; Practice Participation
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                <input type="radio" name="q5" value="D" required /> D) 10%
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700; padding: 10px; font-size: 0.95rem;">🎯 Submit &amp; Grade Quiz</button>
+        </form>
+        <div id="quizScoreResult" style="margin-top: 14px;"></div>
+      `}
     `;
   }
 
-  submitQuizAnswer() {
-    const q1 = document.querySelector('input[name="quizQ1"]:checked');
-    const q2 = document.querySelector('input[name="quizQ2"]:checked');
-    const resultDiv = document.getElementById('quizScoreResult');
+  async submitQuizAnswer() {
+    const currentUser = window.auth.getCurrentUser() || { name: 'Alex Rivera (#10)', id: 'p_guest' };
+
+    const q1 = document.querySelector('input[name="q1"]:checked')?.value;
+    const q2 = document.querySelector('input[name="q2"]:checked')?.value;
+    const q3 = document.querySelector('input[name="q3"]:checked')?.value;
+    const q4 = document.querySelector('input[name="q4"]:checked')?.value;
+    const q5 = document.querySelector('input[name="q5"]:checked')?.value;
+
+    const answerKeys = [
+      { questionId: 1, correct: 'B', selected: q1 },
+      { questionId: 2, correct: 'A', selected: q2 },
+      { questionId: 3, correct: 'A', selected: q3 },
+      { questionId: 4, correct: 'B', selected: q4 },
+      { questionId: 5, correct: 'C', selected: q5 }
+    ];
 
     let score = 0;
-    if (q1 && q1.value === 'correct') score += 50;
-    if (q2 && q2.value === 'correct') score += 50;
+    const playerAnswers = answerKeys.map(a => {
+      const isCorrect = a.selected === a.correct;
+      if (isCorrect) score += 1;
+      return {
+        questionId: a.questionId,
+        selectedOption: a.selected || 'A',
+        isCorrect: isCorrect
+      };
+    });
 
-    if (resultDiv) {
-      if (score === 100) {
-        resultDiv.innerHTML = `
-          <div style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--color-success); padding: 12px; border-radius: 8px; color: #FFF;">
-            🌟 <strong>100% PERFECT SCORE! (100/100)</strong><br/>
-            Awesome job! You are 100% dialed in on Coach Bob's daily tactical focus.
-          </div>
-        `;
-      } else {
-        resultDiv.innerHTML = `
-          <div style="background: rgba(234, 179, 8, 0.2); border: 1px solid var(--bhs-gold-accent); padding: 12px; border-radius: 8px; color: #FFF;">
-            🎯 <strong>SCORE: ${score}/100</strong><br/>
-            Review the daily thought message carefully and try again to get 100%!
-          </div>
-        `;
-      }
+    const totalQuestions = 5;
+    const percentage = Math.round((score / totalQuestions) * 100);
+
+    // Save attempt to local memory
+    if (!this.data.quizAttempts) this.data.quizAttempts = [];
+    const attemptRecord = {
+      attempt_id: Date.now(),
+      player_id: currentUser.id || 'p_guest',
+      player_name: currentUser.name || 'Alex Rivera (#10)',
+      score: score,
+      total_questions: totalQuestions,
+      percentage: percentage,
+      completed_at: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+    };
+    this.data.quizAttempts.unshift(attemptRecord);
+    this.saveData();
+
+    // Save attempt & individual player_answers to Supabase Cloud
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.saveQuizAttempt(currentUser, playerAnswers, score, totalQuestions);
     }
+
+    const resultDiv = document.getElementById('quizScoreResult');
+    if (resultDiv) {
+      resultDiv.innerHTML = `
+        <div style="background: ${score === 5 ? 'rgba(34, 197, 94, 0.25)' : 'rgba(234, 179, 8, 0.25)'}; border: 2px solid ${score === 5 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; padding: 16px; border-radius: 10px; text-align: center;">
+          <h4 style="color: #FFF; margin-bottom: 6px;">
+            ${score === 5 ? '🌟 PERFECT SCORE! 100%' : '🎯 QUIZ GRADED RESULT'}
+          </h4>
+          <div style="font-size: 1.8rem; font-weight: 800; color: ${score >= 4 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; margin-bottom: 6px;">
+            ${score} / ${totalQuestions} (${percentage}%)
+          </div>
+          <p style="font-size: 0.85rem; color: #FFF; margin: 0;">
+            ${score === 5 ? 'Awesome job! Attempt saved to database table <strong>quiz_attempts</strong>.' : 'Review Coach Steele\'s Daily Thoughts and attempt again to reach 100%!'}
+          </p>
+          <button class="btn btn-gold" onclick="app.openTakeQuizModal('leaderboard')" style="margin-top: 12px; font-size: 0.8rem;">🏆 View Leaderboard &amp; Results</button>
+        </div>
+      `;
+    }
+  }
+
+  renderQuizLeaderboardHTML() {
+    const localAttempts = this.data.quizAttempts || [
+      { player_name: 'Alex Rivera (#10)', score: 5, total_questions: 5, percentage: 100, completed_at: 'AUG 2, 6:15 PM' },
+      { player_name: 'Coach Bob Miller', score: 5, total_questions: 5, percentage: 100, completed_at: 'AUG 2, 5:45 PM' }
+    ];
+
+    return `
+      <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 14px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+          <span>📊</span> GRADED QUIZ RESULTS (VIEW: quiz_results)
+        </h4>
+        <p class="text-muted" style="font-size: 0.82rem; margin: 0;">
+          Calculated from <code>quiz_attempts</code> &amp; <code>player_answers</code> database tables.
+        </p>
+      </div>
+
+      <div style="max-height: 360px; overflow-y: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--bhs-navy-border); color: var(--bhs-gold-accent);">
+              <th style="padding: 8px;">PLAYER NAME</th>
+              <th style="padding: 8px; text-align: center;">SCORE</th>
+              <th style="padding: 8px; text-align: center;">PERCENTAGE</th>
+              <th style="padding: 8px; text-align: right;">COMPLETED AT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${localAttempts.map(a => `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <td style="padding: 10px 8px; font-weight: 600; color: #FFF;">⚽ ${a.player_name}</td>
+                <td style="padding: 10px 8px; text-align: center; font-weight: 700; color: ${a.score >= 4 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'};">${a.score} / ${a.total_questions}</td>
+                <td style="padding: 10px 8px; text-align: center;"><span class="badge ${a.percentage === 100 ? 'badge-gold' : 'badge-primary'}">${a.percentage}%</span></td>
+                <td style="padding: 10px 8px; text-align: right; color: var(--text-muted); font-size: 0.78rem;">${a.completed_at || 'Just now'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   renderCoachesView() {
@@ -1991,11 +2706,186 @@ class BHSSoccerApp {
   }
 
   openAuthModal() {
-    this.openAdminModal();
+    const currentUser = window.auth.getCurrentUser();
+    if (!currentUser || currentUser.role === 'guest') {
+      this.openLoginModal();
+    } else {
+      this.openAdminModal();
+    }
+  }
+
+  openLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+    const feedback = document.getElementById('authFormFeedback');
+    if (feedback) feedback.textContent = '';
+  }
+
+  switchAuthTab(tab) {
+    const signInForm = document.getElementById('signInForm');
+    const registerForm = document.getElementById('registerForm');
+    const tabSignInBtn = document.getElementById('tabSignInBtn');
+    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+
+    if (tab === 'register') {
+      if (signInForm) signInForm.style.display = 'none';
+      if (registerForm) registerForm.style.display = '';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-secondary';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-cyan';
+    } else {
+      if (signInForm) signInForm.style.display = '';
+      if (registerForm) registerForm.style.display = 'none';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-gold';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-secondary';
+    }
+  }
+
+  quickLogin(email, password) {
+    const emailInput = document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('loginPassword');
+    if (emailInput) emailInput.value = email;
+    if (passwordInput) passwordInput.value = password || 'password';
+    this.handleSignIn();
+  }
+
+  handleSignIn() {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const feedback = document.getElementById('authFormFeedback');
+
+    const res = window.auth.loginUser(email, password);
+    if (res.success) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      this.closeModals();
+      alert(`🎉 Welcome back, ${res.user.name}!`);
+    } else {
+      if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  }
+
+  handleRegister() {
+    const name = document.getElementById('regName').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const role = document.getElementById('regRole').value;
+    const feedback = document.getElementById('authFormFeedback');
+
+    const res = window.auth.registerUser({ name, email, password, role });
+    if (res.success) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      this.closeModals();
+      alert(`🎉 Account created successfully! Welcome, ${res.user.name}.`);
+    } else {
+      if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  }
+
+  renderPlayerAccountModalContent() {
+    const currentUser = window.auth.getCurrentUser();
+    const container = document.getElementById('adminModalContent');
+    const titleEl = document.getElementById('adminModalTitle');
+    if (!container) return;
+
+    if (titleEl) {
+      titleEl.innerHTML = '👤 MY PLAYER ACCOUNT &amp; PROFILE';
+    }
+
+    // Find matching player in team roster
+    const player = (this.data && this.data.players && this.data.players.find(p => p.id === currentUser.playerId || (currentUser.name && p.name.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])))) || {
+      name: currentUser ? currentUser.name : 'Varsity Player',
+      number: 10,
+      position: 'Forward / CAM',
+      classYear: 'Senior (2027)',
+      height: "5'11\"",
+      photo: currentUser.avatar || 'assets/bhs_cougars_logo.png',
+      seasonStats: { goals: 14, assists: 8, games: 12 },
+      ratings: { technical: 92, tactical: 88, physical: 85, mental: 90 },
+      matrixStats: { rank: 1, points: 94, wins: 28, losses: 6 }
+    };
+
+    container.innerHTML = `
+      <!-- Player Banner Card -->
+      <div style="background: linear-gradient(135deg, rgba(0, 71, 171, 0.4), rgba(10, 20, 40, 0.8)); border: 1px solid var(--bhs-blue-electric); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; position: relative;">
+        <img src="${player.photo || currentUser.avatar || 'assets/bhs_cougars_logo.png'}" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--bhs-gold-accent); object-fit: cover; box-shadow: 0 4px 14px rgba(0,0,0,0.5);" />
+        <h2 style="color: #FFF; margin-top: 10px; margin-bottom: 2px;">${player.number ? '#' + player.number + ' ' : ''}${player.name}</h2>
+        <p class="text-cyan" style="font-weight: 700; margin-bottom: 6px;">${player.position} &bull; ${player.classYear}</p>
+        <span class="badge badge-role">BEAUMONT HIGH SCHOOL VARSITY SOCCER</span>
+      </div>
+
+      <!-- Account Info Row -->
+      <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 10px; font-size: 0.9rem;">📧 ACCOUNT CREDENTIALS &amp; PROFILE INFO</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;">
+          <div><span style="color: var(--text-muted);">Email:</span> <strong style="color: #FFF;">${currentUser.email || 'N/A'}</strong></div>
+          <div><span style="color: var(--text-muted);">Account Role:</span> <span class="badge badge-role">PLAYER</span></div>
+          <div><span style="color: var(--text-muted);">School:</span> <strong style="color: #FFF;">Beaumont High School</strong></div>
+          <div><span style="color: var(--text-muted);">Team:</span> <strong style="color: #FFF;">Boys Varsity Soccer</strong></div>
+        </div>
+      </div>
+
+      <!-- Season Stats Summary -->
+      <div style="margin-bottom: 20px;">
+        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; font-size: 0.9rem;">⚽ MY SEASON PERFORMANCE STATS</h4>
+        <div class="player-stats-row" style="margin-bottom: 0;">
+          <div class="stat-item"><div class="val">${player.seasonStats?.goals ?? 0}</div><div class="lbl">Goals</div></div>
+          <div class="stat-item"><div class="val">${player.seasonStats?.assists ?? 0}</div><div class="lbl">Assists</div></div>
+          <div class="stat-item"><div class="val">${player.seasonStats?.games ?? 0}</div><div class="lbl">Games Played</div></div>
+          <div class="stat-item"><div class="val text-gold">#${player.matrixStats?.rank ?? '1'}</div><div class="lbl">Team Rank</div></div>
+        </div>
+      </div>
+
+      <!-- Coach Ratings Breakdown -->
+      ${player.ratings ? `
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 16px; border-radius: 10px; margin-bottom: 20px;">
+          <h4 style="color: var(--bhs-cyan-accent); margin-bottom: 12px; font-size: 0.9rem;">📊 MY COACH EVALUATION RATINGS</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.88rem;">
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;"><span>Technical Skill</span><strong style="color: var(--bhs-gold-accent);">${player.ratings.technical}/100</strong></div>
+              <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px;"><div style="background: var(--bhs-gold-accent); height: 100%; width: ${player.ratings.technical}%; border-radius: 3px;"></div></div>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;"><span>Tactical IQ</span><strong style="color: var(--bhs-gold-accent);">${player.ratings.tactical}/100</strong></div>
+              <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px;"><div style="background: var(--bhs-gold-accent); height: 100%; width: ${player.ratings.tactical}%; border-radius: 3px;"></div></div>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;"><span>Physical Speed &amp; Power</span><strong style="color: var(--bhs-gold-accent);">${player.ratings.physical}/100</strong></div>
+              <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px;"><div style="background: var(--bhs-gold-accent); height: 100%; width: ${player.ratings.physical}%; border-radius: 3px;"></div></div>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;"><span>Mental Drive</span><strong style="color: var(--bhs-gold-accent);">${player.ratings.mental}/100</strong></div>
+              <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px;"><div style="background: var(--bhs-gold-accent); height: 100%; width: ${player.ratings.mental}%; border-radius: 3px;"></div></div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Action Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--bhs-navy-border); padding-top: 16px;">
+        <button class="btn btn-secondary" onclick="window.auth.logout(); app.updateAuthUI(); app.renderCurrentView(); app.closeModals();">🚪 Sign Out</button>
+        <button class="btn btn-gold" onclick="app.closeModals(); app.switchView('roster');">👥 View Team Roster</button>
+      </div>
+    `;
   }
 
   renderAdminModalContent() {
     const currentUser = window.auth.getCurrentUser();
+    if (currentUser && currentUser.role === 'player') {
+      return this.renderPlayerAccountModalContent();
+    }
+
+    const titleEl = document.getElementById('adminModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = '⚙️ ADMIN &amp; ROLE CONTROL CENTER';
+    }
+
+    const isGuest = !currentUser || currentUser.role === 'guest';
+    const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
 
     const sampleUsers = [
       { id: 'user_coach_bob', name: 'Coach Bob', role: 'Coach', icon: '👔', desc: 'Head Coach: full practice planning, match crud, roster & ratings' },
@@ -2007,11 +2897,21 @@ class BHSSoccerApp {
     const container = document.getElementById('adminModalContent');
     if (!container) return;
 
-    const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
-
     container.innerHTML = `
+      <!-- Current Account Header -->
+      <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img src="${currentUser.avatar || 'assets/bhs_cougars_logo.png'}" style="height: 40px; width: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--bhs-gold-accent);" />
+          <div>
+            <strong style="color: #FFF; font-size: 0.95rem; display: block;">${currentUser.name}</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${currentUser.email || 'Team Account'} &bull; <span style="color: var(--bhs-gold-accent); text-transform: uppercase; font-weight: 700;">${currentUser.role}</span></div>
+          </div>
+        </div>
+        ${!isGuest ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.auth.logout(); app.updateAuthUI(); app.renderCurrentView(); app.closeModals();">🚪 Sign Out</button>` : `<span class="badge badge-gold">PUBLIC ACCESS</span>`}
+      </div>
+
       <!-- Section 1: Role Switcher -->
-      <div style="margin-bottom: 24px;">
+      <div style="margin-bottom: 16px;">
         <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
           <span>🔑</span> SWITCH ACTIVE ROLE / USER ACCOUNT
         </h4>
@@ -2031,13 +2931,14 @@ class BHSSoccerApp {
         </div>
       </div>
 
-      <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
+      ${!isGuest ? `
+        <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
 
-      <!-- Section 2: Import & Export Data -->
-      <div style="margin-bottom: 24px;">
-        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
-          <span>📂</span> IMPORT &amp; EXPORT DATA (CSV / EXCEL)
-        </h4>
+        <!-- Section 2: Import & Export Data -->
+        <div style="margin-bottom: 24px;">
+          <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
+            <span>📂</span> IMPORT &amp; EXPORT DATA (CSV / EXCEL)
+          </h4>
 
         ${!isCoachOrAdmin ? `
           <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #FFF; margin-bottom: 12px;">
@@ -2108,6 +3009,7 @@ class BHSSoccerApp {
           <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
         </div>
       </div>
+      ` : ''}
     `;
   }
 

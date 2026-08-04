@@ -192,4 +192,72 @@ ON public.daily_thoughts FOR DELETE
 TO public, anon, authenticated 
 USING (true);
 
+-- ============================================================
+-- QUIZ ENGINE TABLES & GRADED RESULTS VIEW
+-- ============================================================
+
+-- 10. QUIZ QUESTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.quiz_questions (
+    question_id SERIAL PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    option_a TEXT NOT NULL,
+    option_b TEXT NOT NULL,
+    option_c TEXT NOT NULL,
+    option_d TEXT NOT NULL,
+    correct_option CHAR(1) NOT NULL CHECK (correct_option IN ('A','B','C','D')),
+    explanation TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. QUIZ ATTEMPTS TABLE
+CREATE TABLE IF NOT EXISTS public.quiz_attempts (
+    attempt_id    SERIAL PRIMARY KEY,
+    player_id     TEXT        NOT NULL,
+    player_name   TEXT        NOT NULL,
+    started_at    TIMESTAMPTZ DEFAULT NOW(),
+    completed_at  TIMESTAMPTZ DEFAULT NOW(),
+    score         INTEGER,               -- number of correct answers (0-5)
+    total_questions INTEGER DEFAULT 5,
+    percentage    DECIMAL(5,1) DEFAULT 0.0,
+    CONSTRAINT score_range CHECK (score IS NULL OR (score >= 0 AND score <= total_questions))
+);
+
+-- 12. INDIVIDUAL ANSWERS GIVEN BY PLAYER
+CREATE TABLE IF NOT EXISTS public.player_answers (
+    answer_id       SERIAL PRIMARY KEY,
+    attempt_id      INTEGER     NOT NULL REFERENCES public.quiz_attempts(attempt_id) ON DELETE CASCADE,
+    question_id     INTEGER     NOT NULL,
+    selected_option CHAR(1)     NOT NULL CHECK (selected_option IN ('A','B','C','D')),
+    is_correct      BOOLEAN,            -- calculated when grading
+    UNIQUE (attempt_id, question_id)    -- one answer per question per attempt
+);
+
+-- 13. HELPFUL VIEW TO SEE GRADED QUIZ RESULTS
+CREATE OR REPLACE VIEW public.quiz_results AS
+SELECT 
+    a.attempt_id,
+    a.player_id,
+    a.player_name,
+    a.started_at,
+    a.completed_at,
+    a.score,
+    a.total_questions,
+    ROUND((a.score::DECIMAL / NULLIF(a.total_questions, 0)) * 100, 1) AS percentage
+FROM public.quiz_attempts a
+ORDER BY a.completed_at DESC NULLS LAST;
+
+-- Grant access to anon & authenticated roles
+GRANT ALL ON TABLE public.quiz_questions TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.quiz_attempts TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.player_answers TO anon, authenticated, service_role;
+GRANT ALL ON public.quiz_results TO anon, authenticated, service_role;
+
+ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.player_answers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow full access for quiz_questions" ON public.quiz_questions FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access for quiz_attempts" ON public.quiz_attempts FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access for player_answers" ON public.player_answers FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+
 

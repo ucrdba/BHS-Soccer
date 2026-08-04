@@ -30,6 +30,26 @@ class SupabaseService {
     return this.client !== null;
   }
 
+  async upsertProfile(schoolId = 'bhs', user = {}) {
+    if (!this.isConfigured()) return null;
+    const payload = {
+      school_id: schoolId,
+      name: user.name || 'Team User',
+      email: user.email || '',
+      role: user.role || 'guest',
+      team_level: user.teamLevel || 'Boys Varsity',
+      avatar_url: user.avatar || 'assets/bhs_cougars_logo.png'
+    };
+
+    const { data, error } = await this.client
+      .from('profiles')
+      .insert([payload])
+      .select();
+
+    if (error) console.warn('Supabase upsertProfile notice:', error.message);
+    return data ? data[0] : null;
+  }
+
   // Database Query Wrappers
   async fetchPlayers(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
@@ -332,6 +352,70 @@ class SupabaseService {
       .update({ is_active: true })
       .eq('id', activeId);
     if (err2) console.error('Supabase setActiveDailyThought set error:', err2);
+  }
+
+  async saveQuizAttempt(playerData = {}, answers = [], score = 0, totalQuestions = 5) {
+    if (!this.isConfigured()) return null;
+
+    const percentage = Math.round((score / (totalQuestions || 1)) * 100);
+    const attemptPayload = {
+      player_id: playerData.id || 'p_guest',
+      player_name: playerData.name || 'Alex Rivera (#10)',
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      score: score,
+      total_questions: totalQuestions,
+      percentage: percentage
+    };
+
+    // 1. Insert row into quiz_attempts
+    const { data: attemptData, error: attemptErr } = await this.client
+      .from('quiz_attempts')
+      .insert([attemptPayload])
+      .select();
+
+    if (attemptErr) {
+      console.warn('Supabase saveQuizAttempt notice:', attemptErr.message);
+      return null;
+    }
+
+    const attemptId = attemptData && attemptData[0] ? attemptData[0].attempt_id : null;
+
+    // 2. Insert rows into player_answers if attemptId exists
+    if (attemptId && answers.length > 0) {
+      const answerRows = answers.map(a => ({
+        attempt_id: attemptId,
+        question_id: a.questionId,
+        selected_option: a.selectedOption,
+        is_correct: !!a.isCorrect
+      }));
+
+      const { error: ansErr } = await this.client
+        .from('player_answers')
+        .insert(answerRows);
+
+      if (ansErr) console.warn('Supabase player_answers save notice:', ansErr.message);
+    }
+
+    return attemptData ? attemptData[0] : null;
+  }
+
+  async fetchQuizResults() {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client
+      .from('quiz_results')
+      .select('*')
+      .limit(20);
+
+    if (error) {
+      const { data: attData } = await this.client
+        .from('quiz_attempts')
+        .select('*')
+        .order('completed_at', { ascending: false })
+        .limit(20);
+      return attData;
+    }
+    return data;
   }
 }
 
