@@ -299,6 +299,26 @@ class SoccerTacticalBoard {
     if (!this.keyframes || !this.keyframes[this.currentFrameIndex]) return;
     this.keyframes[this.currentFrameIndex].elements = JSON.parse(JSON.stringify(this.elements));
     this.keyframes[this.currentFrameIndex].drawings = JSON.parse(JSON.stringify(this.drawings));
+    this.propagateNewElementsForward();
+  }
+
+  propagateNewElementsForward() {
+    if (!this.keyframes || this.keyframes.length <= 1) return;
+
+    const currentFrame = this.keyframes[this.currentFrameIndex];
+    if (!currentFrame || !currentFrame.elements) return;
+
+    for (let k = this.currentFrameIndex + 1; k < this.keyframes.length; k++) {
+      const nextFrame = this.keyframes[k];
+      if (!nextFrame || !nextFrame.elements) continue;
+
+      currentFrame.elements.forEach(el => {
+        const exists = nextFrame.elements.some(nextEl => nextEl.id === el.id);
+        if (!exists) {
+          nextFrame.elements.push(JSON.parse(JSON.stringify(el)));
+        }
+      });
+    }
   }
 
   addKeyframe() {
