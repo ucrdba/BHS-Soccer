@@ -629,8 +629,27 @@ class SoccerTacticalBoard {
           number: num
         });
         this.render();
+      } else if (this.activeTool === 'text') {
+        const input = prompt('Enter tactical text label (e.g. "Overlapping Run", "3-Touch Limit", "Pressing Trigger"):', 'Overlapping Run');
+        if (input && input.trim()) {
+          this.saveState();
+          this.elements.push({
+            id: Date.now() + Math.random(),
+            type: 'text',
+            text: input.trim(),
+            x: pos.x,
+            y: pos.y,
+            color: '#FFD700'
+          });
+          this.render();
+        }
       } else if (this.activeTool === 'select' || this.activeTool === 'eraser') {
-        const elIdx = this.elements.findIndex(el => Math.hypot(el.x - pos.x, el.y - pos.y) < 22);
+        const elIdx = this.elements.findIndex(el => {
+          if (el.type === 'text') {
+            return Math.abs(el.x - pos.x) < 40 && Math.abs(el.y - pos.y) < 15;
+          }
+          return Math.hypot(el.x - pos.x, el.y - pos.y) < 22;
+        });
         if (elIdx !== -1) {
           this.saveState();
           if (this.activeTool === 'eraser') {
@@ -897,6 +916,30 @@ class SoccerTacticalBoard {
       ctx.strokeRect(el.x - 16, el.y - 10, 32, 20);
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.fillRect(el.x - 16, el.y - 10, 32, 20);
+    } else if (el.type === 'text') {
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const textWidth = ctx.measureText(el.text || 'Label').width;
+      const padX = 8;
+      const padY = 5;
+      const boxW = textWidth + padX * 2;
+      const boxH = 22;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(el.x - boxW / 2, el.y - boxH / 2, boxW, boxH, 4);
+      } else {
+        ctx.rect(el.x - boxW / 2, el.y - boxH / 2, boxW, boxH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(el.text || 'Label', el.x, el.y);
     }
     ctx.restore();
   }
@@ -1961,6 +2004,7 @@ class BHSSoccerApp {
               <button class="tool-btn" data-tool="ball" onclick="app.setDiagramTool('ball')">⚽ Ball</button>
               <button class="tool-btn" data-tool="cone" onclick="app.setDiagramTool('cone')">🦺 Cone</button>
               <button class="tool-btn" data-tool="goal" onclick="app.setDiagramTool('goal')">🥅 Goal</button>
+              <button class="tool-btn" data-tool="text" onclick="app.setDiagramTool('text')">📝 Text Label</button>
             </div>
 
             <div class="tool-group">
