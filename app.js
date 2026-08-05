@@ -207,6 +207,14 @@ class SoccerTacticalBoard {
     this.draggedElement = null;
     this.dragOffset = { x: 0, y: 0 };
     this.hasAttached = false;
+
+    // Tactical Keyframe Animation Properties
+    this.keyframes = [
+      { time: 0, label: 'Time 0 (Start Position)', elements: [], drawings: [] }
+    ];
+    this.currentFrameIndex = 0;
+    this.isPlaying = false;
+    this.animReqId = null;
   }
 
   init(canvasId) {
@@ -223,6 +231,7 @@ class SoccerTacticalBoard {
     this.attachEvents();
     this.render();
     this.updateToolbarUI();
+    this.updateTimelineUI();
   }
 
   setPitchType(type) {
@@ -280,11 +289,201 @@ class SoccerTacticalBoard {
     this.saveState();
     this.elements = [];
     this.drawings = [];
+    this.saveCurrentFrameState();
     this.render();
   }
 
+  saveCurrentFrameState() {
+    if (!this.keyframes || !this.keyframes[this.currentFrameIndex]) return;
+    this.keyframes[this.currentFrameIndex].elements = JSON.parse(JSON.stringify(this.elements));
+    this.keyframes[this.currentFrameIndex].drawings = JSON.parse(JSON.stringify(this.drawings));
+  }
+
+  addKeyframe() {
+    this.stopAnimation();
+    this.saveCurrentFrameState();
+    const newIndex = this.keyframes.length;
+    const prevFrame = this.keyframes[this.currentFrameIndex] || { elements: [], drawings: [] };
+    
+    this.keyframes.push({
+      time: newIndex,
+      label: `Time ${newIndex}`,
+      elements: JSON.parse(JSON.stringify(prevFrame.elements)),
+      drawings: JSON.parse(JSON.stringify(prevFrame.drawings))
+    });
+
+    this.currentFrameIndex = newIndex;
+    this.elements = JSON.parse(JSON.stringify(this.keyframes[newIndex].elements));
+    this.drawings = JSON.parse(JSON.stringify(this.keyframes[newIndex].drawings));
+    
+    this.render();
+    this.updateTimelineUI();
+  }
+
+  goToKeyframe(index) {
+    if (index < 0 || index >= this.keyframes.length) return;
+    this.stopAnimation();
+    this.saveCurrentFrameState();
+    
+    this.currentFrameIndex = index;
+    const target = this.keyframes[index];
+    this.elements = JSON.parse(JSON.stringify(target.elements || []));
+    this.drawings = JSON.parse(JSON.stringify(target.drawings || []));
+    
+    this.render();
+    this.updateTimelineUI();
+  }
+
+  deleteCurrentKeyframe() {
+    if (this.keyframes.length <= 1) {
+      alert('Cannot delete the initial Time 0 frame.');
+      return;
+    }
+    this.stopAnimation();
+    this.keyframes.splice(this.currentFrameIndex, 1);
+    // Re-index time labels
+    this.keyframes.forEach((kf, idx) => {
+      kf.time = idx;
+      kf.label = idx === 0 ? 'Time 0 (Start Position)' : `Time ${idx}`;
+    });
+    this.currentFrameIndex = Math.max(0, this.currentFrameIndex - 1);
+    const target = this.keyframes[this.currentFrameIndex];
+    this.elements = JSON.parse(JSON.stringify(target.elements || []));
+    this.drawings = JSON.parse(JSON.stringify(target.drawings || []));
+
+    this.render();
+    this.updateTimelineUI();
+  }
+
+  updateTimelineUI() {
+    const badge = document.getElementById('timelineFrameBadge');
+    if (badge && this.keyframes[this.currentFrameIndex]) {
+      badge.textContent = this.keyframes[this.currentFrameIndex].label;
+    }
+
+    const btnPlay = document.getElementById('btnPlayAnim');
+    if (btnPlay) {
+      btnPlay.innerHTML = this.isPlaying ? '⏸️ Pause' : '▶️ Play Animation';
+      btnPlay.className = this.isPlaying ? 'btn btn-gold active' : 'btn btn-gold';
+    }
+
+    const container = document.getElementById('keyframeButtonsContainer');
+    if (container) {
+      container.innerHTML = this.keyframes.map((kf, idx) => {
+        const isActive = (idx === this.currentFrameIndex);
+        return `
+          <button class="btn ${isActive ? 'btn-gold' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 700; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; flex-shrink: 0;" onclick="app.diagrammer.goToKeyframe(${idx})">
+            ⏱️ ${kf.label}
+          </button>
+        `;
+      }).join('');
+    }
+  }
+
+  togglePlayAnimation() {
+    if (this.isPlaying) {
+      this.stopAnimation();
+    } else {
+      this.playAnimation();
+    }
+  }
+
+  playAnimation() {
+    if (this.keyframes.length < 2) {
+      alert('Please add at least 2 time frames (e.g. Time 0 and Time 1) using "+ Add Time Frame" to create movement animation!');
+      return;
+    }
+
+    this.saveCurrentFrameState();
+    this.isPlaying = true;
+    this.updateTimelineUI();
+
+    const totalSteps = this.keyframes.length - 1;
+    const durationPerStepMs = 1200; // 1.2s per step
+    let startTime = null;
+
+    const animate = (timestamp) => {
+      if (!this.isPlaying) return;
+      if (!startTime) startTime = timestamp;
+
+      const elapsed = timestamp - startTime;
+      const totalDuration = totalSteps * durationPerStepMs;
+      const progressTotal = (elapsed % totalDuration) / totalDuration;
+
+      const currentStep = Math.min(Math.floor((elapsed % totalDuration) / durationPerStepMs), totalSteps - 1);
+      const stepProgress = ((elapsed % totalDuration) % durationPerStepMs) / durationPerStepMs;
+
+      const frameA = this.keyframes[currentStep];
+      const frameB = this.keyframes[currentStep + 1];
+
+      this.elements = this.interpolateFrames(frameA.elements, frameB.elements, stepProgress);
+      this.drawings = stepProgress < 0.5 ? frameA.drawings : frameB.drawings;
+      this.currentFrameIndex = currentStep;
+
+      this.render();
+      this.updateTimelineUI();
+
+      this.animReqId = requestAnimationFrame(animate);
+    };
+
+    this.animReqId = requestAnimationFrame(animate);
+  }
+
+  stopAnimation() {
+    this.isPlaying = false;
+    if (this.animReqId) {
+      cancelAnimationFrame(this.animReqId);
+      this.animReqId = null;
+    }
+    if (this.keyframes[this.currentFrameIndex]) {
+      this.elements = JSON.parse(JSON.stringify(this.keyframes[this.currentFrameIndex].elements || []));
+      this.drawings = JSON.parse(JSON.stringify(this.keyframes[this.currentFrameIndex].drawings || []));
+    }
+    this.render();
+    this.updateTimelineUI();
+  }
+
+  interpolateFrames(elementsA, elementsB, t) {
+    const lerp = (a, b, progress) => a + (b - a) * progress;
+
+    const result = [];
+    const usedB = new Set();
+
+    (elementsA || []).forEach(elA => {
+      let matchB = (elementsB || []).find(elB => elB.id === elA.id);
+      if (!matchB && elA.type && elA.number) {
+        matchB = (elementsB || []).find(elB => !usedB.has(elB) && elB.type === elA.type && elB.number === elA.number);
+      }
+      if (!matchB && elA.type === 'ball') {
+        matchB = (elementsB || []).find(elB => !usedB.has(elB) && elB.type === 'ball');
+      }
+
+      if (matchB) {
+        usedB.add(matchB);
+        result.push({
+          ...elA,
+          x: lerp(elA.x, matchB.x, t),
+          y: lerp(elA.y, matchB.y, t)
+        });
+      } else {
+        result.push({ ...elA });
+      }
+    });
+
+    (elementsB || []).forEach(elB => {
+      if (!usedB.has(elB)) {
+        result.push({ ...elB });
+      }
+    });
+
+    return result;
+  }
+
   exportDiagramData() {
+    this.saveCurrentFrameState();
     return {
+      keyframes: JSON.parse(JSON.stringify(this.keyframes)),
+      currentFrameIndex: this.currentFrameIndex,
       elements: JSON.parse(JSON.stringify(this.elements)),
       drawings: JSON.parse(JSON.stringify(this.drawings)),
       pitchType: this.pitchType
@@ -295,13 +494,37 @@ class SoccerTacticalBoard {
     if (!data) {
       this.elements = [];
       this.drawings = [];
+      this.keyframes = [{
+        time: 0,
+        label: 'Time 0 (Start Position)',
+        elements: [],
+        drawings: []
+      }];
+      this.currentFrameIndex = 0;
       this.render();
+      this.updateTimelineUI();
       return;
     }
-    this.elements = data.elements ? JSON.parse(JSON.stringify(data.elements)) : [];
-    this.drawings = data.drawings ? JSON.parse(JSON.stringify(data.drawings)) : [];
+    if (data.keyframes && Array.isArray(data.keyframes) && data.keyframes.length > 0) {
+      this.keyframes = JSON.parse(JSON.stringify(data.keyframes));
+      this.currentFrameIndex = Math.min(data.currentFrameIndex || 0, this.keyframes.length - 1);
+      const frame = this.keyframes[this.currentFrameIndex];
+      this.elements = frame.elements ? JSON.parse(JSON.stringify(frame.elements)) : [];
+      this.drawings = frame.drawings ? JSON.parse(JSON.stringify(frame.drawings)) : [];
+    } else {
+      this.elements = data.elements ? JSON.parse(JSON.stringify(data.elements)) : [];
+      this.drawings = data.drawings ? JSON.parse(JSON.stringify(data.drawings)) : [];
+      this.keyframes = [{
+        time: 0,
+        label: 'Time 0 (Start Position)',
+        elements: JSON.parse(JSON.stringify(this.elements)),
+        drawings: JSON.parse(JSON.stringify(this.drawings))
+      }];
+      this.currentFrameIndex = 0;
+    }
     this.pitchType = data.pitchType || 'full';
     this.render();
+    this.updateTimelineUI();
     this.updateToolbarUI();
   }
 
@@ -1708,6 +1931,27 @@ class BHSSoccerApp {
           <!-- Pitch Canvas Wrapper -->
           <div class="canvas-wrapper">
             <canvas id="soccerBoardCanvas" width="800" height="500"></canvas>
+          </div>
+
+          <!-- Tactical Movement Timeline & Animator Controls -->
+          <div style="margin-top: 16px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.1rem;">⏱️</span>
+                <strong style="color: var(--bhs-gold-accent); font-size: 0.9rem;">TACTICAL MOVEMENT TIMELINE</strong>
+                <span id="timelineFrameBadge" class="badge badge-gold" style="font-size: 0.75rem;">Time 0 (Start Position)</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-gold" id="btnPlayAnim" style="padding: 6px 14px; font-size: 0.85rem; font-weight: 700;" onclick="app.diagrammer.togglePlayAnimation()">▶️ Play Animation</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="app.diagrammer.addKeyframe()">➕ Add Time Frame</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger);" onclick="app.diagrammer.deleteCurrentKeyframe()">🗑️ Delete Frame</button>
+              </div>
+            </div>
+
+            <!-- Keyframe Sequence Bar -->
+            <div id="keyframeButtonsContainer" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0;">
+              <!-- Rendered dynamically -->
+            </div>
           </div>
         </div>
       </div>
