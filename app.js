@@ -654,13 +654,13 @@ class SoccerTacticalBoard {
             }
           }
         }
-      } else if (['line_solid', 'line_arrow', 'line_dribble', 'line_dashed'].includes(this.activeTool)) {
+      } else if (['line_solid', 'line_arrow', 'line_dribble', 'line_dashed', 'line_shot'].includes(this.activeTool)) {
         this.saveState();
         this.isDrawing = true;
         this.currentPath = {
           tool: this.activeTool,
-          color: this.activeTool === 'line_dashed' ? '#FFD700' : this.activeTool === 'line_dribble' ? '#10B981' : '#FFFFFF',
-          width: 3,
+          color: this.activeTool === 'line_shot' ? '#EF4444' : (this.activeTool === 'line_dashed' ? '#FFD700' : this.activeTool === 'line_dribble' ? '#10B981' : '#FFFFFF'),
+          width: this.activeTool === 'line_shot' ? 4 : 3,
           points: [pos]
         };
         this.drawings.push(this.currentPath);
@@ -821,19 +821,28 @@ class SoccerTacticalBoard {
     }
     ctx.stroke();
 
-    if (d.tool === 'line_arrow' || d.tool === 'line_dashed') {
+    if (d.tool === 'line_arrow' || d.tool === 'line_dashed' || d.tool === 'line_shot') {
       const p1 = d.points[d.points.length - 2];
       const p2 = d.points[d.points.length - 1];
       const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-      const headLen = 14;
+      const headLen = d.tool === 'line_shot' ? 18 : 14;
 
-      ctx.fillStyle = d.color || '#FFF';
+      ctx.fillStyle = d.color || (d.tool === 'line_shot' ? '#EF4444' : '#FFF');
       ctx.beginPath();
       ctx.moveTo(p2.x, p2.y);
       ctx.lineTo(p2.x - headLen * Math.cos(angle - Math.PI / 6), p2.y - headLen * Math.sin(angle - Math.PI / 6));
       ctx.lineTo(p2.x - headLen * Math.cos(angle + Math.PI / 6), p2.y - headLen * Math.sin(angle + Math.PI / 6));
       ctx.closePath();
       ctx.fill();
+
+      if (d.tool === 'line_shot') {
+        // Draw target crosshair / ring at the end of the shot on goal
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p2.x, p2.y, 8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -1959,6 +1968,7 @@ class BHSSoccerApp {
               <button class="tool-btn" data-tool="line_arrow" onclick="app.setDiagramTool('line_arrow')">➡️ Arrow / Pass</button>
               <button class="tool-btn" data-tool="line_dashed" onclick="app.setDiagramTool('line_dashed')">⚡ Run / Sprint</button>
               <button class="tool-btn" data-tool="line_dribble" onclick="app.setDiagramTool('line_dribble')">〰️ Dribble</button>
+              <button class="tool-btn" data-tool="line_shot" onclick="app.setDiagramTool('line_shot')">🎯 Shot on Goal</button>
               <button class="tool-btn" data-tool="line_solid" onclick="app.setDiagramTool('line_solid')">✏️ Pen</button>
             </div>
 
