@@ -269,6 +269,7 @@ class SoccerTacticalBoard {
     });
     if (this.history.length > 30) this.history.shift();
     this.redoStack = [];
+    this.saveCurrentFrameState();
   }
 
   undo() {
@@ -282,6 +283,7 @@ class SoccerTacticalBoard {
     this.elements = state.elements;
     this.drawings = state.drawings;
     this.pitchType = state.pitchType || 'full';
+    this.saveCurrentFrameState();
     this.render();
   }
 
@@ -300,8 +302,9 @@ class SoccerTacticalBoard {
   }
 
   addKeyframe() {
-    this.stopAnimation();
     this.saveCurrentFrameState();
+    this.stopAnimation();
+
     const newIndex = this.keyframes.length;
     const prevFrame = this.keyframes[this.currentFrameIndex] || { elements: [], drawings: [] };
     
@@ -322,8 +325,8 @@ class SoccerTacticalBoard {
 
   goToKeyframe(index) {
     if (index < 0 || index >= this.keyframes.length) return;
-    this.stopAnimation();
     this.saveCurrentFrameState();
+    this.stopAnimation();
     
     this.currentFrameIndex = index;
     const target = this.keyframes[index];
@@ -384,6 +387,10 @@ class SoccerTacticalBoard {
     if (this.isPlaying) {
       this.stopAnimation();
     } else {
+      // If at the end of the timeline sequence, rewind to Time 0 before starting play
+      if (this.currentFrameIndex >= this.keyframes.length - 1) {
+        this.goToKeyframe(0);
+      }
       this.playAnimation();
     }
   }
@@ -400,6 +407,7 @@ class SoccerTacticalBoard {
 
     const totalSteps = this.keyframes.length - 1;
     const durationPerStepMs = 1200; // 1.2s per step
+    const totalDuration = totalSteps * durationPerStepMs;
     let startTime = null;
 
     const animate = (timestamp) => {
@@ -407,11 +415,25 @@ class SoccerTacticalBoard {
       if (!startTime) startTime = timestamp;
 
       const elapsed = timestamp - startTime;
-      const totalDuration = totalSteps * durationPerStepMs;
-      const progressTotal = (elapsed % totalDuration) / totalDuration;
 
-      const currentStep = Math.min(Math.floor((elapsed % totalDuration) / durationPerStepMs), totalSteps - 1);
-      const stepProgress = ((elapsed % totalDuration) % durationPerStepMs) / durationPerStepMs;
+      if (elapsed >= totalDuration) {
+        // Reached the end of the movement sequence: stop on final frame
+        this.currentFrameIndex = totalSteps;
+        const lastFrame = this.keyframes[totalSteps];
+        this.elements = JSON.parse(JSON.stringify(lastFrame.elements || []));
+        this.drawings = JSON.parse(JSON.stringify(lastFrame.drawings || []));
+        this.isPlaying = false;
+        if (this.animReqId) {
+          cancelAnimationFrame(this.animReqId);
+          this.animReqId = null;
+        }
+        this.render();
+        this.updateTimelineUI();
+        return;
+      }
+
+      const currentStep = Math.min(Math.floor(elapsed / durationPerStepMs), totalSteps - 1);
+      const stepProgress = (elapsed % durationPerStepMs) / durationPerStepMs;
 
       const frameA = this.keyframes[currentStep];
       const frameB = this.keyframes[currentStep + 1];
@@ -430,12 +452,13 @@ class SoccerTacticalBoard {
   }
 
   stopAnimation() {
+    const wasPlaying = this.isPlaying;
     this.isPlaying = false;
     if (this.animReqId) {
       cancelAnimationFrame(this.animReqId);
       this.animReqId = null;
     }
-    if (this.keyframes[this.currentFrameIndex]) {
+    if (wasPlaying && this.keyframes[this.currentFrameIndex]) {
       this.elements = JSON.parse(JSON.stringify(this.keyframes[this.currentFrameIndex].elements || []));
       this.drawings = JSON.parse(JSON.stringify(this.keyframes[this.currentFrameIndex].drawings || []));
     }
