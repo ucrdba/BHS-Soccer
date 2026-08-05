@@ -30,6 +30,30 @@ class SupabaseService {
     return this.client !== null;
   }
 
+  async signUpUser(email, password) {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client.auth.signUp({ email, password });
+      if (error) console.warn('Supabase Auth signUp notice:', error.message);
+      return { data, error };
+    } catch (e) {
+      console.warn('Supabase Auth signUp exception:', e);
+      return null;
+    }
+  }
+
+  async verifyOtp(email, token) {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client.auth.verifyOtp({ email, token, type: 'signup' });
+      if (error) console.warn('Supabase Auth verifyOtp notice:', error.message);
+      return { data, error };
+    } catch (e) {
+      console.warn('Supabase Auth verifyOtp exception:', e);
+      return null;
+    }
+  }
+
   async upsertProfile(schoolId = 'bhs', user = {}) {
     if (!this.isConfigured()) return null;
     const payload = {
@@ -37,13 +61,14 @@ class SupabaseService {
       name: user.name || 'Team User',
       email: user.email || '',
       role: user.role || 'guest',
+      status: user.status || 'active',
       team_level: user.teamLevel || 'Boys Varsity',
       avatar_url: user.avatar || 'assets/bhs_cougars_logo.png'
     };
 
     const { data, error } = await this.client
       .from('profiles')
-      .insert([payload])
+      .upsert([payload], { onConflict: 'email' })
       .select();
 
     if (error) console.warn('Supabase upsertProfile notice:', error.message);
@@ -122,7 +147,9 @@ class SupabaseService {
       time_slot: d.time || '',
       name: d.name || '',
       duration: d.duration || '',
-      coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim()
+      coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim(),
+      diagram_image: d.diagramImage || null,
+      diagram_data: d.diagramData || null
     }));
     const { data, error } = await this.client
       .from('practice_plans')
@@ -141,7 +168,9 @@ class SupabaseService {
         time_slot: planItem.time,
         name: planItem.name,
         duration: planItem.duration,
-        coach_notes: planItem.coachNotes
+        coach_notes: planItem.coachNotes,
+        diagram_image: planItem.diagramImage || null,
+        diagram_data: planItem.diagramData || null
       }])
       .select();
     if (error) console.error('Supabase savePracticePlanItem error:', error);
@@ -155,7 +184,9 @@ class SupabaseService {
       time_slot: planItem.time,
       name: planItem.name,
       duration: planItem.duration,
-      coach_notes: planItem.coachNotes
+      coach_notes: planItem.coachNotes,
+      diagram_image: planItem.diagramImage || null,
+      diagram_data: planItem.diagramData || null
     };
     if (planItem.id) payload.id = planItem.id;
 

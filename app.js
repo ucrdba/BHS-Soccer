@@ -283,6 +283,28 @@ class SoccerTacticalBoard {
     this.render();
   }
 
+  exportDiagramData() {
+    return {
+      elements: JSON.parse(JSON.stringify(this.elements)),
+      drawings: JSON.parse(JSON.stringify(this.drawings)),
+      pitchType: this.pitchType
+    };
+  }
+
+  loadDiagramData(data) {
+    if (!data) {
+      this.elements = [];
+      this.drawings = [];
+      this.render();
+      return;
+    }
+    this.elements = data.elements ? JSON.parse(JSON.stringify(data.elements)) : [];
+    this.drawings = data.drawings ? JSON.parse(JSON.stringify(data.drawings)) : [];
+    this.pitchType = data.pitchType || 'full';
+    this.render();
+    this.updateToolbarUI();
+  }
+
   getPos(e) {
     const rect = this.canvas.getBoundingClientRect();
     const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
@@ -291,6 +313,26 @@ class SoccerTacticalBoard {
       x: (clientX - rect.left) * (this.canvas.width / rect.width),
       y: (clientY - rect.top) * (this.canvas.height / rect.height)
     };
+  }
+
+  distToSegment(p, v, w) {
+    const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+    if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+  }
+
+  isPointNearDrawing(pos, drawing, maxDist = 18) {
+    const pts = drawing.points;
+    if (!pts || pts.length === 0) return false;
+    if (pts.length === 1) return Math.hypot(pos.x - pts[0].x, pos.y - pts[0].y) <= maxDist;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (this.distToSegment(pos, pts[i], pts[i + 1]) <= maxDist) {
+        return true;
+      }
+    }
+    return false;
   }
 
   attachEvents() {
@@ -322,15 +364,28 @@ class SoccerTacticalBoard {
         });
         this.render();
       } else if (this.activeTool === 'select' || this.activeTool === 'eraser') {
-        const idx = this.elements.findIndex(el => Math.hypot(el.x - pos.x, el.y - pos.y) < 22);
-        if (idx !== -1) {
+        const elIdx = this.elements.findIndex(el => Math.hypot(el.x - pos.x, el.y - pos.y) < 22);
+        if (elIdx !== -1) {
           this.saveState();
           if (this.activeTool === 'eraser') {
-            this.elements.splice(idx, 1);
+            this.elements.splice(elIdx, 1);
             this.render();
           } else {
-            this.draggedElement = this.elements[idx];
+            this.draggedElement = this.elements[elIdx];
             this.dragOffset = { x: pos.x - this.draggedElement.x, y: pos.y - this.draggedElement.y };
+          }
+        } else {
+          // Proximity hit-test for drawn lines, arrows, dribbles, and sprint lines
+          const drawIdx = this.drawings.findIndex(d => this.isPointNearDrawing(pos, d, 18));
+          if (drawIdx !== -1) {
+            this.saveState();
+            if (this.activeTool === 'eraser') {
+              this.drawings.splice(drawIdx, 1);
+              this.render();
+            } else {
+              this.draggedDrawing = this.drawings[drawIdx];
+              this.lastDragPos = pos;
+            }
           }
         }
       } else if (['line_solid', 'line_arrow', 'line_dribble', 'line_dashed'].includes(this.activeTool)) {
@@ -353,6 +408,15 @@ class SoccerTacticalBoard {
         this.draggedElement.x = pos.x - this.dragOffset.x;
         this.draggedElement.y = pos.y - this.dragOffset.y;
         this.render();
+      } else if (this.draggedDrawing && this.lastDragPos) {
+        const dx = pos.x - this.lastDragPos.x;
+        const dy = pos.y - this.lastDragPos.y;
+        this.draggedDrawing.points.forEach(pt => {
+          pt.x += dx;
+          pt.y += dy;
+        });
+        this.lastDragPos = pos;
+        this.render();
       } else if (this.isDrawing && this.currentPath) {
         this.currentPath.points.push(pos);
         this.render();
@@ -363,6 +427,8 @@ class SoccerTacticalBoard {
       this.isDrawing = false;
       this.currentPath = null;
       this.draggedElement = null;
+      this.draggedDrawing = null;
+      this.lastDragPos = null;
     };
 
     this.canvas.addEventListener('mousedown', start);
@@ -670,7 +736,9 @@ class BHSSoccerApp {
               time: plan.time_slot,
               name: plan.name,
               duration: plan.duration,
-              coachNotes: cleanNotes
+              coachNotes: cleanNotes,
+              diagramImage: plan.diagram_image || null,
+              diagramData: plan.diagram_data || null
             });
           } else {
             timelineDrills.push({
@@ -678,7 +746,9 @@ class BHSSoccerApp {
               time: plan.time_slot,
               name: plan.name,
               duration: plan.duration,
-              coachNotes: notes
+              coachNotes: notes,
+              diagramImage: plan.diagram_image || null,
+              diagramData: plan.diagram_data || null
             });
           }
         });
@@ -1537,54 +1607,68 @@ class BHSSoccerApp {
                 <p style="font-size:1rem; margin-bottom:8px;">Today's practice timeline is currently empty.</p>
                 <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Saved Plans Database</strong> to load a session.</p>
               </div>
-            ` : this.data.currentPracticePlan.map((p, idx) => `
-              <div class="drill-item" style="flex-direction: column; align-items: stretch;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
-                  <div class="drill-info" style="flex: 1; padding-right: 20px;">
-                    <h4>${p.name}</h4>
-                    <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="text-align: right;">
-                      <div class="drill-duration">${p.duration}</div>
-                      <div style="font-size: 0.75rem; color: var(--text-muted);">${p.time}</div>
-                    </div>
-                    <div style="display: flex; gap: 6px;">
-                      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="app.openEditPlanDrillModal(${idx})">✏️ Edit</button>
-                      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="app.deletePlanDrill(${idx})">🗑️</button>
-                    </div>
-                  </div>
-                </div>
+            ` : this.data.currentPracticePlan.map((p, idx) => {
+              const isSelected = (this.selectedDrillIndex === idx) || (this.selectedDrillIndex === undefined && idx === 0);
+              if (this.selectedDrillIndex === undefined && idx === 0) this.selectedDrillIndex = 0;
 
-                ${p.diagramImage ? `
-                  <div style="margin-top: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px; border-radius: 8px; text-align: left;">
-                    <div style="font-size: 0.75rem; color: var(--bhs-gold-accent); margin-bottom: 6px; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
-                      <span>🎨 DIAGRAMMED DRILL TACTICS &amp; MOVEMENT</span>
-                      <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: var(--color-danger);" onclick="app.removeDrillDiagram(${idx})">🗑️ Remove Diagram</button>
+              return `
+                <div class="drill-item" onclick="app.selectPracticeDrill(${idx})" style="flex-direction: column; align-items: stretch; cursor: pointer; border: ${isSelected ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; background: ${isSelected ? 'rgba(0, 71, 171, 0.25)' : 'rgba(0, 0, 0, 0.25)'}; transition: all 0.2s ease;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                    <div class="drill-info" style="flex: 1; padding-right: 20px;">
+                      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
+                        <h4 style="margin: 0;">${p.name}</h4>
+                        ${isSelected ? `<span class="badge badge-gold" style="font-size:0.7rem;">ACTIVE SELECTED DRILL</span>` : `<span class="badge badge-secondary" style="font-size:0.68rem; opacity:0.7;">CLICK TO SELECT</span>`}
+                      </div>
+                      <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
                     </div>
-                    <img src="${p.diagramImage}" style="max-width: 100%; max-height: 260px; border-radius: 6px; object-fit: contain; background: #163d16; border: 1px solid var(--bhs-gold-accent);" />
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                      <div style="text-align: right;">
+                        <div class="drill-duration">${p.duration}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${p.time}</div>
+                      </div>
+                      <div style="display: flex; gap: 6px;">
+                        <button class="btn ${isSelected ? 'btn-gold' : 'btn-secondary'}" style="padding: 4px 8px; font-size: 0.8rem;" onclick="event.stopPropagation(); app.selectPracticeDrill(${idx})">🎨 View / Draw Diagram</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="event.stopPropagation(); app.openEditPlanDrillModal(${idx})">✏️ Edit</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="event.stopPropagation(); app.deletePlanDrill(${idx})">🗑️</button>
+                      </div>
+                    </div>
                   </div>
-                ` : ''}
-              </div>
-            `).join('')}
+
+                  ${p.diagramImage ? `
+                    <div style="margin-top: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-gold-accent); padding: 10px; border-radius: 8px; text-align: left;">
+                      <div style="font-size: 0.75rem; color: var(--bhs-gold-accent); margin-bottom: 6px; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
+                        <span>🎨 SAVED TACTICAL DRILL DIAGRAM</span>
+                        <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: var(--color-danger);" onclick="event.stopPropagation(); app.removeDrillDiagram(${idx})">🗑️ Remove Diagram</button>
+                      </div>
+                      <img src="${p.diagramImage}" style="max-width: 100%; max-height: 260px; border-radius: 6px; object-fit: contain; background: #163d16; border: 1px solid var(--bhs-gold-accent);" />
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
         </div>
 
         <!-- Interactive Tactical Drill Diagrammer Card -->
-        <div class="diagrammer-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 12px;">
-            <div>
-              <h3 style="color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
-                <span>🎨</span> TACTICAL SOCCER DRILL DIAGRAMMER
-              </h3>
-              <p class="text-muted" style="font-size: 0.82rem; margin-top: 4px; margin-bottom: 0;">
-                Draw out custom practice drills, place attackers/defenders/cones, draw movement &amp; pass arrows, and attach diagrams directly to your practice timeline.
-              </p>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button class="btn btn-gold" onclick="app.attachDiagramToDrill()">💾 Attach Diagram to Drill</button>
-              <button class="btn btn-secondary" onclick="app.downloadDiagramPNG()">📥 Download PNG</button>
-            </div>
-          </div>
+        ${(() => {
+          const selectedDrill = this.data.currentPracticePlan[this.selectedDrillIndex || 0];
+          return `
+            <div class="diagrammer-card" id="diagrammerCard">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 12px;">
+                <div>
+                  <h3 style="color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <span>🎨</span> TACTICAL SOCCER DRILL DIAGRAMMER
+                  </h3>
+                  <p class="text-muted" style="font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
+                    Target Drill: <strong style="color: var(--bhs-gold-accent);">${selectedDrill ? selectedDrill.name : 'Select a practice drill above'}</strong>
+                  </p>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button class="btn btn-gold" onclick="app.attachDiagramToDrill(${this.selectedDrillIndex || 0})">💾 Save Diagram to "${selectedDrill ? selectedDrill.name : 'Drill'}"</button>
+                  <button class="btn btn-secondary" onclick="app.downloadDiagramPNG()">📥 Download PNG</button>
+                </div>
+              </div>
+          `;
+        })()}
 
           <!-- Diagrammer Toolbar -->
           <div class="diagrammer-toolbar">
@@ -1630,15 +1714,35 @@ class BHSSoccerApp {
     `;
   }
 
+  selectPracticeDrill(idx) {
+    if (!this.data.currentPracticePlan || idx < 0 || idx >= this.data.currentPracticePlan.length) return;
+    this.selectedDrillIndex = idx;
+    const drill = this.data.currentPracticePlan[idx];
+    if (drill && this.diagrammer) {
+      if (drill.diagramData) {
+        this.diagrammer.loadDiagramData(drill.diagramData);
+      } else {
+        this.diagrammer.clear();
+      }
+    }
+    this.renderCurrentView();
+
+    const card = document.getElementById('diagrammerCard');
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
   setDiagramTool(tool) {
     if (this.diagrammer) {
       this.diagrammer.setTool(tool);
     }
   }
 
-  attachDiagramToDrill() {
+  async attachDiagramToDrill(targetIndex = null) {
     if (!this.diagrammer) return;
     const dataUrl = this.diagrammer.exportImage();
+    const diagramData = this.diagrammer.exportDiagramData();
     if (!dataUrl) return;
 
     if (!this.data.currentPracticePlan || this.data.currentPracticePlan.length === 0) {
@@ -1646,27 +1750,46 @@ class BHSSoccerApp {
       return;
     }
 
-    const options = this.data.currentPracticePlan.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
-    const selectedIdxStr = prompt(`Select practice drill number to attach this tactical diagram to:\n\n${options}`, '1');
-
-    if (!selectedIdxStr) return;
-    const selectedIdx = parseInt(selectedIdxStr) - 1;
+    let selectedIdx = (targetIndex !== null && targetIndex !== undefined) ? targetIndex : this.selectedDrillIndex;
+    if (selectedIdx === null || selectedIdx === undefined || selectedIdx < 0 || selectedIdx >= this.data.currentPracticePlan.length) {
+      const options = this.data.currentPracticePlan.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
+      const selectedIdxStr = prompt(`Select practice drill number to attach this tactical diagram to:\n\n${options}`, '1');
+      if (!selectedIdxStr) return;
+      selectedIdx = parseInt(selectedIdxStr) - 1;
+    }
 
     if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= this.data.currentPracticePlan.length) {
       alert('Invalid drill selection.');
       return;
     }
 
-    this.data.currentPracticePlan[selectedIdx].diagramImage = dataUrl;
+    const drill = this.data.currentPracticePlan[selectedIdx];
+    drill.diagramImage = dataUrl;
+    drill.diagramData = diagramData;
+    this.selectedDrillIndex = selectedIdx;
+
     this.saveData();
+
+    // Persist to Supabase Database if configured
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.upsertPracticePlanItem('bhs', drill);
+    }
+
     this.renderCurrentView();
-    alert(`🎉 Tactical drill diagram successfully attached to "${this.data.currentPracticePlan[selectedIdx].name}"!`);
+    alert(`🎉 Tactical drill diagram successfully saved and stored in database for "${drill.name}"!`);
   }
 
-  removeDrillDiagram(idx) {
+  async removeDrillDiagram(idx) {
     if (this.data.currentPracticePlan && this.data.currentPracticePlan[idx]) {
-      delete this.data.currentPracticePlan[idx].diagramImage;
+      const drill = this.data.currentPracticePlan[idx];
+      delete drill.diagramImage;
+      delete drill.diagramData;
       this.saveData();
+
+      if (window.supabaseService && window.supabaseService.isConfigured()) {
+        await window.supabaseService.upsertPracticePlanItem('bhs', drill);
+      }
+
       this.renderCurrentView();
     }
   }
@@ -2724,17 +2847,26 @@ class BHSSoccerApp {
   switchAuthTab(tab) {
     const signInForm = document.getElementById('signInForm');
     const registerForm = document.getElementById('registerForm');
+    const verifyForm = document.getElementById('verifyForm');
     const tabSignInBtn = document.getElementById('tabSignInBtn');
     const tabRegisterBtn = document.getElementById('tabRegisterBtn');
 
     if (tab === 'register') {
       if (signInForm) signInForm.style.display = 'none';
       if (registerForm) registerForm.style.display = '';
+      if (verifyForm) verifyForm.style.display = 'none';
       if (tabSignInBtn) tabSignInBtn.className = 'btn btn-secondary';
       if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-cyan';
+    } else if (tab === 'verify') {
+      if (signInForm) signInForm.style.display = 'none';
+      if (registerForm) registerForm.style.display = 'none';
+      if (verifyForm) verifyForm.style.display = '';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-secondary';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-secondary';
     } else {
       if (signInForm) signInForm.style.display = '';
       if (registerForm) registerForm.style.display = 'none';
+      if (verifyForm) verifyForm.style.display = 'none';
       if (tabSignInBtn) tabSignInBtn.className = 'btn btn-gold';
       if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-secondary';
     }
@@ -2760,7 +2892,9 @@ class BHSSoccerApp {
       this.closeModals();
       alert(`🎉 Welcome back, ${res.user.name}!`);
     } else {
-      if (feedback) {
+      if (res.isPendingVerification) {
+        this.openVerifyTab(res.user.email, res.user.verificationCode);
+      } else if (feedback) {
         feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
       }
     }
@@ -2775,14 +2909,70 @@ class BHSSoccerApp {
 
     const res = window.auth.registerUser({ name, email, password, role });
     if (res.success) {
-      this.updateAuthUI();
-      this.renderCurrentView();
-      this.closeModals();
-      alert(`🎉 Account created successfully! Welcome, ${res.user.name}.`);
+      if (res.requiresVerification) {
+        this.openVerifyTab(email, res.otpCode);
+      } else {
+        this.updateAuthUI();
+        this.renderCurrentView();
+        this.closeModals();
+        alert(`🎉 Account created successfully! Welcome, ${res.user.name}.`);
+      }
     } else {
       if (feedback) {
         feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
       }
+    }
+  }
+
+  openVerifyTab(email, otpCode) {
+    this.switchAuthTab('verify');
+    this.pendingVerifyEmail = email;
+    const targetEl = document.getElementById('verifyTargetEmail');
+    const bannerEl = document.getElementById('simulatedCodeBanner');
+    if (targetEl) targetEl.textContent = email;
+    if (bannerEl && otpCode) {
+      bannerEl.innerHTML = `⚡ DEMO VERIFICATION OTP CODE: <span style="font-size:1.1rem; letter-spacing:2px;">${otpCode}</span> (or enter 123456)`;
+    }
+  }
+
+  handleVerifyOtp() {
+    const code = document.getElementById('verifyOtpCode').value;
+    const feedback = document.getElementById('authFormFeedback');
+    const email = this.pendingVerifyEmail || document.getElementById('regEmail').value || document.getElementById('loginEmail').value;
+
+    const res = window.auth.verifyUserOtp(email, code);
+    if (res.success) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      if (res.status === 'pending_approval') {
+        alert(res.message);
+        this.closeModals();
+      } else {
+        alert(`🎉 Email verified! Account activated for ${res.user.name}.`);
+        this.closeModals();
+      }
+    } else {
+      if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  }
+
+  approveUserAccess(userId) {
+    const ok = window.auth.approveUserAccess(userId);
+    if (ok) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      this.renderAdminModalContent();
+      alert('🎉 User access approved successfully!');
+    }
+  }
+
+  rejectUserAccess(userId) {
+    const ok = window.auth.rejectUserAccess(userId);
+    if (ok) {
+      this.renderAdminModalContent();
+      alert('User request rejected.');
     }
   }
 
@@ -2931,6 +3121,35 @@ class BHSSoccerApp {
         </div>
       </div>
 
+      ${isCoachOrAdmin ? `
+        <!-- Section 1B: Pending User Approvals Queue -->
+        <div style="margin-bottom: 20px; background: rgba(0, 71, 171, 0.15); border: 1px solid var(--bhs-blue-electric); padding: 14px; border-radius: 10px;">
+          <h4 style="color: var(--bhs-gold-accent); margin-bottom: 10px; display:flex; align-items:center; justify-content:space-between;">
+            <span>👥 PENDING USER APPROVAL QUEUE</span>
+            <span class="badge badge-gold">${window.auth.getPendingApprovals().length} REQUESTS</span>
+          </h4>
+
+          ${window.auth.getPendingApprovals().length === 0 ? `
+            <p class="text-muted" style="font-size: 0.85rem; margin: 0;">No pending account authorization requests. New signups requiring Coach/Player access will appear here.</p>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${window.auth.getPendingApprovals().map(p => `
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 8px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                  <div>
+                    <strong style="color:#FFF; display:block; font-size:0.9rem;">${p.name}</strong>
+                    <div style="font-size:0.78rem; color:var(--text-muted);">${p.email} &bull; Requested Role: <span class="badge badge-role">${p.requestedRole.toUpperCase()}</span></div>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.approveUserAccess('${p.id}')">✅ Approve Access</button>
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger);" onclick="app.rejectUserAccess('${p.id}')">❌ Reject</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      ` : ''}
+
       ${!isGuest ? `
         <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
 
@@ -3002,15 +3221,86 @@ class BHSSoccerApp {
         <h4 style="color: var(--bhs-cyan-accent); margin-bottom: 10px; display:flex; align-items:center; gap:8px;">
           <span>⚡</span> SYSTEM &amp; CLOUD DATABASE
         </h4>
-        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding:10px 14px; border-radius:6px; font-size:0.85rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding:10px 14px; border-radius:6px; font-size:0.85rem; margin-bottom: 10px;">
           <div>
             <strong>Cloud Sync Status:</strong> <span style="color: var(--color-success);">Connected to Supabase</span>
           </div>
-          <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.runAuthDiagnosticTest()">🧪 Run Auth Diagnostic Test</button>
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
+          </div>
         </div>
       </div>
       ` : ''}
     `;
+  }
+
+  async runAuthDiagnosticTest() {
+    let report = [];
+
+    // Test 1: Auth Engine
+    if (window.auth) {
+      report.push('✅ 1. AuthManager Engine: Active & Operational');
+    } else {
+      report.push('❌ 1. AuthManager Engine: Missing');
+    }
+
+    // Test 2: User Registration & OTP Generation
+    const testEmail = `test_coach_${Date.now().toString().slice(-4)}@beaumont.edu`;
+    const regRes = window.auth.registerUser({
+      name: 'Diagnostic Coach',
+      email: testEmail,
+      password: 'TestPassword123!',
+      role: 'coach'
+    });
+
+    if (regRes.success && regRes.requiresVerification) {
+      report.push(`✅ 2. Registration Flow: Account created (${testEmail}). OTP Code generated: ${regRes.otpCode}. Status: pending_verification`);
+
+      // Test 3: OTP Code Verification
+      const verifyRes = window.auth.verifyUserOtp(testEmail, regRes.otpCode);
+      if (verifyRes.success && verifyRes.status === 'pending_approval') {
+        report.push(`✅ 3. OTP Verification: Code verified. Account status moved to: pending_approval`);
+
+        // Test 4: Coach Approval Queue
+        const pending = window.auth.getPendingApprovals();
+        const found = pending.find(u => u.email === testEmail);
+        if (found) {
+          report.push(`✅ 4. Coach Approval Queue: Request found in pending queue.`);
+
+          // Test 5: Approval Execution
+          const approveOk = window.auth.approveUserAccess(found.id);
+          if (approveOk) {
+            report.push(`✅ 5. Access Approval: Coach Bob approved request. User account status: ACTIVE.`);
+
+            // Test 6: User Login
+            const loginRes = window.auth.loginUser(testEmail, 'TestPassword123!');
+            if (loginRes.success && loginRes.user.status === 'active') {
+              report.push(`✅ 6. Login Check: User successfully signed in. Role: ${loginRes.user.role.toUpperCase()}`);
+            } else {
+              report.push(`❌ 6. Login Check failed.`);
+            }
+          } else {
+            report.push(`❌ 5. Access Approval failed.`);
+          }
+        } else {
+          report.push(`❌ 4. Coach Approval Queue check failed.`);
+        }
+      } else {
+        report.push(`❌ 3. OTP Verification failed.`);
+      }
+    } else {
+      report.push(`❌ 2. Registration Flow failed.`);
+    }
+
+    // Test 7: Supabase Integration Check
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      report.push('⚡ 7. Supabase Cloud Connection: Connected & Active.');
+    } else {
+      report.push('📦 7. Supabase Cloud Connection: Operating in Local Fallback Mode (LocalStorage).');
+    }
+
+    alert('🧪 AUTHENTICATION & APPROVAL DIAGNOSTIC TEST RESULTS:\n\n' + report.join('\n\n'));
   }
 
   switchUserRole(userId) {

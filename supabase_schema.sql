@@ -80,8 +80,14 @@ CREATE TABLE IF NOT EXISTS public.practice_plans (
   name TEXT NOT NULL,
   duration TEXT NOT NULL,
   coach_notes TEXT,
+  diagram_image TEXT,
+  diagram_data JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration for existing practice_plans table
+ALTER TABLE public.practice_plans ADD COLUMN IF NOT EXISTS diagram_image TEXT;
+ALTER TABLE public.practice_plans ADD COLUMN IF NOT EXISTS diagram_data JSONB DEFAULT '{}'::jsonb;
 
 -- 7. COMPETITIVE MATRIX LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.matrix_logs (

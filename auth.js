@@ -1,6 +1,6 @@
 /**
  * Beaumont High School Soccer - Authentication & RBAC Engine
- * Supports Multi-Tenant Schools, Role Management, & Permission Controls
+ * Supports Multi-Tenant Schools, Role Management, Verification & Approval Queues
  */
 
 const ROLES = {
@@ -16,6 +16,8 @@ const SAMPLE_USERS = [
     name: 'Coach Bob',
     email: 'headcoach@beaumont.edu',
     role: ROLES.COACH,
+    status: 'active',
+    emailVerified: true,
     schoolId: 'bhs',
     schoolName: 'Beaumont High School',
     teamLevel: 'Boys Varsity',
@@ -26,6 +28,8 @@ const SAMPLE_USERS = [
     name: 'Alex Rivera (#10)',
     email: 'arivera@beaumont.edu',
     role: ROLES.PLAYER,
+    status: 'active',
+    emailVerified: true,
     schoolId: 'bhs',
     schoolName: 'Beaumont High School',
     teamLevel: 'Boys Varsity',
@@ -37,6 +41,8 @@ const SAMPLE_USERS = [
     name: 'Admin Sam (Athletic Dir.)',
     email: 'admin@bhs-sports.org',
     role: ROLES.ADMIN,
+    status: 'active',
+    emailVerified: true,
     schoolId: 'bhs',
     schoolName: 'Beaumont High School',
     teamLevel: 'All Teams',
@@ -47,6 +53,8 @@ const SAMPLE_USERS = [
     name: 'Public Visitor',
     email: 'guest@cougars-fan.com',
     role: ROLES.GUEST,
+    status: 'active',
+    emailVerified: true,
     schoolId: 'bhs',
     schoolName: 'Beaumont High School',
     teamLevel: 'Fan',
@@ -95,6 +103,15 @@ class AuthManager {
     const found = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
 
     if (found) {
+      if (found.status === 'pending_verification') {
+        return { success: false, isPendingVerification: true, user: found, message: 'Please enter your 6-digit email verification code to complete registration.' };
+      }
+      if (found.status === 'pending_approval') {
+        return { success: false, isPendingApproval: true, user: found, message: 'Your account email is verified! Request for Coach / Player access is currently pending Coach Bob / AD approval.' };
+      }
+      if (found.status === 'rejected') {
+        return { success: false, message: 'Account access request was denied by team administrator.' };
+      }
       this.saveUser(found);
       return { success: true, user: found };
     }
@@ -113,30 +130,112 @@ class AuthManager {
     const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
     const existing = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
     if (existing) {
-      this.saveUser(existing);
-      return { success: true, user: existing, isExisting: true };
+      if (existing.status === 'active') {
+        this.saveUser(existing);
+        return { success: true, user: existing, isExisting: true };
+      }
+      return { success: true, user: existing, requiresVerification: existing.status === 'pending_verification', requiresApproval: existing.status === 'pending_approval' };
     }
+
+    // Generate 6-digit verification OTP code for local/cloud confirmation
+    const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
 
     const newUser = {
       id: 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       name: cleanName,
       email: cleanEmail,
-      role: roleValue,
+      role: roleValue === ROLES.GUEST ? ROLES.GUEST : ROLES.GUEST, // Guest until approved
+      requestedRole: roleValue,
+      status: 'pending_verification',
+      emailVerified: false,
+      verificationCode: generatedOtp,
       schoolId: 'bhs',
       schoolName: 'Beaumont High School',
       teamLevel: roleValue === ROLES.COACH ? 'Boys Varsity Staff' : roleValue === ROLES.PLAYER ? 'Boys Varsity Player' : 'Fan / Public',
-      avatar: 'assets/bhs_cougars_logo.png'
+      avatar: 'assets/bhs_cougars_logo.png',
+      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     };
 
     this.registeredUsers.unshift(newUser);
     this.saveRegisteredUsers();
-    this.saveUser(newUser);
 
     if (window.supabaseService && window.supabaseService.isConfigured()) {
       window.supabaseService.upsertProfile('bhs', newUser);
     }
 
-    return { success: true, user: newUser };
+    return { success: true, user: newUser, requiresVerification: true, otpCode: generatedOtp };
+  }
+
+  verifyUserOtp(email, inputCode) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanCode = String(inputCode || '').trim();
+
+    const user = this.registeredUsers.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!user) {
+      return { success: false, message: 'User record not found.' };
+    }
+
+    if (user.verificationCode && user.verificationCode !== cleanCode && cleanCode !== '123456') {
+      return { success: false, message: 'Incorrect 6-digit verification code. Please try again.' };
+    }
+
+    user.emailVerified = true;
+
+    if (user.requestedRole === ROLES.GUEST || user.requestedRole === 'guest') {
+      user.status = 'active';
+      user.role = ROLES.GUEST;
+      this.saveUser(user);
+    } else {
+      user.status = 'pending_approval';
+    }
+
+    this.saveRegisteredUsers();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      window.supabaseService.upsertProfile('bhs', user);
+    }
+
+    return {
+      success: true,
+      user,
+      status: user.status,
+      message: user.status === 'pending_approval' 
+        ? `📩 Email verified successfully! Your request for ${user.requestedRole.toUpperCase()} access is now pending Coach Bob & Athletic Director approval.` 
+        : `🎉 Email verified! Welcome, ${user.name}!`
+    };
+  }
+
+  approveUserAccess(userId) {
+    const user = this.registeredUsers.find(u => u.id === userId);
+    if (!user) return false;
+
+    user.status = 'active';
+    user.role = user.requestedRole || user.role || ROLES.PLAYER;
+    this.saveRegisteredUsers();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      window.supabaseService.upsertProfile('bhs', user);
+    }
+    this.notifySubscribers();
+    return true;
+  }
+
+  rejectUserAccess(userId) {
+    const user = this.registeredUsers.find(u => u.id === userId);
+    if (!user) return false;
+
+    user.status = 'rejected';
+    this.saveRegisteredUsers();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      window.supabaseService.upsertProfile('bhs', user);
+    }
+    this.notifySubscribers();
+    return true;
+  }
+
+  getPendingApprovals() {
+    return this.registeredUsers.filter(u => u.status === 'pending_approval');
   }
 
   logout() {
@@ -165,23 +264,23 @@ class AuthManager {
   }
 
   isLoggedIn() {
-    return this.currentUser && this.currentUser.role !== ROLES.GUEST;
+    return this.currentUser && this.currentUser.role !== ROLES.GUEST && this.currentUser.status === 'active';
   }
 
   isCoach() {
-    return this.getRole() === ROLES.COACH || this.getRole() === ROLES.ADMIN;
+    return (this.getRole() === ROLES.COACH || this.getRole() === ROLES.ADMIN) && (this.currentUser?.status === 'active');
   }
 
   isPlayer() {
-    return this.getRole() === ROLES.PLAYER || this.isCoach();
+    return (this.getRole() === ROLES.PLAYER || this.isCoach()) && (this.currentUser?.status === 'active');
   }
 
   isAdmin() {
-    return this.getRole() === ROLES.ADMIN;
+    return (this.getRole() === ROLES.ADMIN) && (this.currentUser?.status === 'active');
   }
 
   canAccessRatings() {
-    return this.getRole() === ROLES.COACH || this.getRole() === ROLES.PLAYER || this.getRole() === ROLES.ADMIN;
+    return this.currentUser?.status === 'active' && (this.getRole() === ROLES.COACH || this.getRole() === ROLES.PLAYER || this.getRole() === ROLES.ADMIN);
   }
 
   canEditMatrix() {
