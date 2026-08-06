@@ -955,6 +955,7 @@ class BHSSoccerApp {
     this.currentView = 'home';
     this.activeFilter = 'ALL';
     this.diagrammer = new SoccerTacticalBoard(this);
+    this.masterDiagrammer = new SoccerTacticalBoard(this);
     this.init();
   }
 
@@ -996,6 +997,51 @@ class BHSSoccerApp {
 
   async syncFromSupabase() {
     try {
+      // Sync School Profile & Multi-tenant Schools list from Supabase DB
+      const currentCode = this.data.school?.code || 'bhs';
+      const dbSchool = await window.supabaseService.fetchSchool(currentCode);
+      if (dbSchool) {
+        this.data.school = {
+          id: dbSchool.id,
+          code: dbSchool.code,
+          name: dbSchool.name,
+          mascot: dbSchool.mascot,
+          city: dbSchool.city,
+          colors: dbSchool.colors || { primary: '#0047AB', secondary: '#FFD700' },
+          record: dbSchool.record || { wins: 0, losses: 0, draws: 0 }
+        };
+      }
+
+      const dbSchools = await window.supabaseService.fetchSchools();
+      if (dbSchools && dbSchools.length > 0) {
+        this.data.schools = dbSchools.map(s => ({
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          mascot: s.mascot,
+          city: s.city,
+          colors: s.colors || { primary: '#0047AB', secondary: '#FFD700' },
+          record: s.record || { wins: 0, losses: 0, draws: 0 }
+        }));
+      }
+
+      const dbDrillsBank = await window.supabaseService.fetchDrillsBank('bhs');
+      if (dbDrillsBank && dbDrillsBank.length > 0) {
+        this.data.drillsBank = dbDrillsBank.map(d => ({
+          id: d.id,
+          name: d.name,
+          duration: d.duration,
+          category: d.category,
+          points: d.points,
+          coachNotes: d.coach_notes || '',
+          diagramImage: d.diagram_image || null,
+          diagramData: d.diagram_data || null
+        }));
+      }
+
+      this.saveData();
+      this.updateHeaderBranding();
+
       const dbPlayers = await window.supabaseService.fetchPlayers('bhs');
       if (dbPlayers && dbPlayers.length > 0) {
         this.data.players = dbPlayers
@@ -1890,8 +1936,9 @@ class BHSSoccerApp {
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="btn btn-gold" onclick="app.openAddPlanDrillModal()">+ Add Drill to Plan</button>
+            <button class="btn btn-gold" style="border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent);" onclick="app.openDrillsBankModal()">➕ Add New Drill (${(this.data.drillsBank || []).length})</button>
             <button class="btn btn-gold" onclick="app.openSavePlanModal()">💾 Save Practice Plan</button>
-            <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Saved Plans Database (${savedCount})</button>
+            <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Select Practice Plan (${savedCount})</button>
             <button class="btn btn-primary" onclick="app.printPracticePlan()">🖨️ Print Practice Plan</button>
             <button class="btn btn-secondary" onclick="app.downloadPracticePlan('html')">📥 Save/Download Plan File</button>
           </div>
@@ -1923,7 +1970,7 @@ class BHSSoccerApp {
             ${this.data.currentPracticePlan.length === 0 ? `
               <div style="text-align:center; padding:30px; color:var(--text-muted);">
                 <p style="font-size:1rem; margin-bottom:8px;">Today's practice timeline is currently empty.</p>
-                <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Saved Plans Database</strong> to load a session.</p>
+                <p style="font-size:0.85rem;">Click <strong>+ Add Drill to Plan</strong> above or <strong>📂 Select Practice Plan</strong> to load a session.</p>
               </div>
             ` : this.data.currentPracticePlan.map((p, idx) => {
               const isSelected = (this.selectedDrillIndex === idx) || (this.selectedDrillIndex === undefined && idx === 0);
@@ -2629,9 +2676,248 @@ class BHSSoccerApp {
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
 
+  getSchoolsList() {
+    if (!this.data.schools || !Array.isArray(this.data.schools) || this.data.schools.length === 0) {
+      this.data.schools = [this.data.school || DEFAULT_BHS_DATA.school];
+    }
+    return this.data.schools;
+  }
+
+  populateCoachSchoolDropdown(selectId, selectedCode = 'bhs') {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+
+    const schools = this.getSchoolsList();
+    el.innerHTML = `
+      ${schools.map(s => {
+        const code = s.code || s.id || 'bhs';
+        const isSelected = (code.toLowerCase() === (selectedCode || 'bhs').toLowerCase());
+        return `<option value="${code}" ${isSelected ? 'selected' : ''}>🏫 ${s.name} (${s.mascot || code})</option>`;
+      }).join('')}
+      <option value="NEW_SCHOOL" style="font-weight:700; color:var(--bhs-gold-accent);">➕ Add New School / Club...</option>
+    `;
+  }
+
+  handleCoachSchoolSelect(val, mode) {
+    if (val === 'NEW_SCHOOL') {
+      this.pendingCoachSchoolMode = mode;
+      this.openSchoolFormModal();
+    }
+  }
+
+  populateSchoolFormSelect(selectedCode = null) {
+    const el = document.getElementById('schoolFormSelect');
+    if (!el) return;
+
+    const schools = this.getSchoolsList();
+    const currentCode = (selectedCode || this.data.school?.code || 'bhs').toLowerCase();
+
+    el.innerHTML = `
+      ${schools.map(s => {
+        const code = (s.code || s.id || 'bhs').toLowerCase();
+        const isSel = code === currentCode;
+        return `<option value="${code}" ${isSel ? 'selected' : ''}>🏫 ${s.name} (${s.mascot || code.toUpperCase()})</option>`;
+      }).join('')}
+      <option value="NEW_SCHOOL" style="font-weight:700; color:var(--bhs-gold-accent);">➕ Add New School / Club...</option>
+    `;
+  }
+
+  onSchoolFormSelectChange(val) {
+    if (val === 'NEW_SCHOOL') {
+      document.getElementById('schoolFormCode').value = '';
+      document.getElementById('schoolFormName').value = '';
+      document.getElementById('schoolFormMascot').value = '';
+      document.getElementById('schoolFormCity').value = '';
+      document.getElementById('schoolFormPrimaryColor').value = '#0047AB';
+      document.getElementById('schoolFormSecondaryColor').value = '#FFD700';
+      document.getElementById('schoolFormWins').value = 0;
+      document.getElementById('schoolFormLosses').value = 0;
+      document.getElementById('schoolFormDraws').value = 0;
+    } else {
+      const schools = this.getSchoolsList();
+      const s = schools.find(item => (item.code || item.id || '').toLowerCase() === val.toLowerCase());
+      if (s) {
+        this.fillSchoolFormFields(s);
+      }
+    }
+  }
+
+  fillSchoolFormFields(s) {
+    document.getElementById('schoolFormCode').value = s.code || s.id || '';
+    document.getElementById('schoolFormName').value = s.name || '';
+    document.getElementById('schoolFormMascot').value = s.mascot || '';
+    document.getElementById('schoolFormCity').value = s.city || '';
+    document.getElementById('schoolFormPrimaryColor').value = s.colors?.primary || '#0047AB';
+    document.getElementById('schoolFormSecondaryColor').value = s.colors?.secondary || '#FFD700';
+    document.getElementById('schoolFormWins').value = s.record?.wins ?? 0;
+    document.getElementById('schoolFormLosses').value = s.record?.losses ?? 0;
+    document.getElementById('schoolFormDraws').value = s.record?.draws ?? 0;
+  }
+
+  openSchoolFormModal(schoolData = null) {
+    const sData = schoolData || this.data.school || DEFAULT_BHS_DATA.school;
+    this.populateSchoolFormSelect(sData.code || sData.id);
+    this.fillSchoolFormFields(sData);
+
+    const noticeEl = document.getElementById('schoolFormStatusNotice');
+    if (noticeEl) {
+      if (window.supabaseService?.isConfigured()) {
+        noticeEl.style.display = 'block';
+        noticeEl.style.background = 'rgba(40,167,69,0.2)';
+        noticeEl.style.borderColor = 'rgba(40,167,69,0.4)';
+        noticeEl.innerHTML = '⚡ <strong>Cloud DB Active:</strong> Changes will save to <strong>LocalStorage</strong> and sync live to <strong>Supabase DB</strong> (`schools` table).';
+      } else {
+        noticeEl.style.display = 'block';
+        noticeEl.style.background = 'rgba(255,193,7,0.2)';
+        noticeEl.style.borderColor = 'rgba(255,193,7,0.4)';
+        noticeEl.innerHTML = '📦 <strong>Local Mode Active:</strong> Saving directly to browser <strong>LocalStorage</strong>. (Provide Supabase key in Admin Center to enable cloud sync).';
+      }
+    }
+
+    const modal = document.getElementById('schoolFormModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  async submitSchoolForm() {
+    const statusNotice = document.getElementById('schoolFormStatusNotice');
+    const submitBtn = document.querySelector('#schoolFormModal button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '💾 Save to LocalStorage &amp; Database';
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⏳ Saving School Profile...';
+      }
+
+      const code = (document.getElementById('schoolFormCode')?.value || '').trim().toLowerCase();
+      const name = (document.getElementById('schoolFormName')?.value || '').trim();
+      const mascot = (document.getElementById('schoolFormMascot')?.value || '').trim();
+      const city = (document.getElementById('schoolFormCity')?.value || '').trim();
+      const primaryColor = document.getElementById('schoolFormPrimaryColor')?.value || '#0047AB';
+      const secondaryColor = document.getElementById('schoolFormSecondaryColor')?.value || '#FFD700';
+      const wins = parseInt(document.getElementById('schoolFormWins')?.value || 0, 10);
+      const losses = parseInt(document.getElementById('schoolFormLosses')?.value || 0, 10);
+      const draws = parseInt(document.getElementById('schoolFormDraws')?.value || 0, 10);
+
+      if (!code || !name) {
+        alert('⚠️ Please enter a valid School Code and School Name.');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+        return;
+      }
+
+      const schools = this.getSchoolsList();
+      const existing = schools.find(s => (s.code || s.id || '').toLowerCase() === code);
+
+      const schoolObj = {
+        id: (existing?.id && existing.id.length === 36 && existing.id.includes('-')) ? existing.id : undefined,
+        code,
+        name,
+        mascot,
+        city,
+        colors: { primary: primaryColor, secondary: secondaryColor },
+        record: { wins, losses, draws }
+      };
+
+      // 1. Update active school object and multi-tenant schools array
+      this.data.school = schoolObj;
+
+      const existingIdx = schools.findIndex(s => (s.code || s.id || '').toLowerCase() === code);
+      if (existingIdx !== -1) {
+        schools[existingIdx] = { ...schools[existingIdx], ...schoolObj };
+      } else {
+        schools.push(schoolObj);
+      }
+      this.data.schools = schools;
+
+      // 2. Save persistently to LocalStorage
+      this.saveData();
+
+      // 3. Save / Upsert to Supabase Database (if configured)
+      let cloudRes = null;
+      if (window.supabaseService?.isConfigured()) {
+        cloudRes = await window.supabaseService.upsertSchool(code, schoolObj);
+        if (cloudRes && cloudRes.data && cloudRes.data.id) {
+          schoolObj.id = cloudRes.data.id;
+          this.saveData();
+        }
+      }
+
+      // Update dropdowns & branding
+      if (this.pendingCoachSchoolMode === 'edit') {
+        this.populateCoachSchoolDropdown('editCoachSchool', code);
+      } else if (this.pendingCoachSchoolMode === 'add') {
+        this.populateCoachSchoolDropdown('newCoachSchool', code);
+      }
+
+      this.updateHeaderBranding();
+      this.renderCurrentView();
+
+      // Provide clear, unambiguous user feedback!
+      if (cloudRes && cloudRes.data) {
+        if (statusNotice) {
+          statusNotice.style.display = 'block';
+          statusNotice.style.background = 'rgba(40,167,69,0.25)';
+          statusNotice.style.borderColor = 'rgba(40,167,69,0.6)';
+          statusNotice.innerHTML = `✅ <strong>Saved to LocalStorage &amp; Supabase DB!</strong><br/>School "${name}" (${code}) successfully updated in cloud database.`;
+        }
+        alert(`✅ SUCCESS!\n\nSchool profile for "${name} ${mascot}" has been saved to LocalStorage and synced to your Supabase Cloud Database!`);
+        this.closeModal('schoolFormModal');
+      } else if (cloudRes && cloudRes.error) {
+        if (statusNotice) {
+          statusNotice.style.display = 'block';
+          statusNotice.style.background = 'rgba(220,53,69,0.25)';
+          statusNotice.style.borderColor = 'rgba(220,53,69,0.6)';
+          statusNotice.innerHTML = `⚠️ <strong>LocalStorage Saved, but Cloud DB Error:</strong> ${cloudRes.error}`;
+        }
+        alert(`⚠️ SAVED LOCALLY ONLY\n\nSchool data saved to browser LocalStorage, but Supabase Cloud error occurred:\n${cloudRes.error}\n\nMake sure the "schools" table and RLS policies are created in your Supabase SQL Editor.`);
+      } else {
+        if (statusNotice) {
+          statusNotice.style.display = 'block';
+          statusNotice.style.background = 'rgba(255,193,7,0.25)';
+          statusNotice.style.borderColor = 'rgba(255,193,7,0.6)';
+          statusNotice.innerHTML = `📦 <strong>Saved to LocalStorage!</strong><br/>Supabase cloud DB is not configured. Enter your Supabase Anon key in Admin Center to enable cloud database sync.`;
+        }
+        alert(`📦 SAVED TO LOCAL STORAGE!\n\nSchool profile for "${name} ${mascot}" saved successfully to your browser's LocalStorage.\n\n(To save to Supabase Cloud DB, click "Sign In / Register" -> Admin Center and enter your Supabase Anon Key).`);
+        this.closeModal('schoolFormModal');
+      }
+    } catch (err) {
+      console.error('Error submitting school form:', err);
+      alert(`❌ Error saving school data:\n${err.message}`);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+      }
+    }
+  }
+
+  updateHeaderBranding() {
+    const school = this.data.school || DEFAULT_BHS_DATA.school;
+    const headerSchoolName = document.querySelector('.brand-text h1');
+    const headerSchoolTag = document.querySelector('.brand-text p');
+    if (headerSchoolName) {
+      headerSchoolName.textContent = (school.name || 'BEAUMONT HIGH SCHOOL').toUpperCase();
+    }
+    if (headerSchoolTag) {
+      headerSchoolTag.textContent = `${(school.mascot || 'COUGARS').toUpperCase()} • HIGH SCHOOL SOCCER`;
+    }
+    const footerSchoolName = document.querySelector('footer strong');
+    if (footerSchoolName) {
+      footerSchoolName.textContent = `${school.name || 'Beaumont High School'} Soccer Program`;
+    }
+  }
+
+  openAddCoachModal() {
+    this.populateCoachSchoolDropdown('newCoachSchool', this.data.school?.code || 'bhs');
+    const modal = document.getElementById('addCoachModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
   async addCoach(data) {
+    const schoolCode = data.schoolCode || 'bhs';
     const newCoach = {
       id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      schoolCode: schoolCode,
       name: data.name.trim(),
       level: data.level.trim(),
       phone: data.phone.trim(),
@@ -2646,7 +2932,7 @@ class BHSSoccerApp {
     this.saveData();
 
     if (window.supabaseService?.isConfigured()) {
-      const saved = await window.supabaseService.upsertCoach('bhs', newCoach);
+      const saved = await window.supabaseService.upsertCoach(schoolCode, newCoach);
       if (saved && saved.id) newCoach.id = saved.id;
     }
 
@@ -2659,6 +2945,7 @@ class BHSSoccerApp {
     const coach = (this.data.coaches || []).find(c => c.id === coachId);
     if (!coach) return;
 
+    this.populateCoachSchoolDropdown('editCoachSchool', coach.schoolCode || coach.school_id || 'bhs');
     document.getElementById('editCoachId').value = coach.id;
     document.getElementById('editCoachName').value = coach.name;
     document.getElementById('editCoachLevel').value = coach.level;
@@ -2677,8 +2964,10 @@ class BHSSoccerApp {
     const index = (this.data.coaches || []).findIndex(c => c.id === id);
     if (index === -1) return;
 
+    const schoolCode = document.getElementById('editCoachSchool').value || 'bhs';
     const updated = {
       ...this.data.coaches[index],
+      schoolCode: schoolCode,
       name: document.getElementById('editCoachName').value.trim(),
       level: document.getElementById('editCoachLevel').value.trim(),
       phone: document.getElementById('editCoachPhone').value.trim(),
@@ -2692,7 +2981,7 @@ class BHSSoccerApp {
     this.saveData();
 
     if (window.supabaseService?.isConfigured()) {
-      await window.supabaseService.upsertCoach('bhs', updated);
+      await window.supabaseService.upsertCoach(schoolCode, updated);
     }
 
     this.renderCurrentView();
@@ -2835,6 +3124,62 @@ class BHSSoccerApp {
     }
   }
 
+  generateDiagramStepDataUrl(diagramData, stepIndex = 0, targetWidth = 800) {
+    if (!diagramData) return null;
+
+    let parsed = diagramData;
+    if (typeof diagramData === 'string') {
+      try { parsed = JSON.parse(diagramData); } catch (e) { return null; }
+    }
+
+    const pitchType = parsed.pitchType || 'full';
+    const keyframes = parsed.keyframes || [];
+
+    let elements = parsed.elements || [];
+    let drawings = parsed.drawings || [];
+    let stepLabel = 'Tactical Pitch Diagram';
+
+    if (keyframes.length > 0 && stepIndex >= 0 && stepIndex < keyframes.length) {
+      const kf = keyframes[stepIndex];
+      elements = kf.elements || [];
+      drawings = kf.drawings || [];
+      stepLabel = kf.label || `Step ${stepIndex + 1}`;
+    }
+
+    // Native tactical canvas dimensions are 800 x 480 (100% identical to interactive board on website)
+    const nativeWidth = 800;
+    const nativeHeight = 480;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = nativeWidth;
+    canvas.height = nativeHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Bind dummy board object to reuse exact SoccerTacticalBoard rendering routines
+    const dummyBoard = {
+      ctx: ctx,
+      pitchType: pitchType
+    };
+
+    // 1. Render Pitch
+    SoccerTacticalBoard.prototype.drawPitch.call(dummyBoard, nativeWidth, nativeHeight);
+
+    // 2. Render Paths
+    drawings.forEach(d => {
+      SoccerTacticalBoard.prototype.drawPath.call(dummyBoard, d);
+    });
+
+    // 3. Render Elements
+    elements.forEach(el => {
+      SoccerTacticalBoard.prototype.drawElement.call(dummyBoard, el);
+    });
+
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      label: stepLabel
+    };
+  }
+
   printPracticePlan() {
     const activeName = this.data.activePlanName || 'Standard Practice Session';
     const plan = this.data.currentPracticePlan || [];
@@ -2906,21 +3251,72 @@ class BHSSoccerApp {
     <thead>
       <tr>
         <th class="time-col">TIME SLOT</th>
-        <th>DRILL NAME & COACH FOCUS NOTES</th>
+        <th>DRILL NAME &amp; COACH FOCUS NOTES</th>
         <th class="dur-col">DURATION</th>
       </tr>
     </thead>
     <tbody>
-      ${plan.map(d => `
-        <tr>
-          <td class="time-col">${d.time || ''}</td>
-          <td>
-            <strong>${d.name}</strong>
-            ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus & Notes:</strong><br/>${d.coachNotes}</div>` : ''}
-          </td>
-          <td class="dur-col">${d.duration}</td>
-        </tr>
-      `).join('')}
+      ${plan.map(d => {
+        let renderedDiagramStepsHtml = '';
+        let parsedDiagram = d.diagramData;
+        if (typeof parsedDiagram === 'string') {
+          try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
+        }
+
+        const keyframes = parsedDiagram?.keyframes || [];
+
+        if (keyframes.length > 0) {
+          const stepCards = keyframes.map((kf, stepIdx) => {
+            const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 520);
+            if (!stepObj) return '';
+            return `
+              <div style="background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 11px; color: #0047AB; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E5E7EB; padding-bottom: 4px;">
+                  <span>📍 STEP ${stepIdx + 1} OF ${keyframes.length}: ${kf.label || `Step ${stepIdx + 1}`}</span>
+                  <span style="color: #6B7280; font-size: 10px;">FRAME #${stepIdx + 1}</span>
+                </div>
+                <img src="${stepObj.dataUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+              </div>
+            `;
+          }).filter(Boolean).join('');
+
+          if (stepCards) {
+            renderedDiagramStepsHtml = `
+              <div style="margin-top: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 12px; color: #1E293B; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  📐 Tactical Pitch Diagram Step-by-Step Sequence (${keyframes.length} Step${keyframes.length > 1 ? 's' : ''}):
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                  ${stepCards}
+                </div>
+              </div>
+            `;
+          }
+        } else if (d.diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
+          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram || { elements: d.elements, drawings: d.drawings, pitchType: d.pitchType }, 0, 520);
+          const imgUrl = stepObj?.dataUrl || d.diagramImage;
+          if (imgUrl) {
+            renderedDiagramStepsHtml = `
+              <div style="margin-top: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 12px; color: #0047AB; margin-bottom: 6px;">📐 Tactical Pitch Diagram:</div>
+                <img src="${imgUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+              </div>
+            `;
+          }
+        }
+
+        return `
+          <tr style="page-break-inside: avoid;">
+            <td class="time-col">${d.time || ''}</td>
+            <td>
+              <div style="font-size: 15px; font-weight: bold; color: #0047AB; margin-bottom: 4px;">${d.name}</div>
+              ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus &amp; Notes:</strong><br/>${d.coachNotes}</div>` : ''}
+              ${renderedDiagramStepsHtml}
+            </td>
+            <td class="dur-col">${d.duration}</td>
+          </tr>
+        `;
+      }).join('')}
     </tbody>
   </table>
 
@@ -3033,16 +3429,67 @@ class BHSSoccerApp {
       </tr>
     </thead>
     <tbody>
-      ${plan.map(d => `
-        <tr>
-          <td class="time-col">${d.time || ''}</td>
-          <td>
-            <strong>${d.name}</strong>
-            ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus & Notes:</strong><br/>${d.coachNotes}</div>` : ''}
-          </td>
-          <td class="dur-col">${d.duration}</td>
-        </tr>
-      `).join('')}
+      ${plan.map(d => {
+        let renderedDiagramStepsHtml = '';
+        let parsedDiagram = d.diagramData;
+        if (typeof parsedDiagram === 'string') {
+          try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
+        }
+
+        const keyframes = parsedDiagram?.keyframes || [];
+
+        if (keyframes.length > 0) {
+          const stepCards = keyframes.map((kf, stepIdx) => {
+            const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 520);
+            if (!stepObj) return '';
+            return `
+              <div style="background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 11px; color: #0047AB; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E5E7EB; padding-bottom: 4px;">
+                  <span>📍 STEP ${stepIdx + 1} OF ${keyframes.length}: ${kf.label || `Step ${stepIdx + 1}`}</span>
+                  <span style="color: #6B7280; font-size: 10px;">FRAME #${stepIdx + 1}</span>
+                </div>
+                <img src="${stepObj.dataUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+              </div>
+            `;
+          }).filter(Boolean).join('');
+
+          if (stepCards) {
+            renderedDiagramStepsHtml = `
+              <div style="margin-top: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 12px; color: #1E293B; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  📐 Tactical Pitch Diagram Step-by-Step Sequence (${keyframes.length} Step${keyframes.length > 1 ? 's' : ''}):
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                  ${stepCards}
+                </div>
+              </div>
+            `;
+          }
+        } else if (d.diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
+          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram || { elements: d.elements, drawings: d.drawings, pitchType: d.pitchType }, 0, 520);
+          const imgUrl = stepObj?.dataUrl || d.diagramImage;
+          if (imgUrl) {
+            renderedDiagramStepsHtml = `
+              <div style="margin-top: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; page-break-inside: avoid;">
+                <div style="font-weight: 700; font-size: 12px; color: #0047AB; margin-bottom: 6px;">📐 Tactical Pitch Diagram:</div>
+                <img src="${imgUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+              </div>
+            `;
+          }
+        }
+
+        return `
+          <tr style="page-break-inside: avoid;">
+            <td class="time-col">${d.time || ''}</td>
+            <td>
+              <div style="font-size: 15px; font-weight: bold; color: #0047AB; margin-bottom: 4px;">${d.name}</div>
+              ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus &amp; Notes:</strong><br/>${d.coachNotes}</div>` : ''}
+              ${renderedDiagramStepsHtml}
+            </td>
+            <td class="dur-col">${d.duration}</td>
+          </tr>
+        `;
+      }).join('')}
     </tbody>
   </table>
 
@@ -3071,7 +3518,234 @@ class BHSSoccerApp {
     return trimmed;
   }
 
+  populateNewDrillLibrarySelect() {
+    const select = document.getElementById('newDrillLibrarySelect');
+    if (!select) return;
+    const drills = this.data.drillsBank || [];
+    select.innerHTML = `
+      <option value="">-- Select Preset Drill from Library --</option>
+      ${drills.map(d => `<option value="${d.id}">📚 ${d.name} (${d.category || 'General'} • ${d.duration})</option>`).join('')}
+    `;
+  }
+
+  onSelectPresetDrillFromLibrary(drillId) {
+    if (!drillId) return;
+    const drills = this.data.drillsBank || [];
+    const drill = drills.find(d => d.id === drillId);
+    if (!drill) return;
+
+    document.getElementById('newDrillName').value = drill.name;
+    document.getElementById('newDrillDuration').value = drill.duration;
+    
+    // Sync duration dropdown if matching
+    const select = document.getElementById('newDrillDurationSelect');
+    if (select) {
+      const hasOption = Array.from(select.options).some(o => o.value === drill.duration);
+      select.value = hasOption ? drill.duration : 'custom';
+    }
+
+    if (drill.coachNotes) {
+      document.getElementById('newDrillNotes').value = drill.coachNotes;
+    }
+  }
+
+  openDrillsBankModal() {
+    this.renderDrillsBankList();
+    const modal = document.getElementById('drillsBankModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  }
+
+  renderDrillsBankList() {
+    const container = document.getElementById('drillsBankListContainer');
+    if (!container) return;
+
+    const drills = this.data.drillsBank || [];
+
+    if (drills.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:30px; background:rgba(0,0,0,0.2); border:1px solid var(--bhs-navy-border); border-radius:8px;">
+          <p style="color:var(--text-muted); margin-bottom:12px;">No master drills in your library yet.</p>
+          <button class="btn btn-gold" onclick="app.openCreateMasterDrillModal()">➕ Create Your First Master Drill</button>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = drills.map((d, index) => {
+      return `
+        <div class="drill-item" style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); border:1px solid var(--bhs-navy-border); padding:14px; border-radius:8px; gap:14px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:240px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+              <strong style="color:#FFF; font-size:1.02rem;">${d.name}</strong>
+              <span class="badge badge-coach">${d.category || 'General'}</span>
+              <span class="badge badge-win">⏱️ ${d.duration}</span>
+              <span class="badge badge-gold">⭐ ${d.points || 3} Pts</span>
+              ${d.diagramImage ? `<span class="badge badge-role">🎨 Diagram Attached</span>` : ''}
+            </div>
+            ${d.coachNotes ? `<p style="color:var(--text-muted); font-size:0.82rem; margin:4px 0 0 0;">${d.coachNotes}</p>` : ''}
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-gold" style="font-size:0.8rem; padding:6px 10px;" onclick="app.addMasterDrillToPlan('${d.id}')">➕ Use in Active Plan</button>
+            <button class="btn btn-secondary" style="font-size:0.8rem; padding:6px 10px;" onclick="app.openCreateMasterDrillModal('${d.id}')">✏️ Edit</button>
+            <button class="btn btn-secondary" style="font-size:0.8rem; padding:6px 10px; background:rgba(239,68,68,0.2); color:var(--color-danger); border-color:var(--color-danger);" onclick="app.deleteMasterDrill('${d.id}')">🗑️ Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  setMasterDiagramTool(tool) {
+    if (this.masterDiagrammer) {
+      this.masterDiagrammer.setTool(tool);
+    }
+  }
+
+  openCreateMasterDrillModal(drillId = null) {
+    document.getElementById('masterDrillFormId').value = '';
+    document.getElementById('masterDrillFormName').value = '';
+    document.getElementById('masterDrillFormCategory').value = 'Tactical / Attacking';
+    document.getElementById('masterDrillFormDuration').value = '20 min';
+    document.getElementById('masterDrillFormPoints').value = 3;
+    document.getElementById('masterDrillFormNotes').value = '';
+
+    const titleEl = document.getElementById('masterDrillFormTitle');
+    let targetDrill = null;
+
+    if (drillId) {
+      const drills = this.data.drillsBank || [];
+      targetDrill = drills.find(item => item.id === drillId);
+      if (targetDrill) {
+        document.getElementById('masterDrillFormId').value = targetDrill.id;
+        document.getElementById('masterDrillFormName').value = targetDrill.name;
+        document.getElementById('masterDrillFormCategory').value = targetDrill.category || 'Tactical / Attacking';
+        document.getElementById('masterDrillFormDuration').value = targetDrill.duration || '20 min';
+        document.getElementById('masterDrillFormPoints').value = targetDrill.points || 3;
+        document.getElementById('masterDrillFormNotes').value = targetDrill.coachNotes || '';
+        if (titleEl) titleEl.textContent = '✏️ EDIT MASTER DRILL';
+      }
+    } else {
+      if (titleEl) titleEl.textContent = '➕ CREATE NEW MASTER DRILL';
+    }
+
+    const modal = document.getElementById('masterDrillFormModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+
+    // Initialize tactical pitch diagrammer for master drill creation
+    setTimeout(() => {
+      if (this.masterDiagrammer) {
+        this.masterDiagrammer.init('masterDrillCanvas');
+        if (targetDrill && targetDrill.diagramData) {
+          this.masterDiagrammer.loadDiagramData(targetDrill.diagramData);
+        } else {
+          this.masterDiagrammer.clear();
+        }
+      }
+    }, 50);
+  }
+
+  async saveMasterDrillForm() {
+    const id = document.getElementById('masterDrillFormId')?.value || '';
+    const name = (document.getElementById('masterDrillFormName')?.value || '').trim();
+    const category = document.getElementById('masterDrillFormCategory')?.value || 'General';
+    const duration = (document.getElementById('masterDrillFormDuration')?.value || '20 min').trim();
+    const points = parseInt(document.getElementById('masterDrillFormPoints')?.value || 3, 10);
+    const coachNotes = (document.getElementById('masterDrillFormNotes')?.value || '').trim();
+
+    if (!name) {
+      alert('Please enter a valid Drill Name.');
+      return;
+    }
+
+    if (!this.data.drillsBank) this.data.drillsBank = [];
+
+    const existingIdx = id ? this.data.drillsBank.findIndex(d => d.id === id) : -1;
+    let drillObj = existingIdx !== -1 ? { ...this.data.drillsBank[existingIdx] } : {};
+
+    drillObj.id = id || ('d_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+    drillObj.name = name;
+    drillObj.category = category;
+    drillObj.duration = duration;
+    drillObj.points = points;
+    drillObj.coachNotes = coachNotes;
+
+    // Export pitch diagram drawings & elements
+    if (this.masterDiagrammer) {
+      if (this.masterDiagrammer.elements.length > 0 || this.masterDiagrammer.drawings.length > 0) {
+        drillObj.diagramImage = this.masterDiagrammer.exportImage();
+        drillObj.diagramData = this.masterDiagrammer.exportDiagramData();
+      }
+    }
+
+    if (existingIdx !== -1) {
+      this.data.drillsBank[existingIdx] = drillObj;
+    } else {
+      this.data.drillsBank.push(drillObj);
+    }
+
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      const saved = await window.supabaseService.upsertDrillBankItem('bhs', drillObj);
+      if (saved && saved.id) {
+        drillObj.id = saved.id;
+        this.saveData();
+      }
+    }
+
+    this.closeModal('masterDrillFormModal');
+    this.renderDrillsBankList();
+    this.renderCurrentView();
+    alert(`✅ Master Drill "${name}" & Tactical Pitch Diagram saved to Master Library & Database!`);
+  }
+
+  async deleteMasterDrill(drillId) {
+    if (!drillId) return;
+    if (!confirm('Are you sure you want to delete this master drill from your library?')) return;
+
+    if (this.data.drillsBank) {
+      this.data.drillsBank = this.data.drillsBank.filter(d => d.id !== drillId);
+      this.saveData();
+    }
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.deleteDrillBankItem(drillId);
+    }
+
+    this.renderDrillsBankList();
+    this.renderCurrentView();
+  }
+
+  async addMasterDrillToPlan(drillId) {
+    const drills = this.data.drillsBank || [];
+    const drill = drills.find(d => d.id === drillId);
+    if (!drill) return;
+
+    const planLen = (this.data.currentPracticePlan || []).length;
+    const defaultTime = `${planLen * 20}:00 - ${(planLen + 1) * 20}:00`;
+
+    const newPlanDrill = {
+      time: defaultTime,
+      name: drill.name,
+      duration: drill.duration,
+      coachNotes: drill.coachNotes,
+      diagramImage: drill.diagramImage || null,
+      diagramData: drill.diagramData || null
+    };
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      const saved = await window.supabaseService.savePracticePlanItem('bhs', newPlanDrill);
+      if (saved && saved.id) newPlanDrill.id = saved.id;
+    }
+
+    this.data.currentPracticePlan.push(newPlanDrill);
+    this.saveData();
+    this.closeModal('drillsBankModal');
+    this.renderCurrentView();
+    alert(`➕ "${drill.name}" added to today's active practice timeline!`);
+  }
+
   openAddPlanDrillModal() {
+    this.populateNewDrillLibrarySelect();
     const modal = document.getElementById('addPlanDrillModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   }
@@ -3441,137 +4115,207 @@ class BHSSoccerApp {
         ${!isGuest ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.auth.logout(); app.updateAuthUI(); app.renderCurrentView(); app.closeModals();">🚪 Sign Out</button>` : `<span class="badge badge-gold">PUBLIC ACCESS</span>`}
       </div>
 
-      <!-- Section 1: Role Switcher -->
-      <div style="margin-bottom: 16px;">
-        <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
-          <span>🔑</span> SWITCH ACTIVE ROLE / USER ACCOUNT
-        </h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          ${sampleUsers.map(u => {
-            const isActive = currentUser && currentUser.id === u.id;
-            return `
-              <div onclick="app.switchUserRole('${u.id}')" style="cursor: pointer; background: ${isActive ? 'rgba(0, 71, 171, 0.35)' : 'rgba(0, 0, 0, 0.25)'}; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; border-radius: 8px; padding: 12px; transition: all 0.2s ease;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                  <strong style="color: #FFF; font-size: 0.95rem;">${u.icon} ${u.name}</strong>
-                  ${isActive ? `<span class="badge badge-gold">ACTIVE</span>` : `<span class="badge badge-secondary" style="font-size:0.7rem;">SWITCH</span>`}
+      <!-- Section 1: Active User Role Switcher -->
+      <details class="admin-accordion">
+        <summary class="admin-accordion-summary">
+          <span>🔑 ACTIVE USER ACCOUNT &amp; ROLE SWITCHER</span>
+          <span class="badge badge-gold">${currentUser.name} (${currentUser.role.toUpperCase()})</span>
+        </summary>
+        <div class="admin-accordion-content">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            ${sampleUsers.map(u => {
+              const isActive = currentUser && currentUser.id === u.id;
+              return `
+                <div onclick="app.switchUserRole('${u.id}')" style="cursor: pointer; background: ${isActive ? 'rgba(0, 71, 171, 0.35)' : 'rgba(0, 0, 0, 0.25)'}; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; border-radius: 8px; padding: 12px; transition: all 0.2s ease;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <strong style="color: #FFF; font-size: 0.95rem;">${u.icon} ${u.name}</strong>
+                    ${isActive ? `<span class="badge badge-gold">ACTIVE</span>` : `<span class="badge badge-secondary" style="font-size:0.7rem;">SWITCH</span>`}
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">${u.desc}</div>
                 </div>
-                <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">${u.desc}</div>
-              </div>
-            `;
-          }).join('')}
+              `;
+            }).join('')}
+          </div>
         </div>
-      </div>
+      </details>
+
+      <!-- Section 2: School & Club Profile Settings -->
+      <details class="admin-accordion">
+        <summary class="admin-accordion-summary">
+          <span>🏫 SCHOOL &amp; CLUB PROFILE SETTINGS</span>
+          <span class="badge badge-coach">${this.data.school?.name || 'Beaumont High School'}</span>
+        </summary>
+        <div class="admin-accordion-content">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">School Code (e.g. bhs)</label>
+              <input type="text" id="adminSchoolCode" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.code || this.data.school?.id || 'bhs'}" placeholder="bhs" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">Official School / Club Name</label>
+              <input type="text" id="adminSchoolName" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.name || 'Beaumont High School'}" placeholder="Beaumont High School" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">Mascot / Team Nickname</label>
+              <input type="text" id="adminSchoolMascot" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.mascot || 'Cougars'}" placeholder="Cougars" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">City &amp; State Location</label>
+              <input type="text" id="adminSchoolCity" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.city || 'Beaumont, CA'}" placeholder="Beaumont, CA" />
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">Season Wins</label>
+              <input type="number" id="adminSchoolWins" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.record?.wins ?? 9}" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">Season Losses</label>
+              <input type="number" id="adminSchoolLosses" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.record?.losses ?? 1}" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">Season Draws</label>
+              <input type="number" id="adminSchoolDraws" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.record?.draws ?? 2}" />
+            </div>
+          </div>
+
+          <button class="btn btn-gold" style="width: 100%; font-weight:700; font-size:0.85rem; padding: 8px;" onclick="app.saveSchoolDataFromAdmin()">💾 Save School Profile to LocalStorage &amp; Database</button>
+        </div>
+      </details>
 
       ${isCoachOrAdmin ? `
-        <!-- Section 1B: Pending User Approvals Queue -->
-        <div style="margin-bottom: 20px; background: rgba(0, 71, 171, 0.15); border: 1px solid var(--bhs-blue-electric); padding: 14px; border-radius: 10px;">
-          <h4 style="color: var(--bhs-gold-accent); margin-bottom: 10px; display:flex; align-items:center; justify-content:space-between;">
+        <!-- Section 3: Pending User Approvals Queue -->
+        <details class="admin-accordion">
+          <summary class="admin-accordion-summary">
             <span>👥 PENDING USER APPROVAL QUEUE</span>
             <span class="badge badge-gold">${window.auth.getPendingApprovals().length} REQUESTS</span>
-          </h4>
-
-          ${window.auth.getPendingApprovals().length === 0 ? `
-            <p class="text-muted" style="font-size: 0.85rem; margin: 0;">No pending account authorization requests. New signups requiring Coach/Player access will appear here.</p>
-          ` : `
-            <div style="display:flex; flex-direction:column; gap:10px;">
-              ${window.auth.getPendingApprovals().map(p => `
-                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 8px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-                  <div>
-                    <strong style="color:#FFF; display:block; font-size:0.9rem;">${p.name}</strong>
-                    <div style="font-size:0.78rem; color:var(--text-muted);">${p.email} &bull; Requested Role: <span class="badge badge-role">${p.requestedRole.toUpperCase()}</span></div>
+          </summary>
+          <div class="admin-accordion-content">
+            ${window.auth.getPendingApprovals().length === 0 ? `
+              <p class="text-muted" style="font-size: 0.85rem; margin: 0;">No pending account authorization requests. New signups requiring Coach/Player access will appear here.</p>
+            ` : `
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                ${window.auth.getPendingApprovals().map(p => `
+                  <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 8px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div>
+                      <strong style="color:#FFF; display:block; font-size:0.9rem;">${p.name}</strong>
+                      <div style="font-size:0.78rem; color:var(--text-muted);">${p.email} &bull; Requested Role: <span class="badge badge-role">${p.requestedRole.toUpperCase()}</span></div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                      <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.approveUserAccess('${p.id}')">✅ Approve Access</button>
+                      <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger);" onclick="app.rejectUserAccess('${p.id}')">❌ Reject</button>
+                    </div>
                   </div>
-                  <div style="display:flex; gap:8px;">
-                    <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.approveUserAccess('${p.id}')">✅ Approve Access</button>
-                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger);" onclick="app.rejectUserAccess('${p.id}')">❌ Reject</button>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          `}
-        </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </details>
       ` : ''}
 
       ${!isGuest ? `
-        <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
+        <!-- Section 4: Import & Export Data -->
+        <details class="admin-accordion">
+          <summary class="admin-accordion-summary">
+            <span>📂 IMPORT &amp; EXPORT DATA (CSV / EXCEL)</span>
+            <span class="badge badge-coach">EXCEL / CSV</span>
+          </summary>
+          <div class="admin-accordion-content">
+            ${!isCoachOrAdmin ? `
+              <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #FFF; margin-bottom: 12px;">
+                🔒 File import/export actions are reserved for Coach and Admin roles. Switch to <strong>Coach Bob</strong> or <strong>Admin Sam</strong> above to enable full import/export functions.
+              </div>
+            ` : ''}
 
-        <!-- Section 2: Import & Export Data -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="color: var(--bhs-gold-accent); margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
-            <span>📂</span> IMPORT &amp; EXPORT DATA (CSV / EXCEL)
-          </h4>
+            <!-- Export Data Card with Dropdown -->
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
+              <h5 style="color: var(--bhs-gold-accent); margin-bottom: 8px;">📊 Export Data to Excel (.xlsx)</h5>
+              <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
+                Select data table or full workbook to generate Excel file download.
+              </p>
 
-        ${!isCoachOrAdmin ? `
-          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #FFF; margin-bottom: 12px;">
-            🔒 File import/export actions are reserved for Coach and Admin roles. Switch to <strong>Coach Bob</strong> or <strong>Admin Sam</strong> above to enable full import/export functions.
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="exportTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+                  <option value="players">👥 Players / Roster</option>
+                  <option value="schedule">📅 Schedule &amp; Results</option>
+                  <option value="plan">📋 Practice Plan</option>
+                  <option value="coaches">👔 Coaching Staff</option>
+                  <option value="thoughts">💡 Coach Daily Thoughts</option>
+                  <option value="all">📦 All Data (Single Workbook)</option>
+                </select>
+                <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
+              </div>
+            </div>
+
+            <!-- Import Data Card with Dropdown -->
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
+              <h5 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">📥 Import Data from CSV or Excel</h5>
+              <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
+                Download a template first, fill in your data, then upload.
+              </p>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts Template</button>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="importTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+                  <option value="players">👥 Players / Roster</option>
+                  <option value="schedule">📅 Schedule &amp; Results</option>
+                  <option value="plan">📋 Practice Plan</option>
+                  <option value="coaches">👔 Coaching Staff</option>
+                  <option value="thoughts">💡 Coach Daily Thoughts</option>
+                </select>
+                <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
+              </div>
+              <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" style="display:none;"
+                onchange="app.handleImportFile(this.files[0], document.getElementById('importTarget').value); this.value='';" />
+              <div id="importStatus" style="margin-top:10px; font-size:0.85rem; color: var(--color-success);"></div>
+            </div>
           </div>
-        ` : ''}
+        </details>
 
-        <!-- Export Data Card with Dropdown -->
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
-          <h5 style="color: var(--bhs-gold-accent); margin-bottom: 8px;">📊 Export Data to Excel (.xlsx)</h5>
-          <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
-            Select data table or full workbook to generate Excel file download.
-          </p>
+        <!-- Section 5: System & Cloud Database Controls -->
+        <details class="admin-accordion">
+          <summary class="admin-accordion-summary">
+            <span>⚡ SYSTEM &amp; CLOUD DATABASE CONTROLS</span>
+            <span class="badge ${window.supabaseService && window.supabaseService.isConfigured() ? 'badge-win' : 'badge-gold'}">
+              ${(window.supabaseService && window.supabaseService.isConfigured()) ? '⚡ CONNECTED' : '📦 LOCAL MODE'}
+            </span>
+          </summary>
+          <div class="admin-accordion-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-wrap:wrap; gap:8px;">
+              <div>
+                <strong>Cloud Sync Status:</strong> 
+                ${(window.supabaseService && window.supabaseService.isConfigured()) 
+                  ? `<span style="color: var(--color-success); font-weight:700;">⚡ Connected to Supabase Cloud DB</span>` 
+                  : `<span style="color: var(--bhs-gold-accent); font-weight:700;">📦 Local Mode (Requires valid Supabase Anon JWT Key)</span>`}
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.78rem;" onclick="app.pushAllLocalDataToSupabase()">⬆️ Sync Local Data to Cloud DB</button>
+                <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.78rem;" onclick="app.runLiveDatabaseTest()">🧪 Run Live Database Test</button>
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.78rem;" onclick="app.testProfilesTableInsert()">👤 Test Profile Insert</button>
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.78rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
+              </div>
+            </div>
 
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="exportTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
-              <option value="players">👥 Players / Roster</option>
-              <option value="schedule">📅 Schedule &amp; Results</option>
-              <option value="plan">📋 Practice Plan</option>
-              <option value="coaches">👔 Coaching Staff</option>
-              <option value="thoughts">💡 Coach Daily Thoughts</option>
-              <option value="all">📦 All Data (Single Workbook)</option>
-            </select>
-            <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--bhs-navy-border); padding: 12px; border-radius: 6px; font-size: 0.82rem;">
+              <div style="font-weight: 700; color: var(--bhs-gold-accent); margin-bottom: 6px;">🔑 Supabase Cloud Project Credentials</div>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label style="font-size:0.75rem;">Supabase Project URL</label>
+                <input type="text" id="supabaseUrlInput" class="form-control" style="font-size:0.8rem;" value="${localStorage.getItem('bhs_supabase_url') || 'https://arsigevpgpbqluqbnhjr.supabase.co'}" placeholder="https://xyz.supabase.co" />
+              </div>
+              <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-size:0.75rem;">Supabase Anon Key (JWT starting with eyJ...)</label>
+                <input type="password" id="supabaseKeyInput" class="form-control" style="font-size:0.8rem;" value="${localStorage.getItem('bhs_supabase_anon_key') || ''}" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+              </div>
+              <button class="btn btn-gold" style="width:100%; font-size:0.8rem; padding: 6px;" onclick="app.saveSupabaseCredentials(document.getElementById('supabaseUrlInput').value, document.getElementById('supabaseKeyInput').value)">💾 Save Credentials &amp; Connect</button>
+            </div>
           </div>
-        </div>
-
-        <!-- Import Data Card with Dropdown -->
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
-          <h5 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">📥 Import Data from CSV or Excel</h5>
-          <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
-            Download a template first, fill in your data, then upload.
-          </p>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;">
-            <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
-            <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
-            <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts Template</button>
-          </div>
-
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="importTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
-              <option value="players">👥 Players / Roster</option>
-              <option value="schedule">📅 Schedule &amp; Results</option>
-              <option value="plan">📋 Practice Plan</option>
-              <option value="coaches">👔 Coaching Staff</option>
-              <option value="thoughts">💡 Coach Daily Thoughts</option>
-            </select>
-            <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
-          </div>
-          <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" style="display:none;"
-            onchange="app.handleImportFile(this.files[0], document.getElementById('importTarget').value); this.value='';" />
-          <div id="importStatus" style="margin-top:10px; font-size:0.85rem; color: var(--color-success);"></div>
-        </div>
-      </div>
-
-      <hr style="border-color: var(--bhs-navy-border); margin: 20px 0;" />
-
-      <!-- Section 3: System & Cloud Database Controls -->
-      <div>
-        <h4 style="color: var(--bhs-cyan-accent); margin-bottom: 10px; display:flex; align-items:center; gap:8px;">
-          <span>⚡</span> SYSTEM &amp; CLOUD DATABASE
-        </h4>
-        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding:10px 14px; border-radius:6px; font-size:0.85rem; margin-bottom: 10px;">
-          <div>
-            <strong>Cloud Sync Status:</strong> <span style="color: var(--color-success);">Connected to Supabase</span>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.runAuthDiagnosticTest()">🧪 Run Auth Diagnostic Test</button>
-            <button class="btn btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.syncFromSupabase(); alert('✅ Synced latest data from Supabase Cloud!');">🔄 Reload Cloud Data</button>
-          </div>
-        </div>
-      </div>
+        </details>
       ` : ''}
     `;
   }
@@ -3642,6 +4386,318 @@ class BHSSoccerApp {
     }
 
     alert('🧪 AUTHENTICATION & APPROVAL DIAGNOSTIC TEST RESULTS:\n\n' + report.join('\n\n'));
+  }
+
+  saveSupabaseCredentials(url, key) {
+    if (!key || !key.startsWith('eyJ')) {
+      alert('⚠️ Please enter a valid Supabase Anon Key (starts with "eyJ..."). You can copy it from your Supabase Dashboard -> Project Settings -> API.');
+      return;
+    }
+    const ok = window.supabaseService.setCredentials(url, key);
+    if (ok) {
+      alert('⚡ Supabase Cloud Database connected successfully!');
+      this.renderAdminModalContent();
+    } else {
+      alert('❌ Failed to connect to Supabase with provided credentials.');
+    }
+  }
+
+  async pushAllLocalDataToSupabase() {
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this sync.');
+      return;
+    }
+
+    const confirmSync = confirm(
+      '⚡ ONE-TIME DATABASE OVERWRITE / SYNC\n\nThis will take all local data stored in your browser (School Info, Roster, Schedule, Practice Plans, Drills Library, Coaches, Daily Thoughts) and write it directly into your Supabase Cloud Database.\n\nDo you want to proceed?'
+    );
+    if (!confirmSync) return;
+
+    const report = [];
+    const schoolCode = this.data.school?.code || 'bhs';
+
+    // 1. School Profile
+    try {
+      if (this.data.school) {
+        const schoolRes = await window.supabaseService.upsertSchool(schoolCode, this.data.school);
+        if (schoolRes && schoolRes.data) {
+          if (schoolRes.data.id) this.data.school.id = schoolRes.data.id;
+          report.push(`✅ 🏫 School Profile ('${this.data.school.name}') synced to DB`);
+        } else {
+          report.push(`⚠️ 🏫 School Profile sync warning: ${schoolRes?.error || 'Unknown error'}`);
+        }
+      }
+    } catch (e) {
+      report.push(`❌ 🏫 School Profile Exception: ${e.message}`);
+    }
+
+    // 2. Roster / Players
+    try {
+      const players = this.data.players || [];
+      let playerSuccess = 0;
+      for (const p of players) {
+        const res = await window.supabaseService.upsertPlayer(schoolCode, p);
+        if (res) {
+          if (res.id) p.id = res.id;
+          playerSuccess++;
+        }
+      }
+      report.push(`✅ 👥 Players Roster: ${playerSuccess} / ${players.length} players synced to DB`);
+    } catch (e) {
+      report.push(`❌ 👥 Players Roster Exception: ${e.message}`);
+    }
+
+    // 3. Schedule / Matches
+    try {
+      const matches = this.data.schedule || [];
+      let matchSuccess = 0;
+      for (const m of matches) {
+        const res = await window.supabaseService.upsertMatch(schoolCode, m);
+        if (res) {
+          if (res.id) m.id = res.id;
+          matchSuccess++;
+        }
+      }
+      report.push(`✅ 📅 Schedule: ${matchSuccess} / ${matches.length} matches synced to DB`);
+    } catch (e) {
+      report.push(`❌ 📅 Schedule Exception: ${e.message}`);
+    }
+
+    // 4. Drills Library Bank
+    try {
+      const drills = this.data.drillsBank || [];
+      let drillSuccess = 0;
+      for (const d of drills) {
+        const res = await window.supabaseService.upsertDrillBankItem(schoolCode, d);
+        if (res) {
+          if (res.id) d.id = res.id;
+          drillSuccess++;
+        }
+      }
+      report.push(`✅ 📚 Master Drills Library: ${drillSuccess} / ${drills.length} drills synced to DB`);
+    } catch (e) {
+      report.push(`❌ 📚 Master Drills Library Exception: ${e.message}`);
+    }
+
+    // 5. Practice Plans (Saved Plans & Current Plan)
+    try {
+      const plans = this.data.savedPlans || [];
+      let planSuccess = 0;
+      for (const plan of plans) {
+        const res = await window.supabaseService.saveFullPracticePlan(schoolCode, plan);
+        if (res && res.success) {
+          planSuccess++;
+        }
+      }
+      if (this.data.currentPracticePlan && this.data.currentPracticePlan.length > 0) {
+        await window.supabaseService.saveFullPracticePlan(schoolCode, {
+          name: this.data.activePlanName || 'Current Practice Session',
+          items: this.data.currentPracticePlan
+        });
+      }
+      report.push(`✅ 📋 Practice Plans: ${planSuccess} saved plans synced to DB`);
+    } catch (e) {
+      report.push(`❌ 📋 Practice Plans Exception: ${e.message}`);
+    }
+
+    // 6. Coaching Staff
+    try {
+      const coaches = this.data.coaches || [];
+      let coachSuccess = 0;
+      for (const c of coaches) {
+        const res = await window.supabaseService.upsertCoach(schoolCode, c);
+        if (res) {
+          if (res.id) c.id = res.id;
+          coachSuccess++;
+        }
+      }
+      report.push(`✅ 👔 Coaching Staff: ${coachSuccess} / ${coaches.length} coaches synced to DB`);
+    } catch (e) {
+      report.push(`❌ 👔 Coaching Staff Exception: ${e.message}`);
+    }
+
+    // 7. Daily Thoughts
+    try {
+      const thoughts = this.data.dailyThoughts || [];
+      let thoughtSuccess = 0;
+      for (const t of thoughts) {
+        const res = await window.supabaseService.upsertDailyThought(schoolCode, t);
+        if (res && res.data) {
+          if (res.data.id) t.id = res.data.id;
+          thoughtSuccess++;
+        }
+      }
+      report.push(`✅ 💡 Coach Daily Thoughts: ${thoughtSuccess} / ${thoughts.length} thoughts synced to DB`);
+    } catch (e) {
+      report.push(`❌ 💡 Coach Daily Thoughts Exception: ${e.message}`);
+    }
+
+    // Save updated ID mappings locally
+    this.saveData();
+
+    alert(`⚡ LOCAL DATA TO SUPABASE CLOUD SYNC COMPLETE!\n\n${report.join('\n')}`);
+  }
+
+  async runLiveDatabaseTest() {
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this test.');
+      return;
+    }
+
+    const modal = document.getElementById('dbDiagnosticModal');
+    const headerEl = document.getElementById('dbDiagnosticSummaryHeader');
+    const listEl = document.getElementById('dbDiagnosticTableList');
+
+    if (modal) {
+      modal.style.display = '';
+      modal.classList.add('active');
+    }
+
+    if (headerEl) {
+      headerEl.innerHTML = `
+        <div style="text-align:center; padding:15px; color:var(--bhs-gold-accent);">
+          <strong style="font-size:1rem;">⏳ Running live 9-table database diagnostic test against Supabase Cloud...</strong>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin:4px 0 0 0;">Verifying SELECT reads, INSERT writes, and RLS policies for each table.</p>
+        </div>
+      `;
+    }
+    if (listEl) listEl.innerHTML = '';
+
+    const res = await window.supabaseService.runFullDatabaseDiagnostic();
+
+    if (!res.credentials) {
+      if (headerEl) headerEl.innerHTML = `<div style="color:var(--color-danger);">${res.summaryText}</div>`;
+      return;
+    }
+
+    const passedCount = (res.tableResults || []).filter(r => r.insertStatus === 'PASSED' || r.insertStatus === 'N/A').length;
+    const totalCount = (res.tableResults || []).length;
+    const isOverallSuccess = passedCount === totalCount;
+
+    if (headerEl) {
+      headerEl.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h4 style="margin:0 0 4px 0; color: ${isOverallSuccess ? 'var(--color-success)' : 'var(--bhs-gold-accent)'};">
+              ${isOverallSuccess ? '🎉 ALL TABLES PASSED DATABASE WRITE & READ TESTS!' : `⚠️ ${totalCount - passedCount} OUT OF ${totalCount} TABLES RETURNED ERRORS`}
+            </h4>
+            <div style="font-size:0.82rem; color:var(--text-muted);">
+              Project URL: <strong>${res.credentials.url}</strong> | Resolved School UUID: <strong style="color:#FFF;">${res.credentials.schoolUuid || 'Default Nullable'}</strong>
+            </div>
+          </div>
+          <span class="badge ${isOverallSuccess ? 'badge-win' : 'badge-coach'}" style="font-size:0.9rem; padding:6px 12px;">
+            ${passedCount} / ${totalCount} Tables Functional
+          </span>
+        </div>
+      `;
+    }
+
+    if (listEl && res.tableResults) {
+      listEl.innerHTML = res.tableResults.map(r => {
+        const isPass = r.insertStatus === 'PASSED' || r.insertStatus === 'N/A';
+        const badgeClass = isPass ? 'badge-win' : 'badge-role';
+        const cardBorderColor = isPass ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.5)';
+
+        return `
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid ${cardBorderColor}; padding: 14px; border-radius: 8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.2rem;">${r.icon}</span>
+                <strong style="color:#FFF; font-size:1rem;">Table: '${r.table}'</strong>
+                <span class="badge badge-coach">${r.operation}</span>
+              </div>
+              <span class="badge ${badgeClass}" style="font-weight:700;">
+                ${isPass ? '✅ SUCCESS' : '❌ WRITE FAILED'}
+              </span>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.82rem; margin-top:8px;">
+              <div style="background:rgba(0,0,0,0.25); padding:8px 10px; border-radius:6px; border:1px solid var(--bhs-navy-border);">
+                <span style="color:var(--text-muted); display:block; font-weight:700; margin-bottom:2px;">📥 SELECT Query Test:</span>
+                <span style="color:${r.selectStatus === 'PASSED' ? 'var(--color-success)' : 'var(--color-danger)'};">${r.selectDetails}</span>
+              </div>
+
+              <div style="background:rgba(0,0,0,0.25); padding:8px 10px; border-radius:6px; border:1px solid var(--bhs-navy-border);">
+                <span style="color:var(--text-muted); display:block; font-weight:700; margin-bottom:2px;">💾 INSERT / UPSERT Response:</span>
+                <span style="color:${isPass ? 'var(--color-success)' : 'var(--color-danger)'}; font-weight:700;">${r.responseDetails}</span>
+              </div>
+            </div>
+
+            ${r.payload ? `
+              <div style="margin-top:10px;">
+                <details>
+                  <summary style="cursor:pointer; color:var(--bhs-gold-accent); font-size:0.8rem; font-weight:700;">🔍 View Exact Test Data Payload Sent to Supabase</summary>
+                  <pre style="background:#090d16; color:#a6accd; padding:8px 10px; border-radius:6px; font-size:0.75rem; margin-top:6px; overflow-x:auto; border:1px solid var(--bhs-navy-border);">${JSON.stringify(r.payload, null, 2)}</pre>
+                </details>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  async testProfilesTableInsert() {
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this test.');
+      return;
+    }
+
+    const res = await window.supabaseService.testProfileInsert();
+    if (res.success) {
+      alert(`🎉 SUCCESS! Profile row inserted into Supabase 'profiles' table:\n\nEmail: ${res.data.email}\nName: ${res.data.name}\nRole: ${res.data.role}\nStatus: ${res.data.status}`);
+    } else {
+      alert(`❌ SUPABASE INSERT NOTICE:\n\n${res.error}\n\nMake sure to run the SQL table script provided in the Admin Center / schema file in your Supabase SQL Editor.`);
+    }
+  }
+
+  async saveSchoolDataFromAdmin() {
+    const code = (document.getElementById('adminSchoolCode')?.value || 'bhs').trim().toLowerCase();
+    const name = (document.getElementById('adminSchoolName')?.value || 'Beaumont High School').trim();
+    const mascot = (document.getElementById('adminSchoolMascot')?.value || 'Cougars').trim();
+    const city = (document.getElementById('adminSchoolCity')?.value || 'Beaumont, CA').trim();
+    const wins = parseInt(document.getElementById('adminSchoolWins')?.value || 0, 10);
+    const losses = parseInt(document.getElementById('adminSchoolLosses')?.value || 0, 10);
+    const draws = parseInt(document.getElementById('adminSchoolDraws')?.value || 0, 10);
+
+    const schoolData = {
+      code: code || 'bhs',
+      name: name,
+      mascot: mascot,
+      city: city,
+      colors: this.data.school?.colors || { primary: '#0047AB', secondary: '#FFD700' },
+      record: { wins, losses, draws }
+    };
+
+    if (this.data.school?.id) schoolData.id = this.data.school.id;
+
+    this.data.school = schoolData;
+
+    const schools = this.getSchoolsList();
+    const existingIdx = schools.findIndex(s => (s.code || s.id || '').toLowerCase() === code);
+    if (existingIdx !== -1) {
+      schools[existingIdx] = { ...schools[existingIdx], ...schoolData };
+    } else {
+      schools.push(schoolData);
+    }
+    this.data.schools = schools;
+
+    this.saveData();
+
+    let dbSuccess = false;
+    if (window.supabaseService?.isConfigured()) {
+      const res = await window.supabaseService.upsertSchool(code, schoolData);
+      if (res) dbSuccess = true;
+    }
+
+    this.updateHeaderBranding();
+    this.renderCurrentView();
+
+    if (dbSuccess) {
+      alert(`✅ School Profile saved for "${name} ${mascot}" in LocalStorage & synced to Supabase Database!`);
+    } else {
+      alert(`📦 School Profile saved for "${name} ${mascot}" in LocalStorage!`);
+    }
   }
 
   switchUserRole(userId) {
@@ -3913,6 +4969,18 @@ class BHSSoccerApp {
     } else {
       reader.readAsArrayBuffer(file);
     }
+  }
+
+  closeModal(modalId) {
+    if (modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+        return;
+      }
+    }
+    this.closeModals();
   }
 
   closeModals() {

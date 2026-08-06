@@ -169,9 +169,17 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>ADD DRILL TO PRACTICE PLAN</h3>
-        <button class="close-btn">&times;</button>
+        <button class="close-btn" onclick="app.closeModal('addPlanDrillModal')">&times;</button>
       </div>
       <form onsubmit="event.preventDefault(); app.addPlanDrill(document.getElementById('newDrillTime').value, document.getElementById('newDrillName').value, document.getElementById('newDrillDuration').value, document.getElementById('newDrillNotes').value);">
+        
+        <div class="form-group" style="background: rgba(0,71,171,0.18); border: 1px solid var(--bhs-gold-accent); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
+          <label style="font-weight: 700; color: var(--bhs-gold-accent);">📚 Choose Preset Drill from Master Library</label>
+          <select id="newDrillLibrarySelect" class="form-control" onchange="app.onSelectPresetDrillFromLibrary(this.value)">
+            <!-- Populated dynamically by app.js -->
+          </select>
+        </div>
+
         <div class="form-group">
           <label>Time Slot (e.g. 1:00 - 1:20)</label>
           <input type="text" id="newDrillTime" class="form-control" placeholder="1:00 - 1:20" required />
@@ -199,17 +207,143 @@
               <option value="60 min">60 min (1 Hr)</option>
               <option value="75 min">75 min</option>
               <option value="90 min">90 min</option>
-              <option value="custom">Custom value below...</option>
+              <option value="custom">Enter Custom Min Below</option>
             </select>
-            <input type="text" id="newDrillDuration" class="form-control" style="flex: 1;" placeholder="Or type custom (e.g. 12 min)" required />
+            <input type="text" id="newDrillDuration" class="form-control" style="flex: 1;" placeholder="e.g., 20 min" required />
           </div>
         </div>
         <div class="form-group">
-          <label>Coach Key Focus & Detailed Notes</label>
-          <textarea id="newDrillNotes" class="form-control" rows="4" placeholder="e.g. Key tactical focus, coaching points, progression rules, and player rotation..." required></textarea>
+          <label>Coach Tactical Notes</label>
+          <textarea id="newDrillNotes" class="form-control" rows="3" placeholder="Key coaching points, grid dimensions, and progression triggers..."></textarea>
         </div>
-        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">➕ Add to Today's Plan</button>
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Add Drill to Practice Schedule</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Add New Drill Modal -->
+  <div id="drillsBankModal" class="modal-overlay" style="display:none; z-index: 10400;">
+    <div class="modal-window" style="max-width: 720px; border: 1px solid var(--bhs-gold-accent);">
+      <div class="modal-header">
+        <h3>➕ ADD NEW DRILL</h3>
+        <button class="close-btn" onclick="app.closeModal('drillsBankModal')">&times;</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">
+          Create &amp; store master drills with custom notes &amp; diagrams to insert into any practice plan anytime.
+        </p>
+        <button class="btn btn-gold" onclick="app.openCreateMasterDrillModal()">➕ Create New Master Drill</button>
+      </div>
+
+      <div id="drillsBankListContainer" style="display:flex; flex-direction:column; gap:10px; max-height:420px; overflow-y:auto; padding-right:4px;">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Master Drill Modal with Live Diagrammer -->
+  <div id="masterDrillFormModal" class="modal-overlay" style="display:none; z-index: 10500;">
+    <div class="modal-window" style="max-width: 840px; border: 1px solid var(--bhs-gold-accent); max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h3 id="masterDrillFormTitle">➕ CREATE NEW MASTER DRILL</h3>
+        <button class="close-btn" onclick="app.closeModal('masterDrillFormModal')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.saveMasterDrillForm();">
+        <input type="hidden" id="masterDrillFormId" />
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Drill Name / Description</label>
+            <input type="text" id="masterDrillFormName" class="form-control" placeholder="e.g. 3v2 Counter Attack Transition" required />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="masterDrillFormCategory" class="form-control" required>
+              <option value="Tactical / Attacking">Tactical / Attacking</option>
+              <option value="Technical / Passing">Technical / Passing</option>
+              <option value="Defending / Organization">Defending / Organization</option>
+              <option value="Small Sided Scrimmage">Small Sided Scrimmage</option>
+              <option value="Competitive Matrix 1v1">Competitive Matrix 1v1</option>
+              <option value="Fitness &amp; Conditioning">Fitness &amp; Conditioning</option>
+              <option value="Goalkeeping">Goalkeeping</option>
+              <option value="General Warmup">General Warmup</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>Default Duration</label>
+            <input type="text" id="masterDrillFormDuration" class="form-control" placeholder="e.g. 20 min" value="20 min" required />
+          </div>
+          <div class="form-group">
+            <label>Matrix Point Value (Leaderboard)</label>
+            <input type="number" id="masterDrillFormPoints" class="form-control" value="3" min="1" max="10" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Coach Key Tactical Focus &amp; Notes</label>
+          <textarea id="masterDrillFormNotes" class="form-control" rows="2" placeholder="Grid dimensions, player rotation rules, press triggers..."></textarea>
+        </div>
+
+        <!-- Integrated Pitch Diagrammer Section -->
+        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--bhs-gold-accent); padding: 12px; border-radius: 8px; margin-top: 10px; margin-bottom: 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+            <strong style="color: var(--bhs-gold-accent); font-size: 0.95rem;">🎨 CREATE TACTICAL PITCH DIAGRAM FOR THIS DRILL</strong>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Draw players, cones, passes &amp; runs on the pitch below</span>
+          </div>
+
+          <div class="diagrammer-toolbar" style="margin-bottom: 8px;">
+            <div class="tool-group">
+              <button type="button" class="tool-btn active" data-pitch="full" onclick="app.masterDiagrammer.setPitchType('full')">🏟️ Full</button>
+              <button type="button" class="tool-btn" data-pitch="half" onclick="app.masterDiagrammer.setPitchType('half')">⚽ Half</button>
+            </div>
+            <div class="tool-group">
+              <button type="button" class="tool-btn active" data-tool="attacker" onclick="app.setMasterDiagramTool('attacker')">🔵 Attacker</button>
+              <button type="button" class="tool-btn" data-tool="defender" onclick="app.setMasterDiagramTool('defender')">🔴 Defender</button>
+              <button type="button" class="tool-btn" data-tool="gk" onclick="app.setMasterDiagramTool('gk')">🟡 GK</button>
+              <button type="button" class="tool-btn" data-tool="ball" onclick="app.setMasterDiagramTool('ball')">⚽ Ball</button>
+              <button type="button" class="tool-btn" data-tool="cone" onclick="app.setMasterDiagramTool('cone')">🦺 Cone</button>
+            </div>
+            <div class="tool-group">
+              <button type="button" class="tool-btn" data-tool="line_arrow" onclick="app.setMasterDiagramTool('line_arrow')">➡️ Pass</button>
+              <button type="button" class="tool-btn" data-tool="line_dashed" onclick="app.setMasterDiagramTool('line_dashed')">⚡ Run</button>
+              <button type="button" class="tool-btn" data-tool="line_dribble" onclick="app.setMasterDiagramTool('line_dribble')">〰️ Dribble</button>
+              <button type="button" class="tool-btn" data-tool="line_shot" onclick="app.setMasterDiagramTool('line_shot')">🎯 Shot</button>
+            </div>
+            <div class="tool-group">
+              <button type="button" class="tool-btn" data-tool="select" onclick="app.setMasterDiagramTool('select')">🖐️ Move</button>
+              <button type="button" class="tool-btn" onclick="app.masterDiagrammer.undo()">↩️ Undo</button>
+              <button type="button" class="tool-btn" onclick="app.masterDiagrammer.clear()">🧹 Clear</button>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper" style="text-align: center;">
+            <canvas id="masterDrillCanvas" style="border: 2px solid var(--bhs-navy-border); border-radius: 6px; cursor: crosshair; background: #1a472a; max-width: 100%; height: auto;"></canvas>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold" style="width:100%; padding: 12px; font-weight:700; font-size:1rem;">💾 Save Master Drill &amp; Tactical Diagram to Library</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Live Database Diagnostic Test Results Modal -->
+  <div id="dbDiagnosticModal" class="modal-overlay" style="display:none; z-index: 10600;">
+    <div class="modal-window" style="max-width: 880px; border: 1px solid var(--bhs-gold-accent); max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h3>🧪 SUPABASE LIVE DATABASE DIAGNOSTIC REPORT</h3>
+        <button class="close-btn" onclick="app.closeModal('dbDiagnosticModal')">&times;</button>
+      </div>
+      
+      <div id="dbDiagnosticSummaryHeader" style="background: rgba(0,71,171,0.2); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
+        <!-- Filled dynamically by app.js -->
+      </div>
+
+      <div id="dbDiagnosticTableList" style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Card results filled dynamically by app.js -->
+      </div>
     </div>
   </div>
 
@@ -366,7 +500,7 @@
   <div id="loadPlanModal" class="modal-overlay" style="display:none;">
     <div class="modal-window" style="max-width: 620px;">
       <div class="modal-header">
-        <h3>📂 SAVED PRACTICE PLANS DATABASE</h3>
+        <h3>📂 SELECT PRACTICE PLAN</h3>
         <button class="close-btn">&times;</button>
       </div>
       <div id="savedPlansContainer">
@@ -382,7 +516,13 @@
         <h3>ADD NEW COACH</h3>
         <button class="close-btn">&times;</button>
       </div>
-      <form onsubmit="event.preventDefault(); app.addCoach({ name: document.getElementById('newCoachName').value, level: document.getElementById('newCoachLevel').value, phone: document.getElementById('newCoachPhone').value, address: document.getElementById('newCoachAddress').value, email: document.getElementById('newCoachEmail').value, photo: document.getElementById('newCoachPhoto').value, bio: document.getElementById('newCoachBio').value });">
+      <form onsubmit="event.preventDefault(); app.addCoach({ name: document.getElementById('newCoachName').value, schoolCode: document.getElementById('newCoachSchool').value, level: document.getElementById('newCoachLevel').value, phone: document.getElementById('newCoachPhone').value, address: document.getElementById('newCoachAddress').value, email: document.getElementById('newCoachEmail').value, photo: document.getElementById('newCoachPhoto').value, bio: document.getElementById('newCoachBio').value });">
+        <div class="form-group">
+          <label>School / Club Organization</label>
+          <select id="newCoachSchool" class="form-control" onchange="app.handleCoachSchoolSelect(this.value, 'add')" required>
+            <!-- Populated dynamically -->
+          </select>
+        </div>
         <div class="form-group">
           <label>Coach Full Name</label>
           <input type="text" id="newCoachName" class="form-control" placeholder="Coach Bob Miller" required />
@@ -428,6 +568,12 @@
       <form onsubmit="event.preventDefault(); app.submitEditCoach();">
         <input type="hidden" id="editCoachId" />
         <div class="form-group">
+          <label>School / Club Organization</label>
+          <select id="editCoachSchool" class="form-control" onchange="app.handleCoachSchoolSelect(this.value, 'edit')" required>
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div class="form-group">
           <label>Coach Full Name</label>
           <input type="text" id="editCoachName" class="form-control" required />
         </div>
@@ -458,6 +604,70 @@
           <textarea id="editCoachBio" class="form-control" rows="2"></textarea>
         </div>
         <button type="submit" class="btn btn-gold" style="width:100%; margin-top:10px;">💾 Save Coach Profile Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / Edit School / Club Modal -->
+  <div id="schoolFormModal" class="modal-overlay" style="display:none; z-index: 10500;">
+    <div class="modal-window" style="max-width: 560px; border: 1px solid var(--bhs-gold-accent);">
+      <div class="modal-header">
+        <h3>🏫 SCHOOL &amp; CLUB PROFILE SETTINGS</h3>
+        <button class="close-btn" onclick="app.closeModal('schoolFormModal')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); app.submitSchoolForm();">
+        <div class="form-group">
+          <label style="font-weight:700; color:var(--bhs-gold-accent);">Select Saved School / Club or Add New</label>
+          <select id="schoolFormSelect" class="form-control" onchange="app.onSchoolFormSelectChange(this.value)">
+            <!-- Populated dynamically by app.js -->
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px;">
+          <div class="form-group">
+            <label>School Code (e.g. bhs)</label>
+            <input type="text" id="schoolFormCode" class="form-control" placeholder="e.g. bhs" required />
+          </div>
+          <div class="form-group">
+            <label>Official School / Club Name</label>
+            <input type="text" id="schoolFormName" class="form-control" placeholder="e.g. Beaumont High School" required />
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>Mascot / Team Name</label>
+            <input type="text" id="schoolFormMascot" class="form-control" placeholder="e.g. Cougars" required />
+          </div>
+          <div class="form-group">
+            <label>City &amp; State</label>
+            <input type="text" id="schoolFormCity" class="form-control" placeholder="e.g. Beaumont, CA" required />
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>Primary Brand Color</label>
+            <input type="color" id="schoolFormPrimaryColor" class="form-control" value="#0047AB" style="height:40px; padding:2px; cursor:pointer;" />
+          </div>
+          <div class="form-group">
+            <label>Secondary Accent Color</label>
+            <input type="color" id="schoolFormSecondaryColor" class="form-control" value="#FFD700" style="height:40px; padding:2px; cursor:pointer;" />
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div class="form-group"><label style="font-size:0.75rem;">Wins</label><input type="number" id="schoolFormWins" class="form-control" value="0" min="0" /></div>
+          <div class="form-group"><label style="font-size:0.75rem;">Losses</label><input type="number" id="schoolFormLosses" class="form-control" value="0" min="0" /></div>
+          <div class="form-group"><label style="font-size:0.75rem;">Draws</label><input type="number" id="schoolFormDraws" class="form-control" value="0" min="0" /></div>
+        </div>
+
+        <div id="schoolFormStatusNotice" style="margin: 10px 0; padding: 10px; background: rgba(0,71,171,0.2); border: 1px solid var(--bhs-navy-border); border-radius: 6px; font-size: 0.82rem; color: #FFF; display: none;"></div>
+
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button type="submit" class="btn btn-gold" style="flex:1; font-weight:700;">💾 Save to LocalStorage &amp; Database</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('schoolFormModal')">Cancel</button>
+        </div>
       </form>
     </div>
   </div>

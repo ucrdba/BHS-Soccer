@@ -888,3 +888,60 @@ footer {
   touch-action: none;
 }
 
+/* Admin Center Collapsible Accordion Styles */
+details.admin-accordion {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+details.admin-accordion[open] {
+  border-color: var(--bhs-gold-accent);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+summary.admin-accordion-summary {
+  padding: 14px 16px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--bhs-gold-accent);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  list-style: none;
+  transition: background 0.2s ease;
+}
+
+summary.admin-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+summary.admin-accordion-summary:hover {
+  background: rgba(0, 71, 171, 0.2);
+}
+
+summary.admin-accordion-summary::after {
+  content: '▼';
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  margin-left: 10px;
+}
+
+details.admin-accordion[open] summary.admin-accordion-summary::after {
+  transform: rotate(180deg);
+  color: var(--bhs-gold-accent);
+}
+
+.admin-accordion-content {
+  padding: 16px;
+  border-top: 1px solid var(--bhs-navy-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+

@@ -3,23 +3,36 @@
  * Beaumont High School Cougars Soccer
  */
 
-// Supabase Project Credentials (Replace with your Supabase Project Settings URL & Anon Key)
-const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://arsigevpgpbqluqbnhjr.supabase.co';
-const SUPABASE_ANON_KEY = window.ENV_SUPABASE_ANON_KEY || 'sb_publishable_8vDbPoDO4-JN2QWsUeiEww_M7Pt2JCn';
+// Load saved project credentials from localStorage or ENV
+function getSupabaseUrl() {
+  return window.ENV_SUPABASE_URL || localStorage.getItem('bhs_supabase_url') || 'https://arsigevpgpbqluqbnhjr.supabase.co';
+}
+
+function getSupabaseAnonKey() {
+  return window.ENV_SUPABASE_ANON_KEY || localStorage.getItem('bhs_supabase_anon_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw';
+}
 
 let supabaseClient = null;
 
-// Initialize Supabase if library & valid URL are present
-if (typeof supabase !== 'undefined' && SUPABASE_URL.includes('.supabase.co')) {
-  try {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('⚡ Connected to Supabase Cloud Database');
-  } catch (err) {
-    console.warn('Supabase init notice:', err.message);
+function initSupabaseClient() {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+
+  if (typeof supabase !== 'undefined' && url && url.includes('.supabase.co') && key && key.startsWith('eyJ')) {
+    try {
+      supabaseClient = supabase.createClient(url, key);
+      console.log('⚡ Connected to Supabase Cloud Database:', url);
+    } catch (err) {
+      console.warn('Supabase init notice:', err.message);
+      supabaseClient = null;
+    }
+  } else {
+    supabaseClient = null;
+    console.log('📦 Operating in Local Database Mode (LocalStorage active). Provide valid Supabase Anon Key (starts with eyJ...) to enable Cloud DB.');
   }
-} else {
-  console.log('📦 Operating in Local Database Mode (LocalStorage active).');
 }
+
+initSupabaseClient();
 
 class SupabaseService {
   constructor() {
@@ -28,6 +41,14 @@ class SupabaseService {
 
   isConfigured() {
     return this.client !== null;
+  }
+
+  setCredentials(url, key) {
+    if (url) localStorage.setItem('bhs_supabase_url', url.trim());
+    if (key) localStorage.setItem('bhs_supabase_anon_key', key.trim());
+    initSupabaseClient();
+    this.client = supabaseClient;
+    return this.isConfigured();
   }
 
   async signUpUser(email, password) {
@@ -54,64 +75,307 @@ class SupabaseService {
     }
   }
 
-  async upsertProfile(schoolId = 'bhs', user = {}) {
+  isUuid(str) {
+    return typeof str === 'string' && str.length === 36 && str.includes('-');
+  }
+
+  async getSchoolUuid(schoolCodeOrId = 'bhs') {
+    if (!schoolCodeOrId) return null;
+    if (this.isUuid(schoolCodeOrId)) return schoolCodeOrId;
     if (!this.isConfigured()) return null;
+
+    if (this._cachedSchoolUuidMap && this._cachedSchoolUuidMap[schoolCodeOrId]) {
+      return this._cachedSchoolUuidMap[schoolCodeOrId];
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('schools')
+        .select('id, code')
+        .eq('code', schoolCodeOrId || 'bhs')
+        .maybeSingle();
+
+      if (data && data.id) {
+        if (!this._cachedSchoolUuidMap) this._cachedSchoolUuidMap = {};
+        this._cachedSchoolUuidMap[schoolCodeOrId] = data.id;
+        return data.id;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async upsertProfile(schoolId = 'bhs', user = {}) {
+    if (!this.isConfigured()) {
+      console.warn('Supabase not configured: profile saved in local storage.');
+      return null;
+    }
+    const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload = {
-      school_id: schoolId,
       name: user.name || 'Team User',
       email: user.email || '',
-      role: user.role || 'guest',
+      role: user.requestedRole || user.role || 'guest',
       status: user.status || 'active',
       team_level: user.teamLevel || 'Boys Varsity',
       avatar_url: user.avatar || 'assets/bhs_cougars_logo.png'
     };
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (user.id && this.isUuid(user.id)) payload.id = user.id;
 
-    const { data, error } = await this.client
-      .from('profiles')
-      .upsert([payload], { onConflict: 'email' })
-      .select();
+    console.log('⚡ Supabase inserting profile into `profiles` table:', payload);
 
-    if (error) console.warn('Supabase upsertProfile notice:', error.message);
-    return data ? data[0] : null;
+    try {
+      const { data, error } = await this.client
+        .from('profiles')
+        .upsert([payload], { onConflict: 'email' })
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase profiles insert error:', error.message, error);
+      } else {
+        console.log('✅ Supabase profile successfully inserted into `profiles` table:', data);
+      }
+      return data ? data[0] : null;
+    } catch (err) {
+      console.error('❌ Supabase profiles exception:', err.message);
+      return null;
+    }
+  }
+
+  async testProfileInsert() {
+    if (!this.isConfigured()) {
+      return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase Anon Key (starts with eyJ...) is entered.' };
+    }
+
+    const testEmail = `test_profile_${Date.now().toString().slice(-4)}@bhs.org`;
+    const schoolUuid = await this.getSchoolUuid('bhs');
+    const payload = {
+      name: 'Diagnostic Test Player',
+      email: testEmail,
+      role: 'player',
+      status: 'active',
+      team_level: 'Boys Varsity'
+    };
+    if (schoolUuid) payload.school_id = schoolUuid;
+
+    try {
+      const { data, error } = await this.client
+        .from('profiles')
+        .upsert([payload], { onConflict: 'email' })
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase test profile insert error:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Supabase test profile inserted successfully:', data);
+      return { success: true, data: data[0] };
+    } catch (err) {
+      console.error('❌ Supabase test profile exception:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async runFullDatabaseDiagnostic() {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        summaryText: '❌ Supabase Database Client is NOT connected.\n\nReason: Missing or invalid Supabase Anon Key.\n\nFix: Open Admin Center -> Enter your Supabase Anon Key (starts with "eyJ...") and click "Save Credentials".',
+        tableResults: []
+      };
+    }
+
+    const schoolUuid = await this.getSchoolUuid('bhs');
+    const tableResults = [];
+
+    // Helper runner for individual table testing
+    const testTable = async (tableName, icon, operation, testPayload, selectCols = '*') => {
+      const res = {
+        table: tableName,
+        icon: icon,
+        operation: operation,
+        payload: testPayload,
+        selectStatus: 'PASSED',
+        selectDetails: '',
+        insertStatus: 'PASSED',
+        responseDetails: '',
+        cleanupStatus: 'SKIPPED'
+      };
+
+      // 1. Test SELECT Query
+      try {
+        const sel = await this.client.from(tableName).select(selectCols).limit(1);
+        if (sel.error) {
+          res.selectStatus = 'FAILED';
+          res.selectDetails = `SELECT Error: ${sel.error.message} (Postgres Code: ${sel.error.code})`;
+        } else {
+          res.selectStatus = 'PASSED';
+          res.selectDetails = `SELECT OK (${sel.data ? sel.data.length : 0} rows found)`;
+        }
+      } catch (e) {
+        res.selectStatus = 'FAILED';
+        res.selectDetails = `SELECT Exception: ${e.message}`;
+      }
+
+      // 2. Test INSERT / UPSERT Query (if test payload provided)
+      if (testPayload) {
+        try {
+          let ins;
+          if (operation === 'UPSERT') {
+            const conflictCol = tableName === 'schools' ? 'code' : (tableName === 'profiles' ? 'email' : undefined);
+            ins = await this.client.from(tableName).upsert([testPayload], conflictCol ? { onConflict: conflictCol } : undefined).select();
+          } else {
+            ins = await this.client.from(tableName).insert([testPayload]).select();
+          }
+
+          if (ins.error) {
+            res.insertStatus = 'FAILED';
+            res.responseDetails = `INSERT/UPSERT Failed: ${ins.error.message} (Postgres Code: ${ins.error.code})`;
+          } else if (ins.data && ins.data.length > 0) {
+            const insertedRow = ins.data[0];
+            const primaryKeyVal = insertedRow.id || insertedRow.code;
+            res.insertStatus = 'PASSED';
+            res.responseDetails = `SUCCESS! Row inserted into '${tableName}' with Key: "${primaryKeyVal}"`;
+
+            // Clean up test row
+            try {
+              if (tableName === 'schools') {
+                await this.client.from('schools').delete().eq('code', primaryKeyVal);
+              } else if (insertedRow.id) {
+                await this.client.from(tableName).delete().eq('id', insertedRow.id);
+              }
+              res.cleanupStatus = 'PASSED (Test row cleaned up)';
+            } catch (cleanErr) {
+              res.cleanupStatus = `Cleanup Warning: ${cleanErr.message}`;
+            }
+          } else {
+            res.insertStatus = 'FAILED';
+            res.responseDetails = `INSERT query executed but returned 0 rows (Check RLS Policy)`;
+          }
+        } catch (e) {
+          res.insertStatus = 'FAILED';
+          res.responseDetails = `INSERT Exception: ${e.message}`;
+        }
+      } else {
+        res.insertStatus = 'N/A';
+        res.responseDetails = 'Read-only log table query test';
+      }
+
+      return res;
+    };
+
+    // 1. schools
+    const testCode = 'diag_' + Date.now().toString().slice(-4);
+    tableResults.push(await testTable('schools', '🏫', 'UPSERT', {
+      code: testCode,
+      name: 'Diagnostic Test School',
+      mascot: 'Cougars',
+      city: 'Beaumont, CA',
+      colors: { primary: '#0047AB', secondary: '#FFD700' },
+      record: { wins: 1, losses: 0, draws: 0 }
+    }));
+
+    // 2. profiles
+    const testEmail = `test_diag_${Date.now().toString().slice(-4)}@bhs.org`;
+    const profPayload = { name: 'Diagnostic Test Profile', email: testEmail, role: 'player', status: 'active' };
+    if (schoolUuid) profPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('profiles', '👤', 'UPSERT', profPayload));
+
+    // 3. players
+    const playerPayload = { number: 99, name: 'Diagnostic Test Player', position: 'MID', class_year: 'Senior', height: "6'0\"" };
+    if (schoolUuid) playerPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('players', '👥', 'INSERT', playerPayload));
+
+    // 4. schedule
+    const schedPayload = { opponent: 'Diagnostic Opponent', match_date: 'OCT 25', match_time: '5:00 PM', location: 'Varsity Field', is_home: true, status: 'UPCOMING' };
+    if (schoolUuid) schedPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('schedule', '📅', 'INSERT', schedPayload));
+
+    // 5. drills_bank
+    const drillPayload = { name: 'Diagnostic Master Drill', duration: '15 min', category: 'Testing', points: 3, coach_notes: 'Automated test drill' };
+    if (schoolUuid) drillPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('drills_bank', '📚', 'INSERT', drillPayload));
+
+    // 6. practice_plans
+    const planPayload = { time_slot: '0:00 - 0:15', name: 'Diagnostic Plan Item', duration: '15 min', coach_notes: 'Automated test item' };
+    if (schoolUuid) planPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('practice_plans', '📋', 'INSERT', planPayload));
+
+    // 7. coaches
+    const coachPayload = { name: 'Diagnostic Coach', level: 'Staff Coach', email: `coach_diag_${Date.now().toString().slice(-4)}@bhs.org` };
+    if (schoolUuid) coachPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('coaches', '👔', 'INSERT', coachPayload));
+
+    // 8. daily_thoughts
+    const thoughtPayload = { coach_name: 'Coach Bob Miller', thoughts_text: 'Diagnostic automated test thought', is_active: false };
+    if (schoolUuid) thoughtPayload.school_id = schoolUuid;
+    tableResults.push(await testTable('daily_thoughts', '💡', 'INSERT', thoughtPayload));
+
+    // 9. matrix_logs
+    tableResults.push(await testTable('matrix_logs', '📊', 'SELECT', null));
+
+    const allPassed = tableResults.every(r => r.selectStatus === 'PASSED' && (r.insertStatus === 'PASSED' || r.insertStatus === 'N/A'));
+
+    const summaryText = tableResults.map(r => {
+      return `${r.icon} TABLE '${r.table}':
+  • Operation: ${r.operation}
+  • SELECT Status: ${r.selectStatus} (${r.selectDetails})
+  • INSERT Status: ${r.insertStatus}
+  • Payload Sent: ${JSON.stringify(r.payload)}
+  • Response: ${r.responseDetails}`;
+    }).join('\n\n');
+
+    return {
+      success: allPassed,
+      credentials: {
+        url: getSupabaseUrl(),
+        anonKeyPrefix: getSupabaseAnonKey().slice(0, 15),
+        schoolUuid: schoolUuid
+      },
+      tableResults: tableResults,
+      summaryText: summaryText
+    };
   }
 
   // Database Query Wrappers
+  // Database Query Wrappers
   async fetchPlayers(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    const { data, error } = await this.client
-      .from('players')
-      .select('*')
-      .eq('school_id', schoolId)
-      .or('is_deleted.is.null,is_deleted.eq.false');
+    let query = this.client.from('players').select('*').or('is_deleted.is.null,is_deleted.eq.false');
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (schoolUuid) query = query.eq('school_id', schoolUuid);
+    const { data, error } = await query;
     if (error) { console.error('Supabase fetchPlayers error:', error); return null; }
     return data;
   }
 
   async fetchSchedule(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    const { data, error } = await this.client
-      .from('schedule')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: true });
+    let query = this.client.from('schedule').select('*').order('created_at', { ascending: true });
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (schoolUuid) query = query.eq('school_id', schoolUuid);
+    const { data, error } = await query;
     if (error) { console.error('Supabase fetchSchedule error:', error); return null; }
     return data;
   }
 
   async upsertMatch(schoolId, match) {
     if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload = {
-      school_id: schoolId,
       opponent: match.opponent,
-      date: match.date,
-      time: match.time,
+      match_date: match.date || match.match_date,
+      match_time: match.time || match.match_time,
       location: match.location,
       is_home: match.isHome,
       status: match.status,
       score: match.score || null,
       result: match.result || null
     };
-    if (match.id && !match.id.startsWith('m_')) payload.id = match.id; // only set UUID ids, not temp ones
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (match.id && this.isUuid(match.id)) payload.id = match.id;
     const { data, error } = await this.client
       .from('schedule')
       .upsert([payload])
@@ -131,26 +395,29 @@ class SupabaseService {
 
   async fetchPracticePlans(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    const { data, error } = await this.client
-      .from('practice_plans')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: true });
+    let query = this.client.from('practice_plans').select('*').order('created_at', { ascending: true });
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (schoolUuid) query = query.eq('school_id', schoolUuid);
+    const { data, error } = await query;
     if (error) { console.error('Supabase fetchPracticePlans error:', error); return null; }
     return data;
   }
 
   async saveFullPracticePlan(schoolId = 'bhs', planName, drills) {
     if (!this.isConfigured() || !drills || drills.length === 0) return null;
-    const rows = drills.map(d => ({
-      school_id: schoolId,
-      time_slot: d.time || '',
-      name: d.name || '',
-      duration: d.duration || '',
-      coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim(),
-      diagram_image: d.diagramImage || null,
-      diagram_data: d.diagramData || null
-    }));
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    const rows = drills.map(d => {
+      const item = {
+        time_slot: d.time || '',
+        name: d.name || '',
+        duration: d.duration || '',
+        coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim(),
+        diagram_image: d.diagramImage || null,
+        diagram_data: d.diagramData || null
+      };
+      if (schoolUuid) item.school_id = schoolUuid;
+      return item;
+    });
     const { data, error } = await this.client
       .from('practice_plans')
       .insert(rows)
@@ -161,41 +428,27 @@ class SupabaseService {
 
   async savePracticePlanItem(schoolId, planItem) {
     if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    const payload = {
+      time_slot: planItem.time || '',
+      name: planItem.name || '',
+      duration: planItem.duration || '',
+      coach_notes: planItem.coachNotes || '',
+      diagram_image: planItem.diagramImage || null,
+      diagram_data: planItem.diagramData || null
+    };
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (planItem.id && this.isUuid(planItem.id)) payload.id = planItem.id;
     const { data, error } = await this.client
       .from('practice_plans')
-      .insert([{
-        school_id: schoolId,
-        time_slot: planItem.time,
-        name: planItem.name,
-        duration: planItem.duration,
-        coach_notes: planItem.coachNotes,
-        diagram_image: planItem.diagramImage || null,
-        diagram_data: planItem.diagramData || null
-      }])
+      .upsert([payload])
       .select();
     if (error) console.error('Supabase savePracticePlanItem error:', error);
     return data ? data[0] : null;
   }
 
   async upsertPracticePlanItem(schoolId, planItem) {
-    if (!this.isConfigured()) return null;
-    const payload = {
-      school_id: schoolId,
-      time_slot: planItem.time,
-      name: planItem.name,
-      duration: planItem.duration,
-      coach_notes: planItem.coachNotes,
-      diagram_image: planItem.diagramImage || null,
-      diagram_data: planItem.diagramData || null
-    };
-    if (planItem.id) payload.id = planItem.id;
-
-    const { data, error } = await this.client
-      .from('practice_plans')
-      .upsert([payload])
-      .select();
-    if (error) console.error('Supabase upsertPracticePlanItem error:', error);
-    return data ? data[0] : null;
+    return this.savePracticePlanItem(schoolId, planItem);
   }
 
   async deletePracticePlanItem(planId) {
@@ -207,28 +460,114 @@ class SupabaseService {
     if (error) console.error('Supabase deletePracticePlanItem error:', error);
   }
 
+  async fetchDrillsBank(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    try {
+      let query = this.client.from('drills_bank').select('*').order('created_at', { ascending: true });
+      const schoolUuid = await this.getSchoolUuid(schoolId);
+      if (schoolUuid) query = query.eq('school_id', schoolUuid);
+      const { data, error } = await query;
+      if (error) { console.error('Supabase fetchDrillsBank error:', error.message); return null; }
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async upsertDrillBankItem(schoolId = 'bhs', drill = {}) {
+    if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+
+    const payload = {
+      name: drill.name || 'Untitled Drill',
+      duration: drill.duration || '20 min',
+      category: drill.category || 'General',
+      points: parseInt(drill.points || 3, 10)
+    };
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (drill.id && this.isUuid(drill.id)) payload.id = drill.id;
+
+    if (drill.coachNotes) payload.coach_notes = drill.coachNotes;
+    if (drill.diagramImage) payload.diagram_image = drill.diagramImage;
+    if (drill.diagramData) payload.diagram_data = drill.diagramData;
+
+    console.log('⚡ Supabase inserting drill into `drills_bank` table:', payload);
+
+    try {
+      let { data, error } = await this.client
+        .from('drills_bank')
+        .upsert([payload])
+        .select();
+
+      // Fallback for older schemas missing coach_notes / diagram columns
+      if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('column')))) {
+        console.warn('⚠️ Retrying drills_bank insert with basic schema columns...');
+        const basicPayload = {
+          name: payload.name,
+          duration: payload.duration,
+          category: payload.category,
+          points: payload.points
+        };
+        if (payload.school_id) basicPayload.school_id = payload.school_id;
+        if (payload.id) basicPayload.id = payload.id;
+
+        const fallback = await this.client
+          .from('drills_bank')
+          .upsert([basicPayload])
+          .select();
+        data = fallback.data;
+        error = fallback.error;
+      }
+
+      if (error) {
+        console.error('❌ Supabase upsertDrillBankItem error:', error.message, error);
+        return null;
+      } else {
+        console.log('✅ Supabase drill saved successfully:', data);
+        return data ? data[0] : null;
+      }
+    } catch (e) {
+      console.error('❌ Supabase upsertDrillBankItem exception:', e.message);
+      return null;
+    }
+  }
+
+  async deleteDrillBankItem(drillId) {
+    if (!this.isConfigured() || !drillId) return null;
+    try {
+      const { error } = await this.client
+        .from('drills_bank')
+        .delete()
+        .eq('id', drillId);
+      if (error) console.error('Supabase deleteDrillBankItem error:', error.message);
+    } catch (e) {}
+  }
+
   async upsertPlayer(schoolId, player) {
     if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
     const dbPayload = {
-      id: player.id,
-      school_id: schoolId,
       number: parseInt(player.number),
       name: player.name,
       position: player.position,
-      class_year: player.classYear,
-      height: player.height,
-      photo_url: player.photo,
-      season_stats: player.seasonStats || {},
+      class_year: player.classYear || player.class_year || 'Senior',
+      height: player.height || '',
+      photo_url: player.photo || player.photo_url || '',
+      season_stats: player.seasonStats || player.season_stats || {},
       ratings: player.ratings || {},
-      matrix_stats: player.matrixStats || {},
+      matrix_stats: player.matrixStats || player.matrix_stats || {},
       is_deleted: player.isDeleted || false
     };
 
+    if (schoolUuid) dbPayload.school_id = schoolUuid;
+    if (player.id && this.isUuid(player.id)) dbPayload.id = player.id;
+
     const { data, error } = await this.client
       .from('players')
-      .upsert([dbPayload]);
+      .upsert([dbPayload])
+      .select();
     if (error) console.error('Supabase upsertPlayer error:', error);
-    return data;
+    return data ? data[0] : null;
   }
 
   async deletePlayer(playerId) {
@@ -248,37 +587,120 @@ class SupabaseService {
     return data;
   }
 
+  async fetchSchool(schoolCode = 'bhs') {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client
+        .from('schools')
+        .select('*')
+        .eq('code', schoolCode)
+        .maybeSingle();
+      if (error) { console.error('Supabase fetchSchool error:', error.message); return null; }
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async fetchSchools() {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client
+        .from('schools')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) { console.error('Supabase fetchSchools error:', error.message); return null; }
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+
+
+  async upsertSchool(schoolCode = 'bhs', school = {}) {
+    if (!this.isConfigured()) return { data: null, error: 'Supabase Cloud DB is not configured (Anon Key missing).' };
+    const payload = {
+      code: schoolCode || school.code || 'bhs',
+      name: school.name || 'Beaumont High School',
+      mascot: school.mascot || 'Cougars',
+      city: school.city || 'Beaumont, CA',
+      colors: school.colors || { primary: '#0047AB', secondary: '#FFD700' },
+      record: school.record || { wins: 0, losses: 0, draws: 0 }
+    };
+
+    if (school.id && this.isUuid(school.id)) {
+      payload.id = school.id;
+    }
+
+    console.log('⚡ Supabase inserting school into `schools` table:', payload);
+
+    try {
+      const { data, error } = await this.client
+        .from('schools')
+        .upsert([payload], { onConflict: 'code' })
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase upsertSchool error:', error.message, error);
+        return { data: null, error: error.message };
+      } else {
+        console.log('✅ Supabase school saved successfully:', data);
+        return { data: data ? data[0] : null, error: null };
+      }
+    } catch (err) {
+      console.error('❌ Supabase upsertSchool exception:', err.message);
+      return { data: null, error: err.message };
+    }
+  }
+
   async fetchCoaches(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    const { data, error } = await this.client
-      .from('coaches')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: true });
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    let query = this.client.from('coaches').select('*').order('created_at', { ascending: true });
+    if (schoolUuid) query = query.eq('school_id', schoolUuid);
+    const { data, error } = await query;
     if (error) { console.error('Supabase fetchCoaches error:', error); return null; }
     return data;
   }
 
-  async upsertCoach(schoolId, coach) {
+  async upsertCoach(schoolId = 'bhs', coach = {}) {
     if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload = {
-      school_id: schoolId,
-      name: coach.name,
-      level: coach.level,
+      name: coach.name || 'Coach',
+      level: coach.level || 'Staff',
       phone: coach.phone || '',
       address: coach.address || '',
       email: coach.email || '',
-      photo_url: coach.photo || '',
+      photo_url: coach.photo || coach.photo_url || '',
       bio: coach.bio || ''
     };
-    if (coach.id && !coach.id.startsWith('c_')) payload.id = coach.id;
 
-    const { data, error } = await this.client
-      .from('coaches')
-      .upsert([payload])
-      .select();
-    if (error) console.error('Supabase upsertCoach error:', error);
-    return data ? data[0] : null;
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (coach.id && this.isUuid(coach.id)) {
+      payload.id = coach.id;
+    }
+
+    console.log('⚡ Supabase inserting coach into `coaches` table:', payload);
+
+    try {
+      const { data, error } = await this.client
+        .from('coaches')
+        .upsert([payload])
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase upsertCoach error:', error.message, error);
+        return null;
+      } else {
+        console.log('✅ Supabase coach saved successfully:', data);
+        return data ? data[0] : null;
+      }
+    } catch (err) {
+      console.error('❌ Supabase upsertCoach exception:', err.message);
+      return null;
+    }
   }
 
   async deleteCoach(coachId) {
