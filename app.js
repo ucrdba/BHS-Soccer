@@ -128,34 +128,51 @@ const DEFAULT_BHS_DATA = {
     }
   ],
   drillsBank: [
-    { id: 'd1', name: '1v1 Gauntlet (Continuous)', duration: '20 min', category: 'Competitive Matrix 1v1', points: 3 },
-    { id: 'd2', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', category: 'Small Sided', points: 3 },
-    { id: 'd3', name: 'Finishing under High Pressure', duration: '15 min', category: 'Technical / Shooting', points: 2 },
-    { id: 'd4', name: '12-Minute Cooper Fitness Test', duration: '15 min', category: 'Physical Conditioning', points: 5 },
-    { id: 'd5', name: '7v7 Tactical Match Play', duration: '30 min', category: 'Full Scrimmage', points: 3 }
+    { id: 'd1', name: '1v1 Gauntlet (Continuous)', category: 'Competitive Matrix 1v1', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
+    { id: 'd2', name: '2v2 Flying Scrimmage with Bumpers', category: 'Small Sided', coachNotes: 'High intensity transition' },
+    { id: 'd3', name: 'Finishing under High Pressure', category: 'Technical / Shooting', coachNotes: 'Focus on clean striking and follow-through under defensive pressure.' },
+    { id: 'd4', name: '12-Minute Cooper Fitness Test', category: 'Physical Conditioning', coachNotes: 'Maximum aerobic effort test' },
+    { id: 'd5', name: '7v7 Tactical Match Play', category: 'Full Scrimmage', coachNotes: 'Applying press triggers' },
+    { id: 'd_dummy_1', name: 'Dummy Drill A: High Pressing Counter', category: 'Tactical / Pressing', coachNotes: 'Trigger high press on wide fullback touch.' },
+    { id: 'd_dummy_2', name: 'Dummy Drill B: Overlapping Fullbacks 3v2', category: 'Attacking Width', coachNotes: 'Overlap timing from LB/RB into crossing zone.' },
+    { id: 'd_dummy_3', name: 'Dummy Drill C: Quick Wall-Pass Combination', category: 'Technical / Passing', coachNotes: '1-touch wall pass combination in tight central space.' }
   ],
   currentPracticePlan: [
-    { time: '0:00 - 0:15', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
-    { time: '0:15 - 0:35', name: '1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
-    { time: '0:35 - 1:00', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', coachNotes: 'High intensity transition' },
-    { time: '1:00 - 1:25', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers' },
-    { time: '1:25 - 1:30', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
+    { time: '4:00 PM - 4:15 PM', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
+    { time: '4:15 PM - 4:35 PM', name: 'Dummy Drill A: High Pressing Counter', duration: '20 min', coachNotes: 'Trigger high press on wide fullback touch.' },
+    { time: '4:35 PM - 5:00 PM', name: 'Dummy Drill B: Overlapping Fullbacks 3v2', duration: '25 min', coachNotes: 'Overlap timing from LB/RB into crossing zone.' },
+    { time: '5:00 PM - 5:15 PM', name: 'Dummy Drill C: Quick Wall-Pass Combination', duration: '15 min', coachNotes: '1-touch wall pass combination in tight central space.' },
+    { time: '5:15 PM - 5:40 PM', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers in game scenario.' },
+    { time: '5:40 PM - 5:45 PM', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
   ],
   savedPlans: [
+    {
+      id: 'plan_dummy_1',
+      name: 'dummy_practice_1',
+      date: 'AUG 6, 2026',
+      drills: [
+        { time: '4:00 PM - 4:15 PM', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
+        { time: '4:15 PM - 4:35 PM', name: 'Dummy Drill A: High Pressing Counter', duration: '20 min', coachNotes: 'Trigger high press on wide fullback touch.' },
+        { time: '4:35 PM - 5:00 PM', name: 'Dummy Drill B: Overlapping Fullbacks 3v2', duration: '25 min', coachNotes: 'Overlap timing from LB/RB into crossing zone.' },
+        { time: '5:00 PM - 5:15 PM', name: 'Dummy Drill C: Quick Wall-Pass Combination', duration: '15 min', coachNotes: '1-touch wall pass combination in tight central space.' },
+        { time: '5:15 PM - 5:40 PM', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers in game scenario.' },
+        { time: '5:40 PM - 5:45 PM', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
+      ]
+    },
     {
       id: 'plan_default_1',
       name: 'Standard Varsity 90-Min High Intensity',
       date: 'AUG 1, 2026',
       drills: [
-        { time: '0:00 - 0:15', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
-        { time: '0:15 - 0:35', name: '1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
-        { time: '0:35 - 1:00', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', coachNotes: 'High intensity transition' },
-        { time: '1:00 - 1:25', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers' },
-        { time: '1:25 - 1:30', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
+        { time: '4:00 PM - 4:15 PM', name: 'Dynamic Warmup & Rondo (5v2)', duration: '15 min', coachNotes: 'Focus on 1-touch speed & communication' },
+        { time: '4:15 PM - 4:35 PM', name: '1v1 Gauntlet (Continuous)', duration: '20 min', coachNotes: 'Log 1v1 win/loss scores into Matrix' },
+        { time: '4:35 PM - 5:00 PM', name: '2v2 Flying Scrimmage with Bumpers', duration: '25 min', coachNotes: 'High intensity transition' },
+        { time: '5:00 PM - 5:25 PM', name: '7v7 Tactical Match Play', duration: '25 min', coachNotes: 'Applying press triggers' },
+        { time: '5:25 PM - 5:30 PM', name: 'Cool Down & Matrix Leaderboard Review', duration: '5 min', coachNotes: 'Announce Competitor of the Day' }
       ]
     }
   ],
-  activePlanName: 'Standard Varsity 90-Min High Intensity',
+  activePlanName: 'dummy_practice_1',
   coaches: [
     {
       id: 'c1',
@@ -1078,18 +1095,24 @@ class BHSSoccerApp {
 
       const dbPlans = await window.supabaseService.fetchPracticePlans('bhs');
       if (dbPlans && dbPlans.length > 0) {
-        const timelineDrills = [];
         const planMap = {};
 
         dbPlans.forEach(plan => {
           const notes = plan.coach_notes || '';
+          let planName = plan.name || 'Practice Plan';
+          let drillName = plan.drill || plan.name || 'Soccer Drill';
+          let cleanNotes = notes;
+
           const match = notes.match(/^\[Plan:\s*([^\]]+)\]\s*(.*)/i);
           if (match) {
-            const planName = match[1].trim();
-            const cleanNotes = match[2].trim();
+            planName = match[1].trim();
+            cleanNotes = match[2].trim();
+          }
+
+          if (planName) {
             if (!planMap[planName]) {
               planMap[planName] = {
-                id: 'plan_db_' + planName.replace(/\s+/g, '_'),
+                id: 'plan_db_' + planName.replace(/\s+/g, '_').toLowerCase(),
                 name: planName,
                 date: new Date(plan.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
                 drills: []
@@ -1098,28 +1121,14 @@ class BHSSoccerApp {
             planMap[planName].drills.push({
               id: plan.id,
               time: plan.time_slot,
-              name: plan.name,
+              name: drillName,
               duration: plan.duration,
               coachNotes: cleanNotes,
               diagramImage: plan.diagram_image || null,
               diagramData: plan.diagram_data || null
             });
-          } else {
-            timelineDrills.push({
-              id: plan.id,
-              time: plan.time_slot,
-              name: plan.name,
-              duration: plan.duration,
-              coachNotes: notes,
-              diagramImage: plan.diagram_image || null,
-              diagramData: plan.diagram_data || null
-            });
           }
         });
-
-        if (timelineDrills.length > 0) {
-          this.data.currentPracticePlan = timelineDrills;
-        }
 
         // Merge DB saved plans into local savedPlans
         Object.values(planMap).forEach(dbPlan => {
@@ -1461,7 +1470,7 @@ class BHSSoccerApp {
         </div>
 
         <div id="rosterGrid" class="roster-grid">
-          ${this.data.players.map(p => `
+          ${(this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted).map(p => `
             <div class="player-card" data-player-id="${p.id}" data-position="${p.position}">
               <div class="player-card-header" onclick="app.openPlayerModal('${p.id}')">
                 <span class="jersey-number">#${p.number}</span>
@@ -1675,7 +1684,7 @@ class BHSSoccerApp {
         </div>
 
         <div class="schedule-list" style="display:flex; flex-direction:column; gap:12px;">
-          ${(this.data.schedule || []).map(m => `
+          ${(this.data.schedule || []).filter(m => !m.is_deleted && !m.isDeleted).map(m => `
             <div class="schedule-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px 18px; border-radius: 10px;">
               <div class="game-date" style="min-width:120px;">
                 <strong style="color:var(--bhs-gold-accent); font-size:1rem; display:block;">${m.date}</strong>
@@ -1932,7 +1941,7 @@ class BHSSoccerApp {
                 </tr>
               </thead>
               <tbody>
-                ${this.data.players.sort((a,b) => a.matrixStats.rank - b.matrixStats.rank).map(p => `
+                ${(this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted).sort((a,b) => (a.matrixStats?.rank || 99) - (b.matrixStats?.rank || 99)).map(p => `
                   <tr>
                     <td>
                       <div class="rank-pill ${p.matrixStats.rank <= 3 ? 'rank-' + p.matrixStats.rank : 'rank-other'}">
@@ -2056,14 +2065,26 @@ class BHSSoccerApp {
               if (this.selectedDrillIndex === undefined && idx === 0) this.selectedDrillIndex = 0;
 
               return `
-                <div class="drill-item" onclick="app.selectPracticeDrill(${idx})" style="flex-direction: column; align-items: stretch; cursor: pointer; border: ${isSelected ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; background: ${isSelected ? 'rgba(0, 71, 171, 0.25)' : 'rgba(0, 0, 0, 0.25)'}; transition: all 0.2s ease;">
+                <div class="drill-item" 
+                  draggable="true"
+                  ondragstart="app.handleDrillDragStart(event, ${idx})"
+                  ondragover="app.handleDrillDragOver(event, ${idx})"
+                  ondragenter="app.handleDrillDragEnter(event, ${idx})"
+                  ondragleave="app.handleDrillDragLeave(event, ${idx})"
+                  ondrop="app.handleDrillDrop(event, ${idx})"
+                  ondragend="app.handleDrillDragEnd(event)"
+                  onclick="app.selectPracticeDrill(${idx})" 
+                  style="flex-direction: column; align-items: stretch; cursor: grab; border: ${isSelected ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; background: ${isSelected ? 'rgba(0, 71, 171, 0.25)' : 'rgba(0, 0, 0, 0.25)'}; transition: all 0.2s ease;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
-                    <div class="drill-info" style="flex: 1; padding-right: 20px;">
-                      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
-                        <h4 style="margin: 0;">${p.name}</h4>
-                        ${isSelected ? `<span class="badge badge-gold" style="font-size:0.7rem;">ACTIVE SELECTED DRILL</span>` : `<span class="badge badge-secondary" style="font-size:0.68rem; opacity:0.7;">CLICK TO SELECT</span>`}
+                    <div style="display:flex; align-items:flex-start; gap:10px; flex:1;">
+                      <div class="drag-handle" title="Drag to re-order drill timeline" style="cursor:grab; font-size:1.4rem; color:var(--bhs-gold-accent); padding:2px 4px; user-select:none; font-weight:bold;">⣿</div>
+                      <div class="drill-info" style="flex: 1; padding-right: 20px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
+                          <h4 style="margin: 0;">${p.name}</h4>
+                          ${isSelected ? `<span class="badge badge-gold" style="font-size:0.7rem;">ACTIVE SELECTED DRILL</span>` : `<span class="badge badge-secondary" style="font-size:0.68rem; opacity:0.7;">CLICK TO SELECT</span>`}
+                        </div>
+                        <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
                       </div>
-                      <p style="white-space: pre-wrap; margin-top: 4px; color: var(--bhs-silver); font-size: 0.85rem;">💡 <strong>Coach Focus &amp; Notes:</strong>\n${p.coachNotes}</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                       <div style="text-align: right;">
@@ -3638,7 +3659,7 @@ class BHSSoccerApp {
     const container = document.getElementById('drillsBankListContainer');
     if (!container) return;
 
-    const drills = this.data.drillsBank || [];
+    const drills = (this.data.drillsBank || []).filter(d => !d.is_deleted && !d.isDeleted);
 
     if (drills.length === 0) {
       container.innerHTML = `
@@ -3782,6 +3803,11 @@ class BHSSoccerApp {
     if (!confirm('Are you sure you want to delete this master drill from your library?')) return;
 
     if (this.data.drillsBank) {
+      const drill = this.data.drillsBank.find(d => d.id === drillId);
+      if (drill) {
+        drill.isDeleted = true;
+        drill.is_deleted = true;
+      }
       this.data.drillsBank = this.data.drillsBank.filter(d => d.id !== drillId);
       this.saveData();
     }
@@ -4025,6 +4051,105 @@ class BHSSoccerApp {
       }
 
       this.renderCurrentView();
+    }
+  }
+
+  handleDrillDragStart(e, idx) {
+    this.draggedDrillIndex = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', idx);
+    if (e.currentTarget) e.currentTarget.classList.add('dragging');
+  }
+
+  handleDrillDragOver(e, idx) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
+  handleDrillDragEnter(e, idx) {
+    e.preventDefault();
+    if (this.draggedDrillIndex !== undefined && this.draggedDrillIndex !== idx && e.currentTarget) {
+      e.currentTarget.classList.add('drag-over');
+    }
+  }
+
+  handleDrillDragLeave(e, idx) {
+    if (e.currentTarget) e.currentTarget.classList.remove('drag-over');
+  }
+
+  handleDrillDrop(e, targetIdx) {
+    e.preventDefault();
+    if (e.currentTarget) e.currentTarget.classList.remove('drag-over');
+
+    const sourceIdx = this.draggedDrillIndex;
+    if (sourceIdx === undefined || sourceIdx === targetIdx) return;
+
+    const plan = this.data.currentPracticePlan;
+    const [movedDrill] = plan.splice(sourceIdx, 1);
+    plan.splice(targetIdx, 0, movedDrill);
+
+    if (this.selectedDrillIndex === sourceIdx) {
+      this.selectedDrillIndex = targetIdx;
+    } else if (sourceIdx < this.selectedDrillIndex && targetIdx >= this.selectedDrillIndex) {
+      this.selectedDrillIndex--;
+    } else if (sourceIdx > this.selectedDrillIndex && targetIdx <= this.selectedDrillIndex) {
+      this.selectedDrillIndex++;
+    }
+
+    this.recalculatePlanTimelineTimes();
+    this.saveData();
+
+    if (window.supabaseService && window.supabaseService.isConfigured()) {
+      window.supabaseService.saveFullPracticePlan(this.data.school?.code || 'bhs', {
+        name: this.data.activePlanName || 'Current Practice Session',
+        items: this.data.currentPracticePlan
+      });
+    }
+
+    this.renderCurrentView();
+  }
+
+  handleDrillDragEnd(e) {
+    this.draggedDrillIndex = undefined;
+    document.querySelectorAll('.drill-item').forEach(el => {
+      el.classList.remove('dragging', 'drag-over');
+    });
+  }
+
+  recalculatePlanTimelineTimes() {
+    const plan = this.data.currentPracticePlan || [];
+    if (plan.length === 0) return;
+
+    let currentMins = 16 * 60; // 4:00 PM default
+    if (plan[0].time && plan[0].time.includes('-')) {
+      const parts = plan[0].time.split('-');
+      const firstStartStr = parts[0].trim();
+      const converted24h = this.format12hTo24h(firstStartStr);
+      if (converted24h && converted24h.includes(':')) {
+        const p = converted24h.split(':').map(n => parseInt(n, 10));
+        currentMins = p[0] * 60 + p[1];
+      }
+    }
+
+    for (const drill of plan) {
+      let durationMins = 20;
+      if (drill.duration) {
+        const match = drill.duration.match(/(\d+)/);
+        if (match) durationMins = parseInt(match[1], 10);
+      }
+
+      const startHrsStr = String(Math.floor(currentMins / 60) % 24).padStart(2, '0');
+      const startMinsStr = String(currentMins % 60).padStart(2, '0');
+
+      const endMinsTotal = currentMins + durationMins;
+      const endHrsStr = String(Math.floor(endMinsTotal / 60) % 24).padStart(2, '0');
+      const endMinsStr = String(endMinsTotal % 60).padStart(2, '0');
+
+      const displayStart = this.format24hTo12h(`${startHrsStr}:${startMinsStr}`);
+      const displayEnd = this.format24hTo12h(`${endHrsStr}:${endMinsStr}`);
+
+      drill.time = `${displayStart} - ${displayEnd}`;
+      currentMins = endMinsTotal % (24 * 60);
     }
   }
 
@@ -4429,21 +4554,30 @@ class BHSSoccerApp {
 
             <!-- Export Data Card with Dropdown -->
             <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
-              <h5 style="color: var(--bhs-gold-accent); margin-bottom: 8px;">📊 Export Data to Excel (.xlsx)</h5>
+              <h5 style="color: var(--bhs-gold-accent); margin-bottom: 8px;">📊 Export System Data to Excel (.xlsx)</h5>
               <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
-                Select data table or full workbook to generate Excel file download.
+                Select a individual table or export all 10 database tables at once into a multi-sheet Excel workbook package.
               </p>
 
-              <div style="display: flex; gap: 10px; align-items: center;">
-                <select id="exportTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                <select id="exportTarget" class="form-control" style="flex:1; min-width: 220px;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+                  <option value="all">📦 ALL TABLES AT ONCE (Complete Multi-Sheet Workbook)</option>
+                  <option value="schools">🏫 Schools &amp; Team Config</option>
+                  <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
-                  <option value="plan">📋 Practice Plan</option>
+                  <option value="drills">📚 Master Drills Library</option>
+                  <option value="plan">📋 Practice Plans</option>
+                  <option value="matrix">⚔️ Matrix Competition Logs</option>
                   <option value="coaches">👔 Coaching Staff</option>
                   <option value="thoughts">💡 Coach Daily Thoughts</option>
-                  <option value="all">📦 All Data (Single Workbook)</option>
+                  <option value="quiz">📝 Quiz Questions Bank</option>
                 </select>
                 <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="btn btn-gold" style="width:100%; border-color:var(--bhs-cyan-accent); color:var(--bhs-cyan-accent);" onclick="app.exportXLSX('all')" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 Quick Export All 10 Tables at Once (.xlsx)</button>
               </div>
             </div>
 
@@ -4451,24 +4585,35 @@ class BHSSoccerApp {
             <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
               <h5 style="color: var(--bhs-cyan-accent); margin-bottom: 8px;">📥 Import Data from CSV or Excel</h5>
               <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 12px;">
-                Download a template first, fill in your data, then upload.
+                Download a template first, fill in your data, then upload CSV or Multi-Sheet Excel files.
               </p>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;">
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Player Template</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule Template</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts Template</button>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px;">
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('all')" style="font-size:0.75rem; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 All Tables Template</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Players</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('drills')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Drills</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('plan')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Plans</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('coaches')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Coaches</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('quiz')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Quiz</button>
               </div>
 
-              <div style="display: flex; gap: 10px; align-items: center;">
-                <select id="importTarget" class="form-control" style="flex:1;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="importTarget" class="form-control" style="flex:1; min-width: 220px;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+                  <option value="all">📦 ALL TABLES AT ONCE (Multi-Sheet Workbook / Package)</option>
+                  <option value="schools">🏫 Schools &amp; Team Config</option>
+                  <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
-                  <option value="plan">📋 Practice Plan</option>
+                  <option value="drills">📚 Master Drills Library</option>
+                  <option value="plan">📋 Practice Plans</option>
+                  <option value="matrix">⚔️ Matrix Competition Logs</option>
                   <option value="coaches">👔 Coaching Staff</option>
                   <option value="thoughts">💡 Coach Daily Thoughts</option>
+                  <option value="quiz">📝 Quiz Questions Bank</option>
                 </select>
-                <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import</button>
+                <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import Data</button>
               </div>
               <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" style="display:none;"
                 onchange="app.handleImportFile(this.files[0], document.getElementById('importTarget').value); this.value='';" />
@@ -4975,59 +5120,136 @@ class BHSSoccerApp {
     if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
     const wb = XLSX.utils.book_new();
 
+    // 1. SCHOOLS SHEET
+    if (type === 'schools' || type === 'all') {
+      const rows = [{
+        Code: this.data.schoolInfo?.code || 'bhs',
+        Name: this.data.schoolInfo?.name || 'Beaumont High School',
+        Mascot: this.data.schoolInfo?.mascot || 'Cougars',
+        City: this.data.schoolInfo?.city || 'Beaumont, CA',
+        PrimaryColor: this.data.schoolInfo?.colors?.primary || '#0047AB',
+        SecondaryColor: this.data.schoolInfo?.colors?.secondary || '#FFD700',
+        Wins: this.data.schoolInfo?.record?.wins || 0,
+        Losses: this.data.schoolInfo?.record?.losses || 0,
+        Draws: this.data.schoolInfo?.record?.draws || 0,
+        IsDeleted: 'FALSE'
+      }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Schools');
+    }
+
+    // 2. PROFILES SHEET
+    if (type === 'profiles' || type === 'all') {
+      const rows = (this.data.userProfiles || [
+        { username: 'coach_bob', name: 'Coach Bob Miller', role: 'Coach', approved: true },
+        { username: 'sam_admin', name: 'Admin Sam', role: 'Admin', approved: true }
+      ]).map(u => ({
+        Username: u.username || '', Name: u.name || '', Role: u.role || 'User',
+        PlayerId: u.playerId || '', SchoolCode: u.schoolCode || 'bhs',
+        Approved: u.approved !== false ? 'YES' : 'NO',
+        IsDeleted: u.is_deleted || u.isDeleted ? 'TRUE' : 'FALSE'
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Profiles');
+    }
+
+    // 3. PLAYERS SHEET
     if (type === 'players' || type === 'all') {
-      const rows = this.data.players.map(p => ({
+      const rows = (this.data.players || []).map(p => ({
         Number: p.number, Name: p.name, Position: p.position,
-        Class: p.classYear, Height: p.height || '',
-        Goals: p.seasonStats.goals ?? '', Assists: p.seasonStats.assists ?? '',
-        Saves: p.seasonStats.saves ?? '', CleanSheets: p.seasonStats.cleanSheets ?? '',
+        Class: p.classYear || p.class_year || 'Senior', Height: p.height || '',
+        Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '',
+        Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '',
         Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '',
         Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '',
-        Photo: p.photo || ''
+        Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE'
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Players');
     }
 
+    // 4. SCHEDULE SHEET
     if (type === 'schedule' || type === 'all') {
-      const rows = this.data.schedule.map(m => ({
+      const rows = (this.data.schedule || []).map(m => ({
         Date: m.date, Time: m.time, Opponent: m.opponent,
         Location: m.location, Home: m.isHome ? 'Home' : 'Away',
-        Status: m.status, Score: m.score || ''
+        Status: m.status, Score: m.score || '',
+        IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE'
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Schedule');
     }
 
-    if (type === 'plan' || type === 'all') {
-      const rows = this.data.currentPracticePlan.map(d => ({
-        TimeSlot: d.time, DrillName: d.name, Duration: d.duration, CoachNotes: d.coachNotes
+    // 5. MASTER DRILLS SHEET
+    if (type === 'drills' || type === 'all') {
+      const rows = (this.data.drillsBank || []).map(d => ({
+        Name: d.name, Category: d.category || 'General',
+        CoachNotes: d.coachNotes || d.coach_notes || '',
+        IsDeleted: d.is_deleted || d.isDeleted ? 'TRUE' : 'FALSE'
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'PracticePlan');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MasterDrills');
     }
 
+    // 6. PRACTICE PLANS SHEET
+    if (type === 'plan' || type === 'all') {
+      const rows = (this.data.currentPracticePlan || []).map(d => ({
+        PlanName: this.data.activePlanName || 'Practice Plan',
+        TimeSlot: d.time, DrillName: d.name, Duration: d.duration,
+        CoachNotes: d.coachNotes || '',
+        IsDeleted: d.is_deleted || d.isDeleted ? 'TRUE' : 'FALSE'
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'PracticePlans');
+    }
+
+    // 7. MATRIX LOGS SHEET
+    if (type === 'matrix' || type === 'all') {
+      const rows = (this.data.matrixLogs || []).map(l => ({
+        PlayerName: l.playerName || '', DrillName: l.drillName || '',
+        Result: l.result || 'WIN', OpponentName: l.opponentName || '',
+        ScoreText: l.scoreText || '', Date: l.date || '',
+        IsDeleted: l.is_deleted || l.isDeleted ? 'TRUE' : 'FALSE'
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ PlayerName:'Sample Player', DrillName:'1v1 Gauntlet', Result:'WIN', OpponentName:'Challenger', ScoreText:'3-1', Date:'AUG 6, 2026', IsDeleted:'FALSE' }]), 'MatrixLogs');
+    }
+
+    // 8. COACHES SHEET
     if (type === 'coaches' || type === 'all') {
       const rows = (this.data.coaches || []).map(c => ({
         Name: c.name, Level: c.level, Phone: c.phone || '',
-        Email: c.email || '', Address: c.address || '', Bio: c.bio || '', Photo: c.photo || ''
+        Email: c.email || '', Address: c.address || '', Bio: c.bio || '',
+        Photo: c.photo || '', IsDeleted: c.is_deleted || c.isDeleted ? 'TRUE' : 'FALSE'
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Coaches');
     }
 
+    // 9. DAILY THOUGHTS SHEET
     if (type === 'thoughts' || type === 'all') {
       const rows = (this.data.dailyThoughts || []).map(t => ({
         CoachName: t.coachName || 'Coach Bob Miller',
         ThoughtsText: t.text || '',
         IsActive: t.isActive ? 'YES' : 'NO',
-        CreatedAt: t.createdAt || ''
+        CreatedAt: t.createdAt || '',
+        IsDeleted: t.is_deleted || t.isDeleted ? 'TRUE' : 'FALSE'
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'DailyThoughts');
     }
 
+    // 10. QUIZ QUESTIONS SHEET
+    if (type === 'quiz' || type === 'all') {
+      const rows = [
+        { QuestionText: 'What is the primary tactical objective emphasized in Coach\'s Daily Thoughts?', OptionA: 'Drop back into low-block passive defense', OptionB: 'High intensity pressing & quick 2-touch passing transitions', OptionC: 'Dribble individually without passing options', OptionD: 'Long high balls into penalty box only', CorrectAnswer: 'B', Explanation: 'High intensity press and quick transitions.', IsDeleted: 'FALSE' },
+        { QuestionText: 'How should players handle possession under pressure according to today\'s focus?', OptionA: 'Make the simple, quick pass as first option', OptionB: 'Hold the ball until surrounded by defenders', OptionC: 'Turn around and kick the ball out of bounds', OptionD: 'Stop moving completely and wait for whistle', CorrectAnswer: 'A', Explanation: 'Make the simple quick pass early.', IsDeleted: 'FALSE' }
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'QuizQuestions');
+    }
+
     const planNameClean = (this.data.activePlanName || 'PracticePlan').replace(/[/\\?%*:|"<>]/g, '_');
-    const fileName = type === 'all' ? 'BHS_Soccer_AllData.xlsx' :
+    const fileName = type === 'all' ? 'BHS_Soccer_AllData_Complete.xlsx' :
+      type === 'schools' ? 'BHS_Schools_Config.xlsx' :
+      type === 'profiles' ? 'BHS_User_Profiles.xlsx' :
       type === 'players' ? 'BHS_Roster.xlsx' :
       type === 'schedule' ? 'BHS_Schedule.xlsx' :
+      type === 'drills' ? 'BHS_Master_Drills_Library.xlsx' :
+      type === 'matrix' ? 'BHS_Matrix_Logs.xlsx' :
       type === 'coaches' ? 'BHS_Coaching_Staff.xlsx' :
-      type === 'thoughts' ? 'BHS_Coach_Daily_Thoughts.xlsx' : `${planNameClean}.xlsx`;
+      type === 'thoughts' ? 'BHS_Coach_Daily_Thoughts.xlsx' :
+      type === 'quiz' ? 'BHS_Quiz_Questions.xlsx' : `${planNameClean}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   }
@@ -5035,128 +5257,260 @@ class BHSSoccerApp {
   downloadTemplate(type) {
     if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
     const wb = XLSX.utils.book_new();
-    if (type === 'players') {
-      const headers = [{ Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'' }];
+
+    if (type === 'all') {
+      this.exportXLSX('all');
+      return;
+    }
+
+    if (type === 'schools') {
+      const headers = [{ Code:'bhs', Name:'Beaumont High School', Mascot:'Cougars', City:'Beaumont, CA', PrimaryColor:'#0047AB', SecondaryColor:'#FFD700', Wins:0, Losses:0, Draws:0, IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schools');
+      XLSX.writeFile(wb, 'BHS_Schools_Template.xlsx');
+    } else if (type === 'profiles') {
+      const headers = [{ Username:'johndoe', Name:'John Doe', Role:'Coach', PlayerId:'', SchoolCode:'bhs', Approved:'YES', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Profiles');
+      XLSX.writeFile(wb, 'BHS_Profiles_Template.xlsx');
+    } else if (type === 'players') {
+      const headers = [{ Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
       XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
     } else if (type === 'schedule') {
-      const headers = [{ Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'' }];
+      const headers = [{ Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
       XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
+    } else if (type === 'drills') {
+      const headers = [{ Name:'', Category:'General', CoachNotes:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'MasterDrills');
+      XLSX.writeFile(wb, 'BHS_Master_Drills_Template.xlsx');
+    } else if (type === 'plan') {
+      const headers = [{ PlanName:'dummy_practice_1', TimeSlot:'4:00 PM - 4:15 PM', DrillName:'Dynamic Warmup', Duration:'15 min', CoachNotes:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'PracticePlans');
+      XLSX.writeFile(wb, 'BHS_Practice_Plan_Template.xlsx');
+    } else if (type === 'matrix') {
+      const headers = [{ PlayerName:'Diego Silva', DrillName:'1v1 Gauntlet', Result:'WIN', OpponentName:'Mateo Rossi', ScoreText:'3-1', Date:'AUG 6, 2026', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'MatrixLogs');
+      XLSX.writeFile(wb, 'BHS_Matrix_Logs_Template.xlsx');
+    } else if (type === 'coaches') {
+      const headers = [{ Name:'', Level:'Staff', Phone:'', Email:'', Address:'', Bio:'', Photo:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Coaches');
+      XLSX.writeFile(wb, 'BHS_Coaching_Staff_Template.xlsx');
     } else if (type === 'thoughts') {
-      const headers = [{ CoachName:'Coach Bob Miller', ThoughtsText:'Enter daily focus message here...', IsActive:'YES or NO', CreatedAt:'AUG 2, 2026' }];
+      const headers = [{ CoachName:'Coach Bob Miller', ThoughtsText:'Enter daily focus message here...', IsActive:'YES or NO', CreatedAt:'AUG 6, 2026', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'DailyThoughts');
       XLSX.writeFile(wb, 'BHS_Daily_Thoughts_Template.xlsx');
+    } else if (type === 'quiz') {
+      const headers = [{ QuestionText:'Sample Question?', OptionA:'Option 1', OptionB:'Option 2', OptionC:'Option 3', OptionD:'Option 4', CorrectAnswer:'B', Explanation:'Sample explanation', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'QuizQuestions');
+      XLSX.writeFile(wb, 'BHS_Quiz_Questions_Template.xlsx');
     }
   }
 
   async handleImportFile(file, target) {
     if (!file) return;
     const status = document.getElementById('importStatus');
-    if (status) status.textContent = '⏳ Reading file...';
+    if (status) status.textContent = '⏳ Reading & importing file package...';
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        let rows = [];
+        const toStr = (v) => String(v ?? '').trim();
+        let totalCount = 0;
+
+        let workbookSheets = {};
+
         if (file.name.endsWith('.csv')) {
           const text = e.target.result;
           const lines = text.trim().split('\n');
           const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-          rows = lines.slice(1).map(line => {
+          const rows = lines.slice(1).map(line => {
             const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
             const obj = {};
             headers.forEach((h, i) => obj[h] = vals[i] || '');
             return obj;
           });
+          workbookSheets[target || 'Sheet1'] = rows;
         } else {
-          if (typeof XLSX === 'undefined') throw new Error('SheetJS not loaded');
+          if (typeof XLSX === 'undefined') throw new Error('SheetJS library not loaded');
           const data = new Uint8Array(e.target.result);
           const wb = XLSX.read(data, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          wb.SheetNames.forEach(sName => {
+            workbookSheets[sName] = XLSX.utils.sheet_to_json(wb.Sheets[sName], { defval: '' });
+          });
         }
 
-        const toStr = (v) => String(v ?? '').trim();
-        let count = 0;
+        const sheetsToProcess = target === 'all'
+          ? Object.keys(workbookSheets)
+          : [Object.keys(workbookSheets)[0]];
 
-        if (target === 'players') {
-          const imported = rows.filter(r => r.Name).map(r => ({
-            id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-            number: parseInt(r.Number) || 0,
-            name: toStr(r.Name), position: toStr(r.Position) || 'Midfielder',
-            classYear: toStr(r.Class) || 'Junior', height: toStr(r.Height) || "5'10\"",
-            photo: toStr(r.Photo) || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-            seasonStats: toStr(r.Position).includes('Goalkeeper')
-              ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
-              : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
-            ratings: { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 },
-            matrixStats: { wins: 0, losses: 0, points: 0, rank: 99, drillScore: 0 }
-          }));
-          this.data.players.push(...imported);
-          count = imported.length;
-          if (window.supabaseService?.isConfigured()) {
-            for (const p of imported) await window.supabaseService.upsertPlayer('bhs', p);
-          }
-        } else if (target === 'schedule') {
-          const imported = rows.filter(r => r.Opponent).map(r => ({
-            id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-            date: toStr(r.Date).toUpperCase(),
-            time: toStr(r.Time) || '6:00 PM',
-            opponent: toStr(r.Opponent),
-            location: toStr(r.Location) || 'Home - Cougar Stadium',
-            isHome: toStr(r.Home).toLowerCase() !== 'away',
-            status: (toStr(r.Status) || 'UPCOMING').toUpperCase(),
-            score: toStr(r.Score) || null
-          }));
-          this.data.schedule.push(...imported);
-          count = imported.length;
-          if (window.supabaseService?.isConfigured()) {
-            for (const m of imported) await window.supabaseService.upsertMatch('bhs', m);
-          }
-        } else if (target === 'plan') {
-          const imported = rows.filter(r => r.DrillName || r.name).map(r => ({
-            id: null,
-            time: toStr(r.TimeSlot || r.time),
-            name: toStr(r.DrillName || r.name),
-            duration: toStr(r.Duration || r.duration) || '15 min',
-            coachNotes: toStr(r.CoachNotes || r.coachNotes)
-          }));
-          this.data.currentPracticePlan.push(...imported);
-          count = imported.length;
-        } else if (target === 'thoughts') {
-          const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
-            id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-            coachId: 'c1',
-            coachName: toStr(r.CoachName || r.coachName) || 'Coach Bob Miller',
-            text: toStr(r.ThoughtsText || r.text),
-            isActive: toStr(r.IsActive || r.isActive).toLowerCase() === 'yes' || toStr(r.IsActive || r.isActive).toLowerCase() === 'true',
-            createdAt: toStr(r.CreatedAt || r.createdAt) || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
-          }));
+        for (const sheetName of sheetsToProcess) {
+          const rows = workbookSheets[sheetName] || [];
+          if (!rows || rows.length === 0) continue;
 
-          if (imported.some(t => t.isActive)) {
-            (this.data.dailyThoughts || []).forEach(t => t.isActive = false);
-          }
-          if (!this.data.dailyThoughts) this.data.dailyThoughts = [];
-          this.data.dailyThoughts.unshift(...imported);
-          count = imported.length;
+          const sLower = sheetName.toLowerCase();
+          const activeTarget = (target !== 'all') ? target :
+            sLower.includes('school') ? 'schools' :
+            sLower.includes('profile') ? 'profiles' :
+            sLower.includes('player') ? 'players' :
+            sLower.includes('schedule') ? 'schedule' :
+            sLower.includes('drill') ? 'drills' :
+            sLower.includes('plan') ? 'plan' :
+            sLower.includes('matrix') ? 'matrix' :
+            sLower.includes('coach') ? 'coaches' :
+            sLower.includes('thought') ? 'thoughts' :
+            sLower.includes('quiz') ? 'quiz' : 'players';
 
-          if (window.supabaseService?.isConfigured()) {
-            for (const t of imported) {
-              await window.supabaseService.upsertDailyThought('bhs', {
-                id: t.id,
-                coachId: t.coachId,
-                coachName: t.coachName,
-                text: t.text,
-                isActive: t.isActive
-              });
+          if (activeTarget === 'schools') {
+            const r = rows[0];
+            if (r) {
+              this.data.schoolInfo = {
+                code: toStr(r.Code) || 'bhs',
+                name: toStr(r.Name) || 'Beaumont High School',
+                mascot: toStr(r.Mascot) || 'Cougars',
+                city: toStr(r.City) || 'Beaumont, CA',
+                colors: { primary: toStr(r.PrimaryColor) || '#0047AB', secondary: toStr(r.SecondaryColor) || '#FFD700' },
+                record: { wins: parseInt(r.Wins)||0, losses: parseInt(r.Losses)||0, draws: parseInt(r.Draws)||0 }
+              };
+              totalCount += 1;
+              if (window.supabaseService?.isConfigured()) {
+                await window.supabaseService.upsertSchool('bhs', this.data.schoolInfo);
+              }
+            }
+          } else if (activeTarget === 'profiles') {
+            const imported = rows.filter(r => r.Username || r.Name).map(r => ({
+              id: 'prof_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              username: toStr(r.Username || r.Name).toLowerCase().replace(/\s+/g, '_'),
+              name: toStr(r.Name || r.Username),
+              role: toStr(r.Role) || 'User',
+              schoolCode: toStr(r.SchoolCode) || 'bhs',
+              approved: toStr(r.Approved).toUpperCase() !== 'NO',
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            if (!this.data.userProfiles) this.data.userProfiles = [];
+            this.data.userProfiles.push(...imported);
+            totalCount += imported.length;
+          } else if (activeTarget === 'players') {
+            const imported = rows.filter(r => r.Name).map(r => ({
+              id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              number: parseInt(r.Number) || 0,
+              name: toStr(r.Name), position: toStr(r.Position) || 'Midfielder',
+              classYear: toStr(r.Class || r.ClassYear) || 'Junior', height: toStr(r.Height) || "5'10\"",
+              photo: toStr(r.Photo || r.PhotoUrl) || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+              seasonStats: toStr(r.Position).includes('Goalkeeper')
+                ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
+                : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
+              ratings: { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 },
+              matrixStats: { wins: 0, losses: 0, points: 0, rank: 99, drillScore: 0 },
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            this.data.players.push(...imported);
+            totalCount += imported.length;
+            if (window.supabaseService?.isConfigured()) {
+              for (const p of imported) await window.supabaseService.upsertPlayer('bhs', p);
+            }
+          } else if (activeTarget === 'schedule') {
+            const imported = rows.filter(r => r.Opponent).map(r => ({
+              id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              date: toStr(r.Date).toUpperCase(),
+              time: toStr(r.Time) || '6:00 PM',
+              opponent: toStr(r.Opponent),
+              location: toStr(r.Location) || 'Home - Cougar Stadium',
+              isHome: toStr(r.Home).toLowerCase() !== 'away',
+              status: (toStr(r.Status) || 'UPCOMING').toUpperCase(),
+              score: toStr(r.Score) || null,
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            this.data.schedule.push(...imported);
+            totalCount += imported.length;
+            if (window.supabaseService?.isConfigured()) {
+              for (const m of imported) await window.supabaseService.upsertMatch('bhs', m);
+            }
+          } else if (activeTarget === 'drills') {
+            const imported = rows.filter(r => r.Name || r.DrillName).map(r => ({
+              id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              name: toStr(r.Name || r.DrillName),
+              category: toStr(r.Category) || 'General',
+              coachNotes: toStr(r.CoachNotes || r.coach_notes),
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            if (!this.data.drillsBank) this.data.drillsBank = [];
+            this.data.drillsBank.push(...imported);
+            totalCount += imported.length;
+            if (window.supabaseService?.isConfigured()) {
+              for (const d of imported) await window.supabaseService.upsertDrillBankItem('bhs', d);
+            }
+          } else if (activeTarget === 'plan') {
+            const imported = rows.filter(r => r.DrillName || r.drill || r.Name || r.name).map(r => ({
+              id: null,
+              time: toStr(r.TimeSlot || r.Time || r.time),
+              name: toStr(r.DrillName || r.drill || r.Name || r.name),
+              duration: toStr(r.Duration || r.duration) || '15 min',
+              coachNotes: toStr(r.CoachNotes || r.coachNotes),
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            this.data.currentPracticePlan.push(...imported);
+            totalCount += imported.length;
+          } else if (activeTarget === 'coaches') {
+            const imported = rows.filter(r => r.Name).map(r => ({
+              id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              name: toStr(r.Name),
+              level: toStr(r.Level) || 'Staff',
+              phone: toStr(r.Phone),
+              email: toStr(r.Email),
+              address: toStr(r.Address),
+              bio: toStr(r.Bio),
+              photo: toStr(r.Photo || r.PhotoUrl),
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            if (!this.data.coaches) this.data.coaches = [];
+            this.data.coaches.push(...imported);
+            totalCount += imported.length;
+            if (window.supabaseService?.isConfigured()) {
+              for (const c of imported) await window.supabaseService.upsertCoach('bhs', c);
+            }
+          } else if (activeTarget === 'thoughts') {
+            const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
+              id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              coachId: 'c1',
+              coachName: toStr(r.CoachName || r.coachName) || 'Coach Bob Miller',
+              text: toStr(r.ThoughtsText || r.text),
+              isActive: toStr(r.IsActive || r.isActive).toLowerCase() === 'yes' || toStr(r.IsActive || r.isActive).toLowerCase() === 'true',
+              createdAt: toStr(r.CreatedAt || r.createdAt) || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+
+            if (imported.some(t => t.isActive)) {
+              (this.data.dailyThoughts || []).forEach(t => t.isActive = false);
+            }
+            if (!this.data.dailyThoughts) this.data.dailyThoughts = [];
+            this.data.dailyThoughts.unshift(...imported);
+            totalCount += imported.length;
+
+            if (window.supabaseService?.isConfigured()) {
+              for (const t of imported) {
+                await window.supabaseService.upsertDailyThought('bhs', {
+                  id: t.id,
+                  coachId: t.coachId,
+                  coachName: t.coachName,
+                  text: t.text,
+                  isActive: t.isActive,
+                  is_deleted: t.is_deleted
+                });
+              }
             }
           }
         }
 
         this.saveData();
         this.renderCurrentView();
-        if (status) status.textContent = `✅ Successfully imported ${count} ${target} records!`;
+        if (status) status.textContent = `✅ Successfully imported ${totalCount} records across your database tables!`;
       } catch (err) {
         console.error('Import error:', err);
         if (status) status.textContent = `❌ Import failed: ${err.message}`;

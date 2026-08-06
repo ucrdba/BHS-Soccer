@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.schools (
   city TEXT,
   colors JSONB,
   record JSONB DEFAULT '{"wins":0, "losses":0, "draws":0}'::jsonb,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   team_level TEXT DEFAULT 'Boys Varsity',
   player_id UUID,
   avatar_url TEXT,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -59,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.schedule (
   is_home BOOLEAN DEFAULT true,
   score TEXT,
   result TEXT,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -73,12 +76,9 @@ CREATE TABLE IF NOT EXISTS public.drills_bank (
   coach_notes TEXT,
   diagram_image TEXT,
   diagram_data JSONB DEFAULT '{}'::jsonb,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS coach_notes TEXT;
-ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS diagram_image TEXT;
-ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS diagram_data JSONB DEFAULT '{}'::jsonb;
 
 -- 6. PRACTICE PLANS TABLE
 CREATE TABLE IF NOT EXISTS public.practice_plans (
@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS public.practice_plans (
   coach_notes TEXT,
   diagram_image TEXT,
   diagram_data JSONB DEFAULT '{}'::jsonb,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS public.matrix_logs (
   winning_player_id UUID REFERENCES public.players(id) ON DELETE CASCADE,
   points_earned INT NOT NULL,
   logged_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -115,6 +117,7 @@ CREATE TABLE IF NOT EXISTS public.coaches (
   email TEXT,
   photo_url TEXT,
   bio TEXT,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -126,8 +129,23 @@ CREATE TABLE IF NOT EXISTS public.daily_thoughts (
   coach_name TEXT NOT NULL DEFAULT 'Coach Bob Miller',
   thoughts_text TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
+  is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ENSURE IS_DELETED COLUMN EXISTS ACROSS ALL EXISTING TABLES
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.players ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.schedule ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.practice_plans ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.matrix_logs ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.coaches ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.daily_thoughts ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS coach_notes TEXT;
+ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS diagram_image TEXT;
+ALTER TABLE public.drills_bank ADD COLUMN IF NOT EXISTS diagram_data JSONB DEFAULT '{}'::jsonb;
 
 -- 10. QUIZ QUESTIONS TABLE
 CREATE TABLE IF NOT EXISTS public.quiz_questions (

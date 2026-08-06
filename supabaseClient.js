@@ -353,7 +353,7 @@ class SupabaseService {
 
   async fetchSchedule(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    let query = this.client.from('schedule').select('*').order('created_at', { ascending: true });
+    let query = this.client.from('schedule').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
     const schoolUuid = await this.getSchoolUuid(schoolId);
     if (schoolUuid) query = query.eq('school_id', schoolUuid);
     const { data, error } = await query;
@@ -372,7 +372,8 @@ class SupabaseService {
       is_home: match.isHome,
       status: match.status,
       score: match.score || null,
-      result: match.result || null
+      result: match.result || null,
+      is_deleted: match.is_deleted || match.isDeleted || false
     };
     if (schoolUuid) payload.school_id = schoolUuid;
     if (match.id && this.isUuid(match.id)) payload.id = match.id;
@@ -386,16 +387,18 @@ class SupabaseService {
 
   async deleteMatch(matchId) {
     if (!this.isConfigured()) return null;
-    const { error } = await this.client
+    const { data, error } = await this.client
       .from('schedule')
-      .delete()
-      .eq('id', matchId);
-    if (error) console.error('Supabase deleteMatch error:', error);
+      .update({ is_deleted: true })
+      .eq('id', matchId)
+      .select();
+    if (error) console.error('Supabase soft deleteMatch error:', error);
+    return data;
   }
 
   async fetchPracticePlans(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
-    let query = this.client.from('practice_plans').select('*').order('created_at', { ascending: true });
+    let query = this.client.from('practice_plans').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
     const schoolUuid = await this.getSchoolUuid(schoolId);
     if (schoolUuid) query = query.eq('school_id', schoolUuid);
     const { data, error } = await query;
@@ -403,35 +406,68 @@ class SupabaseService {
     return data;
   }
 
-  async saveFullPracticePlan(schoolId = 'bhs', planName, drills) {
-    if (!this.isConfigured() || !drills || drills.length === 0) return null;
+  async saveFullPracticePlan(schoolId = 'bhs', planNameOrObj, drillsArr) {
+    if (!this.isConfigured()) return { success: false, error: 'Supabase Cloud DB is not configured.' };
+
+    let planName = 'Practice Plan';
+    let drills = [];
+
+    if (typeof planNameOrObj === 'object' && planNameOrObj !== null) {
+      planName = planNameOrObj.name || planNameOrObj.planName || 'Practice Plan';
+      drills = planNameOrObj.items || planNameOrObj.drills || [];
+    } else {
+      planName = planNameOrObj || 'Practice Plan';
+      drills = drillsArr || [];
+    }
+
+    if (!drills || drills.length === 0) {
+      return { success: false, error: 'No drills provided in practice plan' };
+    }
+
     const schoolUuid = await this.getSchoolUuid(schoolId);
     const rows = drills.map(d => {
       const item = {
+        name: planName || 'Standard Practice Plan',
+        drill: d.name || d.drill || 'Soccer Drill',
         time_slot: d.time || '',
-        name: d.name || '',
         duration: d.duration || '',
-        coach_notes: `[Plan: ${planName}] ${d.coachNotes || ''}`.trim(),
+        coach_notes: d.coachNotes || '',
         diagram_image: d.diagramImage || null,
         diagram_data: d.diagramData || null
       };
       if (schoolUuid) item.school_id = schoolUuid;
+      if (d.id && this.isUuid(d.id)) item.id = d.id;
       return item;
     });
-    const { data, error } = await this.client
-      .from('practice_plans')
-      .insert(rows)
-      .select();
-    if (error) console.error('Supabase saveFullPracticePlan error:', error);
-    return data;
+
+    console.log('⚡ Supabase inserting practice plan items into `practice_plans` table:', rows);
+
+    try {
+      const { data, error } = await this.client
+        .from('practice_plans')
+        .upsert(rows)
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase saveFullPracticePlan error:', error.message, error);
+        return { success: false, error: error.message };
+      } else {
+        console.log('✅ Supabase practice plan items saved successfully:', data);
+        return { success: true, data };
+      }
+    } catch (err) {
+      console.error('❌ Supabase saveFullPracticePlan exception:', err.message);
+      return { success: false, error: err.message };
+    }
   }
 
   async savePracticePlanItem(schoolId, planItem) {
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload = {
+      name: planItem.planName || window.app?.data?.activePlanName || 'Standard Practice Plan',
+      drill: planItem.name || planItem.drill || 'Soccer Drill',
       time_slot: planItem.time || '',
-      name: planItem.name || '',
       duration: planItem.duration || '',
       coach_notes: planItem.coachNotes || '',
       diagram_image: planItem.diagramImage || null,
@@ -439,12 +475,23 @@ class SupabaseService {
     };
     if (schoolUuid) payload.school_id = schoolUuid;
     if (planItem.id && this.isUuid(planItem.id)) payload.id = planItem.id;
-    const { data, error } = await this.client
-      .from('practice_plans')
-      .upsert([payload])
-      .select();
-    if (error) console.error('Supabase savePracticePlanItem error:', error);
-    return data ? data[0] : null;
+
+    console.log('⚡ Supabase inserting practice plan item into `practice_plans` table:', payload);
+
+    try {
+      const { data, error } = await this.client
+        .from('practice_plans')
+        .upsert([payload])
+        .select();
+      if (error) {
+        console.error('❌ Supabase savePracticePlanItem error:', error.message, error);
+        return null;
+      }
+      return data ? data[0] : null;
+    } catch (e) {
+      console.error('❌ Supabase savePracticePlanItem exception:', e.message);
+      return null;
+    }
   }
 
   async upsertPracticePlanItem(schoolId, planItem) {
@@ -455,17 +502,15 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { error } = await this.client
       .from('practice_plans')
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', planId);
-    if (error) console.error('Supabase deletePracticePlanItem error:', error);
+    if (error) console.error('Supabase soft deletePracticePlanItem error:', error);
   }
 
   async fetchDrillsBank(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client.from('drills_bank').select('*').order('created_at', { ascending: true });
-      const schoolUuid = await this.getSchoolUuid(schoolId);
-      if (schoolUuid) query = query.eq('school_id', schoolUuid);
+      let query = this.client.from('drills_bank').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
       const { data, error } = await query;
       if (error) { console.error('Supabase fetchDrillsBank error:', error.message); return null; }
       return data;
@@ -480,9 +525,8 @@ class SupabaseService {
 
     const payload = {
       name: drill.name || 'Untitled Drill',
-      duration: drill.duration || '20 min',
       category: drill.category || 'General',
-      points: parseInt(drill.points || 3, 10)
+      is_deleted: drill.is_deleted || drill.isDeleted || false
     };
     if (schoolUuid) payload.school_id = schoolUuid;
     if (drill.id && this.isUuid(drill.id)) payload.id = drill.id;
@@ -491,39 +535,19 @@ class SupabaseService {
     if (drill.diagramImage) payload.diagram_image = drill.diagramImage;
     if (drill.diagramData) payload.diagram_data = drill.diagramData;
 
-    console.log('⚡ Supabase inserting drill into `drills_bank` table:', payload);
+    console.log('⚡ Supabase inserting drill into global `drills_bank` repository:', payload);
 
     try {
-      let { data, error } = await this.client
+      const { data, error } = await this.client
         .from('drills_bank')
-        .upsert([payload])
+        .upsert([payload], { onConflict: 'name' })
         .select();
-
-      // Fallback for older schemas missing coach_notes / diagram columns
-      if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('column')))) {
-        console.warn('⚠️ Retrying drills_bank insert with basic schema columns...');
-        const basicPayload = {
-          name: payload.name,
-          duration: payload.duration,
-          category: payload.category,
-          points: payload.points
-        };
-        if (payload.school_id) basicPayload.school_id = payload.school_id;
-        if (payload.id) basicPayload.id = payload.id;
-
-        const fallback = await this.client
-          .from('drills_bank')
-          .upsert([basicPayload])
-          .select();
-        data = fallback.data;
-        error = fallback.error;
-      }
 
       if (error) {
         console.error('❌ Supabase upsertDrillBankItem error:', error.message, error);
         return null;
       } else {
-        console.log('✅ Supabase drill saved successfully:', data);
+        console.log('✅ Supabase master drill saved successfully:', data);
         return data ? data[0] : null;
       }
     } catch (e) {
@@ -537,9 +561,9 @@ class SupabaseService {
     try {
       const { error } = await this.client
         .from('drills_bank')
-        .delete()
+        .update({ is_deleted: true })
         .eq('id', drillId);
-      if (error) console.error('Supabase deleteDrillBankItem error:', error.message);
+      if (error) console.error('Supabase soft deleteDrillBankItem error:', error.message);
     } catch (e) {}
   }
 
@@ -657,7 +681,7 @@ class SupabaseService {
   async fetchCoaches(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
-    let query = this.client.from('coaches').select('*').order('created_at', { ascending: true });
+    let query = this.client.from('coaches').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
     if (schoolUuid) query = query.eq('school_id', schoolUuid);
     const { data, error } = await query;
     if (error) { console.error('Supabase fetchCoaches error:', error); return null; }
@@ -674,7 +698,8 @@ class SupabaseService {
       address: coach.address || '',
       email: coach.email || '',
       photo_url: coach.photo || coach.photo_url || '',
-      bio: coach.bio || ''
+      bio: coach.bio || '',
+      is_deleted: coach.is_deleted || coach.isDeleted || false
     };
 
     if (schoolUuid) payload.school_id = schoolUuid;
@@ -707,9 +732,9 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { error } = await this.client
       .from('coaches')
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', coachId);
-    if (error) console.error('Supabase deleteCoach error:', error);
+    if (error) console.error('Supabase soft deleteCoach error:', error);
   }
 
   async fetchDailyThoughts(schoolId = 'bhs') {
@@ -717,6 +742,7 @@ class SupabaseService {
     const { data, error } = await this.client
       .from('daily_thoughts')
       .select('*')
+      .or('is_deleted.is.null,is_deleted.eq.false')
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetchDailyThoughts error:', error); return null; }
@@ -728,6 +754,7 @@ class SupabaseService {
     const { data, error } = await this.client
       .from('daily_thoughts')
       .select('*')
+      .or('is_deleted.is.null,is_deleted.eq.false')
       .eq('school_id', schoolId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -744,12 +771,12 @@ class SupabaseService {
       coach_id: thought.coachId || 'c1',
       coach_name: thought.coachName || 'Coach Bob Miller',
       thoughts_text: thought.text || '',
-      is_active: thought.isActive !== false
+      is_active: thought.isActive !== false,
+      is_deleted: thought.is_deleted || thought.isDeleted || false
     };
 
     const isClientTempId = !thought.id || thought.id.startsWith('dt_') || thought.id.startsWith('temp_');
 
-    // 1. Try explicit UPDATE if an existing database ID is provided
     if (thought.id && !isClientTempId) {
       const { data: updData, error: updErr } = await this.client
         .from('daily_thoughts')
@@ -765,7 +792,6 @@ class SupabaseService {
       }
     }
 
-    // 2. Perform clean INSERT for new records (let Supabase generate primary key id)
     const { data: insData, error: insErr } = await this.client
       .from('daily_thoughts')
       .insert([payload])
@@ -787,9 +813,9 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { error } = await this.client
       .from('daily_thoughts')
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', thoughtId);
-    if (error) console.error('Supabase deleteDailyThought error:', error);
+    if (error) console.error('Supabase soft deleteDailyThought error:', error);
   }
 
   async setActiveDailyThought(schoolId = 'bhs', activeId) {

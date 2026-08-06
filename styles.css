@@ -960,3 +960,40 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border-radius: 4px;
 }
 
+/* Drag & Drop Practice Timeline Styles */
+.drill-item {
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.drill-item.dragging {
+  opacity: 0.45;
+  border: 2px dashed var(--bhs-gold-accent) !important;
+  transform: scale(0.98);
+}
+
+.drill-item.drag-over {
+  border: 2px solid var(--bhs-cyan-accent) !important;
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.45);
+  background: rgba(0, 71, 171, 0.4) !important;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--bhs-gold-accent);
+  font-size: 1.3rem;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
