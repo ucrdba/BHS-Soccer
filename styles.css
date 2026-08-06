@@ -945,3 +945,18 @@ details.admin-accordion[open] summary.admin-accordion-summary::after {
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* Dark Theme Calendar & Time Picker Indicator Styling */
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) sepia(1) saturate(5) hue-rotate(5deg);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
