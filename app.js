@@ -4576,8 +4576,9 @@ class BHSSoccerApp {
                 <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
               </div>
 
-              <div style="display:flex; gap:10px; margin-top:8px;">
-                <button class="btn btn-gold" style="width:100%; border-color:var(--bhs-cyan-accent); color:var(--bhs-cyan-accent);" onclick="app.exportXLSX('all')" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 Quick Export All 10 Tables at Once (.xlsx)</button>
+              <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+                <button class="btn btn-gold" style="flex:1; min-width:200px; border-color:var(--bhs-cyan-accent); color:var(--bhs-cyan-accent);" onclick="app.exportXLSX('all', false)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 Export All 10 Tables (Single Workbook Package)</button>
+                <button class="btn btn-secondary" style="flex:1; min-width:200px; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" onclick="app.exportXLSX('all', true)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Export All 10 Tables (10 Separate Files)</button>
               </div>
             </div>
 
@@ -5116,8 +5117,20 @@ class BHSSoccerApp {
     if (status) status.textContent = '';
   }
 
-  exportXLSX(type) {
+  exportXLSX(type, separateFiles = false) {
     if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
+
+    const tables = ['schools', 'profiles', 'players', 'schedule', 'drills', 'plan', 'matrix', 'coaches', 'thoughts', 'quiz'];
+
+    if (type === 'all' && separateFiles) {
+      tables.forEach((t, idx) => {
+        setTimeout(() => {
+          this.exportXLSX(t, false);
+        }, idx * 250);
+      });
+      return;
+    }
+
     const wb = XLSX.utils.book_new();
 
     // 1. SCHOOLS SHEET
