@@ -204,6 +204,14 @@ const DEFAULT_BHS_DATA = {
       isActive: true,
       createdAt: 'AUG 2, 2026'
     }
+  ],
+  soccerCategories: [
+    { id: 'cat_1', name: 'Tactical / Attacking', description: 'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.' },
+    { id: 'cat_2', name: 'Defending / Pressing', description: 'Drills focusing on backline compact shape, high pressing triggers, defensive 1v1 containment, and tackling form.' },
+    { id: 'cat_3', name: 'Technical / Passing', description: 'Drills highlighting ball control, quick 2-touch wall passes, weight of pass, and receiving under pressure.' },
+    { id: 'cat_4', name: 'Physical / Conditioning', description: 'High-intensity fitness intervals, shuttle runs, agility ladder work, speed endurance, and core strength.' },
+    { id: 'cat_5', name: 'Warmup & Rondo', description: 'Dynamic mobility warmups, 5v2 / 4v2 rondos, activation patterns, and touch refinement.' },
+    { id: 'cat_6', name: 'Set Pieces / Penalty', description: 'Corner kick routines, free kick wall placement, long throw-ins, and penalty shootout practice.' }
   ]
 };
 
@@ -1005,6 +1013,9 @@ class BHSSoccerApp {
     if (!data.dailyThoughts || !Array.isArray(data.dailyThoughts) || data.dailyThoughts.length === 0) {
       data.dailyThoughts = DEFAULT_BHS_DATA.dailyThoughts;
     }
+    if (!data.soccerCategories || !Array.isArray(data.soccerCategories) || data.soccerCategories.length === 0) {
+      data.soccerCategories = DEFAULT_BHS_DATA.soccerCategories;
+    }
     return data;
   }
 
@@ -1020,6 +1031,7 @@ class BHSSoccerApp {
 
     this.bindEvents();
     this.updateAuthUI();
+    this.populateCategoryDropdowns();
     this.renderCurrentView();
     this.startCountdownTimer();
 
@@ -1185,10 +1197,61 @@ class BHSSoccerApp {
         }));
       }
 
+      const dbCategories = await window.supabaseService.fetchSoccerCategories('bhs');
+      if (dbCategories && dbCategories.length > 0) {
+        this.data.soccerCategories = dbCategories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description || '',
+          is_deleted: cat.is_deleted
+        }));
+      }
+
       console.log('⚡ Successfully loaded live data from Supabase Cloud!');
+      this.populateCategoryDropdowns();
       this.renderCurrentView();
     } catch (e) {
       console.warn('Supabase data sync notice:', e);
+    }
+  }
+
+  populateCategoryDropdowns() {
+    if (!this.data.soccerCategories || !Array.isArray(this.data.soccerCategories) || this.data.soccerCategories.length === 0) {
+      this.data.soccerCategories = [
+        { id: 'cat_1', name: 'Tactical / Attacking', description: 'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.' },
+        { id: 'cat_2', name: 'Defending / Pressing', description: 'Drills focusing on backline compact shape, high pressing triggers, defensive 1v1 containment, and tackling form.' },
+        { id: 'cat_3', name: 'Technical / Passing', description: 'Drills highlighting ball control, quick 2-touch wall passes, weight of pass, and receiving under pressure.' },
+        { id: 'cat_4', name: 'Physical / Conditioning', description: 'High-intensity fitness intervals, shuttle runs, agility ladder work, speed endurance, and core strength.' },
+        { id: 'cat_5', name: 'Warmup & Rondo', description: 'Dynamic mobility warmups, 5v2 / 4v2 rondos, activation patterns, and touch refinement.' },
+        { id: 'cat_6', name: 'Set Pieces / Penalty', description: 'Corner kick routines, free kick wall placement, long throw-ins, and penalty shootout practice.' }
+      ];
+    }
+
+    const categories = this.data.soccerCategories;
+    const masterSelect = document.getElementById('masterDrillFormCategory');
+    if (masterSelect) {
+      const currentVal = masterSelect.value;
+      masterSelect.innerHTML = categories.map(c => 
+        `<option value="${c.name}" title="${c.description}">${c.name}</option>`
+      ).join('');
+      if (currentVal && categories.some(c => c.name === currentVal)) {
+        masterSelect.value = currentVal;
+      }
+      this.updateCategoryDescriptionTooltip(masterSelect.value, 'masterDrillCategoryDesc');
+    }
+  }
+
+  updateCategoryDescriptionTooltip(categoryName, targetId = 'masterDrillCategoryDesc') {
+    if (!categoryName) return;
+    const categories = this.data.soccerCategories || [];
+    const match = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) {
+      if (match && match.description) {
+        targetEl.innerHTML = `💡 <strong>${match.name} DB Description:</strong> ${match.description}`;
+      } else {
+        targetEl.innerHTML = `Hover or select a category above to view database description.`;
+      }
     }
   }
 
@@ -3670,6 +3733,8 @@ class BHSSoccerApp {
   }
 
   openCreateMasterDrillModal(drillId = null) {
+    this.populateCategoryDropdowns();
+
     document.getElementById('masterDrillFormId').value = '';
     document.getElementById('masterDrillFormName').value = '';
     document.getElementById('masterDrillFormCategory').value = 'Tactical / Attacking';
@@ -3694,6 +3759,11 @@ class BHSSoccerApp {
       }
     } else {
       if (titleEl) titleEl.textContent = '➕ CREATE NEW MASTER DRILL';
+    }
+
+    const catSelect = document.getElementById('masterDrillFormCategory');
+    if (catSelect) {
+      this.updateCategoryDescriptionTooltip(catSelect.value, 'masterDrillCategoryDesc');
     }
 
     const modal = document.getElementById('masterDrillFormModal');
@@ -4575,13 +4645,14 @@ class BHSSoccerApp {
                   <option value="coaches">👔 Coaching Staff</option>
                   <option value="thoughts">💡 Coach Daily Thoughts</option>
                   <option value="quiz">📝 Quiz Questions Bank</option>
+                  <option value="categories">🏷️ Soccer Categories Bank</option>
                 </select>
                 <button class="btn btn-gold" onclick="app.exportXLSX(document.getElementById('exportTarget').value)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📊 Export Selected Data</button>
               </div>
 
               <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
-                <button class="btn btn-gold" style="flex:1; min-width:200px; border-color:var(--bhs-cyan-accent); color:var(--bhs-cyan-accent);" onclick="app.exportXLSX('all', false)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 Export All 10 Tables (Single Workbook Package)</button>
-                <button class="btn btn-secondary" style="flex:1; min-width:200px; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" onclick="app.exportXLSX('all', true)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Export All 10 Tables (10 Separate Files)</button>
+                <button class="btn btn-gold" style="flex:1; min-width:200px; border-color:var(--bhs-cyan-accent); color:var(--bhs-cyan-accent);" onclick="app.exportXLSX('all', false)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 Export All 11 Tables (Single Workbook Package)</button>
+                <button class="btn btn-secondary" style="flex:1; min-width:200px; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" onclick="app.exportXLSX('all', true)" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Export All 11 Tables (11 Separate Files)</button>
               </div>
             </div>
 
@@ -4601,6 +4672,7 @@ class BHSSoccerApp {
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('coaches')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Coaches</button>
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts</button>
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('quiz')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Quiz</button>
+                <button class="btn btn-secondary" onclick="app.downloadTemplate('categories')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Categories</button>
               </div>
 
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -4616,6 +4688,7 @@ class BHSSoccerApp {
                   <option value="coaches">👔 Coaching Staff</option>
                   <option value="thoughts">💡 Coach Daily Thoughts</option>
                   <option value="quiz">📝 Quiz Questions Bank</option>
+                  <option value="categories">🏷️ Soccer Categories Bank</option>
                 </select>
                 <button class="btn btn-gold" onclick="document.getElementById('importFileInput').click()" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📂 Choose &amp; Import Data</button>
               </div>
@@ -5123,7 +5196,7 @@ class BHSSoccerApp {
   async exportXLSX(type, separateFiles = false) {
     if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
 
-    const tables = ['schools', 'profiles', 'players', 'schedule', 'drills', 'plan', 'matrix', 'coaches', 'thoughts', 'quiz'];
+    const tables = ['schools', 'profiles', 'players', 'schedule', 'drills', 'plan', 'matrix', 'coaches', 'thoughts', 'quiz', 'categories'];
 
     if (type === 'all' && separateFiles) {
       if (typeof JSZip !== 'undefined') {
@@ -5175,6 +5248,10 @@ class BHSSoccerApp {
             fileName = '10_Quiz_Questions.xlsx'; sheetName = 'QuizQuestions';
             const rows = [{ QuestionText: 'What is the primary tactical objective emphasized in Coach\'s Daily Thoughts?', OptionA: 'Drop back into low-block passive defense', OptionB: 'High intensity pressing & quick 2-touch passing transitions', OptionC: 'Dribble individually without passing options', OptionD: 'Long high balls into penalty box only', CorrectAnswer: 'B', Explanation: 'High intensity press and quick transitions.', IsDeleted: 'FALSE' }];
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'categories') {
+            fileName = '11_Soccer_Categories.xlsx'; sheetName = 'SoccerCategories';
+            const rows = (this.data.soccerCategories || []).map(c => ({ Name: c.name, Description: c.description || '', IsDeleted: c.is_deleted || c.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           }
 
           const fileData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -5185,7 +5262,7 @@ class BHSSoccerApp {
         const zipUrl = URL.createObjectURL(zipContent);
         const a = document.createElement('a');
         a.href = zipUrl;
-        a.download = 'BHS_Soccer_All_10_Separate_Tables_Package.zip';
+        a.download = 'BHS_Soccer_All_11_Separate_Tables_Package.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -5322,6 +5399,16 @@ class BHSSoccerApp {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'QuizQuestions');
     }
 
+    // 11. SOCCER CATEGORIES SHEET
+    if (type === 'categories' || type === 'all') {
+      const rows = (this.data.soccerCategories || []).map(c => ({
+        Name: c.name,
+        Description: c.description || '',
+        IsDeleted: c.is_deleted || c.isDeleted ? 'TRUE' : 'FALSE'
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SoccerCategories');
+    }
+
     const planNameClean = (this.data.activePlanName || 'PracticePlan').replace(/[/\\?%*:|"<>]/g, '_');
     const fileName = type === 'all' ? 'BHS_Soccer_AllData_Complete.xlsx' :
       type === 'schools' ? 'BHS_Schools_Config.xlsx' :
@@ -5332,7 +5419,8 @@ class BHSSoccerApp {
       type === 'matrix' ? 'BHS_Matrix_Logs.xlsx' :
       type === 'coaches' ? 'BHS_Coaching_Staff.xlsx' :
       type === 'thoughts' ? 'BHS_Coach_Daily_Thoughts.xlsx' :
-      type === 'quiz' ? 'BHS_Quiz_Questions.xlsx' : `${planNameClean}.xlsx`;
+      type === 'quiz' ? 'BHS_Quiz_Questions.xlsx' :
+      type === 'categories' ? 'BHS_Soccer_Categories.xlsx' : `${planNameClean}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   }
@@ -5366,26 +5454,14 @@ class BHSSoccerApp {
       const headers = [{ Name:'', Category:'General', CoachNotes:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'MasterDrills');
       XLSX.writeFile(wb, 'BHS_Master_Drills_Template.xlsx');
-    } else if (type === 'plan') {
-      const headers = [{ PlanName:'dummy_practice_1', TimeSlot:'4:00 PM - 4:15 PM', DrillName:'Dynamic Warmup', Duration:'15 min', CoachNotes:'', IsDeleted:'FALSE' }];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'PracticePlans');
-      XLSX.writeFile(wb, 'BHS_Practice_Plan_Template.xlsx');
-    } else if (type === 'matrix') {
-      const headers = [{ PlayerName:'Diego Silva', DrillName:'1v1 Gauntlet', Result:'WIN', OpponentName:'Mateo Rossi', ScoreText:'3-1', Date:'AUG 6, 2026', IsDeleted:'FALSE' }];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'MatrixLogs');
-      XLSX.writeFile(wb, 'BHS_Matrix_Logs_Template.xlsx');
-    } else if (type === 'coaches') {
-      const headers = [{ Name:'', Level:'Staff', Phone:'', Email:'', Address:'', Bio:'', Photo:'', IsDeleted:'FALSE' }];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Coaches');
-      XLSX.writeFile(wb, 'BHS_Coaching_Staff_Template.xlsx');
-    } else if (type === 'thoughts') {
-      const headers = [{ CoachName:'Coach Bob Miller', ThoughtsText:'Enter daily focus message here...', IsActive:'YES or NO', CreatedAt:'AUG 6, 2026', IsDeleted:'FALSE' }];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'DailyThoughts');
-      XLSX.writeFile(wb, 'BHS_Daily_Thoughts_Template.xlsx');
-    } else if (type === 'quiz') {
+} else if (type === 'quiz') {
       const headers = [{ QuestionText:'Sample Question?', OptionA:'Option 1', OptionB:'Option 2', OptionC:'Option 3', OptionD:'Option 4', CorrectAnswer:'B', Explanation:'Sample explanation', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'QuizQuestions');
       XLSX.writeFile(wb, 'BHS_Quiz_Questions_Template.xlsx');
+    } else if (type === 'categories') {
+      const headers = [{ Name:'Tactical / Attacking', Description:'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'SoccerCategories');
+      XLSX.writeFile(wb, 'BHS_Soccer_Categories_Template.xlsx');
     }
   }
 
@@ -5441,7 +5517,8 @@ class BHSSoccerApp {
             sLower.includes('matrix') ? 'matrix' :
             sLower.includes('coach') ? 'coaches' :
             sLower.includes('thought') ? 'thoughts' :
-            sLower.includes('quiz') ? 'quiz' : 'players';
+            sLower.includes('quiz') ? 'quiz' :
+            (sLower.includes('category') || sLower.includes('categories')) ? 'categories' : 'players';
 
           if (activeTarget === 'schools') {
             const r = rows[0];
@@ -5452,12 +5529,10 @@ class BHSSoccerApp {
                 mascot: toStr(r.Mascot) || 'Cougars',
                 city: toStr(r.City) || 'Beaumont, CA',
                 colors: { primary: toStr(r.PrimaryColor) || '#0047AB', secondary: toStr(r.SecondaryColor) || '#FFD700' },
-                record: { wins: parseInt(r.Wins)||0, losses: parseInt(r.Losses)||0, draws: parseInt(r.Draws)||0 }
+                record: { wins: parseInt(r.Wins) || 0, losses: parseInt(r.Losses) || 0, draws: parseInt(r.Draws) || 0 }
               };
               totalCount += 1;
-              if (window.supabaseService?.isConfigured()) {
-                await window.supabaseService.upsertSchool('bhs', this.data.schoolInfo);
-              }
+              if (window.supabaseService?.isConfigured()) await window.supabaseService.upsertSchool('bhs', this.data.schoolInfo);
             }
           } else if (activeTarget === 'profiles') {
             const imported = rows.filter(r => r.Username || r.Name).map(r => ({
@@ -5588,6 +5663,28 @@ class BHSSoccerApp {
                 });
               }
             }
+          } else if (activeTarget === 'categories') {
+            const imported = rows.filter(r => r.Name || r.name).map(r => ({
+              id: 'cat_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              name: toStr(r.Name || r.name),
+              description: toStr(r.Description || r.description),
+              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
+              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+            }));
+            if (!this.data.soccerCategories) this.data.soccerCategories = [];
+            imported.forEach(cat => {
+              const idx = this.data.soccerCategories.findIndex(c => c.name.toLowerCase() === cat.name.toLowerCase());
+              if (idx !== -1) {
+                this.data.soccerCategories[idx] = cat;
+              } else {
+                this.data.soccerCategories.push(cat);
+              }
+            });
+            totalCount += imported.length;
+            if (window.supabaseService?.isConfigured()) {
+              for (const cat of imported) await window.supabaseService.upsertSoccerCategory('bhs', cat);
+            }
+            this.populateCategoryDropdowns();
           }
         }
 

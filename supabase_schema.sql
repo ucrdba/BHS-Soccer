@@ -211,29 +211,26 @@ GRANT ALL ON TABLE public.quiz_attempts TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.player_answers TO anon, authenticated, service_role;
 GRANT ALL ON public.quiz_results TO anon, authenticated, service_role;
 
--- ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.schedule ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.drills_bank ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.practice_plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.matrix_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.coaches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.daily_thoughts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.player_answers ENABLE ROW LEVEL SECURITY;
+-- 14. SOCCER CATEGORIES TABLE
+CREATE TABLE IF NOT EXISTS public.soccer_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.schools(id) ON DELETE CASCADE,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  is_deleted BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-CREATE POLICY "Allow full access for schools" ON public.schools FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for profiles" ON public.profiles FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for players" ON public.players FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for schedule" ON public.schedule FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for drills_bank" ON public.drills_bank FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for practice_plans" ON public.practice_plans FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for matrix_logs" ON public.matrix_logs FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for coaches" ON public.coaches FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for daily_thoughts" ON public.daily_thoughts FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for quiz_questions" ON public.quiz_questions FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for quiz_attempts" ON public.quiz_attempts FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow full access for player_answers" ON public.player_answers FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);
+-- Seed Initial Soccer Categories with Descriptions
+INSERT INTO public.soccer_categories (name, description) VALUES
+  ('Tactical / Attacking', 'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.'),
+  ('Defending / Pressing', 'Drills focusing on backline compact shape, high pressing triggers, defensive 1v1 containment, and tackling form.'),
+  ('Technical / Passing', 'Drills highlighting ball control, quick 2-touch wall passes, weight of pass, and receiving under pressure.'),
+  ('Physical / Conditioning', 'High-intensity fitness intervals, shuttle runs, agility ladder work, speed endurance, and core strength.'),
+  ('Warmup & Rondo', 'Dynamic mobility warmups, 5v2 / 4v2 rondos, activation patterns, and touch refinement.'),
+  ('Set Pieces / Penalty', 'Corner kick routines, free kick wall placement, long throw-ins, and penalty shootout practice.')
+ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description;
+
+GRANT ALL ON TABLE public.soccer_categories TO anon, authenticated, service_role;
+ALTER TABLE public.soccer_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow full access for soccer_categories" ON public.soccer_categories FOR ALL TO public, anon, authenticated USING (true) WITH CHECK (true);

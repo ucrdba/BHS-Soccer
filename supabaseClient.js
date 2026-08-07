@@ -507,6 +507,41 @@ class SupabaseService {
     if (error) console.error('Supabase soft deletePracticePlanItem error:', error);
   }
 
+  async fetchSoccerCategories(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    try {
+      let query = this.client.from('soccer_categories').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('name', { ascending: true });
+      const { data, error } = await query;
+      if (error) { console.error('Supabase fetchSoccerCategories error:', error.message); return null; }
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async upsertSoccerCategory(schoolId = 'bhs', categoryObj = {}) {
+    if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    const payload = {
+      name: categoryObj.name,
+      description: categoryObj.description || '',
+      is_deleted: categoryObj.is_deleted || false
+    };
+    if (schoolUuid) payload.school_id = schoolUuid;
+    if (categoryObj.id && this.isUuid(categoryObj.id)) payload.id = categoryObj.id;
+
+    try {
+      const { data, error } = await this.client
+        .from('soccer_categories')
+        .upsert([payload], { onConflict: 'name' })
+        .select();
+      if (error) { console.error('Supabase upsertSoccerCategory error:', error.message); return null; }
+      return data ? data[0] : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async fetchDrillsBank(schoolId = 'bhs') {
     if (!this.isConfigured()) return null;
     try {

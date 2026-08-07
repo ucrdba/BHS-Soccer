@@ -270,17 +270,18 @@
             <input type="text" id="masterDrillFormName" class="form-control" placeholder="e.g. 3v2 Counter Attack Transition" required />
           </div>
           <div class="form-group">
-            <label>Category</label>
-            <select id="masterDrillFormCategory" class="form-control" required>
-              <option value="Tactical / Attacking">Tactical / Attacking</option>
-              <option value="Technical / Passing">Technical / Passing</option>
-              <option value="Defending / Organization">Defending / Organization</option>
-              <option value="Small Sided Scrimmage">Small Sided Scrimmage</option>
-              <option value="Competitive Matrix 1v1">Competitive Matrix 1v1</option>
-              <option value="Fitness &amp; Conditioning">Fitness &amp; Conditioning</option>
-              <option value="Goalkeeping">Goalkeeping</option>
-              <option value="General Warmup">General Warmup</option>
+            <label>Category (Hover or Select for DB Description)</label>
+            <select id="masterDrillFormCategory" class="form-control" required onchange="app.updateCategoryDescriptionTooltip(this.value, 'masterDrillCategoryDesc')" onmouseover="app.updateCategoryDescriptionTooltip(this.value, 'masterDrillCategoryDesc')">
+              <option value="Tactical / Attacking" title="Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.">Tactical / Attacking</option>
+              <option value="Defending / Pressing" title="Drills focusing on backline compact shape, high pressing triggers, defensive 1v1 containment, and tackling form.">Defending / Pressing</option>
+              <option value="Technical / Passing" title="Drills highlighting ball control, quick 2-touch wall passes, weight of pass, and receiving under pressure.">Technical / Passing</option>
+              <option value="Physical / Conditioning" title="High-intensity fitness intervals, shuttle runs, agility ladder work, speed endurance, and core strength.">Physical / Conditioning</option>
+              <option value="Warmup &amp; Rondo" title="Dynamic mobility warmups, 5v2 / 4v2 rondos, activation patterns, and touch refinement.">Warmup &amp; Rondo</option>
+              <option value="Set Pieces / Penalty" title="Corner kick routines, free kick wall placement, long throw-ins, and penalty shootout practice.">Set Pieces / Penalty</option>
             </select>
+            <div id="masterDrillCategoryDesc" style="font-size: 0.8rem; color: var(--bhs-gold-accent); margin-top: 5px; font-style: italic; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 6px 10px; border-radius: 6px; min-height: 28px;">
+              Hover or select a category above to view database description.
+            </div>
           </div>
         </div>
 
