@@ -396,23 +396,29 @@ class SoccerTacticalBoard {
   }
 
   updateTimelineUI() {
-    const badge = document.getElementById('timelineFrameBadge');
+    const isMaster = (this.app && this.app.masterDiagrammer === this);
+    const badgeId = isMaster ? 'masterTimelineFrameBadge' : 'timelineFrameBadge';
+    const btnPlayId = isMaster ? 'masterBtnPlayAnim' : 'btnPlayAnim';
+    const containerId = isMaster ? 'masterKeyframeButtonsContainer' : 'keyframeButtonsContainer';
+    const instanceName = isMaster ? 'masterDiagrammer' : 'diagrammer';
+
+    const badge = document.getElementById(badgeId);
     if (badge && this.keyframes[this.currentFrameIndex]) {
       badge.textContent = this.keyframes[this.currentFrameIndex].label;
     }
 
-    const btnPlay = document.getElementById('btnPlayAnim');
+    const btnPlay = document.getElementById(btnPlayId);
     if (btnPlay) {
       btnPlay.innerHTML = this.isPlaying ? '⏸️ Pause' : '▶️ Play Animation';
       btnPlay.className = this.isPlaying ? 'btn btn-gold active' : 'btn btn-gold';
     }
 
-    const container = document.getElementById('keyframeButtonsContainer');
+    const container = document.getElementById(containerId);
     if (container) {
       container.innerHTML = this.keyframes.map((kf, idx) => {
         const isActive = (idx === this.currentFrameIndex);
         return `
-          <button class="btn ${isActive ? 'btn-gold' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 700; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; flex-shrink: 0;" onclick="app.diagrammer.goToKeyframe(${idx})">
+          <button type="button" class="btn ${isActive ? 'btn-gold' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 700; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; flex-shrink: 0;" onclick="app.${instanceName}.goToKeyframe(${idx})">
             ⏱️ ${kf.label}
           </button>
         `;
@@ -565,13 +571,23 @@ class SoccerTacticalBoard {
       this.updateTimelineUI();
       return;
     }
-    if (data.keyframes && Array.isArray(data.keyframes) && data.keyframes.length > 0) {
+
+    // Parse stringified JSON diagram data if retrieved from database or localstorage
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) {
+        console.warn('⚠️ loadDiagramData JSON parse error:', e);
+      }
+    }
+
+    if (data && data.keyframes && Array.isArray(data.keyframes) && data.keyframes.length > 0) {
       this.keyframes = JSON.parse(JSON.stringify(data.keyframes));
       this.currentFrameIndex = Math.min(data.currentFrameIndex || 0, this.keyframes.length - 1);
       const frame = this.keyframes[this.currentFrameIndex];
-      this.elements = frame.elements ? JSON.parse(JSON.stringify(frame.elements)) : [];
-      this.drawings = frame.drawings ? JSON.parse(JSON.stringify(frame.drawings)) : [];
-    } else {
+      this.elements = frame && frame.elements ? JSON.parse(JSON.stringify(frame.elements)) : (data.elements ? JSON.parse(JSON.stringify(data.elements)) : []);
+      this.drawings = frame && frame.drawings ? JSON.parse(JSON.stringify(frame.drawings)) : (data.drawings ? JSON.parse(JSON.stringify(data.drawings)) : []);
+    } else if (data) {
       this.elements = data.elements ? JSON.parse(JSON.stringify(data.elements)) : [];
       this.drawings = data.drawings ? JSON.parse(JSON.stringify(data.drawings)) : [];
       this.keyframes = [{
@@ -582,7 +598,8 @@ class SoccerTacticalBoard {
       }];
       this.currentFrameIndex = 0;
     }
-    this.pitchType = data.pitchType || 'full';
+
+    this.pitchType = (data && data.pitchType) || 'full';
     this.render();
     this.updateTimelineUI();
     this.updateToolbarUI();
@@ -1300,7 +1317,15 @@ class BHSSoccerApp {
       } else {
         container.innerHTML = this.renderPlannerView();
         setTimeout(() => {
-          if (this.diagrammer) this.diagrammer.init('soccerBoardCanvas');
+          if (this.diagrammer) {
+            this.diagrammer.init('soccerBoardCanvas');
+            const selectedDrill = (this.data.currentPracticePlan || [])[this.selectedDrillIndex || 0];
+            const masterDrill = (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (selectedDrill?.name || '').toLowerCase());
+            const targetData = selectedDrill?.diagramData || masterDrill?.diagramData;
+            if (targetData) {
+              this.diagrammer.loadDiagramData(targetData);
+            }
+          }
         }, 80);
       }
     } else if (this.currentView === 'coaches') {
@@ -2092,111 +2117,29 @@ class BHSSoccerApp {
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${p.time}</div>
                       </div>
                       <div style="display: flex; gap: 6px;">
-                        <button class="btn ${isSelected ? 'btn-gold' : 'btn-secondary'}" style="padding: 4px 8px; font-size: 0.8rem;" onclick="event.stopPropagation(); app.selectPracticeDrill(${idx})">🎨 View / Draw Diagram</button>
+                        <button class="btn ${isSelected ? 'btn-gold' : 'btn-secondary'}" style="padding: 4px 8px; font-size: 0.8rem;" onclick="event.stopPropagation(); app.openCreateMasterDrillModalForPlanDrill(${idx})">🎨 View / Edit Diagram</button>
                         <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="event.stopPropagation(); app.openEditPlanDrillModal(${idx})">✏️ Edit</button>
                         <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger); border-color: var(--color-danger);" onclick="event.stopPropagation(); app.deletePlanDrill(${idx})">🗑️</button>
                       </div>
                     </div>
                   </div>
 
-                  ${p.diagramImage ? `
-                    <div style="margin-top: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-gold-accent); padding: 10px; border-radius: 8px; text-align: left;">
-                      <div style="font-size: 0.75rem; color: var(--bhs-gold-accent); margin-bottom: 6px; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
-                        <span>🎨 SAVED TACTICAL DRILL DIAGRAM</span>
-                        <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: var(--color-danger);" onclick="event.stopPropagation(); app.removeDrillDiagram(${idx})">🗑️ Remove Diagram</button>
+                  ${(() => {
+                    const diagramImg = p.diagramImage || (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (p.name || '').toLowerCase())?.diagramImage;
+                    if (!diagramImg) return '';
+                    return `
+                      <div style="margin-top: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-gold-accent); padding: 10px; border-radius: 8px; text-align: left;">
+                        <div style="font-size: 0.75rem; color: var(--bhs-gold-accent); margin-bottom: 6px; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
+                          <span>🎨 TACTICAL DRILL DIAGRAM (CLICK TO EDIT IN FULL DIAGRAMMER)</span>
+                          <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: var(--color-danger);" onclick="event.stopPropagation(); app.removeDrillDiagram(${idx})">🗑️ Remove Diagram</button>
+                        </div>
+                        <img src="${diagramImg}" style="max-width: 100%; max-height: 260px; border-radius: 6px; object-fit: contain; background: #163d16; border: 1px solid var(--bhs-gold-accent); cursor: pointer;" onclick="event.stopPropagation(); app.openCreateMasterDrillModalForPlanDrill(${idx})" title="Click to open full tactical diagram editor" />
                       </div>
-                      <img src="${p.diagramImage}" style="max-width: 100%; max-height: 260px; border-radius: 6px; object-fit: contain; background: #163d16; border: 1px solid var(--bhs-gold-accent);" />
-                    </div>
-                  ` : ''}
+                    `;
+                  })()}
                 </div>
               `;
             }).join('')}
-        </div>
-
-        <!-- Interactive Tactical Drill Diagrammer Card -->
-        ${(() => {
-          const selectedDrill = this.data.currentPracticePlan[this.selectedDrillIndex || 0];
-          return `
-            <div class="diagrammer-card" id="diagrammerCard">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 12px;">
-                <div>
-                  <h3 style="color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
-                    <span>🎨</span> TACTICAL SOCCER DRILL DIAGRAMMER
-                  </h3>
-                  <p class="text-muted" style="font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                    Target Drill: <strong style="color: var(--bhs-gold-accent);">${selectedDrill ? selectedDrill.name : 'Select a practice drill above'}</strong>
-                  </p>
-                </div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-gold" onclick="app.attachDiagramToDrill(${this.selectedDrillIndex || 0})">💾 Save Diagram to "${selectedDrill ? selectedDrill.name : 'Drill'}"</button>
-                  <button class="btn btn-secondary" onclick="app.downloadDiagramPNG()">📥 Download PNG</button>
-                </div>
-              </div>
-          `;
-        })()}
-
-          <!-- Diagrammer Toolbar -->
-          <div class="diagrammer-toolbar">
-            <div class="tool-group">
-              <span class="tool-group-label">Pitch View:</span>
-              <button class="tool-btn active" data-pitch="full" onclick="app.diagrammer.setPitchType('full')">🏟️ Full Field</button>
-              <button class="tool-btn" data-pitch="half" onclick="app.diagrammer.setPitchType('half')">⚽ Half Field</button>
-            </div>
-
-            <div class="tool-group">
-              <span class="tool-group-label">Stamps / Items:</span>
-              <button class="tool-btn active" data-tool="attacker" onclick="app.setDiagramTool('attacker')">🔵 Attacker</button>
-              <button class="tool-btn" data-tool="defender" onclick="app.setDiagramTool('defender')">🔴 Defender</button>
-              <button class="tool-btn" data-tool="gk" onclick="app.setDiagramTool('gk')">🟡 GK</button>
-              <button class="tool-btn" data-tool="ball" onclick="app.setDiagramTool('ball')">⚽ Ball</button>
-              <button class="tool-btn" data-tool="cone" onclick="app.setDiagramTool('cone')">🦺 Cone</button>
-              <button class="tool-btn" data-tool="goal" onclick="app.setDiagramTool('goal')">🥅 Goal</button>
-              <button class="tool-btn" data-tool="text" onclick="app.setDiagramTool('text')">📝 Text Label</button>
-            </div>
-
-            <div class="tool-group">
-              <span class="tool-group-label">Drawing Tools:</span>
-              <button class="tool-btn" data-tool="line_arrow" onclick="app.setDiagramTool('line_arrow')">➡️ Arrow / Pass</button>
-              <button class="tool-btn" data-tool="line_dashed" onclick="app.setDiagramTool('line_dashed')">⚡ Run / Sprint</button>
-              <button class="tool-btn" data-tool="line_dribble" onclick="app.setDiagramTool('line_dribble')">〰️ Dribble</button>
-              <button class="tool-btn" data-tool="line_shot" onclick="app.setDiagramTool('line_shot')">🎯 Shot on Goal</button>
-              <button class="tool-btn" data-tool="line_solid" onclick="app.setDiagramTool('line_solid')">✏️ Pen</button>
-            </div>
-
-            <div class="tool-group">
-              <span class="tool-group-label">Actions:</span>
-              <button class="tool-btn" data-tool="select" onclick="app.setDiagramTool('select')">🖐️ Move Item</button>
-              <button class="tool-btn" data-tool="eraser" onclick="app.setDiagramTool('eraser')">🧽 Delete</button>
-              <button class="tool-btn" onclick="app.diagrammer.undo()">↩️ Undo</button>
-              <button class="tool-btn" onclick="app.diagrammer.clear()">🧹 Clear Field</button>
-            </div>
-          </div>
-
-          <!-- Pitch Canvas Wrapper -->
-          <div class="canvas-wrapper">
-            <canvas id="soccerBoardCanvas" width="800" height="500"></canvas>
-          </div>
-
-          <!-- Tactical Movement Timeline & Animator Controls -->
-          <div style="margin-top: 16px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.1rem;">⏱️</span>
-                <strong style="color: var(--bhs-gold-accent); font-size: 0.9rem;">TACTICAL MOVEMENT TIMELINE</strong>
-                <span id="timelineFrameBadge" class="badge badge-gold" style="font-size: 0.75rem;">Time 0 (Start Position)</span>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <button class="btn btn-gold" id="btnPlayAnim" style="padding: 6px 14px; font-size: 0.85rem; font-weight: 700;" onclick="app.diagrammer.togglePlayAnimation()">▶️ Play Animation</button>
-                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="app.diagrammer.addKeyframe()">➕ Add Time Frame</button>
-                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger);" onclick="app.diagrammer.deleteCurrentKeyframe()">🗑️ Delete Frame</button>
-              </div>
-            </div>
-
-            <!-- Keyframe Sequence Bar -->
-            <div id="keyframeButtonsContainer" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0;">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
         </div>
       </div>
     `;
@@ -2205,20 +2148,30 @@ class BHSSoccerApp {
   selectPracticeDrill(idx) {
     if (!this.data.currentPracticePlan || idx < 0 || idx >= this.data.currentPracticePlan.length) return;
     this.selectedDrillIndex = idx;
-    const drill = this.data.currentPracticePlan[idx];
-    if (drill && this.diagrammer) {
-      if (drill.diagramData) {
-        this.diagrammer.loadDiagramData(drill.diagramData);
-      } else {
-        this.diagrammer.clear();
-      }
-    }
+
+    // 1. Render view first so the canvas element 'soccerBoardCanvas' is re-created in DOM
     this.renderCurrentView();
 
-    const card = document.getElementById('diagrammerCard');
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    const drill = this.data.currentPracticePlan[idx];
+    const masterDrill = (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (drill?.name || '').toLowerCase());
+    const targetData = drill?.diagramData || masterDrill?.diagramData;
+
+    // 2. Initialize diagrammer on the active canvas element and load diagram elements (attackers, defenders, drawings)
+    setTimeout(() => {
+      if (this.diagrammer) {
+        this.diagrammer.init('soccerBoardCanvas');
+        if (targetData) {
+          this.diagrammer.loadDiagramData(targetData);
+        } else {
+          this.diagrammer.clear();
+        }
+      }
+
+      const card = document.getElementById('diagrammerCard');
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
   }
 
   setDiagramTool(tool) {
@@ -2256,15 +2209,31 @@ class BHSSoccerApp {
     drill.diagramData = diagramData;
     this.selectedDrillIndex = selectedIdx;
 
+    // Persist diagram to Master Drills Repository (drills_bank) so it only has to be created once
+    if (!this.data.drillsBank) this.data.drillsBank = [];
+    let masterDrill = this.data.drillsBank.find(d => d.name.toLowerCase() === drill.name.toLowerCase());
+    if (!masterDrill) {
+      masterDrill = {
+        id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name: drill.name,
+        category: 'General',
+        coachNotes: drill.coachNotes || ''
+      };
+      this.data.drillsBank.push(masterDrill);
+    }
+    masterDrill.diagramImage = dataUrl;
+    masterDrill.diagramData = diagramData;
+
     this.saveData();
 
-    // Persist to Supabase Database if configured
+    // Persist to Supabase Database for both practice plan and drills_bank repository
     if (window.supabaseService && window.supabaseService.isConfigured()) {
       await window.supabaseService.upsertPracticePlanItem('bhs', drill);
+      await window.supabaseService.upsertDrillBankItem('bhs', masterDrill);
     }
 
     this.renderCurrentView();
-    alert(`🎉 Tactical drill diagram successfully saved and stored in database for "${drill.name}"!`);
+    alert(`🎉 Tactical drill diagram stored in Master Drills Repository (drills_bank) for "${drill.name}"!`);
   }
 
   async removeDrillDiagram(idx) {
@@ -3743,6 +3712,27 @@ class BHSSoccerApp {
     }, 50);
   }
 
+  openCreateMasterDrillModalForPlanDrill(idx) {
+    const planDrill = (this.data.currentPracticePlan || [])[idx];
+    if (!planDrill) return;
+
+    if (!this.data.drillsBank) this.data.drillsBank = [];
+    let masterDrill = this.data.drillsBank.find(d => d.name.toLowerCase() === (planDrill.name || '').toLowerCase());
+    if (!masterDrill) {
+      masterDrill = {
+        id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name: planDrill.name,
+        category: 'General',
+        coachNotes: planDrill.coachNotes || '',
+        diagramImage: planDrill.diagramImage || null,
+        diagramData: planDrill.diagramData || null
+      };
+      this.data.drillsBank.push(masterDrill);
+      this.saveData();
+    }
+    this.openCreateMasterDrillModal(masterDrill.id);
+  }
+
   async saveMasterDrillForm() {
     const id = document.getElementById('masterDrillFormId')?.value || '';
     const name = (document.getElementById('masterDrillFormName')?.value || '').trim();
@@ -3782,6 +3772,19 @@ class BHSSoccerApp {
       this.data.drillsBank.push(drillObj);
     }
 
+    // Sync saved diagram to active practice plan timeline items matching this drill
+    if (this.data.currentPracticePlan) {
+      this.data.currentPracticePlan.forEach(p => {
+        if ((p.name || '').toLowerCase() === name.toLowerCase()) {
+          p.diagramImage = drillObj.diagramImage;
+          p.diagramData = drillObj.diagramData;
+          if (window.supabaseService && window.supabaseService.isConfigured()) {
+            window.supabaseService.upsertPracticePlanItem('bhs', p);
+          }
+        }
+      });
+    }
+
     this.saveData();
 
     if (window.supabaseService && window.supabaseService.isConfigured()) {
@@ -3795,7 +3798,7 @@ class BHSSoccerApp {
     this.closeModal('masterDrillFormModal');
     this.renderDrillsBankList();
     this.renderCurrentView();
-    alert(`✅ Master Drill "${name}" & Tactical Pitch Diagram saved to Master Library & Database!`);
+    alert(`✅ Master Drill "${name}" & Tactical Pitch Diagram saved to Master Library & Practice Planner!`);
   }
 
   async deleteMasterDrill(drillId) {

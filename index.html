@@ -335,6 +335,27 @@
           <div class="canvas-wrapper" style="text-align: center;">
             <canvas id="masterDrillCanvas" style="border: 2px solid var(--bhs-navy-border); border-radius: 6px; cursor: crosshair; background: #1a472a; max-width: 100%; height: auto;"></canvas>
           </div>
+
+          <!-- Tactical Movement Timeline Controls for Master Drill Diagram -->
+          <div style="margin-top: 14px; margin-bottom: 16px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--bhs-navy-border); padding: 12px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.1rem;">⏱️</span>
+                <strong style="color: var(--bhs-gold-accent); font-size: 0.88rem;">TACTICAL MOVEMENT TIMELINE</strong>
+                <span id="masterTimelineFrameBadge" class="badge badge-gold" style="font-size: 0.75rem;">Time 0 (Start Position)</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="btn btn-gold" id="masterBtnPlayAnim" style="padding: 5px 12px; font-size: 0.82rem; font-weight: 700;" onclick="app.masterDiagrammer.togglePlayAnimation()">▶️ Play Animation</button>
+                <button type="button" class="btn type-secondary btn-secondary" style="padding: 5px 12px; font-size: 0.82rem;" onclick="app.masterDiagrammer.addKeyframe()">➕ Add Time Frame</button>
+                <button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.82rem; background: rgba(239, 68, 68, 0.2); color: var(--color-danger);" onclick="app.masterDiagrammer.deleteCurrentKeyframe()">🗑️ Delete Frame</button>
+              </div>
+            </div>
+
+            <!-- Keyframe Sequence Bar -->
+            <div id="masterKeyframeButtonsContainer" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-gold" style="width:100%; padding: 12px; font-weight:700; font-size:1rem;">💾 Save Master Drill &amp; Tactical Diagram to Library</button>
