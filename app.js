@@ -5117,16 +5117,83 @@ class BHSSoccerApp {
     if (status) status.textContent = '';
   }
 
-  exportXLSX(type, separateFiles = false) {
+  async exportXLSX(type, separateFiles = false) {
     if (typeof XLSX === 'undefined') { alert('Excel library not loaded yet — please wait a moment and try again.'); return; }
 
     const tables = ['schools', 'profiles', 'players', 'schedule', 'drills', 'plan', 'matrix', 'coaches', 'thoughts', 'quiz'];
 
     if (type === 'all' && separateFiles) {
+      if (typeof JSZip !== 'undefined') {
+        const zip = new JSZip();
+        const folder = zip.folder("BHS_Soccer_Database_Export");
+
+        tables.forEach(t => {
+          const wb = XLSX.utils.book_new();
+          let fileName = 'Table.xlsx';
+          let sheetName = 'Data';
+
+          if (t === 'schools') {
+            fileName = '1_Schools_Config.xlsx'; sheetName = 'Schools';
+            const rows = [{ Code: this.data.schoolInfo?.code || 'bhs', Name: this.data.schoolInfo?.name || 'Beaumont High School', Mascot: this.data.schoolInfo?.mascot || 'Cougars', City: this.data.schoolInfo?.city || 'Beaumont, CA', PrimaryColor: this.data.schoolInfo?.colors?.primary || '#0047AB', SecondaryColor: this.data.schoolInfo?.colors?.secondary || '#FFD700', Wins: this.data.schoolInfo?.record?.wins || 0, Losses: this.data.schoolInfo?.record?.losses || 0, Draws: this.data.schoolInfo?.record?.draws || 0, IsDeleted: 'FALSE' }];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'profiles') {
+            fileName = '2_User_Profiles.xlsx'; sheetName = 'Profiles';
+            const rows = (this.data.userProfiles || [{ username: 'coach_bob', name: 'Coach Bob Miller', role: 'Coach', approved: true }, { username: 'sam_admin', name: 'Admin Sam', role: 'Admin', approved: true }]).map(u => ({ Username: u.username || '', Name: u.name || '', Role: u.role || 'User', PlayerId: u.playerId || '', SchoolCode: u.schoolCode || 'bhs', Approved: u.approved !== false ? 'YES' : 'NO', IsDeleted: u.is_deleted || u.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'players') {
+            fileName = '3_Roster_Players.xlsx'; sheetName = 'Players';
+            const rows = (this.data.players || []).map(p => ({ Number: p.number, Name: p.name, Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'schedule') {
+            fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
+            const rows = (this.data.schedule || []).map(m => ({ Date: m.date, Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'drills') {
+            fileName = '5_Master_Drills_Library.xlsx'; sheetName = 'MasterDrills';
+            const rows = (this.data.drillsBank || []).map(d => ({ Name: d.name, Category: d.category || 'General', CoachNotes: d.coachNotes || d.coach_notes || '', IsDeleted: d.is_deleted || d.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'plan') {
+            fileName = '6_Practice_Plans.xlsx'; sheetName = 'PracticePlans';
+            const rows = (this.data.currentPracticePlan || []).map(d => ({ PlanName: this.data.activePlanName || 'Practice Plan', TimeSlot: d.time, DrillName: d.name, Duration: d.duration, CoachNotes: d.coachNotes || '', IsDeleted: d.is_deleted || d.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'matrix') {
+            fileName = '7_Matrix_Logs.xlsx'; sheetName = 'MatrixLogs';
+            const rows = (this.data.matrixLogs || []).map(l => ({ PlayerName: l.playerName || '', DrillName: l.drillName || '', Result: l.result || 'WIN', OpponentName: l.opponentName || '', ScoreText: l.scoreText || '', Date: l.date || '', IsDeleted: l.is_deleted || l.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ PlayerName:'Sample Player', DrillName:'1v1 Gauntlet', Result:'WIN', OpponentName:'Challenger', ScoreText:'3-1', Date:'AUG 6, 2026', IsDeleted:'FALSE' }]), sheetName);
+          } else if (t === 'coaches') {
+            fileName = '8_Coaching_Staff.xlsx'; sheetName = 'Coaches';
+            const rows = (this.data.coaches || []).map(c => ({ Name: c.name, Level: c.level, Phone: c.phone || '', Email: c.email || '', Address: c.address || '', Bio: c.bio || '', Photo: c.photo || '', IsDeleted: c.is_deleted || c.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'thoughts') {
+            fileName = '9_Coach_Daily_Thoughts.xlsx'; sheetName = 'DailyThoughts';
+            const rows = (this.data.dailyThoughts || []).map(t => ({ CoachName: t.coachName || 'Coach Bob Miller', ThoughtsText: t.text || '', IsActive: t.isActive ? 'YES' : 'NO', CreatedAt: t.createdAt || '', IsDeleted: t.is_deleted || t.isDeleted ? 'TRUE' : 'FALSE' }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          } else if (t === 'quiz') {
+            fileName = '10_Quiz_Questions.xlsx'; sheetName = 'QuizQuestions';
+            const rows = [{ QuestionText: 'What is the primary tactical objective emphasized in Coach\'s Daily Thoughts?', OptionA: 'Drop back into low-block passive defense', OptionB: 'High intensity pressing & quick 2-touch passing transitions', OptionC: 'Dribble individually without passing options', OptionD: 'Long high balls into penalty box only', CorrectAnswer: 'B', Explanation: 'High intensity press and quick transitions.', IsDeleted: 'FALSE' }];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+          }
+
+          const fileData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          folder.file(fileName, fileData);
+        });
+
+        const zipContent = await zip.generateAsync({ type: 'blob' });
+        const zipUrl = URL.createObjectURL(zipContent);
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        a.download = 'BHS_Soccer_All_10_Separate_Tables_Package.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(zipUrl), 2000);
+        return;
+      }
+
       tables.forEach((t, idx) => {
         setTimeout(() => {
           this.exportXLSX(t, false);
-        }, idx * 250);
+        }, idx * 200);
       });
       return;
     }
