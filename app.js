@@ -4113,17 +4113,36 @@ class BHSSoccerApp {
   }
 
   async deletePlanDrill(index) {
-    if (confirm('Are you sure you want to delete this drill from today\'s practice plan?')) {
-      const drill = this.data.currentPracticePlan[index];
-      this.data.currentPracticePlan.splice(index, 1);
-      this.saveData();
+    if (!confirm('🗑️ Remove this drill from today\'s practice plan?')) return;
 
-      // Delete from Supabase using the drill's db id
-      if (drill && drill.id && window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.deletePracticePlanItem(drill.id);
-      }
+    const drill = this.data.currentPracticePlan[index];
+    this.data.currentPracticePlan.splice(index, 1);
 
-      this.renderCurrentView();
+    // Adjust selectedDrillIndex so it stays in bounds after removal
+    if (this.selectedDrillIndex >= this.data.currentPracticePlan.length) {
+      this.selectedDrillIndex = Math.max(0, this.data.currentPracticePlan.length - 1);
+    }
+
+    this.saveData();
+
+    // Re-render just the planner directly — avoids isCoach() re-check that can block the view
+    const container = document.getElementById('mainAppContainer');
+    if (container) {
+      container.innerHTML = this.renderPlannerView();
+      setTimeout(() => {
+        if (this.diagrammer) {
+          this.diagrammer.init('soccerBoardCanvas');
+          const selectedDrill = (this.data.currentPracticePlan || [])[this.selectedDrillIndex || 0];
+          const masterDrill = (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (selectedDrill?.name || '').toLowerCase());
+          const targetData = selectedDrill?.diagramData || masterDrill?.diagramData;
+          if (targetData) this.diagrammer.loadDiagramData(targetData);
+        }
+      }, 80);
+    }
+
+    // Delete from Supabase cloud DB if connected
+    if (drill && drill.id && window.supabaseService && window.supabaseService.isConfigured()) {
+      await window.supabaseService.deletePracticePlanItem(drill.id);
     }
   }
 
