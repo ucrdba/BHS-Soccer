@@ -3321,6 +3321,46 @@ class BHSSoccerApp {
       return;
     }
 
+    // Ask coach for the practice start time
+    const startTimeInput = prompt(
+      '⏰ What time does practice start? (e.g. 3:30 PM, 4:00 PM, 15:30)\nLeave blank to use 4:00 PM default.',
+      this.data.practiceStartTime || '4:00 PM'
+    );
+    if (startTimeInput === null) return; // cancelled
+
+    // Parse start time into total minutes
+    let startMins = 16 * 60; // default 4:00 PM
+    const rawStart = (startTimeInput || '').trim();
+    if (rawStart) {
+      const converted = this.format12hTo24h(rawStart) || rawStart;
+      const parts = converted.split(':').map(n => parseInt(n, 10));
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        startMins = parts[0] * 60 + parts[1];
+      }
+    }
+
+    // Save chosen start time for next print
+    this.data.practiceStartTime = rawStart || '4:00 PM';
+    this.saveData();
+
+    // Build running timeline: compute start & end time for each drill inline
+    const toHHMM = (totalMins) => {
+      const h = Math.floor(totalMins / 60) % 24;
+      const m = totalMins % 60;
+      const hh = String(h).padStart(2, '0');
+      const mm = String(m).padStart(2, '0');
+      return this.format24hTo12h(`${hh}:${mm}`);
+    };
+
+    let cursor = startMins;
+    const drillTimes = plan.map(d => {
+      const mins = parseInt((d.duration || '').match(/(\d+)/)?.[1] || '20', 10);
+      const start = toHHMM(cursor);
+      const end   = toHHMM(cursor + mins);
+      cursor += mins;
+      return { start, end };
+    });
+
     let totalMinutes = 0;
     plan.forEach(p => {
       const match = (p.duration || '').match(/(\d+)/);
@@ -3334,7 +3374,100 @@ class BHSSoccerApp {
       totalTimeStr = `${totalMinutes} min (${hrs} hr${hrs > 1 ? 's' : ''}${mins > 0 ? ` ${mins} min` : ''})`;
     }
 
+    const sessionStart = toHHMM(startMins);
+    const sessionEnd   = toHHMM(startMins + totalMinutes);
     const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // ── Pre-build every table row BEFORE assembling the template ──────────────
+    // (Avoids nested template literal mis-parsing that caused only the last row to render)
+    let tableRowsHtml = '';
+    let elapsedSoFar = 0;
+
+    for (let idx = 0; idx < plan.length; idx++) {
+      const d = plan[idx];
+      const drillMins = parseInt((d.duration || '').match(/(\d+)/)?.[1] || '0', 10);
+      const drillElapsed = elapsedSoFar;
+      elapsedSoFar += drillMins;
+
+      const timeStart = drillTimes[idx] ? drillTimes[idx].start : '';
+      const timeEnd   = drillTimes[idx] ? drillTimes[idx].end   : '';
+
+      // Resolve diagram: use plan drill's own data or fall back to master drills bank
+      const masterDrill = (this.data.drillsBank || []).find(b =>
+        b.name && d.name && b.name.toLowerCase() === d.name.toLowerCase()
+      );
+      let parsedDiagram = d.diagramData || (masterDrill && masterDrill.diagramData);
+      if (typeof parsedDiagram === 'string') {
+        try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
+      }
+      const diagramImage = d.diagramImage || (masterDrill && masterDrill.diagramImage);
+      const keyframes = (parsedDiagram && parsedDiagram.keyframes) || [];
+
+      let diagramHtml = '';
+
+      if (keyframes.length > 0) {
+        let stepCardsHtml = '';
+        for (let stepIdx = 0; stepIdx < keyframes.length; stepIdx++) {
+          const kf = keyframes[stepIdx];
+          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 560);
+          if (!stepObj) continue;
+          stepCardsHtml +=
+            '<div style="background:#FFFFFF;border:1px solid #D1D5DB;border-radius:6px;padding:10px;page-break-inside:avoid;">' +
+              '<div style="font-weight:700;font-size:11px;color:#0047AB;margin-bottom:6px;display:flex;justify-content:space-between;border-bottom:1px dashed #E5E7EB;padding-bottom:4px;">' +
+                '<span>\uD83D\uDCCD STEP ' + (stepIdx + 1) + ' OF ' + keyframes.length + ': ' + (kf.label || ('Step ' + (stepIdx + 1))) + '</span>' +
+                '<span style="color:#6B7280;font-size:10px;">FRAME #' + (stepIdx + 1) + '</span>' +
+              '</div>' +
+              '<img src="' + stepObj.dataUrl + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
+            '</div>';
+        }
+        if (stepCardsHtml) {
+          diagramHtml =
+            '<div style="margin-top:12px;background:#F8FAFC;border:1px solid #E2E8F0;padding:12px;border-radius:8px;page-break-inside:avoid;">' +
+              '<div style="font-weight:700;font-size:12px;color:#1E293B;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">' +
+                '\uD83D\uDCD0 Tactical Pitch Diagram \u2014 ' + keyframes.length + ' Step' + (keyframes.length > 1 ? ' Sequence' : '') + ':' +
+              '</div>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">' +
+                stepCardsHtml +
+              '</div>' +
+            '</div>';
+        }
+      } else if (diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
+        const stepObj = this.generateDiagramStepDataUrl(
+          parsedDiagram || { elements: d.elements || (masterDrill && masterDrill.elements), drawings: d.drawings || (masterDrill && masterDrill.drawings), pitchType: d.pitchType || (masterDrill && masterDrill.pitchType) },
+          0, 560
+        );
+        const imgUrl = (stepObj && stepObj.dataUrl) || diagramImage;
+        if (imgUrl) {
+          diagramHtml =
+            '<div style="margin-top:10px;background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;page-break-inside:avoid;">' +
+              '<div style="font-weight:700;font-size:12px;color:#0047AB;margin-bottom:6px;">\uD83D\uDCD0 Tactical Pitch Diagram:</div>' +
+              '<img src="' + imgUrl + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
+            '</div>';
+        }
+      }
+
+      const notesHtml = d.coachNotes
+        ? '<div class="notes">\uD83D\uDCA1 <strong>Coach Focus &amp; Notes:</strong><br/>' + d.coachNotes + '</div>'
+        : '';
+
+      const elapsedLabel = drillElapsed > 0 ? ('+' + drillElapsed + ' min') : 'Start';
+
+      tableRowsHtml +=
+        '<tr style="page-break-inside:avoid;">' +
+          '<td class="time-col">' +
+            '<div class="time-start">' + timeStart + '</div>' +
+            (timeEnd ? '<div class="time-arrow">\u2193</div><div class="time-end">' + timeEnd + '</div>' : '') +
+          '</td>' +
+          '<td>' +
+            '<div style="font-size:15px;font-weight:bold;color:#0047AB;margin-bottom:4px;">' + d.name + '</div>' +
+            notesHtml +
+            diagramHtml +
+          '</td>' +
+          '<td class="dur-col">' + d.duration + '</td>' +
+          '<td class="elapsed-col">' + elapsedLabel + '</td>' +
+        '</tr>';
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -3352,8 +3485,12 @@ class BHSSoccerApp {
     th { background: #0047AB; color: #FFFFFF; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
     td { padding: 12px 10px; border-bottom: 1px solid #E5E7EB; vertical-align: top; font-size: 13px; }
     tr:nth-child(even) { background: #F9FAFB; }
-    .time-col { width: 120px; font-weight: bold; color: #0047AB; }
+    .time-col { width: 150px; font-weight: bold; color: #0047AB; vertical-align: top; }
+    .time-start { font-size: 14px; font-weight: 800; color: #0047AB; }
+    .time-end   { font-size: 12px; color: #374151; margin-top: 2px; }
+    .time-arrow { font-size: 11px; color: #6B7280; margin: 1px 0; }
     .dur-col { width: 90px; font-weight: bold; text-align: center; color: #111827; }
+    .elapsed-col { width: 80px; text-align: center; font-size: 11px; color: #6B7280; }
     .notes { margin-top: 6px; color: #374151; font-size: 12px; white-space: pre-wrap; background: #FFF; padding: 6px 8px; border-left: 3px solid #0047AB; }
     .footer { margin-top: 35px; border-top: 1px solid #E5E7EB; padding-top: 10px; font-size: 11px; color: #6B7280; text-align: center; }
     @media print {
@@ -3374,9 +3511,9 @@ class BHSSoccerApp {
   </div>
 
   <div class="summary-bar">
-    <div>⏱️ Total Time: ${totalTimeStr}</div>
+    <div>⏱️ Session: ${sessionStart} – ${sessionEnd} (${totalTimeStr})</div>
     <div>⚽ Total Drills: ${plan.length}</div>
-    <div>📍 Location: Cougar Stadium Practice Field</div>
+    <div>📍 Beaumont Cougar Stadium Practice Field</div>
   </div>
 
   <table>
@@ -3385,100 +3522,35 @@ class BHSSoccerApp {
         <th class="time-col">TIME SLOT</th>
         <th>DRILL NAME &amp; COACH FOCUS NOTES</th>
         <th class="dur-col">DURATION</th>
+        <th class="elapsed-col">ELAPSED</th>
       </tr>
     </thead>
     <tbody>
-      ${plan.map(d => {
-        let renderedDiagramStepsHtml = '';
-        let parsedDiagram = d.diagramData;
-        if (typeof parsedDiagram === 'string') {
-          try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
-        }
-
-        const keyframes = parsedDiagram?.keyframes || [];
-
-        if (keyframes.length > 0) {
-          const stepCards = keyframes.map((kf, stepIdx) => {
-            const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 520);
-            if (!stepObj) return '';
-            return `
-              <div style="background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
-                <div style="font-weight: 700; font-size: 11px; color: #0047AB; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E5E7EB; padding-bottom: 4px;">
-                  <span>📍 STEP ${stepIdx + 1} OF ${keyframes.length}: ${kf.label || `Step ${stepIdx + 1}`}</span>
-                  <span style="color: #6B7280; font-size: 10px;">FRAME #${stepIdx + 1}</span>
-                </div>
-                <img src="${stepObj.dataUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
-              </div>
-            `;
-          }).filter(Boolean).join('');
-
-          if (stepCards) {
-            renderedDiagramStepsHtml = `
-              <div style="margin-top: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; page-break-inside: avoid;">
-                <div style="font-weight: 700; font-size: 12px; color: #1E293B; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-                  📐 Tactical Pitch Diagram Step-by-Step Sequence (${keyframes.length} Step${keyframes.length > 1 ? 's' : ''}):
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
-                  ${stepCards}
-                </div>
-              </div>
-            `;
-          }
-        } else if (d.diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
-          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram || { elements: d.elements, drawings: d.drawings, pitchType: d.pitchType }, 0, 520);
-          const imgUrl = stepObj?.dataUrl || d.diagramImage;
-          if (imgUrl) {
-            renderedDiagramStepsHtml = `
-              <div style="margin-top: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; page-break-inside: avoid;">
-                <div style="font-weight: 700; font-size: 12px; color: #0047AB; margin-bottom: 6px;">📐 Tactical Pitch Diagram:</div>
-                <img src="${imgUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
-              </div>
-            `;
-          }
-        }
-
-        return `
-          <tr style="page-break-inside: avoid;">
-            <td class="time-col">${d.time || ''}</td>
-            <td>
-              <div style="font-size: 15px; font-weight: bold; color: #0047AB; margin-bottom: 4px;">${d.name}</div>
-              ${d.coachNotes ? `<div class="notes">💡 <strong>Coach Focus &amp; Notes:</strong><br/>${d.coachNotes}</div>` : ''}
-              ${renderedDiagramStepsHtml}
-            </td>
-            <td class="dur-col">${d.duration}</td>
-          </tr>
-        `;
-      }).join('')}
+      ${tableRowsHtml}
     </tbody>
   </table>
 
   <div class="footer">
     Beaumont High School Athletics &bull; Boys Varsity Soccer Command Center
   </div>
-
-  <script>
-    document.title = ${JSON.stringify(activeName)};
-    window.onload = function() {
-      document.title = ${JSON.stringify(activeName)};
-      setTimeout(function() {
-        document.title = ${JSON.stringify(activeName)};
-        window.print();
-      }, 300);
-    };
-  </script>
 </body>
 </html>`;
 
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const printWin = window.open(url, '_blank', 'width=850,height=950');
-
+    // Use document.write — far more reliable than blob URLs which get popup-blocked
+    // and cause the fallback to print the main app page (the soccer pitch diagrammer).
+    const printWin = window.open('about:blank', '_blank', 'width=900,height=1000,scrollbars=yes');
     if (!printWin) {
-      const origTitle = document.title;
-      document.title = activeName;
-      window.print();
-      setTimeout(() => { document.title = origTitle; }, 3000);
+      alert('⚠️ Your browser blocked the print window popup.\n\nPlease allow popups for this page, then try again.\n(Click the popup-blocked icon in the address bar → Always allow)');
+      return;
     }
+    printWin.document.open();
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+    printWin.focus();
+    // Give the new window time to render canvas-based diagrams before printing
+    setTimeout(() => {
+      try { printWin.print(); } catch(e) { /* user closed window early */ }
+    }, 500);
   }
 
   downloadPracticePlan(format = 'html') {
