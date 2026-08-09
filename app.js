@@ -672,19 +672,25 @@ class SoccerTacticalBoard {
         });
         this.render();
       } else if (this.activeTool === 'text') {
-        const input = prompt('Enter tactical text label (e.g. "Overlapping Run", "3-Touch Limit", "Pressing Trigger"):', 'Overlapping Run');
-        if (input && input.trim()) {
-          this.saveState();
-          this.elements.push({
-            id: Date.now() + Math.random(),
-            type: 'text',
-            text: input.trim(),
-            x: pos.x,
-            y: pos.y,
-            color: '#FFD700'
-          });
-          this.render();
-        }
+        app.showPromptModal({
+          title: '📝 TACTICAL TEXT LABEL',
+          message: 'Enter tactical text label (e.g. "Overlapping Run", "3-Touch Limit", "Pressing Trigger"):',
+          defaultValue: 'Overlapping Run',
+          onConfirm: (input) => {
+            if (input && input.trim()) {
+              this.saveState();
+              this.elements.push({
+                id: Date.now() + Math.random(),
+                type: 'text',
+                text: input.trim(),
+                x: pos.x,
+                y: pos.y,
+                color: '#FFD700'
+              });
+              this.render();
+            }
+          }
+        });
       } else if (this.activeTool === 'select' || this.activeTool === 'eraser') {
         const elIdx = this.elements.findIndex(el => {
           if (el.type === 'text') {
@@ -1984,17 +1990,24 @@ class BHSSoccerApp {
   async deleteMatch(matchId) {
     const match = (this.data.schedule || []).find(m => String(m.id) === String(matchId));
     if (!match) return;
-    if (confirm(`Are you sure you want to delete the match vs "${match.opponent}" on ${match.date}?`)) {
-      this.data.schedule = this.data.schedule.filter(m => String(m.id) !== String(matchId));
-      this.saveData();
 
-      if (window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.deleteMatch(matchId);
+    this.showConfirmModal({
+      title: '🗑️ DELETE MATCH',
+      message: `Are you sure you want to delete the match vs "${match.opponent}" on ${match.date}?`,
+      confirmText: '🗑️ Delete Match',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        this.data.schedule = this.data.schedule.filter(m => String(m.id) !== String(matchId));
+        this.saveData();
+
+        if (window.supabaseService && window.supabaseService.isConfigured()) {
+          await window.supabaseService.deleteMatch(matchId);
+        }
+
+        this.renderCurrentView();
+        this.showAlertModal('Match Deleted', `🗑️ Match vs "${match.opponent}" removed from Schedule & Database.`);
       }
-
-      this.renderCurrentView();
-      alert(`🗑️ Match vs "${match.opponent}" removed from Schedule & Database.`);
-    }
+    });
   }
 
   renderMatrixView() {
@@ -2257,9 +2270,21 @@ class BHSSoccerApp {
     let selectedIdx = (targetIndex !== null && targetIndex !== undefined) ? targetIndex : this.selectedDrillIndex;
     if (selectedIdx === null || selectedIdx === undefined || selectedIdx < 0 || selectedIdx >= this.data.currentPracticePlan.length) {
       const options = this.data.currentPracticePlan.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
-      const selectedIdxStr = prompt(`Select practice drill number to attach this tactical diagram to:\n\n${options}`, '1');
-      if (!selectedIdxStr) return;
-      selectedIdx = parseInt(selectedIdxStr) - 1;
+      this.showPromptModal({
+        title: '🎯 ATTACH TACTICAL DIAGRAM TO DRILL',
+        message: `Select practice drill number to attach this tactical diagram to:\n\n${options}`,
+        defaultValue: '1',
+        onConfirm: (selectedIdxStr) => {
+          if (!selectedIdxStr) return;
+          const idx = parseInt(selectedIdxStr) - 1;
+          if (isNaN(idx) || idx < 0 || idx >= this.data.currentPracticePlan.length) {
+            this.showAlertModal('Invalid Selection', 'Invalid drill selection.');
+            return;
+          }
+          this.attachDiagramToDrillAtIndex(dataUrl, diagramData, idx);
+        }
+      });
+      return;
     }
 
     if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= this.data.currentPracticePlan.length) {
@@ -2480,21 +2505,27 @@ class BHSSoccerApp {
   }
 
   async deleteThought(thoughtId) {
-    if (!confirm('Are you sure you want to delete this daily thought entry?')) return;
+    this.showConfirmModal({
+      title: '🗑️ DELETE DAILY THOUGHT',
+      message: 'Are you sure you want to delete this daily thought entry?',
+      confirmText: '🗑️ Delete Entry',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        this.data.dailyThoughts = (this.data.dailyThoughts || []).filter(t => t.id !== thoughtId);
+        if (this.data.dailyThoughts.length > 0 && !this.data.dailyThoughts.some(t => t.isActive)) {
+          this.data.dailyThoughts[0].isActive = true;
+        }
 
-    this.data.dailyThoughts = (this.data.dailyThoughts || []).filter(t => t.id !== thoughtId);
-    if (this.data.dailyThoughts.length > 0 && !this.data.dailyThoughts.some(t => t.isActive)) {
-      this.data.dailyThoughts[0].isActive = true;
-    }
+        this.saveData();
 
-    this.saveData();
+        if (window.supabaseService && window.supabaseService.isConfigured()) {
+          await window.supabaseService.deleteDailyThought(thoughtId);
+        }
 
-    if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.deleteDailyThought(thoughtId);
-    }
-
-    this.renderThoughtsList();
-    this.renderCurrentView();
+        this.renderThoughtsList();
+        this.renderCurrentView();
+      }
+    });
   }
 
   openTakeQuizModal(tab = 'quiz') {
@@ -3125,16 +3156,22 @@ class BHSSoccerApp {
     const coach = (this.data.coaches || []).find(c => c.id === coachId);
     if (!coach) return;
 
-    if (confirm(`Are you sure you want to remove "${coach.name}" from the coaching staff?`)) {
-      this.data.coaches = (this.data.coaches || []).filter(c => c.id !== coachId);
-      this.saveData();
+    this.showConfirmModal({
+      title: '🗑️ REMOVE COACH PROFILE',
+      message: `Are you sure you want to remove "${coach.name}" from the coaching staff?`,
+      confirmText: '🗑️ Remove Coach',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        this.data.coaches = (this.data.coaches || []).filter(c => c.id !== coachId);
+        this.saveData();
 
-      if (window.supabaseService?.isConfigured()) {
-        await window.supabaseService.deleteCoach(coachId);
+        if (window.supabaseService?.isConfigured()) {
+          await window.supabaseService.deleteCoach(coachId);
+        }
+
+        this.renderCurrentView();
       }
-
-      this.renderCurrentView();
-    }
+    });
   }
 
   openSavePlanModal() {
@@ -3236,24 +3273,36 @@ class BHSSoccerApp {
     const plan = (this.data.savedPlans || []).find(p => p.id === planId);
     if (!plan) return;
 
-    if (confirm(`Load practice plan "${plan.name}"? This will replace today's practice timeline with the ${plan.drills.length} drills from this plan.`)) {
-      this.data.currentPracticePlan = JSON.parse(JSON.stringify(plan.drills));
-      this.data.activePlanName = plan.name;
-      this.saveData();
-      this.renderCurrentView();
-      this.closeModals();
-    }
+    this.showConfirmModal({
+      title: '📂 LOAD PRACTICE PLAN',
+      message: `Load practice plan "${plan.name}"?\n\nThis will replace today's practice timeline with the ${plan.drills.length} drills from this plan.`,
+      confirmText: '📂 Load Plan',
+      confirmClass: 'btn-gold',
+      onConfirm: () => {
+        this.data.currentPracticePlan = JSON.parse(JSON.stringify(plan.drills));
+        this.data.activePlanName = plan.name;
+        this.saveData();
+        this.renderCurrentView();
+        this.closeModals();
+      }
+    });
   }
 
   deleteSavedPlan(planId) {
     const plan = (this.data.savedPlans || []).find(p => p.id === planId);
     if (!plan) return;
 
-    if (confirm(`Are you sure you want to delete the saved plan "${plan.name}"?`)) {
-      this.data.savedPlans = (this.data.savedPlans || []).filter(p => p.id !== planId);
-      this.saveData();
-      this.openLoadPlanModal();
-    }
+    this.showConfirmModal({
+      title: '🗑️ DELETE SAVED PLAN',
+      message: `Are you sure you want to delete the saved plan "${plan.name}"?`,
+      confirmText: '🗑️ Delete Plan',
+      confirmClass: 'btn-danger',
+      onConfirm: () => {
+        this.data.savedPlans = (this.data.savedPlans || []).filter(p => p.id !== planId);
+        this.saveData();
+        this.openLoadPlanModal();
+      }
+    });
   }
 
   generateDiagramStepDataUrl(diagramData, stepIndex = 0, targetWidth = 800) {
@@ -3267,15 +3316,18 @@ class BHSSoccerApp {
     const pitchType = parsed.pitchType || 'full';
     const keyframes = parsed.keyframes || [];
 
-    let elements = parsed.elements || [];
-    let drawings = parsed.drawings || [];
+    let elements = [];
+    let drawings = [];
     let stepLabel = 'Tactical Pitch Diagram';
 
     if (keyframes.length > 0 && stepIndex >= 0 && stepIndex < keyframes.length) {
       const kf = keyframes[stepIndex];
-      elements = kf.elements || [];
-      drawings = kf.drawings || [];
+      elements = (kf && Array.isArray(kf.elements)) ? kf.elements : (parsed.elements || []);
+      drawings = (kf && Array.isArray(kf.drawings)) ? kf.drawings : (parsed.drawings || []);
       stepLabel = kf.label || `Step ${stepIndex + 1}`;
+    } else {
+      elements = parsed.elements || [];
+      drawings = parsed.drawings || [];
     }
 
     // Native tactical canvas dimensions are 800 x 480 (100% identical to interactive board on website)
@@ -3313,20 +3365,41 @@ class BHSSoccerApp {
   }
 
   printPracticePlan() {
-    const activeName = this.data.activePlanName || 'Standard Practice Session';
     const plan = this.data.currentPracticePlan || [];
 
     if (plan.length === 0) {
-      alert('Your current practice timeline is empty. Add at least one drill to the plan before printing.');
+      this.showAlertModal('Timeline Empty', 'Your current practice timeline is empty. Add at least one drill to the plan before printing.');
       return;
     }
 
-    // Ask coach for the practice start time
-    const startTimeInput = prompt(
-      '⏰ What time does practice start? (e.g. 3:30 PM, 4:00 PM, 15:30)\nLeave blank to use 4:00 PM default.',
-      this.data.practiceStartTime || '4:00 PM'
-    );
-    if (startTimeInput === null) return; // cancelled
+    const modal = document.getElementById('printPlanModal');
+    const input = document.getElementById('practiceStartTimeInput');
+    if (modal && input) {
+      const savedTime = this.data.practiceStartTime || '4:00 PM';
+      let matchFound = Array.from(input.options).some(opt => opt.value === savedTime);
+      if (!matchFound) {
+        const customOpt = document.createElement('option');
+        customOpt.value = savedTime;
+        customOpt.textContent = savedTime;
+        input.appendChild(customOpt);
+      }
+      input.value = savedTime;
+      modal.style.display = '';
+      modal.classList.add('active');
+      setTimeout(() => {
+        input.focus();
+      }, 50);
+    } else {
+      this.confirmPrintPracticePlan(this.data.practiceStartTime || '4:00 PM');
+    }
+  }
+
+  confirmPrintPracticePlan(startTimeInput) {
+    this.closeModals();
+    const activeName = this.data.activePlanName || 'Standard Practice Session';
+    const plan = this.data.currentPracticePlan || [];
+
+    if (plan.length === 0) return;
 
     // Parse start time into total minutes
     let startMins = 16 * 60; // default 4:00 PM
@@ -3392,30 +3465,53 @@ class BHSSoccerApp {
       const timeStart = drillTimes[idx] ? drillTimes[idx].start : '';
       const timeEnd   = drillTimes[idx] ? drillTimes[idx].end   : '';
 
-      // Resolve diagram: use plan drill's own data or fall back to master drills bank
+      // Resolve diagram: prioritize Master Drill Library repository (Edit Master Drill)
       const masterDrill = (this.data.drillsBank || []).find(b =>
-        b.name && d.name && b.name.toLowerCase() === d.name.toLowerCase()
+        (d.drillId && b.id === d.drillId) ||
+        (d.id && b.id === d.id) ||
+        (b.name && d.name && b.name.toLowerCase().trim() === d.name.toLowerCase().trim())
       );
-      let parsedDiagram = d.diagramData || (masterDrill && masterDrill.diagramData);
-      if (typeof parsedDiagram === 'string') {
-        try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
+
+      let masterParsed = masterDrill ? masterDrill.diagramData : null;
+      if (typeof masterParsed === 'string') {
+        try { masterParsed = JSON.parse(masterParsed); } catch(e) { masterParsed = null; }
       }
-      const diagramImage = d.diagramImage || (masterDrill && masterDrill.diagramImage);
-      const keyframes = (parsedDiagram && parsedDiagram.keyframes) || [];
+
+      let planParsed = d.diagramData;
+      if (typeof planParsed === 'string') {
+        try { planParsed = JSON.parse(planParsed); } catch(e) { planParsed = null; }
+      }
+
+      // If Master Drill has keyframes (from Edit Master Drill editor), prioritize it
+      let parsedDiagram = null;
+      if (masterParsed && masterParsed.keyframes && masterParsed.keyframes.length > 0) {
+        parsedDiagram = masterParsed;
+      } else if (planParsed && planParsed.keyframes && planParsed.keyframes.length > 0) {
+        parsedDiagram = planParsed;
+      } else {
+        parsedDiagram = masterParsed || planParsed;
+      }
+
+      const diagramImage = (masterDrill && masterDrill.diagramImage) || d.diagramImage;
+      const keyframes = (parsedDiagram && parsedDiagram.keyframes && parsedDiagram.keyframes.length > 0)
+        ? parsedDiagram.keyframes
+        : (d.keyframes || (masterDrill && masterDrill.keyframes) || []);
 
       let diagramHtml = '';
 
+      // 1. Keyframe sequence — render EVERY step frame card
       if (keyframes.length > 0) {
         let stepCardsHtml = '';
+        const diagramToPass = parsedDiagram || { keyframes, pitchType: d.pitchType || (masterDrill && masterDrill.pitchType) };
         for (let stepIdx = 0; stepIdx < keyframes.length; stepIdx++) {
           const kf = keyframes[stepIdx];
-          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 560);
-          if (!stepObj) continue;
+          const stepObj = this.generateDiagramStepDataUrl(diagramToPass, stepIdx, 560);
+          if (!stepObj || !stepObj.dataUrl) continue;
           stepCardsHtml +=
-            '<div style="background:#FFFFFF;border:1px solid #D1D5DB;border-radius:6px;padding:10px;page-break-inside:avoid;">' +
-              '<div style="font-weight:700;font-size:11px;color:#0047AB;margin-bottom:6px;display:flex;justify-content:space-between;border-bottom:1px dashed #E5E7EB;padding-bottom:4px;">' +
-                '<span>\uD83D\uDCCD STEP ' + (stepIdx + 1) + ' OF ' + keyframes.length + ': ' + (kf.label || ('Step ' + (stepIdx + 1))) + '</span>' +
-                '<span style="color:#6B7280;font-size:10px;">FRAME #' + (stepIdx + 1) + '</span>' +
+            '<div style="flex:1 1 240px;max-width:100%;background:#FFFFFF;border:1px solid #D1D5DB;border-radius:8px;padding:12px;page-break-inside:avoid;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
+              '<div style="font-weight:700;font-size:11px;color:#0047AB;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #E5E7EB;padding-bottom:4px;">' +
+                '<span>📍 ' + (kf.label || ('Step ' + (stepIdx + 1))) + '</span>' +
+                '<span style="color:#6B7280;font-size:10px;font-weight:600;">FRAME #' + (stepIdx + 1) + ' OF ' + keyframes.length + '</span>' +
               '</div>' +
               '<img src="' + stepObj.dataUrl + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
             '</div>';
@@ -3424,24 +3520,32 @@ class BHSSoccerApp {
           diagramHtml =
             '<div style="margin-top:12px;background:#F8FAFC;border:1px solid #E2E8F0;padding:12px;border-radius:8px;page-break-inside:avoid;">' +
               '<div style="font-weight:700;font-size:12px;color:#1E293B;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">' +
-                '\uD83D\uDCD0 Tactical Pitch Diagram \u2014 ' + keyframes.length + ' Step' + (keyframes.length > 1 ? ' Sequence' : '') + ':' +
+                '📐 Tactical Pitch Diagram — Complete Sequence (' + keyframes.length + ' Step' + (keyframes.length > 1 ? 's' : '') + '):' +
               '</div>' +
-              '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">' +
+              '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;">' +
                 stepCardsHtml +
               '</div>' +
             '</div>';
         }
-      } else if (diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
-        const stepObj = this.generateDiagramStepDataUrl(
-          parsedDiagram || { elements: d.elements || (masterDrill && masterDrill.elements), drawings: d.drawings || (masterDrill && masterDrill.drawings), pitchType: d.pitchType || (masterDrill && masterDrill.pitchType) },
-          0, 560
-        );
-        const imgUrl = (stepObj && stepObj.dataUrl) || diagramImage;
-        if (imgUrl) {
+      }
+
+      // 2. Direct diagram image (attached PNG / data URL)
+      if (!diagramHtml && diagramImage) {
+        diagramHtml =
+          '<div style="margin-top:10px;background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;page-break-inside:avoid;">' +
+            '<div style="font-weight:700;font-size:12px;color:#0047AB;margin-bottom:6px;">📐 Tactical Pitch Diagram:</div>' +
+            '<img src="' + diagramImage + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
+          '</div>';
+      }
+
+      // 3. Dynamic canvas rendering from diagramData elements/drawings
+      if (!diagramHtml && parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0))) {
+        const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, 0, 560);
+        if (stepObj && stepObj.dataUrl) {
           diagramHtml =
             '<div style="margin-top:10px;background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;page-break-inside:avoid;">' +
-              '<div style="font-weight:700;font-size:12px;color:#0047AB;margin-bottom:6px;">\uD83D\uDCD0 Tactical Pitch Diagram:</div>' +
-              '<img src="' + imgUrl + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
+              '<div style="font-weight:700;font-size:12px;color:#0047AB;margin-bottom:6px;">📐 Tactical Pitch Diagram:</div>' +
+              '<img src="' + stepObj.dataUrl + '" style="width:100%;max-width:520px;height:auto;border-radius:4px;border:1px solid #9CA3AF;display:block;margin:0 auto;" />' +
             '</div>';
         }
       }
@@ -3635,22 +3739,47 @@ class BHSSoccerApp {
     <tbody>
       ${plan.map(d => {
         let renderedDiagramStepsHtml = '';
-        let parsedDiagram = d.diagramData;
-        if (typeof parsedDiagram === 'string') {
-          try { parsedDiagram = JSON.parse(parsedDiagram); } catch(e) { parsedDiagram = null; }
+        const masterDrill = (this.data.drillsBank || []).find(b =>
+          (d.drillId && b.id === d.drillId) ||
+          (d.id && b.id === d.id) ||
+          (b.name && d.name && b.name.toLowerCase().trim() === d.name.toLowerCase().trim())
+        );
+
+        let masterParsed = masterDrill ? masterDrill.diagramData : null;
+        if (typeof masterParsed === 'string') {
+          try { masterParsed = JSON.parse(masterParsed); } catch(e) { masterParsed = null; }
         }
 
-        const keyframes = parsedDiagram?.keyframes || [];
+        let planParsed = d.diagramData;
+        if (typeof planParsed === 'string') {
+          try { planParsed = JSON.parse(planParsed); } catch(e) { planParsed = null; }
+        }
+
+        // If Master Drill has keyframes (from Edit Master Drill editor), prioritize it
+        let parsedDiagram = null;
+        if (masterParsed && masterParsed.keyframes && masterParsed.keyframes.length > 0) {
+          parsedDiagram = masterParsed;
+        } else if (planParsed && planParsed.keyframes && planParsed.keyframes.length > 0) {
+          parsedDiagram = planParsed;
+        } else {
+          parsedDiagram = masterParsed || planParsed;
+        }
+
+        const diagramImage = (masterDrill && masterDrill.diagramImage) || d.diagramImage;
+        const keyframes = (parsedDiagram && parsedDiagram.keyframes && parsedDiagram.keyframes.length > 0)
+          ? parsedDiagram.keyframes
+          : (d.keyframes || (masterDrill && masterDrill.keyframes) || []);
 
         if (keyframes.length > 0) {
+          const diagramToPass = parsedDiagram || { keyframes, pitchType: d.pitchType || (masterDrill && masterDrill.pitchType) };
           const stepCards = keyframes.map((kf, stepIdx) => {
-            const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, stepIdx, 520);
-            if (!stepObj) return '';
+            const stepObj = this.generateDiagramStepDataUrl(diagramToPass, stepIdx, 520);
+            if (!stepObj || !stepObj.dataUrl) return '';
             return `
-              <div style="background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
+              <div style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; padding: 12px; page-break-inside: avoid; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <div style="font-weight: 700; font-size: 11px; color: #0047AB; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #E5E7EB; padding-bottom: 4px;">
-                  <span>📍 STEP ${stepIdx + 1} OF ${keyframes.length}: ${kf.label || `Step ${stepIdx + 1}`}</span>
-                  <span style="color: #6B7280; font-size: 10px;">FRAME #${stepIdx + 1}</span>
+                  <span>📍 ${kf.label || `Step ${stepIdx + 1}`}</span>
+                  <span style="color: #6B7280; font-size: 10px; font-weight: 600;">FRAME #${stepIdx + 1} OF ${keyframes.length}</span>
                 </div>
                 <img src="${stepObj.dataUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
               </div>
@@ -3661,22 +3790,30 @@ class BHSSoccerApp {
             renderedDiagramStepsHtml = `
               <div style="margin-top: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; page-break-inside: avoid;">
                 <div style="font-weight: 700; font-size: 12px; color: #1E293B; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-                  📐 Tactical Pitch Diagram Step-by-Step Sequence (${keyframes.length} Step${keyframes.length > 1 ? 's' : ''}):
+                  📐 Tactical Pitch Diagram Complete Sequence (${keyframes.length} Step${keyframes.length > 1 ? 's' : ''}):
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;">
                   ${stepCards}
                 </div>
               </div>
             `;
           }
-        } else if (d.diagramImage || (parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0)))) {
-          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram || { elements: d.elements, drawings: d.drawings, pitchType: d.pitchType }, 0, 520);
-          const imgUrl = stepObj?.dataUrl || d.diagramImage;
-          if (imgUrl) {
+        }
+
+        if (!renderedDiagramStepsHtml && diagramImage) {
+          renderedDiagramStepsHtml = `
+            <div style="margin-top: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; page-break-inside: avoid;">
+              <div style="font-weight: 700; font-size: 12px; color: #0047AB; margin-bottom: 6px;">📐 Tactical Pitch Diagram:</div>
+              <img src="${diagramImage}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+            </div>
+          `;
+        } else if (!renderedDiagramStepsHtml && parsedDiagram && ((parsedDiagram.elements && parsedDiagram.elements.length > 0) || (parsedDiagram.drawings && parsedDiagram.drawings.length > 0))) {
+          const stepObj = this.generateDiagramStepDataUrl(parsedDiagram, 0, 520);
+          if (stepObj && stepObj.dataUrl) {
             renderedDiagramStepsHtml = `
               <div style="margin-top: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; page-break-inside: avoid;">
                 <div style="font-weight: 700; font-size: 12px; color: #0047AB; margin-bottom: 6px;">📐 Tactical Pitch Diagram:</div>
-                <img src="${imgUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
+                <img src="${stepObj.dataUrl}" style="width: 100%; max-width: 480px; height: auto; border-radius: 4px; border: 1px solid #9CA3AF; display: block; margin: 0 auto;" />
               </div>
             `;
           }
@@ -3945,24 +4082,31 @@ class BHSSoccerApp {
 
   async deleteMasterDrill(drillId) {
     if (!drillId) return;
-    if (!confirm('Are you sure you want to delete this master drill from your library?')) return;
 
-    if (this.data.drillsBank) {
-      const drill = this.data.drillsBank.find(d => d.id === drillId);
-      if (drill) {
-        drill.isDeleted = true;
-        drill.is_deleted = true;
+    this.showConfirmModal({
+      title: '🗑️ DELETE MASTER DRILL',
+      message: 'Are you sure you want to delete this master drill from your library?',
+      confirmText: '🗑️ Delete Drill',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        if (this.data.drillsBank) {
+          const drill = this.data.drillsBank.find(d => d.id === drillId);
+          if (drill) {
+            drill.isDeleted = true;
+            drill.is_deleted = true;
+          }
+          this.data.drillsBank = this.data.drillsBank.filter(d => d.id !== drillId);
+          this.saveData();
+        }
+
+        if (window.supabaseService && window.supabaseService.isConfigured()) {
+          await window.supabaseService.deleteDrillBankItem(drillId);
+        }
+
+        this.renderDrillsBankList();
+        this.renderCurrentView();
       }
-      this.data.drillsBank = this.data.drillsBank.filter(d => d.id !== drillId);
-      this.saveData();
-    }
-
-    if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.deleteDrillBankItem(drillId);
-    }
-
-    this.renderDrillsBankList();
-    this.renderCurrentView();
+    });
   }
 
   async addMasterDrillToPlan(drillId) {
@@ -4185,37 +4329,42 @@ class BHSSoccerApp {
   }
 
   async deletePlanDrill(index) {
-    if (!confirm('🗑️ Remove this drill from today\'s practice plan?')) return;
+    this.showConfirmModal({
+      title: '🗑️ REMOVE DRILL FROM TIMELINE',
+      message: 'Remove this drill from today\'s practice plan?',
+      confirmText: '🗑️ Remove Drill',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        const drill = this.data.currentPracticePlan[index];
+        if (!drill) return;
 
-    const drill = this.data.currentPracticePlan[index];
-    this.data.currentPracticePlan.splice(index, 1);
+        this.data.currentPracticePlan.splice(index, 1);
 
-    // Adjust selectedDrillIndex so it stays in bounds after removal
-    if (this.selectedDrillIndex >= this.data.currentPracticePlan.length) {
-      this.selectedDrillIndex = Math.max(0, this.data.currentPracticePlan.length - 1);
-    }
-
-    this.saveData();
-
-    // Re-render just the planner directly — avoids isCoach() re-check that can block the view
-    const container = document.getElementById('mainAppContainer');
-    if (container) {
-      container.innerHTML = this.renderPlannerView();
-      setTimeout(() => {
-        if (this.diagrammer) {
-          this.diagrammer.init('soccerBoardCanvas');
-          const selectedDrill = (this.data.currentPracticePlan || [])[this.selectedDrillIndex || 0];
-          const masterDrill = (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (selectedDrill?.name || '').toLowerCase());
-          const targetData = selectedDrill?.diagramData || masterDrill?.diagramData;
-          if (targetData) this.diagrammer.loadDiagramData(targetData);
+        if (this.selectedDrillIndex >= this.data.currentPracticePlan.length) {
+          this.selectedDrillIndex = Math.max(0, this.data.currentPracticePlan.length - 1);
         }
-      }, 80);
-    }
 
-    // Delete from Supabase cloud DB if connected
-    if (drill && drill.id && window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.deletePracticePlanItem(drill.id);
-    }
+        this.saveData();
+
+        const container = document.getElementById('mainAppContainer');
+        if (container) {
+          container.innerHTML = this.renderPlannerView();
+          setTimeout(() => {
+            if (this.diagrammer) {
+              this.diagrammer.init('soccerBoardCanvas');
+              const selectedDrill = (this.data.currentPracticePlan || [])[this.selectedDrillIndex || 0];
+              const masterDrill = (this.data.drillsBank || []).find(d => d.name.toLowerCase() === (selectedDrill?.name || '').toLowerCase());
+              const targetData = selectedDrill?.diagramData || masterDrill?.diagramData;
+              if (targetData) this.diagrammer.loadDiagramData(targetData);
+            }
+          }, 80);
+        }
+
+        if (drill && drill.id && window.supabaseService && window.supabaseService.isConfigured()) {
+          await window.supabaseService.deletePracticePlanItem(drill.id);
+        }
+      }
+    });
   }
 
   handleDrillDragStart(e, idx) {
@@ -4916,138 +5065,141 @@ class BHSSoccerApp {
 
   async pushAllLocalDataToSupabase() {
     if (!window.supabaseService || !window.supabaseService.isConfigured()) {
-      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this sync.');
+      this.showAlertModal('Supabase Disconnected', '⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this sync.');
       return;
     }
 
-    const confirmSync = confirm(
-      '⚡ ONE-TIME DATABASE OVERWRITE / SYNC\n\nThis will take all local data stored in your browser (School Info, Roster, Schedule, Practice Plans, Drills Library, Coaches, Daily Thoughts) and write it directly into your Supabase Cloud Database.\n\nDo you want to proceed?'
-    );
-    if (!confirmSync) return;
+    this.showConfirmModal({
+      title: '⚡ ONE-TIME DATABASE OVERWRITE / SYNC',
+      message: 'This will take all local data stored in your browser (School Info, Roster, Schedule, Practice Plans, Drills Library, Coaches, Daily Thoughts) and write it directly into your Supabase Cloud Database.\n\nDo you want to proceed?',
+      confirmText: '⚡ Proceed with Sync',
+      confirmClass: 'btn-gold',
+      onConfirm: async () => {
+        const report = [];
+        const schoolCode = this.data.school?.code || 'bhs';
 
-    const report = [];
-    const schoolCode = this.data.school?.code || 'bhs';
-
-    // 1. School Profile
-    try {
-      if (this.data.school) {
-        const schoolRes = await window.supabaseService.upsertSchool(schoolCode, this.data.school);
-        if (schoolRes && schoolRes.data) {
-          if (schoolRes.data.id) this.data.school.id = schoolRes.data.id;
-          report.push(`✅ 🏫 School Profile ('${this.data.school.name}') synced to DB`);
-        } else {
-          report.push(`⚠️ 🏫 School Profile sync warning: ${schoolRes?.error || 'Unknown error'}`);
+        // 1. School Profile
+        try {
+          if (this.data.school) {
+            const schoolRes = await window.supabaseService.upsertSchool(schoolCode, this.data.school);
+            if (schoolRes && schoolRes.data) {
+              if (schoolRes.data.id) this.data.school.id = schoolRes.data.id;
+              report.push(`✅ 🏫 School Profile ('${this.data.school.name}') synced to DB`);
+            } else {
+              report.push(`⚠️ 🏫 School Profile sync warning: ${schoolRes?.error || 'Unknown error'}`);
+            }
+          }
+        } catch (e) {
+          report.push(`❌ 🏫 School Profile Exception: ${e.message}`);
         }
-      }
-    } catch (e) {
-      report.push(`❌ 🏫 School Profile Exception: ${e.message}`);
-    }
 
-    // 2. Roster / Players
-    try {
-      const players = this.data.players || [];
-      let playerSuccess = 0;
-      for (const p of players) {
-        const res = await window.supabaseService.upsertPlayer(schoolCode, p);
-        if (res) {
-          if (res.id) p.id = res.id;
-          playerSuccess++;
+        // 2. Roster / Players
+        try {
+          const players = this.data.players || [];
+          let playerSuccess = 0;
+          for (const p of players) {
+            const res = await window.supabaseService.upsertPlayer(schoolCode, p);
+            if (res) {
+              if (res.id) p.id = res.id;
+              playerSuccess++;
+            }
+          }
+          report.push(`✅ 👥 Players Roster: ${playerSuccess} / ${players.length} players synced to DB`);
+        } catch (e) {
+          report.push(`❌ 👥 Players Roster Exception: ${e.message}`);
         }
-      }
-      report.push(`✅ 👥 Players Roster: ${playerSuccess} / ${players.length} players synced to DB`);
-    } catch (e) {
-      report.push(`❌ 👥 Players Roster Exception: ${e.message}`);
-    }
 
-    // 3. Schedule / Matches
-    try {
-      const matches = this.data.schedule || [];
-      let matchSuccess = 0;
-      for (const m of matches) {
-        const res = await window.supabaseService.upsertMatch(schoolCode, m);
-        if (res) {
-          if (res.id) m.id = res.id;
-          matchSuccess++;
+        // 3. Schedule / Matches
+        try {
+          const matches = this.data.schedule || [];
+          let matchSuccess = 0;
+          for (const m of matches) {
+            const res = await window.supabaseService.upsertMatch(schoolCode, m);
+            if (res) {
+              if (res.id) m.id = res.id;
+              matchSuccess++;
+            }
+          }
+          report.push(`✅ 📅 Schedule: ${matchSuccess} / ${matches.length} matches synced to DB`);
+        } catch (e) {
+          report.push(`❌ 📅 Schedule Exception: ${e.message}`);
         }
-      }
-      report.push(`✅ 📅 Schedule: ${matchSuccess} / ${matches.length} matches synced to DB`);
-    } catch (e) {
-      report.push(`❌ 📅 Schedule Exception: ${e.message}`);
-    }
 
-    // 4. Drills Library Bank
-    try {
-      const drills = this.data.drillsBank || [];
-      let drillSuccess = 0;
-      for (const d of drills) {
-        const res = await window.supabaseService.upsertDrillBankItem(schoolCode, d);
-        if (res) {
-          if (res.id) d.id = res.id;
-          drillSuccess++;
+        // 4. Drills Library Bank
+        try {
+          const drills = this.data.drillsBank || [];
+          let drillSuccess = 0;
+          for (const d of drills) {
+            const res = await window.supabaseService.upsertDrillBankItem(schoolCode, d);
+            if (res) {
+              if (res.id) d.id = res.id;
+              drillSuccess++;
+            }
+          }
+          report.push(`✅ 📚 Master Drills Library: ${drillSuccess} / ${drills.length} drills synced to DB`);
+        } catch (e) {
+          report.push(`❌ 📚 Master Drills Library Exception: ${e.message}`);
         }
-      }
-      report.push(`✅ 📚 Master Drills Library: ${drillSuccess} / ${drills.length} drills synced to DB`);
-    } catch (e) {
-      report.push(`❌ 📚 Master Drills Library Exception: ${e.message}`);
-    }
 
-    // 5. Practice Plans (Saved Plans & Current Plan)
-    try {
-      const plans = this.data.savedPlans || [];
-      let planSuccess = 0;
-      for (const plan of plans) {
-        const res = await window.supabaseService.saveFullPracticePlan(schoolCode, plan);
-        if (res && res.success) {
-          planSuccess++;
+        // 5. Practice Plans (Saved Plans & Current Plan)
+        try {
+          const plans = this.data.savedPlans || [];
+          let planSuccess = 0;
+          for (const plan of plans) {
+            const res = await window.supabaseService.saveFullPracticePlan(schoolCode, plan);
+            if (res && res.success) {
+              planSuccess++;
+            }
+          }
+          if (this.data.currentPracticePlan && this.data.currentPracticePlan.length > 0) {
+            await window.supabaseService.saveFullPracticePlan(schoolCode, {
+              name: this.data.activePlanName || 'Current Practice Session',
+              items: this.data.currentPracticePlan
+            });
+          }
+          report.push(`✅ 📋 Practice Plans: ${planSuccess} saved plans synced to DB`);
+        } catch (e) {
+          report.push(`❌ 📋 Practice Plans Exception: ${e.message}`);
         }
-      }
-      if (this.data.currentPracticePlan && this.data.currentPracticePlan.length > 0) {
-        await window.supabaseService.saveFullPracticePlan(schoolCode, {
-          name: this.data.activePlanName || 'Current Practice Session',
-          items: this.data.currentPracticePlan
-        });
-      }
-      report.push(`✅ 📋 Practice Plans: ${planSuccess} saved plans synced to DB`);
-    } catch (e) {
-      report.push(`❌ 📋 Practice Plans Exception: ${e.message}`);
-    }
 
-    // 6. Coaching Staff
-    try {
-      const coaches = this.data.coaches || [];
-      let coachSuccess = 0;
-      for (const c of coaches) {
-        const res = await window.supabaseService.upsertCoach(schoolCode, c);
-        if (res) {
-          if (res.id) c.id = res.id;
-          coachSuccess++;
+        // 6. Coaching Staff
+        try {
+          const coaches = this.data.coaches || [];
+          let coachSuccess = 0;
+          for (const c of coaches) {
+            const res = await window.supabaseService.upsertCoach(schoolCode, c);
+            if (res) {
+              if (res.id) c.id = res.id;
+              coachSuccess++;
+            }
+          }
+          report.push(`✅ 👔 Coaching Staff: ${coachSuccess} / ${coaches.length} coaches synced to DB`);
+        } catch (e) {
+          report.push(`❌ 👔 Coaching Staff Exception: ${e.message}`);
         }
-      }
-      report.push(`✅ 👔 Coaching Staff: ${coachSuccess} / ${coaches.length} coaches synced to DB`);
-    } catch (e) {
-      report.push(`❌ 👔 Coaching Staff Exception: ${e.message}`);
-    }
 
-    // 7. Daily Thoughts
-    try {
-      const thoughts = this.data.dailyThoughts || [];
-      let thoughtSuccess = 0;
-      for (const t of thoughts) {
-        const res = await window.supabaseService.upsertDailyThought(schoolCode, t);
-        if (res && res.data) {
-          if (res.data.id) t.id = res.data.id;
-          thoughtSuccess++;
+        // 7. Daily Thoughts
+        try {
+          const thoughts = this.data.dailyThoughts || [];
+          let thoughtSuccess = 0;
+          for (const t of thoughts) {
+            const res = await window.supabaseService.upsertDailyThought(schoolCode, t);
+            if (res && res.data) {
+              if (res.data.id) t.id = res.data.id;
+              thoughtSuccess++;
+            }
+          }
+          report.push(`✅ 💡 Coach Daily Thoughts: ${thoughtSuccess} / ${thoughts.length} thoughts synced to DB`);
+        } catch (e) {
+          report.push(`❌ 💡 Coach Daily Thoughts Exception: ${e.message}`);
         }
+
+        // Save updated ID mappings locally
+        this.saveData();
+
+        this.showAlertModal('Sync Complete', `⚡ LOCAL DATA TO SUPABASE CLOUD SYNC COMPLETE!\n\n${report.join('\n')}`);
       }
-      report.push(`✅ 💡 Coach Daily Thoughts: ${thoughtSuccess} / ${thoughts.length} thoughts synced to DB`);
-    } catch (e) {
-      report.push(`❌ 💡 Coach Daily Thoughts Exception: ${e.message}`);
-    }
-
-    // Save updated ID mappings locally
-    this.saveData();
-
-    alert(`⚡ LOCAL DATA TO SUPABASE CLOUD SYNC COMPLETE!\n\n${report.join('\n')}`);
+    });
   }
 
   async runLiveDatabaseTest() {
@@ -5812,6 +5964,105 @@ class BHSSoccerApp {
       modal.classList.remove('active');
       modal.style.display = '';
     });
+  }
+
+  showPromptModal({ title, message, defaultValue = '', placeholder = '', confirmText = 'Submit', onConfirm, onCancel }) {
+    this._customPromptCallback = onConfirm;
+    this._customPromptCancelCallback = onCancel;
+    
+    const modal = document.getElementById('customPromptModal');
+    const titleEl = document.getElementById('customPromptTitle');
+    const msgEl = document.getElementById('customPromptMessage');
+    const inputEl = document.getElementById('customPromptInput');
+    const submitBtn = document.getElementById('customPromptSubmitBtn');
+    
+    if (modal && titleEl && msgEl && inputEl) {
+      titleEl.textContent = title || 'INPUT REQUIRED';
+      msgEl.textContent = message || '';
+      inputEl.value = defaultValue || '';
+      if (placeholder) inputEl.placeholder = placeholder;
+      if (submitBtn) submitBtn.textContent = confirmText || 'Submit';
+      
+      modal.style.display = '';
+      modal.classList.add('active');
+      setTimeout(() => {
+        inputEl.focus();
+        inputEl.select();
+      }, 50);
+    } else if (onConfirm) {
+      const val = prompt(`${title ? title + '\n\n' : ''}${message}`, defaultValue);
+      onConfirm(val);
+    }
+  }
+
+  submitCustomPrompt() {
+    const inputEl = document.getElementById('customPromptInput');
+    const val = inputEl ? inputEl.value : '';
+    const cb = this._customPromptCallback;
+    this.closeModals();
+    this._customPromptCallback = null;
+    this._customPromptCancelCallback = null;
+    if (cb) cb(val);
+  }
+
+  cancelCustomPrompt() {
+    const cb = this._customPromptCancelCallback;
+    this.closeModals();
+    this._customPromptCallback = null;
+    this._customPromptCancelCallback = null;
+    if (cb) cb(null);
+  }
+
+  showAlertModal(title, message) {
+    this.showPromptModal({
+      title: title || 'NOTICE',
+      message: message || '',
+      defaultValue: '',
+      confirmText: 'OK',
+      onConfirm: () => {}
+    });
+  }
+
+  showConfirmModal({ title, message, confirmText = 'Confirm', confirmClass = 'btn-gold', onConfirm, onCancel }) {
+    this._customConfirmCallback = onConfirm;
+    this._customConfirmCancelCallback = onCancel;
+    
+    const modal = document.getElementById('customConfirmModal');
+    const titleEl = document.getElementById('customConfirmTitle');
+    const msgEl = document.getElementById('customConfirmMessage');
+    const submitBtn = document.getElementById('customConfirmSubmitBtn');
+    
+    if (modal && titleEl && msgEl && submitBtn) {
+      titleEl.textContent = title || 'CONFIRM ACTION';
+      msgEl.textContent = message || '';
+      submitBtn.textContent = confirmText || 'Confirm';
+      submitBtn.className = `btn ${confirmClass || 'btn-gold'}`;
+      
+      modal.style.display = '';
+      modal.classList.add('active');
+    } else if (onConfirm) {
+      if (window.confirm(`${title ? title + '\n\n' : ''}${message}`)) {
+        onConfirm();
+      } else if (onCancel) {
+        onCancel();
+      }
+    }
+  }
+
+  submitCustomConfirm() {
+    const cb = this._customConfirmCallback;
+    this.closeModals();
+    this._customConfirmCallback = null;
+    this._customConfirmCancelCallback = null;
+    if (cb) cb();
+  }
+
+  cancelCustomConfirm() {
+    const cb = this._customConfirmCancelCallback;
+    this.closeModals();
+    this._customConfirmCallback = null;
+    this._customConfirmCancelCallback = null;
+    if (cb) cb();
   }
 
   attachDynamicListeners() {
