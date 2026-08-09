@@ -870,6 +870,27 @@ footer {
   box-shadow: 0 0 10px rgba(30, 144, 255, 0.4);
 }
 
+.tool-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.tool-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.tool-btn[data-tool="eraser"].active,
+.tool-btn-danger.active {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+  color: #fff !important;
+  border-color: #fca5a5 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6) !important;
+}
+
 .canvas-wrapper {
   position: relative;
   display: flex;

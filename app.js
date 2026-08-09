@@ -230,8 +230,11 @@ class SoccerTacticalBoard {
     this.isDrawing = false;
     this.currentPath = null;
     this.draggedElement = null;
+    this.selectedElement = null;
+    this.selectedDrawing = null;
     this.dragOffset = { x: 0, y: 0 };
     this.hasAttached = false;
+    this.hasKeydownAttached = false;
 
     // Tactical Keyframe Animation Properties
     this.keyframes = [
@@ -316,8 +319,66 @@ class SoccerTacticalBoard {
     this.saveState();
     this.elements = [];
     this.drawings = [];
+    this.selectedElement = null;
+    this.selectedDrawing = null;
     this.saveCurrentFrameState();
     this.render();
+  }
+
+  reindexNumbers() {
+    let aCount = 1;
+    let dCount = 1;
+    this.elements.forEach(el => {
+      if (el.type === 'attacker') {
+        el.number = String(aCount++);
+      } else if (el.type === 'defender') {
+        el.number = String(dCount++);
+      }
+    });
+  }
+
+  deleteSelected() {
+    if (this.selectedElement) {
+      const idx = this.elements.findIndex(el => el.id === this.selectedElement.id);
+      if (idx !== -1) {
+        this.saveState();
+        this.elements.splice(idx, 1);
+        this.reindexNumbers();
+        this.selectedElement = null;
+        this.saveCurrentFrameState();
+        this.render();
+        return true;
+      }
+    }
+    if (this.selectedDrawing) {
+      const idx = this.drawings.indexOf(this.selectedDrawing);
+      if (idx !== -1) {
+        this.saveState();
+        this.drawings.splice(idx, 1);
+        this.selectedDrawing = null;
+        this.saveCurrentFrameState();
+        this.render();
+        return true;
+      }
+    }
+    // If nothing explicitly selected, delete the last added element or line
+    if (this.elements.length > 0) {
+      this.saveState();
+      this.elements.pop();
+      this.reindexNumbers();
+      this.selectedElement = null;
+      this.saveCurrentFrameState();
+      this.render();
+      return true;
+    } else if (this.drawings.length > 0) {
+      this.saveState();
+      this.drawings.pop();
+      this.selectedDrawing = null;
+      this.saveCurrentFrameState();
+      this.render();
+      return true;
+    }
+    return false;
   }
 
   saveCurrentFrameState() {
@@ -662,14 +723,18 @@ class SoccerTacticalBoard {
           num = String(count + 1);
         }
 
-        this.elements.push({
+        const newEl = {
           id: Date.now() + Math.random(),
           type: this.activeTool,
           x: pos.x,
           y: pos.y,
           color: this.activeTool === 'attacker' ? '#0047AB' : this.activeTool === 'defender' ? '#EF4444' : this.activeTool === 'gk' ? '#FFD700' : '#FF8C00',
           number: num
-        });
+        };
+        this.elements.push(newEl);
+        this.selectedElement = newEl;
+        this.selectedDrawing = null;
+        this.reindexNumbers();
         this.render();
       } else if (this.activeTool === 'text') {
         app.showPromptModal({
@@ -679,14 +744,17 @@ class SoccerTacticalBoard {
           onConfirm: (input) => {
             if (input && input.trim()) {
               this.saveState();
-              this.elements.push({
+              const newEl = {
                 id: Date.now() + Math.random(),
                 type: 'text',
                 text: input.trim(),
                 x: pos.x,
                 y: pos.y,
                 color: '#FFD700'
-              });
+              };
+              this.elements.push(newEl);
+              this.selectedElement = newEl;
+              this.selectedDrawing = null;
               this.render();
             }
           }
@@ -702,10 +770,17 @@ class SoccerTacticalBoard {
           this.saveState();
           if (this.activeTool === 'eraser') {
             this.elements.splice(elIdx, 1);
+            this.reindexNumbers();
+            this.selectedElement = null;
+            this.selectedDrawing = null;
+            this.saveCurrentFrameState();
             this.render();
           } else {
             this.draggedElement = this.elements[elIdx];
+            this.selectedElement = this.elements[elIdx];
+            this.selectedDrawing = null;
             this.dragOffset = { x: pos.x - this.draggedElement.x, y: pos.y - this.draggedElement.y };
+            this.render();
           }
         } else {
           // Proximity hit-test for drawn lines, arrows, dribbles, and sprint lines
@@ -714,11 +789,21 @@ class SoccerTacticalBoard {
             this.saveState();
             if (this.activeTool === 'eraser') {
               this.drawings.splice(drawIdx, 1);
+              this.selectedElement = null;
+              this.selectedDrawing = null;
+              this.saveCurrentFrameState();
               this.render();
             } else {
               this.draggedDrawing = this.drawings[drawIdx];
+              this.selectedDrawing = this.drawings[drawIdx];
+              this.selectedElement = null;
               this.lastDragPos = pos;
+              this.render();
             }
+          } else {
+            this.selectedElement = null;
+            this.selectedDrawing = null;
+            this.render();
           }
         }
       } else if (['line_solid', 'line_arrow', 'line_dribble', 'line_dashed', 'line_shot'].includes(this.activeTool)) {
@@ -731,6 +816,8 @@ class SoccerTacticalBoard {
           points: [pos]
         };
         this.drawings.push(this.currentPath);
+        this.selectedDrawing = this.currentPath;
+        this.selectedElement = null;
       }
     };
 
@@ -771,6 +858,20 @@ class SoccerTacticalBoard {
     this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); });
     this.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); });
     window.addEventListener('touchend', end);
+
+    if (!this.hasKeydownAttached) {
+      this.hasKeydownAttached = true;
+      window.addEventListener('keydown', (e) => {
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (['input', 'textarea', 'select'].includes(activeTag)) return;
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (this.selectedElement || this.selectedDrawing) {
+            e.preventDefault();
+            this.deleteSelected();
+          }
+        }
+      });
+    }
   }
 
   render() {
@@ -861,6 +962,24 @@ class SoccerTacticalBoard {
     if (!d.points || d.points.length < 2) return;
     const ctx = this.ctx;
     ctx.save();
+
+    const isSelected = (this.selectedDrawing === d);
+    if (isSelected) {
+      ctx.save();
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = (d.width || 3) + 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(d.points[0].x, d.points[0].y);
+      for (let i = 1; i < d.points.length; i++) {
+        ctx.lineTo(d.points[i].x, d.points[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.strokeStyle = d.color || '#FFF';
     ctx.lineWidth = d.width || 3;
     ctx.lineCap = 'round';
@@ -918,13 +1037,25 @@ class SoccerTacticalBoard {
     const ctx = this.ctx;
     ctx.save();
 
+    const isSelected = (this.selectedElement === el);
+
     if (el.type === 'attacker' || el.type === 'defender' || el.type === 'gk') {
       const radius = 14;
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, radius + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
       ctx.beginPath();
       ctx.arc(el.x, el.y, radius, 0, Math.PI * 2);
       ctx.fillStyle = el.color;
       ctx.fill();
-      ctx.strokeStyle = '#FFFFFF';
+      ctx.strokeStyle = isSelected ? '#FFD700' : '#FFFFFF';
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -934,11 +1065,20 @@ class SoccerTacticalBoard {
       ctx.textBaseline = 'middle';
       ctx.fillText(el.type === 'gk' ? 'GK' : (el.number || '10'), el.x, el.y);
     } else if (el.type === 'ball') {
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, 14, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.beginPath();
       ctx.arc(el.x, el.y, 9, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
-      ctx.strokeStyle = '#000000';
+      ctx.strokeStyle = isSelected ? '#FFD700' : '#000000';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -948,6 +1088,15 @@ class SoccerTacticalBoard {
       ctx.textBaseline = 'middle';
       ctx.fillText('⚽', el.x, el.y + 1);
     } else if (el.type === 'cone') {
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, 15, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.beginPath();
       ctx.moveTo(el.x, el.y - 12);
       ctx.lineTo(el.x + 10, el.y + 8);
@@ -955,10 +1104,15 @@ class SoccerTacticalBoard {
       ctx.closePath();
       ctx.fillStyle = el.color || '#FF8C00';
       ctx.fill();
-      ctx.strokeStyle = '#FFF';
+      ctx.strokeStyle = isSelected ? '#FFD700' : '#FFF';
       ctx.lineWidth = 1;
       ctx.stroke();
     } else if (el.type === 'goal') {
+      if (isSelected) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(el.x - 19, el.y - 13, 38, 26);
+      }
       ctx.strokeStyle = '#FFF';
       ctx.lineWidth = 3;
       ctx.strokeRect(el.x - 16, el.y - 10, 32, 20);
@@ -975,8 +1129,8 @@ class SoccerTacticalBoard {
       const boxH = 22;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = isSelected ? '#FFD700' : 'rgba(255, 215, 0, 0.6)';
+      ctx.lineWidth = isSelected ? 2.5 : 1.5;
       ctx.beginPath();
       if (ctx.roundRect) {
         ctx.roundRect(el.x - boxW / 2, el.y - boxH / 2, boxW, boxH, 4);

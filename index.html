@@ -327,10 +327,15 @@
               <button type="button" class="tool-btn" data-tool="line_shot" onclick="app.setMasterDiagramTool('line_shot')">🎯 Shot</button>
             </div>
             <div class="tool-group">
-              <button type="button" class="tool-btn" data-tool="select" onclick="app.setMasterDiagramTool('select')">🖐️ Move</button>
+              <button type="button" class="tool-btn" data-tool="select" onclick="app.setMasterDiagramTool('select')" title="Select and move players or lines">🖐️ Move</button>
+              <button type="button" class="tool-btn tool-btn-danger" data-tool="eraser" onclick="app.setMasterDiagramTool('eraser')" title="Click any Attacker, Defender, GK, Ball, Cone or Line to delete it">❌ Eraser</button>
+              <button type="button" class="tool-btn tool-btn-danger" onclick="app.masterDiagrammer.deleteSelected()" title="Delete currently selected element or last added item (or press Delete/Backspace key)">🗑️ Delete Selected</button>
               <button type="button" class="tool-btn" onclick="app.masterDiagrammer.undo()">↩️ Undo</button>
               <button type="button" class="tool-btn" onclick="app.masterDiagrammer.clear()">🧹 Clear</button>
             </div>
+          </div>
+          <div style="font-size:0.75rem; color:var(--bhs-gold-accent); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>💡 <strong>Tip:</strong> Select <strong>❌ Eraser</strong> &amp; click any Attacker, Defender, GK, Ball or Cone to delete it, or select an item with <strong>🖐️ Move</strong> &amp; press <strong>Delete/Backspace</strong> key.</span>
           </div>
 
           <div class="canvas-wrapper" style="text-align: center;">
