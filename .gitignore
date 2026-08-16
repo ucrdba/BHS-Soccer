@@ -1,19 +1,78 @@
-# Dependencies
+# ==========================================
+# Dependencies & Package Managers
+# ==========================================
 node_modules/
-/.pnpm
-/.yarn
+.pnpm-store/
+.yarn/
+*.tsbuildinfo
 
-# Environment & Secret files
+# ==========================================
+# Environment & Secret Keys
+# ==========================================
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.cert
+config.local.json
+secrets.json
 
-# Temporary / Lock files from MS Office (Excel, Word, etc.)
+# ==========================================
+# Temporary & Lock files (MS Office / Editors)
+# ==========================================
 ~$*
 ~$*.xlsx
+~$*.xls
 ~$*.docx
+~$*.doc
+~$*.pptx
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
 
-# OS generated files
+# ==========================================
+# Database Backups & Data Dumps
+# ==========================================
+*_backup.csv
+*_backup_rows.csv
+*.dump
+*.sql.bak
+*.bak
+
+# ==========================================
+# Compressed Archives & Build Bundles
+# ==========================================
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
+# ==========================================
+# Production & Distribution Builds
+# ==========================================
+/dist
+/build
+/out
+/.next/
+/.nuxt/
+/.cache/
+
+# ==========================================
+# Logs & Diagnostic Files
+# ==========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# OS Generated Files
+# ==========================================
 .DS_Store
 .DS_Store?
 ._*
@@ -23,35 +82,35 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# IDE / Editor settings
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
+# ==========================================
+# IDE & Code Editor Files
+# ==========================================
 .idea/
 *.suo
 *.user
 *.userossc
 *.sln.docstates
+*.code-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# ==========================================
+# WordPress Theme / Overrides
+# ==========================================
+wordpress-theme/
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/cache/
+sitemap.xml
+sitemap.xml.gz
 
-# Production / Build output
-/dist
-/build
-/out
-/.next/
-/.nuxt/
-
-# Temporary / Scratch files
-/scratch/
-*.tmp
-*.temp
+# ==========================================
+# Antigravity & AI scratch directories
+# ==========================================
+.gemini/
+scratch/

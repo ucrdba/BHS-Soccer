@@ -1,0 +1,7 @@
+id,code,name,mascot,city,colors,record,created_at,is_deleted
+4762a957-a555-4315-80be-cf3e284bd450,diag_4640,Diagnostic Test School,Cougars,"Beaumont, CA","{""primary"": ""#0047AB"", ""secondary"": ""#FFD700""}","{""wins"": 1, ""draws"": 0, ""losses"": 0}",2026-08-06 18:23:35.552438 +00:00,false
+bb7bd5ff-e281-4d04-9dac-488bd63edcd3,diag_4596,Diagnostic Test School,Cougars,"Beaumont, CA","{""primary"": ""#0047AB"", ""secondary"": ""#FFD700""}","{""wins"": 1, ""draws"": 0, ""losses"": 0}",2026-08-06 21:15:45.604528 +00:00,false
+8fe583c4-d8eb-4ce7-bb1a-7b468203ec91,diag_3826,Diagnostic Test School,Cougars,"Beaumont, CA","{""primary"": ""#0047AB"", ""secondary"": ""#FFD700""}","{""wins"": 1, ""draws"": 0, ""losses"": 0}",2026-08-06 21:30:04.751156 +00:00,false
+82237fb2-fdf7-4699-ab49-8172ce480f60,abc,REV  High School,Terriers,Redlands CA,"{""primary"": ""#ad2b00"", ""secondary"": ""#ffffff""}","{""wins"": 0, ""draws"": 0, ""losses"": 0}",2026-08-06 21:24:11.619619 +00:00,false
+7ebbe980-b87e-421f-a11f-788ca2519504,bhs,Beaumont High School,Cougars,"Beaumont, CA","{""primary"": ""#0047ab"", ""secondary"": ""#ffffff""}","{""wins"": 0, ""draws"": 0, ""losses"": 0}",2026-08-06 22:40:52.919077 +00:00,false
+15c3caaf-db17-41af-84c2-b4df6ab8f256,vhs,REV  Club,Wild Cats,"Beaumont, CA","{""primary"": ""#00ad62"", ""secondary"": ""#ff0088""}","{""wins"": 0, ""draws"": 0, ""losses"": 0}",2026-08-07 21:43:05.397475 +00:00,false
