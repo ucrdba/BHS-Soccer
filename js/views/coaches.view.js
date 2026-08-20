@@ -1,0 +1,169 @@
+﻿/**
+ * BHS Soccer - Coaches View and Auth Modal Handlers
+ */
+
+Object.assign(BHSSoccerApp.prototype, {
+
+  renderRestrictedAccess(featureName, reason) {
+    return `
+      <div class="container">
+        <div class="restricted-box">
+          <div class="restricted-icon">🔒</div>
+          <h2 style="color: #FFF; margin-bottom: 8px;">RESTRICTED TEAM AREA</h2>
+          <h4 style="color: var(--bhs-gold-accent); margin-bottom: 16px;">${featureName}</h4>
+          <p class="text-muted" style="margin-bottom: 24px; font-size: 0.95rem;">${reason}</p>
+          <button class="btn btn-primary" onclick="app.openAuthModal()">🔑 Sign In / Switch Role</button>
+        </div>
+      </div>
+    `;
+  },
+
+  openAuthModal() {
+    const currentUser = window.auth.getCurrentUser();
+    if (!currentUser || currentUser.role === 'guest') {
+      this.openLoginModal();
+    } else {
+      this.openAdminModal();
+    }
+  },
+
+  openLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+    const feedback = document.getElementById('authFormFeedback');
+    if (feedback) feedback.textContent = '';
+  },
+
+  switchAuthTab(tab) {
+    const signInForm = document.getElementById('signInForm');
+    const registerForm = document.getElementById('registerForm');
+    const verifyForm = document.getElementById('verifyForm');
+    const tabSignInBtn = document.getElementById('tabSignInBtn');
+    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+
+    if (tab === 'register') {
+      if (signInForm) signInForm.style.display = 'none';
+      if (registerForm) registerForm.style.display = '';
+      if (verifyForm) verifyForm.style.display = 'none';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-secondary';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-cyan';
+    } else if (tab === 'verify') {
+      if (signInForm) signInForm.style.display = 'none';
+      if (registerForm) registerForm.style.display = 'none';
+      if (verifyForm) verifyForm.style.display = '';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-secondary';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-secondary';
+    } else {
+      if (signInForm) signInForm.style.display = '';
+      if (registerForm) registerForm.style.display = 'none';
+      if (verifyForm) verifyForm.style.display = 'none';
+      if (tabSignInBtn) tabSignInBtn.className = 'btn btn-gold';
+      if (tabRegisterBtn) tabRegisterBtn.className = 'btn btn-secondary';
+    }
+  },
+
+  quickLogin(email, password) {
+    const emailInput = document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('loginPassword');
+    if (emailInput) emailInput.value = email;
+    if (passwordInput) passwordInput.value = password || 'password';
+    this.handleSignIn();
+  },
+
+  handleSignIn() {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const feedback = document.getElementById('authFormFeedback');
+
+    const res = window.auth.loginUser(email, password);
+    if (res.success) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      this.closeModals();
+      alert(`🎉 Welcome back, ${res.user.name}!`);
+    } else {
+      if (res.isPendingVerification) {
+        this.openVerifyTab(res.user.email, res.user.verificationCode);
+      } else if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  },
+
+  handleRegister() {
+    const name = document.getElementById('regName').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const role = document.getElementById('regRole').value;
+    const feedback = document.getElementById('authFormFeedback');
+
+    const res = window.auth.registerUser({ name, email, password, role });
+    if (res.success) {
+      if (res.requiresVerification) {
+        this.openVerifyTab(email, res.otpCode);
+      } else {
+        this.updateAuthUI();
+        this.renderCurrentView();
+        this.closeModals();
+        alert(`🎉 Account created successfully! Welcome, ${res.user.name}.`);
+      }
+    } else {
+      if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  },
+
+  openVerifyTab(email, otpCode) {
+    this.switchAuthTab('verify');
+    this.pendingVerifyEmail = email;
+    const targetEl = document.getElementById('verifyTargetEmail');
+    const bannerEl = document.getElementById('simulatedCodeBanner');
+    if (targetEl) targetEl.textContent = email;
+    if (bannerEl && otpCode) {
+      bannerEl.innerHTML = `⚡ DEMO VERIFICATION OTP CODE: <span style="font-size:1.1rem; letter-spacing:2px;">${otpCode}</span> (or enter 123456)`;
+    }
+  },
+
+  handleVerifyOtp() {
+    const code = document.getElementById('verifyOtpCode').value;
+    const feedback = document.getElementById('authFormFeedback');
+    const email = this.pendingVerifyEmail || document.getElementById('regEmail').value || document.getElementById('loginEmail').value;
+
+    const res = window.auth.verifyUserOtp(email, code);
+    if (res.success) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      if (res.status === 'pending_approval') {
+        alert(res.message);
+        this.closeModals();
+      } else {
+        alert(`🎉 Email verified! Account activated for ${res.user.name}.`);
+        this.closeModals();
+      }
+    } else {
+      if (feedback) {
+        feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
+      }
+    }
+  },
+
+  approveUserAccess(userId) {
+    const ok = window.auth.approveUserAccess(userId);
+    if (ok) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      this.renderAdminModalContent();
+      alert('🎉 User access approved successfully!');
+    }
+  },
+
+  rejectUserAccess(userId) {
+    const ok = window.auth.rejectUserAccess(userId);
+    if (ok) {
+      this.renderAdminModalContent();
+      alert('User request rejected.');
+    }
+  }
+
+});

@@ -1219,6 +1219,23 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="./supabaseClient.js"></script>
   <script src="./auth.js"></script>
-  <script src="./app.js"></script>
+  <!-- Refactored app modules (fix/refactor branch) -->
+  <!-- 1. Seed data -->
+  <script src="./js/data.js"></script>
+  <!-- 2. Canvas diagrammer engine -->
+  <script src="./js/diagrammer.js"></script>
+  <!-- 3. Core app class (constructor, init, auth, routing) -->
+  <script src="./js/app.core.js"></script>
+  <!-- 4. View modules (prototype extensions) -->
+  <script src="./js/views/home.view.js"></script>
+  <script src="./js/views/roster.view.js"></script>
+  <script src="./js/views/schedule.view.js"></script>
+  <script src="./js/views/matrix.view.js"></script>
+  <script src="./js/views/planner.view.js"></script>
+  <script src="./js/views/coaches.view.js"></script>
+  <!-- 5. Admin panel & import/export -->
+  <script src="./js/admin.js"></script>
+  <!-- 6. Utilities + initApp boot -->
+  <script src="./js/utils.js"></script>
 </body>
 </html>
