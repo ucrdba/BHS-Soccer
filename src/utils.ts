@@ -7,7 +7,6 @@
  */
 
 import type { Countdown, PromptModalOptions, ConfirmModalOptions } from './types';
-import { auth } from './auth';
 import { BHSSoccerApp } from './app.core';
 
 declare module './app.core' {
@@ -155,14 +154,7 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   attachDynamicListeners(this: BHSSoccerApp): void {
-    // Role switcher choices inside modal
-    document.querySelectorAll('.role-switch-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const userId = card.getAttribute('data-userid');
-        if (userId) auth.switchRole(userId);
-        this.closeModals();
-      });
-    });
+    // no-op placeholder retained for future dynamically-attached listeners
   },
 
   parseMatchDateTime(this: BHSSoccerApp, dateStr: string | undefined | null, timeStr: string | undefined | null): Date | null {

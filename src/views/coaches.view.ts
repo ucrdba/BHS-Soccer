@@ -17,13 +17,12 @@ declare module '../app.core' {
     openAuthModal(): void;
     openLoginModal(): void;
     switchAuthTab(tab: AuthTab): void;
-    quickLogin(email: string, password?: string): void;
-    handleSignIn(): void;
-    handleRegister(): void;
-    openVerifyTab(email: string, otpCode?: string): void;
-    handleVerifyOtp(): void;
-    approveUserAccess(userId: string): void;
-    rejectUserAccess(userId: string): void;
+    handleSignIn(): Promise<void>;
+    handleRegister(): Promise<void>;
+    openVerifyTab(email: string): void;
+    handleVerifyOtp(): Promise<void>;
+    approveUserAccess(userId: string): Promise<void>;
+    rejectUserAccess(userId: string): Promise<void>;
   }
 }
 
@@ -87,20 +86,12 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  quickLogin(this: BHSSoccerApp, email: string, password?: string): void {
-    const emailInput = document.getElementById('loginEmail') as HTMLInputElement | null;
-    const passwordInput = document.getElementById('loginPassword') as HTMLInputElement | null;
-    if (emailInput) emailInput.value = email;
-    if (passwordInput) passwordInput.value = password || 'password';
-    this.handleSignIn();
-  },
-
-  handleSignIn(this: BHSSoccerApp): void {
+  async handleSignIn(this: BHSSoccerApp): Promise<void> {
     const email = (document.getElementById('loginEmail') as HTMLInputElement).value;
     const password = (document.getElementById('loginPassword') as HTMLInputElement).value;
     const feedback = document.getElementById('authFormFeedback');
 
-    const res = auth.loginUser(email, password);
+    const res = await auth.loginUser(email, password);
     if (res.success) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -108,24 +99,24 @@ Object.assign(BHSSoccerApp.prototype, {
       alert(`🎉 Welcome back, ${res.user!.name}!`);
     } else {
       if (res.isPendingVerification) {
-        this.openVerifyTab(res.user!.email, res.user!.verificationCode);
+        this.openVerifyTab(res.user!.email);
       } else if (feedback) {
         feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
       }
     }
   },
 
-  handleRegister(this: BHSSoccerApp): void {
+  async handleRegister(this: BHSSoccerApp): Promise<void> {
     const name = (document.getElementById('regName') as HTMLInputElement).value;
     const email = (document.getElementById('regEmail') as HTMLInputElement).value;
     const password = (document.getElementById('regPassword') as HTMLInputElement).value;
     const role = (document.getElementById('regRole') as HTMLSelectElement).value;
     const feedback = document.getElementById('authFormFeedback');
 
-    const res = auth.registerUser({ name, email, password, role });
+    const res = await auth.registerUser({ name, email, password, role });
     if (res.success) {
       if (res.requiresVerification) {
-        this.openVerifyTab(email, res.otpCode);
+        this.openVerifyTab(email);
       } else {
         this.updateAuthUI();
         this.renderCurrentView();
@@ -139,18 +130,14 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  openVerifyTab(this: BHSSoccerApp, email: string, otpCode?: string): void {
+  openVerifyTab(this: BHSSoccerApp, email: string): void {
     this.switchAuthTab('verify');
     this.pendingVerifyEmail = email;
     const targetEl = document.getElementById('verifyTargetEmail');
-    const bannerEl = document.getElementById('simulatedCodeBanner');
     if (targetEl) targetEl.textContent = email;
-    if (bannerEl && otpCode) {
-      bannerEl.innerHTML = `⚡ DEMO VERIFICATION OTP CODE: <span style="font-size:1.1rem; letter-spacing:2px;">${otpCode}</span> (or enter 123456)`;
-    }
   },
 
-  handleVerifyOtp(this: BHSSoccerApp): void {
+  async handleVerifyOtp(this: BHSSoccerApp): Promise<void> {
     const code = (document.getElementById('verifyOtpCode') as HTMLInputElement).value;
     const feedback = document.getElementById('authFormFeedback');
     const email = this.pendingVerifyEmail
@@ -158,7 +145,7 @@ Object.assign(BHSSoccerApp.prototype, {
       || (document.getElementById('loginEmail') as HTMLInputElement | null)?.value
       || '';
 
-    const res = auth.verifyUserOtp(email, code);
+    const res = await auth.verifyUserOtp(email, code);
     if (res.success) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -176,8 +163,8 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  approveUserAccess(this: BHSSoccerApp, userId: string): void {
-    const ok = auth.approveUserAccess(userId);
+  async approveUserAccess(this: BHSSoccerApp, userId: string): Promise<void> {
+    const ok = await auth.approveUserAccess(userId);
     if (ok) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -186,8 +173,8 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  rejectUserAccess(this: BHSSoccerApp, userId: string): void {
-    const ok = auth.rejectUserAccess(userId);
+  async rejectUserAccess(this: BHSSoccerApp, userId: string): Promise<void> {
+    const ok = await auth.rejectUserAccess(userId);
     if (ok) {
       this.renderAdminModalContent();
       alert('User request rejected.');

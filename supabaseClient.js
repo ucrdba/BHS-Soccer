@@ -51,16 +51,50 @@ class SupabaseService {
     return this.isConfigured();
   }
 
-  async signUpUser(email, password) {
+  async signUpUser(email, password, metadata = {}) {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client.auth.signUp({ email, password });
+      const { data, error } = await this.client.auth.signUp({ email, password, options: { data: metadata } });
       if (error) console.warn('Supabase Auth signUp notice:', error.message);
       return { data, error };
     } catch (e) {
       console.warn('Supabase Auth signUp exception:', e);
       return null;
     }
+  }
+
+  async signInUser(email, password) {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client.auth.signInWithPassword({ email, password });
+      if (error) console.warn('Supabase Auth signIn notice:', error.message);
+      return { data, error };
+    } catch (e) {
+      console.warn('Supabase Auth signIn exception:', e);
+      return null;
+    }
+  }
+
+  async signOutUser() {
+    if (!this.isConfigured()) return null;
+    try {
+      const { error } = await this.client.auth.signOut();
+      if (error) console.warn('Supabase Auth signOut notice:', error.message);
+      return { error };
+    } catch (e) {
+      console.warn('Supabase Auth signOut exception:', e);
+      return null;
+    }
+  }
+
+  async getSession() {
+    if (!this.isConfigured()) return { data: { session: null }, error: null };
+    return this.client.auth.getSession();
+  }
+
+  onAuthStateChange(callback) {
+    if (!this.isConfigured()) return null;
+    return this.client.auth.onAuthStateChange(callback);
   }
 
   async verifyOtp(email, token) {
@@ -71,6 +105,24 @@ class SupabaseService {
       return { data, error };
     } catch (e) {
       console.warn('Supabase Auth verifyOtp exception:', e);
+      return null;
+    }
+  }
+
+  async fetchOwnProfile() {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data: userData, error: userError } = await this.client.auth.getUser();
+      if (userError || !userData?.user) return null;
+      const { data, error } = await this.client
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+      if (error) { console.error('Supabase fetchOwnProfile error:', error.message); return null; }
+      return data;
+    } catch (e) {
+      console.error('Supabase fetchOwnProfile exception:', e);
       return null;
     }
   }
@@ -106,41 +158,81 @@ class SupabaseService {
     }
   }
 
-  async upsertProfile(schoolId = 'bhs', user = {}) {
-    if (!this.isConfigured()) {
-      console.warn('Supabase not configured: profile saved in local storage.');
-      return null;
-    }
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    const payload = {
-      name: user.name || 'Team User',
-      email: user.email || '',
-      role: user.requestedRole || user.role || 'guest',
-      status: user.status || 'active',
-      team_level: user.teamLevel || 'Boys Varsity',
-      avatar_url: user.avatar || 'assets/bhs_cougars_logo.png'
-    };
-    if (schoolUuid) payload.school_id = schoolUuid;
-    if (user.id && this.isUuid(user.id)) payload.id = user.id;
+  async upsertProfile(userId, fields = {}) {
+    if (!this.isConfigured()) return null;
+    if (!userId) { console.warn('Supabase upsertProfile: missing userId — profile rows are created by the handle_new_user DB trigger, not the client.'); return null; }
 
-    console.log('⚡ Supabase inserting profile into `profiles` table:', payload);
+    const payload = {};
+    if (fields.name !== undefined) payload.name = fields.name;
+    if (fields.avatar !== undefined) payload.avatar_url = fields.avatar;
+    if (fields.teamLevel !== undefined) payload.team_level = fields.teamLevel;
 
     try {
       const { data, error } = await this.client
         .from('profiles')
-        .upsert([payload], { onConflict: 'email' })
+        .update(payload)
+        .eq('id', userId)
         .select();
 
       if (error) {
-        console.error('❌ Supabase profiles insert error:', error.message, error);
-      } else {
-        console.log('✅ Supabase profile successfully inserted into `profiles` table:', data);
+        console.error('❌ Supabase profiles update error:', error.message, error);
+        return null;
       }
       return data ? data[0] : null;
     } catch (err) {
       console.error('❌ Supabase profiles exception:', err.message);
       return null;
     }
+  }
+
+  async approveProfile(userId) {
+    if (!this.isConfigured() || !userId) return null;
+    try {
+      const { data: existing, error: fetchError } = await this.client
+        .from('profiles')
+        .select('requested_role')
+        .eq('id', userId)
+        .maybeSingle();
+      if (fetchError || !existing) { console.error('❌ Supabase approveProfile fetch error:', fetchError?.message); return null; }
+
+      const { data, error } = await this.client
+        .from('profiles')
+        .update({ status: 'active', role: existing.requested_role || 'player' })
+        .eq('id', userId)
+        .select();
+      if (error) { console.error('❌ Supabase approveProfile error:', error.message); return null; }
+      return data ? data[0] : null;
+    } catch (e) {
+      console.error('❌ Supabase approveProfile exception:', e.message);
+      return null;
+    }
+  }
+
+  async rejectProfile(userId) {
+    if (!this.isConfigured() || !userId) return null;
+    try {
+      const { data, error } = await this.client
+        .from('profiles')
+        .update({ status: 'rejected' })
+        .eq('id', userId)
+        .select();
+      if (error) { console.error('❌ Supabase rejectProfile error:', error.message); return null; }
+      return data ? data[0] : null;
+    } catch (e) {
+      console.error('❌ Supabase rejectProfile exception:', e.message);
+      return null;
+    }
+  }
+
+  async fetchPendingApprovals(schoolId = 'bhs') {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client
+      .from('profiles')
+      .select('*')
+      .eq('status', 'pending_approval')
+      .order('created_at', { ascending: true });
+    if (error) { console.error('Supabase fetchPendingApprovals error:', error.message); return null; }
+    return data;
   }
 
   async testProfileInsert() {

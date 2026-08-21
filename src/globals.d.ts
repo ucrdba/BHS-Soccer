@@ -17,6 +17,11 @@ declare global {
   // window.supabaseService. Shapes here are intentionally loose (the raw rows
   // are snake_case Supabase rows, not our camelCase app types) — callers
   // re-map fields by hand, same as the original JS did.
+  interface SupabaseAuthResult {
+    data: Record<string, any>;
+    error: { message: string } | null;
+  }
+
   interface SupabaseServiceLike {
     isConfigured(): boolean;
     fetchSchool(code: string): Promise<Partial<School> | null>;
@@ -28,11 +33,23 @@ declare global {
     fetchCoaches(schoolCode: string): Promise<Partial<Coach>[] | null>;
     fetchDailyThoughts(schoolCode: string): Promise<Partial<DailyThought>[] | null>;
     fetchSoccerCategories(schoolCode: string): Promise<Partial<SoccerCategory>[] | null>;
-    upsertProfile(schoolCode: string, user: unknown): Promise<unknown>;
+    upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string }): Promise<Record<string, any> | null>;
     upsertPlayer(schoolCode: string, player: unknown): Promise<{ id?: string } | null>;
     deletePlayer(playerId: string): Promise<unknown>;
     upsertMatch(schoolCode: string, match: unknown): Promise<{ id?: string } | null>;
     deleteMatch(matchId: string): Promise<unknown>;
+
+    // Real Supabase Auth
+    signUpUser(email: string, password: string, metadata?: Record<string, any>): Promise<SupabaseAuthResult | null>;
+    signInUser(email: string, password: string): Promise<SupabaseAuthResult | null>;
+    signOutUser(): Promise<{ error: { message: string } | null } | null>;
+    getSession(): Promise<{ data: { session: Record<string, any> | null }; error: unknown }>;
+    onAuthStateChange(callback: (event: string, session: Record<string, any> | null) => void): unknown;
+    verifyOtp(email: string, token: string): Promise<SupabaseAuthResult | null>;
+    fetchOwnProfile(): Promise<Record<string, any> | null>;
+    approveProfile(userId: string): Promise<Record<string, any> | null>;
+    rejectProfile(userId: string): Promise<Record<string, any> | null>;
+    fetchPendingApprovals(schoolCode?: string): Promise<Record<string, any>[] | null>;
   }
 
   interface Window {

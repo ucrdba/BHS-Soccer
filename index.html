@@ -71,49 +71,6 @@
     </div>
   </footer>
 
-  <!-- Auth Role Switcher Modal -->
-  <div id="authRoleModal" class="modal-overlay">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3>SELECT USER ROLE / DEMO ACCOUNT</h3>
-        <button class="close-btn">&times;</button>
-      </div>
-      <p class="text-muted" style="margin-bottom: 20px; font-size: 0.85rem;">
-        Test the multi-tenant role-based permissions system by switching between accounts:
-      </p>
-
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <div class="role-switch-card drill-item" data-userid="user_coach_bob" style="cursor: pointer;">
-          <div>
-            <strong style="color: #FFF; display: block;">Coach Bob (Head Coach - Beaumont)</strong>
-            <span class="badge badge-coach">COACH ROLE</span> - Full access to Matrix, Practice Planner, Roster Ratings
-          </div>
-        </div>
-
-        <div class="role-switch-card drill-item" data-userid="user_player_alex" style="cursor: pointer;">
-          <div>
-            <strong style="color: #FFF; display: block;">Alex Rivera (#10 - Senior Forward)</strong>
-            <span class="badge badge-role">PLAYER ROLE</span> - Can view team Matrix ranks, personal evaluations, announcements
-          </div>
-        </div>
-
-        <div class="role-switch-card drill-item" data-userid="user_admin_sam" style="cursor: pointer;">
-          <div>
-            <strong style="color: #FFF; display: block;">Admin Sam (Athletic Director)</strong>
-            <span class="badge badge-admin">ADMIN ROLE</span> - Full global control across school teams & coaches
-          </div>
-        </div>
-
-        <div class="role-switch-card drill-item" data-userid="user_guest" style="cursor: pointer;">
-          <div>
-            <strong style="color: #FFF; display: block;">Public Visitor (Parent / Fan)</strong>
-            <span class="badge badge-win">GUEST ROLE</span> - Public schedule, roster, game recaps (Ratings 🔒 Protected)
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Player Detail Modal -->
   <div id="playerDetailModal" class="modal-overlay">
     <div class="modal-window">
@@ -1145,17 +1102,6 @@
         <button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700; padding: 12px; font-size: 0.95rem; justify-content: center;">🔑 Sign In to Team Hub</button>
       </form>
 
-      <!-- Quick Demo Login Shortcuts -->
-      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: left;">
-        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Quick One-Click Demo Logins:</p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <button type="button" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 10px; justify-content: center;" onclick="app.quickLogin('headcoach@beaumont.edu', 'password')">👔 Coach Bob</button>
-          <button type="button" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 10px; justify-content: center;" onclick="app.quickLogin('arivera@beaumont.edu', 'password')">⚽ Alex Rivera (#10)</button>
-          <button type="button" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 10px; justify-content: center;" onclick="app.quickLogin('admin@bhs-sports.org', 'password')">⚙️ Admin Sam</button>
-          <button type="button" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 10px; justify-content: center;" onclick="app.quickLogin('guest@cougars-fan.com', 'password')">👤 Public Guest</button>
-        </div>
-      </div>
-
       <!-- Create Account Form (Hidden initially) -->
       <form id="registerForm" onsubmit="event.preventDefault(); app.handleRegister();" style="text-align: left; display: none;">
         <div class="form-group" style="margin-bottom: 12px;">
@@ -1185,8 +1131,7 @@
       <form id="verifyForm" onsubmit="event.preventDefault(); app.handleVerifyOtp();" style="text-align: left; display: none;">
         <div style="background: rgba(30, 144, 255, 0.15); border: 1px solid var(--bhs-blue-electric); padding: 12px; border-radius: 8px; margin-bottom: 14px; text-align: center;">
           <div style="font-size: 1.05rem; font-weight: 700; color: #FFF; margin-bottom: 4px;">📩 Enter 6-Digit Email Verification Code</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">A verification code was generated for <strong id="verifyTargetEmail" style="color: var(--bhs-gold-accent);">email@beaumont.edu</strong>.</div>
-          <div id="simulatedCodeBanner" style="font-size: 0.85rem; color: var(--bhs-gold-accent); margin-top: 6px; font-weight: 700;"></div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Check your inbox at <strong id="verifyTargetEmail" style="color: var(--bhs-gold-accent);">email@beaumont.edu</strong> for the code.</div>
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
           <label style="font-weight: 600; color: #E2E8F0; font-size: 0.85rem; display: block; margin-bottom: 6px;">6-Digit OTP Verification Code</label>

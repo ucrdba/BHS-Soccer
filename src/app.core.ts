@@ -54,6 +54,8 @@ export class BHSSoccerApp {
   }
 
   async init(): Promise<void> {
+    await auth.init();
+
     auth.subscribe(() => {
       this.updateAuthUI();
       this.renderCurrentView();

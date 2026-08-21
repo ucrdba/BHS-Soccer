@@ -1,12 +1,14 @@
 /**
  * BHS Soccer - Authentication & RBAC Engine
+ * Backed by Supabase Auth (auth.users) + the `profiles` table for role/status/RBAC.
  * Supports Multi-Tenant Schools, Role Management, Verification & Approval Queues
  */
 
 import type {
-  AppUser, UserRole, UserStatus,
+  AppUser, UserRole,
   LoginResult, RegisterResult, OtpVerifyResult
 } from './types';
+import './globals';
 
 const ROLES = {
   GUEST: 'guest' as UserRole,
@@ -15,253 +17,177 @@ const ROLES = {
   ADMIN: 'admin' as UserRole,
 };
 
-const SAMPLE_USERS: AppUser[] = [
-  {
-    id: 'user_coach_bob',
-    name: 'Coach Bob',
-    email: 'headcoach@beaumont.edu',
-    role: ROLES.COACH,
-    status: 'active',
-    emailVerified: true,
+const GUEST_USER: AppUser = {
+  id: 'user_guest',
+  name: 'Public Visitor',
+  email: 'guest@cougars-fan.com',
+  role: ROLES.GUEST,
+  status: 'active',
+  emailVerified: true,
+  schoolId: 'bhs',
+  schoolName: 'Beaumont High School',
+  teamLevel: 'Fan',
+  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
+};
+
+function mapProfileRowToAppUser(row: Record<string, any>): AppUser {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    requestedRole: row.requested_role || undefined,
+    status: row.status,
+    emailVerified: !!row.email_verified,
     schoolId: 'bhs',
     schoolName: 'Beaumont High School',
-    teamLevel: 'Boys Varsity',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-  },
-  {
-    id: 'user_player_alex',
-    name: 'Alex Rivera (#10)',
-    email: 'arivera@beaumont.edu',
-    role: ROLES.PLAYER,
-    status: 'active',
-    emailVerified: true,
-    schoolId: 'bhs',
-    schoolName: 'Beaumont High School',
-    teamLevel: 'Boys Varsity',
-    playerId: 'p101',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80'
-  },
-  {
-    id: 'user_admin_sam',
-    name: 'Admin Sam (Athletic Dir.)',
-    email: 'admin@bhs-sports.org',
-    role: ROLES.ADMIN,
-    status: 'active',
-    emailVerified: true,
-    schoolId: 'bhs',
-    schoolName: 'Beaumont High School',
-    teamLevel: 'All Teams',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80'
-  },
-  {
-    id: 'user_guest',
-    name: 'Public Visitor',
-    email: 'guest@cougars-fan.com',
-    role: ROLES.GUEST,
-    status: 'active',
-    emailVerified: true,
-    schoolId: 'bhs',
-    schoolName: 'Beaumont High School',
-    teamLevel: 'Fan',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
-  }
-];
+    teamLevel: row.team_level || 'Boys Varsity',
+    playerId: row.player_id || undefined,
+    avatar: row.avatar_url || 'assets/bhs_cougars_logo.png',
+    createdAt: row.created_at
+      ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : undefined
+  };
+}
+
+function humanizeAuthError(error?: { message: string } | null): string {
+  const msg = error?.message || '';
+  if (/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
+  if (/email not confirmed/i.test(msg)) return 'Please confirm your email before signing in.';
+  if (/user already registered/i.test(msg)) return 'An account with this email already exists. Try signing in instead.';
+  return msg || 'Something went wrong. Please try again.';
+}
 
 export class AuthManager {
   currentUser: AppUser;
-  registeredUsers: AppUser[];
   private subscribers: Array<(user: AppUser) => void>;
 
   constructor() {
-    this.registeredUsers = this.loadRegisteredUsers();
-    const guestUser = SAMPLE_USERS.find(u => u.role === ROLES.GUEST)!;
-    this.currentUser = this.loadUser() || guestUser;
+    this.currentUser = GUEST_USER;
     this.subscribers = [];
   }
 
-  private loadRegisteredUsers(): AppUser[] {
-    const saved = localStorage.getItem('bhs_soccer_registered_users');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return []; }
-    }
-    return [];
+  async init(): Promise<void> {
+    const sessionResult = await window.supabaseService?.getSession();
+    const session = sessionResult?.data?.session;
+    this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
+
+    window.supabaseService?.onAuthStateChange(async (_event, changedSession) => {
+      this.currentUser = changedSession ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
+      this.notifySubscribers();
+    });
   }
 
-  private saveRegisteredUsers(): void {
-    localStorage.setItem('bhs_soccer_registered_users', JSON.stringify(this.registeredUsers));
+  private async loadProfileForSession(): Promise<AppUser | null> {
+    const row = await window.supabaseService?.fetchOwnProfile();
+    return row ? mapProfileRowToAppUser(row) : null;
   }
 
-  private loadUser(): AppUser | null {
-    const saved = localStorage.getItem('bhs_soccer_current_user');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return null; }
-    }
-    return null;
-  }
-
-  saveUser(user: AppUser): void {
+  private setCurrentUser(user: AppUser): void {
     this.currentUser = user;
-    localStorage.setItem('bhs_soccer_current_user', JSON.stringify(user));
     this.notifySubscribers();
   }
 
-  loginUser(email: string, _password?: string): LoginResult {
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
-    const found = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-
-    if (found) {
-      if (found.status === 'pending_verification') {
-        return { success: false, isPendingVerification: true, user: found, message: 'Please enter your 6-digit email verification code to complete registration.' };
-      }
-      if (found.status === 'pending_approval') {
-        return { success: false, isPendingApproval: true, user: found, message: 'Your account email is verified! Request for Coach / Player access is currently pending Coach Bob / AD approval.' };
-      }
-      if (found.status === 'rejected') {
-        return { success: false, message: 'Account access request was denied by team administrator.' };
-      }
-      this.saveUser(found);
-      return { success: true, user: found };
+  async loginUser(email: string, password: string): Promise<LoginResult> {
+    if (!window.supabaseService?.isConfigured()) {
+      return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
-    return { success: false, message: 'User account not found with this email address. Please register a new account.' };
+
+    const result = await window.supabaseService.signInUser(String(email || '').trim().toLowerCase(), password);
+    if (!result || result.error) {
+      return { success: false, message: humanizeAuthError(result?.error) };
+    }
+
+    const profile = await this.loadProfileForSession();
+    if (!profile) {
+      await window.supabaseService.signOutUser();
+      return { success: false, message: 'Account profile could not be loaded. Please try again.' };
+    }
+
+    if (profile.status === 'pending_verification') {
+      this.setCurrentUser(profile);
+      return { success: false, isPendingVerification: true, user: profile, message: 'Please enter your 6-digit email verification code to complete registration.' };
+    }
+    if (profile.status === 'pending_approval') {
+      this.setCurrentUser(profile);
+      return { success: false, isPendingApproval: true, user: profile, message: 'Your account email is verified! Request for Coach / Player access is currently pending Coach Bob / AD approval.' };
+    }
+    if (profile.status === 'rejected') {
+      await window.supabaseService.signOutUser();
+      return { success: false, message: 'Account access request was denied by team administrator.' };
+    }
+
+    this.setCurrentUser(profile);
+    return { success: true, user: profile };
   }
 
-  registerUser({ name, email, role }: { name: string; email: string; password?: string; role?: string }): RegisterResult {
+  async registerUser({ name, email, password, role }: { name: string; email: string; password?: string; role?: string }): Promise<RegisterResult> {
     const cleanName = String(name || '').trim();
     const cleanEmail = String(email || '').trim().toLowerCase();
-    const roleValue = ((role || ROLES.GUEST) as string).toLowerCase() as UserRole;
+    const roleValue = ((role || ROLES.GUEST) as string).toLowerCase();
 
-    if (!cleanName || !cleanEmail) {
-      return { success: false, message: 'Please provide both Name and Email.' };
+    if (!cleanName || !cleanEmail || !password) {
+      return { success: false, message: 'Please provide Name, Email, and Password.' };
+    }
+    if (!window.supabaseService?.isConfigured()) {
+      return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
-    const existing = allUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-    if (existing) {
-      if (existing.status === 'active') {
-        this.saveUser(existing);
-        return { success: true, user: existing, isExisting: true };
-      }
-      return { success: true, user: existing, requiresVerification: existing.status === 'pending_verification', requiresApproval: existing.status === 'pending_approval' };
+    const result = await window.supabaseService.signUpUser(cleanEmail, password, { name: cleanName, requested_role: roleValue });
+    if (!result || result.error) {
+      return { success: false, message: humanizeAuthError(result?.error) };
     }
 
-    const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-
-    const newUser: AppUser = {
-      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      name: cleanName,
-      email: cleanEmail,
-      role: ROLES.GUEST,
-      requestedRole: roleValue,
-      status: 'pending_verification',
-      emailVerified: false,
-      verificationCode: generatedOtp,
-      schoolId: 'bhs',
-      schoolName: 'Beaumont High School',
-      teamLevel: roleValue === ROLES.COACH ? 'Boys Varsity Staff' : roleValue === ROLES.PLAYER ? 'Boys Varsity Player' : 'Fan / Public',
-      avatar: 'assets/bhs_cougars_logo.png',
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    };
-
-    this.registeredUsers.unshift(newUser);
-    this.saveRegisteredUsers();
-
-    if ((window as any).supabaseService?.isConfigured()) {
-      (window as any).supabaseService.upsertProfile('bhs', newUser);
-    }
-
-    return { success: true, user: newUser, requiresVerification: true, otpCode: generatedOtp };
+    return { success: true, requiresVerification: true, message: 'Account created — check your email for a 6-digit verification code.' };
   }
 
-  verifyUserOtp(email: string, inputCode: string): OtpVerifyResult {
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const cleanCode = String(inputCode || '').trim();
-
-    const user = this.registeredUsers.find(u => u.email.toLowerCase() === cleanEmail);
-    if (!user) {
-      return { success: false, message: 'User record not found.' };
+  async verifyUserOtp(email: string, inputCode: string): Promise<OtpVerifyResult> {
+    if (!window.supabaseService?.isConfigured()) {
+      return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    if (user.verificationCode && user.verificationCode !== cleanCode && cleanCode !== '123456') {
-      return { success: false, message: 'Incorrect 6-digit verification code. Please try again.' };
+    const result = await window.supabaseService.verifyOtp(String(email || '').trim().toLowerCase(), String(inputCode || '').trim());
+    if (!result || result.error) {
+      return { success: false, message: 'Incorrect or expired verification code. Please try again.' };
     }
 
-    user.emailVerified = true;
-
-    if (user.requestedRole === ROLES.GUEST) {
-      user.status = 'active';
-      user.role = ROLES.GUEST;
-      this.saveUser(user);
-    } else {
-      user.status = 'pending_approval';
+    const profile = await this.loadProfileForSession();
+    if (!profile) {
+      return { success: false, message: 'Verification succeeded but the account profile could not be loaded.' };
     }
 
-    this.saveRegisteredUsers();
-
-    if ((window as any).supabaseService?.isConfigured()) {
-      (window as any).supabaseService.upsertProfile('bhs', user);
-    }
+    this.setCurrentUser(profile);
 
     return {
       success: true,
-      user,
-      status: user.status,
-      message: user.status === 'pending_approval'
-        ? `📩 Email verified successfully! Your request for ${(user.requestedRole || '').toUpperCase()} access is now pending Coach Bob & Athletic Director approval.`
-        : `🎉 Email verified! Welcome, ${user.name}!`
+      user: profile,
+      status: profile.status,
+      message: profile.status === 'pending_approval'
+        ? `📩 Email verified successfully! Your request for ${(profile.requestedRole || '').toUpperCase()} access is now pending Coach Bob & Athletic Director approval.`
+        : `🎉 Email verified! Welcome, ${profile.name}!`
     };
   }
 
-  approveUserAccess(userId: string): boolean {
-    const user = this.registeredUsers.find(u => u.id === userId);
-    if (!user) return false;
-
-    user.status = 'active';
-    user.role = user.requestedRole || user.role || ROLES.PLAYER;
-    this.saveRegisteredUsers();
-
-    if ((window as any).supabaseService?.isConfigured()) {
-      (window as any).supabaseService.upsertProfile('bhs', user);
-    }
-    this.notifySubscribers();
-    return true;
+  async approveUserAccess(userId: string): Promise<boolean> {
+    const row = await window.supabaseService?.approveProfile(userId);
+    if (row) this.notifySubscribers();
+    return !!row;
   }
 
-  rejectUserAccess(userId: string): boolean {
-    const user = this.registeredUsers.find(u => u.id === userId);
-    if (!user) return false;
-
-    user.status = 'rejected';
-    this.saveRegisteredUsers();
-
-    if ((window as any).supabaseService?.isConfigured()) {
-      (window as any).supabaseService.upsertProfile('bhs', user);
-    }
-    this.notifySubscribers();
-    return true;
+  async rejectUserAccess(userId: string): Promise<boolean> {
+    const row = await window.supabaseService?.rejectProfile(userId);
+    if (row) this.notifySubscribers();
+    return !!row;
   }
 
-  getPendingApprovals(): AppUser[] {
-    return this.registeredUsers.filter(u => u.status === 'pending_approval');
+  async getPendingApprovals(): Promise<AppUser[]> {
+    const rows = await window.supabaseService?.fetchPendingApprovals();
+    return (rows || []).map(mapProfileRowToAppUser);
   }
 
-  logout(): void {
-    const guestUser = SAMPLE_USERS.find(u => u.role === ROLES.GUEST) || {
-      id: 'user_guest', name: 'Public Visitor', email: 'guest@cougars-fan.com',
-      role: ROLES.GUEST, status: 'active' as UserStatus,
-      emailVerified: true, schoolId: 'bhs', schoolName: 'Beaumont High School', teamLevel: 'Fan'
-    };
-    this.saveUser(guestUser);
-  }
-
-  switchRole(userId: string): AppUser {
-    const allUsers = [...SAMPLE_USERS, ...this.registeredUsers];
-    const found = allUsers.find(u => u.id === userId);
-    if (found) {
-      this.saveUser(found);
-      return found;
-    }
-    return this.currentUser;
+  async logout(): Promise<void> {
+    await window.supabaseService?.signOutUser();
+    this.setCurrentUser(GUEST_USER);
   }
 
   getCurrentUser(): AppUser {

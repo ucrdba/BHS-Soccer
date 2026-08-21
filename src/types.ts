@@ -193,7 +193,6 @@ export interface AppUser {
   requestedRole?: UserRole;
   status: UserStatus;
   emailVerified: boolean;
-  verificationCode?: string;
   schoolId: string;
   schoolName: string;
   teamLevel: string;
@@ -217,7 +216,6 @@ export interface RegisterResult {
   requiresVerification?: boolean;
   requiresApproval?: boolean;
   isExisting?: boolean;
-  otpCode?: string;
 }
 
 export interface OtpVerifyResult {
