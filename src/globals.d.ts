@@ -12,11 +12,11 @@
 import type { Coach, DailyThought, School, SoccerCategory } from './types';
 
 declare global {
-  // ─── supabaseClient.js (not yet converted) ─────────────────────────────────
-  // Loaded via <script src="./supabaseClient.js"> and attached to
-  // window.supabaseService. Shapes here are intentionally loose (the raw rows
-  // are snake_case Supabase rows, not our camelCase app types) — callers
-  // re-map fields by hand, same as the original JS did.
+  // ─── window.supabaseService (src/data/supabase.ts) ─────────────────────────
+  // Assigned by src/main.ts at startup. Shapes here are intentionally loose
+  // (the raw rows are snake_case Supabase rows, not our camelCase app types)
+  // — callers re-map fields by hand, same as the original supabaseClient.js
+  // (now deleted) did.
   interface SupabaseAuthResult {
     data: Record<string, any>;
     error: { message: string } | null;

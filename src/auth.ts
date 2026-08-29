@@ -71,9 +71,16 @@ export class AuthManager {
     const session = sessionResult?.data?.session;
     this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
 
-    window.supabaseService?.onAuthStateChange(async (_event, changedSession) => {
-      this.currentUser = changedSession ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
-      this.notifySubscribers();
+    window.supabaseService?.onAuthStateChange((_event, changedSession) => {
+      // Deferred via setTimeout: this callback runs while GoTrueClient holds its
+      // navigator.locks lock, and loadProfileForSession() awaits another `auth`
+      // call (getUser()) — awaiting that here, inside the callback's synchronous
+      // frame, is a documented supabase-js v2 re-entrancy hazard that can hang.
+      // Deferring to a macrotask lets the lock release first.
+      setTimeout(async () => {
+        this.currentUser = changedSession ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
+        this.notifySubscribers();
+      }, 0);
     });
   }
 

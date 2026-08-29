@@ -654,10 +654,7 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   renderQuizLeaderboardHTML() {
-    const localAttempts = this.data.quizAttempts || [
-      { player_name: 'Alex Rivera (#10)', score: 5, total_questions: 5, percentage: 100, completed_at: 'AUG 2, 6:15 PM' },
-      { player_name: 'Coach Bob Miller', score: 5, total_questions: 5, percentage: 100, completed_at: 'AUG 2, 5:45 PM' }
-    ];
+    const localAttempts = this.data.quizAttempts || [];
 
     return `
       <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px; border-radius: 8px; margin-bottom: 14px;">
@@ -839,12 +836,12 @@ Object.assign(BHSSoccerApp.prototype, {
         noticeEl.style.display = 'block';
         noticeEl.style.background = 'rgba(40,167,69,0.2)';
         noticeEl.style.borderColor = 'rgba(40,167,69,0.4)';
-        noticeEl.innerHTML = '⚡ <strong>Cloud DB Active:</strong> Changes will save to <strong>LocalStorage</strong> and sync live to <strong>Supabase DB</strong> (`schools` table).';
+        noticeEl.innerHTML = '⚡ <strong>Cloud DB Active:</strong> Changes will sync live to <strong>Supabase DB</strong> (`schools` table).';
       } else {
         noticeEl.style.display = 'block';
         noticeEl.style.background = 'rgba(255,193,7,0.2)';
         noticeEl.style.borderColor = 'rgba(255,193,7,0.4)';
-        noticeEl.innerHTML = '📦 <strong>Local Mode Active:</strong> Saving directly to browser <strong>LocalStorage</strong>. (Provide Supabase key in Admin Center to enable cloud sync).';
+        noticeEl.innerHTML = '📦 <strong>Local Mode Active:</strong> Supabase Cloud DB is not configured, so changes will not be saved. (Provide Supabase key in Admin Center to enable cloud sync).';
       }
     }
 
@@ -855,7 +852,7 @@ Object.assign(BHSSoccerApp.prototype, {
   async submitSchoolForm() {
     const statusNotice = document.getElementById('schoolFormStatusNotice');
     const submitBtn = document.querySelector('#schoolFormModal button[type="submit"]');
-    const originalBtnText = submitBtn ? submitBtn.innerHTML : '💾 Save to LocalStorage &amp; Database';
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '💾 Save to Database';
 
     try {
       if (submitBtn) {
@@ -903,7 +900,7 @@ Object.assign(BHSSoccerApp.prototype, {
       }
       this.data.schools = schools;
 
-      // 2. Save persistently to LocalStorage
+      // 2. Update in-memory app state (saveData() is a no-op; Postgres is source of truth)
       this.saveData();
 
       // 3. Save / Upsert to Supabase Database (if configured)
@@ -932,26 +929,26 @@ Object.assign(BHSSoccerApp.prototype, {
           statusNotice.style.display = 'block';
           statusNotice.style.background = 'rgba(40,167,69,0.25)';
           statusNotice.style.borderColor = 'rgba(40,167,69,0.6)';
-          statusNotice.innerHTML = `✅ <strong>Saved to LocalStorage &amp; Supabase DB!</strong><br/>School "${name}" (${code}) successfully updated in cloud database.`;
+          statusNotice.innerHTML = `✅ <strong>Saved to Supabase DB!</strong><br/>School "${name}" (${code}) successfully updated in cloud database.`;
         }
-        alert(`✅ SUCCESS!\n\nSchool profile for "${name} ${mascot}" has been saved to LocalStorage and synced to your Supabase Cloud Database!`);
+        alert(`✅ SUCCESS!\n\nSchool profile for "${name} ${mascot}" has been synced to your Supabase Cloud Database!`);
         this.closeModal('schoolFormModal');
       } else if (cloudRes && cloudRes.error) {
         if (statusNotice) {
           statusNotice.style.display = 'block';
           statusNotice.style.background = 'rgba(220,53,69,0.25)';
           statusNotice.style.borderColor = 'rgba(220,53,69,0.6)';
-          statusNotice.innerHTML = `⚠️ <strong>LocalStorage Saved, but Cloud DB Error:</strong> ${cloudRes.error}`;
+          statusNotice.innerHTML = `⚠️ <strong>Cloud DB Error — Not Saved:</strong> ${cloudRes.error}`;
         }
-        alert(`⚠️ SAVED LOCALLY ONLY\n\nSchool data saved to browser LocalStorage, but Supabase Cloud error occurred:\n${cloudRes.error}\n\nMake sure the "schools" table and RLS policies are created in your Supabase SQL Editor.`);
+        alert(`⚠️ NOT SAVED\n\nA Supabase Cloud error occurred, so this school profile was not persisted:\n${cloudRes.error}\n\nMake sure the "schools" table and RLS policies are created in your Supabase SQL Editor.`);
       } else {
         if (statusNotice) {
           statusNotice.style.display = 'block';
           statusNotice.style.background = 'rgba(255,193,7,0.25)';
           statusNotice.style.borderColor = 'rgba(255,193,7,0.6)';
-          statusNotice.innerHTML = `📦 <strong>Saved to LocalStorage!</strong><br/>Supabase cloud DB is not configured. Enter your Supabase Anon key in Admin Center to enable cloud database sync.`;
+          statusNotice.innerHTML = `📦 <strong>Not Saved — Cloud DB Not Configured.</strong><br/>Enter your Supabase Anon key in Admin Center to enable cloud database sync.`;
         }
-        alert(`📦 SAVED TO LOCAL STORAGE!\n\nSchool profile for "${name} ${mascot}" saved successfully to your browser's LocalStorage.\n\n(To save to Supabase Cloud DB, click "Sign In / Register" -> Admin Center and enter your Supabase Anon Key).`);
+        alert(`📦 NOT SAVED\n\nSupabase Cloud DB is not configured, so this school profile was not persisted.\n\n(To save to Supabase Cloud DB, click "Sign In / Register" -> Admin Center and enter your Supabase Anon Key).`);
         this.closeModal('schoolFormModal');
       }
     } catch (err) {

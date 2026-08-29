@@ -219,7 +219,7 @@ class BHSSoccerApp {
         this.data.dailyThoughts = dbThoughts.map(t => ({
           id: t.id,
           coachId: t.coach_id,
-          coachName: t.coach_name || 'Coach Bob Miller',
+          coachName: t.coach_name || '',
           text: t.thoughts_text,
           isActive: !!t.is_active,
           createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
@@ -245,18 +245,7 @@ class BHSSoccerApp {
   }
 
   populateCategoryDropdowns() {
-    if (!this.data.soccerCategories || !Array.isArray(this.data.soccerCategories) || this.data.soccerCategories.length === 0) {
-      this.data.soccerCategories = [
-        { id: 'cat_1', name: 'Tactical / Attacking', description: 'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.' },
-        { id: 'cat_2', name: 'Defending / Pressing', description: 'Drills focusing on backline compact shape, high pressing triggers, defensive 1v1 containment, and tackling form.' },
-        { id: 'cat_3', name: 'Technical / Passing', description: 'Drills highlighting ball control, quick 2-touch wall passes, weight of pass, and receiving under pressure.' },
-        { id: 'cat_4', name: 'Physical / Conditioning', description: 'High-intensity fitness intervals, shuttle runs, agility ladder work, speed endurance, and core strength.' },
-        { id: 'cat_5', name: 'Warmup & Rondo', description: 'Dynamic mobility warmups, 5v2 / 4v2 rondos, activation patterns, and touch refinement.' },
-        { id: 'cat_6', name: 'Set Pieces / Penalty', description: 'Corner kick routines, free kick wall placement, long throw-ins, and penalty shootout practice.' }
-      ];
-    }
-
-    const categories = this.data.soccerCategories;
+    const categories = this.data.soccerCategories || [];
     const masterSelect = document.getElementById('masterDrillFormCategory');
     if (masterSelect) {
       const currentVal = masterSelect.value;

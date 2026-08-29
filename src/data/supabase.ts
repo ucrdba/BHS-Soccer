@@ -9,8 +9,9 @@
  * `public/js/admin.js` and `public/js/views/planner.view.js` depend on them
  * through the `window.supabaseService` global.
  *
- * This module is not yet wired up anywhere — a later task assigns this
- * export to `window.supabaseService` and deletes the original file.
+ * `src/main.ts` assigns this module's `supabaseService` export to
+ * `window.supabaseService` at startup. The original `supabaseClient.js`
+ * has been deleted.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -40,9 +41,8 @@ function getSupabaseUrl(): string {
 // The anon key is designed to be publishable — it ships in every Supabase
 // client bundle, and RLS (not secrecy) is what actually protects the data.
 // Keep the existing fallback: dropping it would leave the app silently
-// disconnected the moment Task 7 deletes supabaseClient.js, degrading to
-// localStorage-only — precisely the failure this migration removes.
-// Value copied verbatim from getSupabaseAnonKey() in supabaseClient.js.
+// disconnected when no credentials are configured. Value copied verbatim
+// from the original getSupabaseAnonKey() in the now-deleted supabaseClient.js.
 function getSupabaseAnonKey(): string {
   return (window as any).ENV_SUPABASE_ANON_KEY
     || readStoredCredential('bhs_supabase_anon_key')
@@ -443,7 +443,7 @@ class SupabaseService {
     tableResults.push(await testTable('coaches', '👔', 'INSERT', coachPayload));
 
     // 8. daily_thoughts
-    const thoughtPayload: Record<string, any> = { coach_name: 'Coach Bob Miller', thoughts_text: 'Diagnostic automated test thought', is_active: false };
+    const thoughtPayload: Record<string, any> = { coach_name: 'Diagnostic Coach', thoughts_text: 'Diagnostic automated test thought', is_active: false };
     if (schoolUuid) thoughtPayload.school_id = schoolUuid;
     tableResults.push(await testTable('daily_thoughts', '💡', 'INSERT', thoughtPayload));
 
@@ -935,7 +935,7 @@ class SupabaseService {
     const payload: Record<string, any> = {
       school_id: schoolId,
       coach_id: thought.coachId || 'c1',
-      coach_name: thought.coachName || 'Coach Bob Miller',
+      coach_name: thought.coachName || '',
       thoughts_text: thought.text || '',
       is_active: thought.isActive !== false,
       is_deleted: thought.is_deleted || thought.isDeleted || false

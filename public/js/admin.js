@@ -111,6 +111,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const isGuest = !currentUser || currentUser.role === 'guest';
     const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
+    const isAdminUser = window.auth.isAdmin();
     const pending = this._pendingApprovals || [];
 
     const container = document.getElementById('adminModalContent');
@@ -137,8 +138,9 @@ Object.assign(BHSSoccerApp.prototype, {
         </summary>
         <div class="admin-accordion-content">
           <p class="text-muted" style="font-size: 0.85rem; margin: 0;">
-            Signed in as <strong style="color:#FFF;">${currentUser.email}</strong>.
-            Roles are assigned by an administrator and cannot be changed from this panel.
+            ${window.auth.isLoggedIn()
+              ? `Signed in as <strong style="color:#FFF;">${currentUser.email}</strong>. Roles are assigned by an administrator and cannot be changed from this panel.`
+              : `Browsing as a public visitor. Sign in to access team tools.`}
           </p>
         </div>
       </details>
@@ -184,11 +186,11 @@ Object.assign(BHSSoccerApp.prototype, {
             </div>
           </div>
 
-          <button class="btn btn-gold" style="width: 100%; font-weight:700; font-size:0.85rem; padding: 8px;" onclick="app.saveSchoolDataFromAdmin()">💾 Save School Profile to LocalStorage &amp; Database</button>
+          <button class="btn btn-gold" style="width: 100%; font-weight:700; font-size:0.85rem; padding: 8px;" onclick="app.saveSchoolDataFromAdmin()">💾 Save School Profile to Database</button>
         </div>
       </details>
 
-      ${isCoachOrAdmin ? `
+      ${isAdminUser ? `
         <!-- Section 3: Pending User Approvals Queue -->
         <details class="admin-accordion">
           <summary class="admin-accordion-summary">
@@ -204,7 +206,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 8px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div>
                       <strong style="color:#FFF; display:block; font-size:0.9rem;">${p.name}</strong>
-                      <div style="font-size:0.78rem; color:var(--text-muted);">${p.email} &bull; Requested Role: <span class="badge badge-role">${p.requestedRole.toUpperCase()}</span></div>
+                      <div style="font-size:0.78rem; color:var(--text-muted);">${p.email} &bull; Requested Role: <span class="badge badge-role">${(p.requestedRole || 'player').toUpperCase()}</span></div>
                     </div>
                     <div style="display:flex; gap:8px;">
                       <button class="btn btn-gold" style="padding: 4px 10px; font-size:0.8rem;" onclick="app.approveUserAccess('${p.id}')">✅ Approve Access</button>
@@ -657,9 +659,9 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderCurrentView();
 
     if (dbSuccess) {
-      alert(`✅ School Profile saved for "${name} ${mascot}" in LocalStorage & synced to Supabase Database!`);
+      alert(`✅ School Profile saved for "${name} ${mascot}" and synced to Supabase Database!`);
     } else {
-      alert(`📦 School Profile saved for "${name} ${mascot}" in LocalStorage!`);
+      alert(`⚠️ School Profile for "${name} ${mascot}" could not be synced to the database. Changes may not persist.`);
     }
   },
 
@@ -668,10 +670,6 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
-  },
-
-  openImportExportModal() {
-    this.openAdminModal();
   },
 
   openPlayerModal(playerId) {

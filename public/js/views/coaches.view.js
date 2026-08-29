@@ -147,6 +147,8 @@ Object.assign(BHSSoccerApp.prototype, {
       this.renderCurrentView();
       await this.openAdminModal();
       alert('🎉 User access approved successfully!');
+    } else {
+      alert('Could not complete that request. You may not have permission, or the account may have already been actioned.');
     }
   },
 
@@ -155,6 +157,8 @@ Object.assign(BHSSoccerApp.prototype, {
     if (ok) {
       await this.openAdminModal();
       alert('User request rejected.');
+    } else {
+      alert('Could not complete that request. You may not have permission, or the account may have already been actioned.');
     }
   }
 
