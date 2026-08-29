@@ -1298,7 +1298,8 @@ git commit -m "feat: replace fake client-side auth with real Supabase Auth"
 - Modify: `src/main.ts`
 
 **Interfaces:**
-- Consumes: `getClient` from `../data/supabase`; `auth` from `../auth`; `window.authReady` from Task 12.
+- Consumes: `supabaseService` from `../data/supabase`; `auth` from `../auth`; `window.authReady` from Task 12.
+- Adds: `supabaseService.fetchRoles()` — a new method on the ported client (see Step 5).
 - Produces:
   - `type PermissionKey` — the 15 keys present in `roles.permissions`
   - `loadRoles(): Promise<void>`
@@ -1395,21 +1396,47 @@ introducing a top-level `await`, which the Global Constraints forbid.
 
 In `src/main.ts`, replace the `window.authReady = auth.init();` line from Task 12 with:
 
+The ported client does **not** export a raw `getClient` accessor — it exposes only the
+`supabaseService` instance, and every other collection is read through a method on it. Follow
+that pattern rather than breaking the encapsulation: add a `fetchRoles()` method to
+`src/data/supabase.ts`, beside the other fetchers, matching their existing idiom exactly
+(guard on `isConfigured()`, `console.warn` and return `null` on error):
+
 ```ts
-import { getClient } from './data/supabase';
+  async fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client.from('roles').select('name,permissions');
+      if (error) {
+        console.warn('Supabase fetchRoles notice:', error.message);
+        return null;
+      }
+      return data;
+    } catch (e) {
+      console.warn('Supabase fetchRoles exception:', e);
+      return null;
+    }
+  }
+```
+
+Then in `src/main.ts`, replace the `window.authReady = auth.init();` line from Task 12 with:
+
+```ts
+import { supabaseService } from './data/supabase';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 
 window.authReady = auth.init().then(async () => {
-  const client = getClient();
-  if (!client) return;
-  const { data } = await client.from('roles').select('name,permissions');
-  setRoles((data as RoleRow[]) ?? []);
+  const rows = await supabaseService.fetchRoles();
+  setRoles((rows as RoleRow[]) ?? []);
 });
 
 window.can = can;
 ```
 
 Add `can: typeof can` to the `Window` interface declaration.
+
+Also add `fetchRoles` to the `SupabaseServiceLike` interface in `src/globals.d.ts`, so the
+declared shape keeps matching the real one.
 
 Note that `setRoles` failing to run leaves the roles list empty, and `canFor` fails
 closed — a load failure denies permissions rather than granting them.
