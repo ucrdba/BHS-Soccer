@@ -1175,25 +1175,64 @@ git rm auth.js
 
 In `index.html`, delete the `<script src="./auth.js"></script>` line.
 
-- [ ] **Step 4: Verify no call site was missed**
+- [ ] **Step 4: Remove the demo OTP banner**
+
+The fake auth returned a verification code to the client, and the UI displayed it. Real
+Supabase Auth emails the code instead: `AppUser` has no `verificationCode` field and
+`RegisterResult` has no `otpCode`, so both call sites now pass `undefined`. It fails soft
+rather than throwing — but the banner it feeds reads *"DEMO VERIFICATION OTP CODE: … (or
+enter 123456)"*, which would instruct real users to enter a code Supabase will reject.
+
+In `public/js/views/coaches.view.js`, drop the unused second argument at both call sites
+(in `handleSignIn` and `handleRegister`, originally lines 86 and 103 — locate by symbol):
+
+```js
+        this.openVerifyTab(res.user.email);
+```
+
+```js
+        this.openVerifyTab(email);
+```
+
+and simplify `openVerifyTab` to tell the user where the code actually came from:
+
+```js
+  openVerifyTab(email) {
+    this.switchAuthTab('verify');
+    this.pendingVerifyEmail = email;
+    const targetEl = document.getElementById('verifyTargetEmail');
+    const bannerEl = document.getElementById('simulatedCodeBanner');
+    if (targetEl) targetEl.textContent = email;
+    if (bannerEl) {
+      bannerEl.textContent = 'We emailed you a 6-digit verification code. Enter it below.';
+    }
+  },
+```
+
+Verify no demo-code path survives:
+
+Run: `grep -rn "otpCode\|verificationCode\|123456" public/js/`
+Expected: no output. (`admin.js`'s uses were deleted with the fake self-test in Task 11.)
+
+- [ ] **Step 5: Verify no call site was missed**
 
 Run: `grep -rn "window\.auth\." public/js/ index.html | grep -v "await\|async"`
 
 Inspect each hit. Getters (`getCurrentUser`, `getRole`, `isCoach`, `isAdmin`, `canAccessRatings`, `isLoggedIn`, `subscribe`) are synchronous in `src/auth.ts` and correctly appear here. Any of the seven async methods appearing without `await` is a bug from Tasks 8–10.
 
-- [ ] **Step 5: Verify sign-in against the real database**
+- [ ] **Step 6: Verify sign-in against the real database**
 
 Run: `npm run dev`. Sign in with the existing `admin`/`active` account (use Supabase password reset if the credential is unknown).
 Expected: the header shows the admin role, and restricted tabs unlock. A wrong password must now be rejected — the fake implementation accepted any password, so verify this explicitly.
 
-- [ ] **Step 6: Verify the guest path**
+- [ ] **Step 7: Verify the guest path**
 
 Sign out. Expected: the roster and schedule still render for an anonymous visitor; matrix and planner show the restricted-access guard.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add index.html src/main.ts public/js/app.core.js
+git add index.html src/main.ts public/js/app.core.js public/js/views/coaches.view.js
 git commit -m "feat: replace fake client-side auth with real Supabase Auth"
 ```
 
