@@ -762,7 +762,9 @@ class SupabaseService {
       position: player.position,
       class_year: player.classYear || player.class_year || 'Senior',
       height: player.height || '',
-      photo_url: player.photo || player.photo_url || '',
+      // null, not '' — one representation of "no photo", so `photo_url is null`
+      // matches every such row rather than half of them.
+      photo_url: player.photo || player.photo_url || null,
       season_stats: player.seasonStats || player.season_stats || {},
       ratings: player.ratings || {},
       matrix_stats: player.matrixStats || player.matrix_stats || {},
@@ -881,7 +883,7 @@ class SupabaseService {
       phone: coach.phone || '',
       address: coach.address || '',
       email: coach.email || '',
-      photo_url: coach.photo || coach.photo_url || '',
+      photo_url: coach.photo || coach.photo_url || null,
       bio: coach.bio || '',
       is_deleted: coach.is_deleted || coach.isDeleted || false
     };
