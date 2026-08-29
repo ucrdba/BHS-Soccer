@@ -17,6 +17,8 @@
 - **`rows.length === 0` is never a reason to fall back to cache or seed.** This is the governing rule of the store.
 - **Writes go to Postgres first, local state second.** On write failure, local state must not change.
 - **Unmigrated entities keep working through the `window.supabaseService` facade.** Do not remove the facade in this plan.
+- **Every task runs `npm run typecheck` before committing, and the report must show its output.** `npm test` does NOT typecheck — Vitest transpiles without checking types, so a task can be 15/15 green and still ship type errors. Task 4 did exactly that. A clean test run is not evidence of a clean build.
+- **Do not change `tsconfig.json`.** `strict: false` is deliberate, so the ported JavaScript typechecks without a rewrite. If code fails to compile, fix the code, not the compiler settings.
 - **Cache keys are versioned:** `bhs.cache.v1.<collection>`.
 - **All view-file edits are in `public/js/` after Task 1.** Paths in tasks 8–13 reflect the post-move location.
 - **Line numbers in this plan are pre-edit.** Tasks 9, 10 and 11 all modify `public/js/admin.js` in sequence, so each edit shifts the lines beneath it. Always locate the edit site by the quoted symbol name or comment text given in the task, never by the line number alone. Re-grep before editing.
@@ -461,9 +463,17 @@ export interface CollectionState<T> {
   error: string | null;
 }
 
+// Each variant declares the other's key as optional-undefined. This repo's
+// tsconfig sets `strict: false` (so the ported JS typechecks without a
+// rewrite), and under `strictNullChecks: false` a boolean-literal discriminant
+// does NOT narrow a generic union — `result.error` after `if (result.ok)`
+// fails to compile. Declaring both keys on both variants makes the access
+// resolve while the discriminant still documents intent. Do not "simplify"
+// this back to a bare two-member union, and do not turn on `strict` to make
+// it work: that would break the ported supabaseClient code.
 export type FetchResult<T> =
-  | { ok: true; rows: T[] }
-  | { ok: false; error: string };
+  | { ok: true; rows: T[]; error?: undefined }
+  | { ok: false; rows?: undefined; error: string };
 
 export function initialState<T>(): CollectionState<T> {
   return { rows: [], status: 'loading', fetchedAt: null, error: null };
