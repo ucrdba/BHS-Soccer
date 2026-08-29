@@ -17,6 +17,7 @@
 - **`rows.length === 0` is never a reason to fall back to cache or seed.** This is the governing rule of the store.
 - **Writes go to Postgres first, local state second.** On write failure, local state must not change.
 - **Unmigrated entities keep working through the `window.supabaseService` facade.** Do not remove the facade in this plan.
+- **`npm run typecheck` does NOT cover `public/js/`.** `tsconfig.json` sets `"include": ["src"]`, so a clean typecheck says nothing about any view file. For every task that edits a file under `public/js/`, the syntax gate is `node --check <file>` — run it on each edited file and show the output. A green typecheck plus a green test run can both pass while a view file has a syntax error.
 - **Every task runs `npm run typecheck` before committing, and the report must show its output.** `npm test` does NOT typecheck — Vitest transpiles without checking types, so a task can be 15/15 green and still ship type errors. Task 4 did exactly that. A clean test run is not evidence of a clean build.
 - **Do not change `tsconfig.json`.** `strict: false` is deliberate, so the ported JavaScript typechecks without a rewrite. If code fails to compile, fix the code, not the compiler settings.
 - **Cache keys are versioned:** `bhs.cache.v1.<collection>`.
@@ -982,6 +983,7 @@ git commit -m "refactor: make auth entry points await-ready ahead of the async c
 **Files:**
 - Modify: `public/js/admin.js:200-216`
 - Modify: `public/js/admin.js:749` (`openAdminModal`)
+- Modify: `public/js/views/coaches.view.js` (`approveUserAccess`, `rejectUserAccess`) — the refresh paths live here, not in `admin.js`
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -1026,7 +1028,37 @@ At `public/js/admin.js:200-216`, replace the three `window.auth.getPendingApprov
 
 - [ ] **Step 3: Refresh after an approval decision**
 
-Anywhere the admin modal re-renders after approve or reject, it must re-fetch first. Replace bare `this.renderAdminModalContent()` calls that follow an approval action with `await this.openAdminModal()`.
+The two call sites that re-render after an approval decision are **not in `admin.js`** — they are
+`approveUserAccess` and `rejectUserAccess` in `public/js/views/coaches.view.js`. Both are already
+`async`. Change the bare render call in each:
+
+```js
+  async approveUserAccess(userId) {
+    const ok = await window.auth.approveUserAccess(userId);
+    if (ok) {
+      this.updateAuthUI();
+      this.renderCurrentView();
+      await this.openAdminModal();
+      alert('🎉 User access approved successfully!');
+    }
+  },
+
+  async rejectUserAccess(userId) {
+    const ok = await window.auth.rejectUserAccess(userId);
+    if (ok) {
+      await this.openAdminModal();
+      alert('User request rejected.');
+    }
+  }
+```
+
+Without this, pre-fetching is a regression rather than a refactor: before this task the template
+called `getPendingApprovals()` live during render, so re-rendering after an approve fetched fresh
+data. Reading a stale pre-fetched field instead leaves the actioned user sitting in the queue
+until the modal is closed and reopened.
+
+Change only these two render calls. Do not blanket-replace other `renderAdminModalContent()`
+calls elsewhere in the file.
 
 - [ ] **Step 4: Verify**
 
