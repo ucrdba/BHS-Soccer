@@ -4,7 +4,7 @@
 
 **Goal:** Get a real ES-module data layer and real Supabase authentication running in the browser, replacing the fake client-side auth and the localStorage-as-seed model.
 
-**Architecture:** A new `src/main.ts` module entry point installs three globals (`window.store`, `window.supabaseService`, `window.auth`) before `DOMContentLoaded`, so the existing classic-script view files keep working untouched. A repository layer owns a mutable `app.data` and reconciles it against Postgres, writing Postgres first and localStorage second. Auth call sites are made `await`-ready *before* the auth implementation is swapped, so every task ships working software.
+**Architecture:** A new `src/main.ts` module entry point installs `window.supabaseService`, `window.auth`, `window.authReady` and `window.can` before the app constructs, so the existing classic-script view files keep working untouched. The base repository class ships here with Postgres-first writes; **`window.store` and the per-entity repositories are Phase 2** and are deliberately not installed by this plan. Auth call sites are made `await`-ready *before* the auth implementation is swapped, so every task ships working software.
 
 **Tech Stack:** TypeScript 7, Vite 8, Vitest + jsdom, Supabase JS v2, Postgres (Supabase).
 
@@ -19,6 +19,8 @@
 - **Unmigrated entities keep working through the `window.supabaseService` facade.** Do not remove the facade in this plan.
 - **Cache keys are versioned:** `bhs.cache.v1.<collection>`.
 - **All view-file edits are in `public/js/` after Task 1.** Paths in tasks 8–13 reflect the post-move location.
+- **Line numbers in this plan are pre-edit.** Tasks 9, 10 and 11 all modify `public/js/admin.js` in sequence, so each edit shifts the lines beneath it. Always locate the edit site by the quoted symbol name or comment text given in the task, never by the line number alone. Re-grep before editing.
+- **No top-level `await` in `src/main.ts`.** Whether top-level await delays `DOMContentLoaded` is subtle; the app must not depend on it. Asynchronous boot work chains onto `window.authReady`, which `app.core.js` awaits explicitly.
 - **Phases 2–4 are out of scope:** entity-by-entity repository migration, matrix schema and standings view, quiz and thoughts import.
 
 ## File Structure
@@ -132,10 +134,12 @@ git commit -m "build: move classic scripts to public/js so Vite emits a loadable
 - [ ] **Step 1: Install Vitest and jsdom**
 
 ```bash
-npm install -D vitest@^3 jsdom@^25
+npm install -D vitest jsdom
 ```
 
 - [ ] **Step 2: Create the Vitest config**
+
+Do not pin a major version: Vite 8 is newer than the Vite range Vitest 3 supports, so let npm resolve the current compatible pair and record the resolved versions in the report.
 
 A separate config file, so the Vite build config stays untouched.
 
@@ -1187,7 +1191,7 @@ git commit -m "feat: replace fake client-side auth with real Supabase Auth"
 - Modify: `src/main.ts`
 
 **Interfaces:**
-- Consumes: `Repository` from `../data/repo`; `auth` from `../auth`.
+- Consumes: `getClient` from `../data/supabase`; `auth` from `../auth`; `window.authReady` from Task 12.
 - Produces:
   - `type PermissionKey` — the 15 keys present in `roles.permissions`
   - `loadRoles(): Promise<void>`
@@ -1278,20 +1282,30 @@ Expected: 4 permission tests pass.
 
 - [ ] **Step 5: Load roles at boot and expose `can`**
 
-In `src/main.ts`, after `await auth.init()`:
+Roles gate UI affordances, so they must be loaded before the first render. Chain the
+load onto `window.authReady` — which `app.core.js` already awaits — rather than
+introducing a top-level `await`, which the Global Constraints forbid.
+
+In `src/main.ts`, replace the `window.authReady = auth.init();` line from Task 12 with:
 
 ```ts
+import { getClient } from './data/supabase';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 
-const client = getClient();
-if (client) {
+window.authReady = auth.init().then(async () => {
+  const client = getClient();
+  if (!client) return;
   const { data } = await client.from('roles').select('name,permissions');
   setRoles((data as RoleRow[]) ?? []);
-}
+});
+
 window.can = can;
 ```
 
-Add `can: typeof can` to the `Window` interface, and import `getClient` from `./data/supabase`.
+Add `can: typeof can` to the `Window` interface declaration.
+
+Note that `setRoles` failing to run leaves the roles list empty, and `canFor` fails
+closed — a load failure denies permissions rather than granting them.
 
 - [ ] **Step 6: Verify in the browser**
 
@@ -1442,7 +1456,7 @@ const DEFAULT_BHS_DATA = {};
 
 - [ ] **Step 4: Guard the null school**
 
-`loadData()` now returns `school: null`, and several views read `this.data.school.name`. Run:
+`loadData()` now returns `school: null`, and views read `this.data.school.name`. Run:
 
 ```bash
 grep -rn "data\.school\." public/js/
@@ -1450,22 +1464,60 @@ grep -rn "data\.school\." public/js/
 
 Add optional chaining (`this.data.school?.name`) at each hit, with a literal fallback where the value is interpolated into HTML, for example `${this.data.school?.name || 'Loading…'}`.
 
-- [ ] **Step 5: Verify empty state rather than seed data**
+- [ ] **Step 5: Fix the surviving `DEFAULT_BHS_DATA` fallbacks**
+
+Emptying the seed object in Step 3 turns `DEFAULT_BHS_DATA.school` into `undefined`, which
+the previous step's grep does **not** catch. Three sites in `public/js/views/planner.view.js`
+use it as a fallback and will silently produce `undefined` or `[null]`:
+
+```bash
+grep -rn "DEFAULT_BHS_DATA" public/js/
+```
+
+Expected hits: `planner.view.js` at the `getSchoolsList`, `fillSchoolFormFields` and
+`updateHeaderBranding` methods (originally lines 754, 831 and 968 — locate by symbol, the
+line numbers will have shifted).
+
+Rewrite each to drop the seed fallback and handle absence honestly:
+
+```js
+    // getSchoolsList
+    this.data.schools = this.data.school ? [this.data.school] : [];
+```
+
+```js
+    // fillSchoolFormFields
+    const sData = schoolData || this.data.school;
+    if (!sData) return;
+```
+
+```js
+    // updateHeaderBranding
+    const school = this.data.school;
+    if (!school) return;
+```
+
+Verify none remain outside the seed module itself:
+
+Run: `grep -rn "DEFAULT_BHS_DATA" public/js/ | grep -v "public/js/data.js"`
+Expected: no output.
+
+- [ ] **Step 6: Verify empty state rather than seed data**
 
 Clear site data in the browser, then run `npm run dev` with valid Supabase credentials configured.
 Expected: roster, schedule and drills populate from Postgres. The "Coach's Daily Thoughts" section renders an **empty state**, not the hardcoded "Coach Bob Miller" thought — that table genuinely has zero rows, and this is the fix landing.
 
-- [ ] **Step 6: Verify the offline path**
+- [ ] **Step 7: Verify the offline path**
 
 Load the app once with a connection, then stop the network and reload.
 Expected: cached rows still render, the staleness indicator appears, and no seed data appears for `daily_thoughts`.
 
-- [ ] **Step 7: Run the full test suite**
+- [ ] **Step 8: Run the full test suite**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add public/js/app.core.js public/js/data.js src/main.ts
