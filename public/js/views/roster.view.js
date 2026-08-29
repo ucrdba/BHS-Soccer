@@ -34,7 +34,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <div class="player-card" data-player-id="${p.id}" data-position="${p.position}">
               <div class="player-card-header" onclick="app.openPlayerModal('${p.id}')">
                 <span class="jersey-number">#${p.number}</span>
-                <img src="${p.photo}" class="player-photo" alt="${p.name}" />
+                <img src="${this.photoOrPlaceholder(p.photo)}" class="player-photo" alt="${p.name}" />
               </div>
               <div class="player-card-body">
                 <h3 class="player-name" style="cursor:pointer;" onclick="app.openPlayerModal('${p.id}')">${p.name}</h3>
@@ -112,7 +112,10 @@ Object.assign(BHSSoccerApp.prototype, {
       position: playerData.position,
       classYear: playerData.classYear,
       height: playerData.height || "5'10\"",
-      photo: playerData.photo || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+      // Stored empty rather than defaulted to a stock photo: assigning a random
+      // stranger's face makes a player without a photo look like they have one.
+      // The roster and player modal render the silhouette placeholder instead.
+      photo: (playerData.photo || '').trim(),
       seasonStats: playerData.position.includes('Goalkeeper') ? { saves: parseInt(playerData.stat1 || 0), cleanSheets: parseInt(playerData.stat2 || 0), games: 1 } : { goals: parseInt(playerData.stat1 || 0), assists: parseInt(playerData.stat2 || 0), games: 1 },
       ratings: {
         technical: parseInt(playerData.tech || 80),

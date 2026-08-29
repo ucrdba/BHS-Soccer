@@ -695,7 +695,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     content.innerHTML = `
       <div style="text-align: center; margin-bottom: 20px;">
-        <img src="${player.photo}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--bhs-blue-electric); object-fit: cover;" />
+        <img src="${this.photoOrPlaceholder(player.photo)}" alt="${player.name}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--bhs-blue-electric); object-fit: cover;" />
         <h2 style="color: #FFF; margin-top: 10px;">#${player.number} ${player.name}</h2>
         <p class="text-cyan" style="font-weight: 600;">${player.position} • ${player.classYear}</p>
       </div>
