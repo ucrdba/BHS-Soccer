@@ -751,7 +751,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   getSchoolsList() {
     if (!this.data.schools || !Array.isArray(this.data.schools) || this.data.schools.length === 0) {
-      this.data.schools = [this.data.school || DEFAULT_BHS_DATA.school];
+      this.data.schools = this.data.school ? [this.data.school] : [];
     }
     return this.data.schools;
   },
@@ -828,7 +828,8 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   openSchoolFormModal(schoolData = null) {
-    const sData = schoolData || this.data.school || DEFAULT_BHS_DATA.school;
+    const sData = schoolData || this.data.school;
+    if (!sData) return;
     this.populateSchoolFormSelect(sData.code || sData.id);
     this.fillSchoolFormFields(sData);
 
@@ -965,7 +966,8 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   updateHeaderBranding() {
-    const school = this.data.school || DEFAULT_BHS_DATA.school;
+    const school = this.data.school;
+    if (!school) return;
     const headerSchoolName = document.querySelector('.brand-text h1');
     const headerSchoolTag = document.querySelector('.brand-text p');
     if (headerSchoolName) {

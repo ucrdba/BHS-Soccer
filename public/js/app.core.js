@@ -15,21 +15,19 @@ class BHSSoccerApp {
   }
 
   loadData() {
-    let data = DEFAULT_BHS_DATA;
-    const saved = localStorage.getItem('bhs_soccer_app_data');
-    if (saved) {
-      try { data = JSON.parse(saved); } catch (e) { data = DEFAULT_BHS_DATA; }
-    }
-    if (!data.savedPlans) data.savedPlans = DEFAULT_BHS_DATA.savedPlans;
-    if (!data.activePlanName) data.activePlanName = DEFAULT_BHS_DATA.activePlanName;
-    if (!data.coaches || !Array.isArray(data.coaches) || data.coaches.length === 0) data.coaches = DEFAULT_BHS_DATA.coaches;
-    if (!data.dailyThoughts || !Array.isArray(data.dailyThoughts) || data.dailyThoughts.length === 0) {
-      data.dailyThoughts = DEFAULT_BHS_DATA.dailyThoughts;
-    }
-    if (!data.soccerCategories || !Array.isArray(data.soccerCategories) || data.soccerCategories.length === 0) {
-      data.soccerCategories = DEFAULT_BHS_DATA.soccerCategories;
-    }
-    return data;
+    return {
+      school: null,
+      schools: [],
+      players: [],
+      schedule: [],
+      drillsBank: [],
+      currentPracticePlan: [],
+      savedPlans: [],
+      activePlanName: '',
+      coaches: [],
+      dailyThoughts: [],
+      soccerCategories: [],
+    };
   }
 
   saveData() {
