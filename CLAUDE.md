@@ -4,24 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A single-page web app for the Beaumont High School (CA) Cougars soccer program: public roster/schedule hub plus a coach-only command center (Anson Dorrance "Competitive Matrix" player ranking, practice planner, canvas tactical diagrammer, XLSX import/export). No framework — plain classes rendering HTML template strings into `#mainAppContainer`. Backend is Supabase (Postgres + Auth + RLS); the app degrades to a localStorage-only mode when Supabase is not configured.
+A single-page web app for the Beaumont High School (CA) Cougars soccer program: public roster/schedule hub plus a coach-only command center (Anson Dorrance "Competitive Matrix" player ranking, practice planner, canvas tactical diagrammer, XLSX import/export). No framework — plain classes rendering HTML template strings into `#mainAppContainer`. Backend is Supabase (Postgres + Auth + RLS), which is the source of truth: `loadData()` returns empty collections, `saveData()` is a no-op, and `syncFromSupabase()` populates app state from Postgres on boot. When Supabase is not configured, the app runs with empty data rather than falling back to localStorage.
 
 `walkthrough.md` and `implementation_plan.md` are the original product spec and verification notes. They are still broadly accurate about *features*, but predate the refactors below — do not trust them for file layout.
 
 ## Commands
 
 ```bash
-npm run dev        # vite dev server on :3000, opens browser
+npm run dev        # vite dev server, opens browser
 npm run build      # tsc (typecheck) + vite build -> dist/
 npm run typecheck  # tsc --noEmit over src/ only
+npm test           # vitest — 25 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
-powershell -File check_syntax.ps1   # node --check every js/*.js file
+powershell -File check_syntax.ps1   # node --check every public/js/*.js file
 ```
 
-There is no test framework. `check_syntax.ps1` (a parse check over the JS files the browser actually loads) plus loading the page and watching the console is the whole verification story — the manual scenarios at the bottom of `implementation_plan.md` are the acceptance criteria.
+Verification is a four-part story, and each part covers a different slice of the code:
 
-**Node version caveat:** the installed Node here is v14, but `vite@8` requires `^20.19 || >=22.12` and the `typescript@7` binary also fails to launch on v14. `npm run dev/build/typecheck` will not run until Node is upgraded. To eyeball the app without Vite, serve the repo root statically (`npx serve .`) — `index.html` needs no build step (see below).
+- `npm test` — Vitest unit tests (25 tests).
+- `npm run typecheck` — `tsc --noEmit` over `src/` **only**; it does not see `public/js/`.
+- `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
+- `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
+
+`npm run dev` serves the app correctly — do not serve the repo root statically. `index.html` loads `./src/main.ts` as an ES module (no browser executes a `.ts` file directly), and everything under `./js/*` resolves only through Vite's `publicDir` mapping to `public/js/`. Use `npm run dev` to run the app locally.
 
 ## The three parallel copies of the app — read this first
 
@@ -30,28 +36,28 @@ The same application exists three times, and only one of them actually runs:
 | Location | Status |
 | --- | --- |
 | `app.js` (6.3k lines) | Legacy monolith. **Dead** — not referenced by `index.html`. Kept only as the source the split scripts cut from. |
-| `js/*.js`, `js/views/*.js` | **What the browser actually loads.** `index.html` lists them as ordered classic `<script>` tags. |
-| `src/*.ts`, `src/views/*.ts` | In-progress TypeScript port (branch `feat/typescript`). Checked by `tsc --noEmit` only; **nothing loads it at runtime yet.** |
+| `public/js/*.js`, `public/js/views/*.js` | **What the browser actually loads**, via Vite's `publicDir` (referenced from `index.html` as `./js/*`). |
+| `src/*.ts`, `src/views/*.ts` | Real Supabase Auth, RBAC, and the Supabase client are here (`src/auth.ts`, `src/data/supabase.ts`). `src/main.ts` is the module entry point `index.html` loads (`<script type="module" src="./src/main.ts">`); it installs `window.auth`, `window.authReady`, `window.can`, and `window.supabaseService`. |
 
 Consequences worth respecting:
 
-- **A change made only in `src/` has no effect in the browser.** Until an ES-module entry point exists, a behavior fix generally has to be made in `js/`, then mirrored into `src/` if that module has already been ported.
-- `src/` is not a complete port. Still JS-only: `js/views/planner.view.js` (2.4k lines — planner, print/PDF, drills library, daily thoughts, quiz), `js/admin.js` (admin panel, diagnostics, import/export), and `supabaseClient.js`.
-- `src/app.core.ts` ends with a **"Pending migration"** `export interface BHSSoccerApp` block declaring the still-JS methods so the TS side type-checks on its own. Delete a line from it when that method lands as a real `src/` module. Same idea in `src/globals.d.ts`, which ambient-declares `window.supabaseService` (from `supabaseClient.js`) and the CDN UMD globals `XLSX` / `JSZip`.
-- `npm run build` is currently **broken as a deployment artifact**: `index.html`'s scripts are classic, not `type="module"`, so Vite passes them through untouched and copies neither `js/` nor `supabaseClient.js` into `dist/`. `dist/index.html` bundles the CSS correctly but its script `src` paths 404. Fixing this means giving `src/` a real module entry point and switching `index.html` to `<script type="module">`.
+- `src/` is not a complete port of the UI. Still JS-only: `public/js/views/planner.view.js` (2.3k+ lines — planner, print/PDF, drills library, daily thoughts, quiz, coaches view, school profile forms), and `public/js/admin.js` (admin panel, diagnostics, import/export). `auth.js` and `supabaseClient.js` are **deleted** — real auth is `src/auth.ts`, the client is `src/data/supabase.ts`.
+- `src/app.core.ts` ends with a **"Pending migration"** `export interface BHSSoccerApp` block declaring the still-JS methods so the TS side type-checks on its own. Delete a line from it when that method lands as a real `src/` module. Same idea in `src/globals.d.ts`, which ambient-declares `window.supabaseService`'s shape and the CDN UMD globals `XLSX` / `JSZip`.
+- `src/app.core.ts`, `src/data.ts`, and `src/utils.ts` are dormant — not part of the module graph `src/main.ts` builds, and not referenced by `index.html`. They still carry the pre-migration seed logic (`DEFAULT_BHS_DATA`, the localStorage read/write cycle) that `public/js/app.core.js` already had stripped out. They must be ported to match the live behavior before anything wires them into the module graph in Phase 2 — do not activate them as-is.
+- `npm run build` **works**: `tsc` typechecks `src/`, then Vite bundles `src/main.ts` and copies `public/` (including `public/js/`) into `dist/` via `publicDir`. `npm run build` is the only check that exercises real module resolution, and is mandatory before merging any change that touches imports.
 - The root `*.ps1` scripts (`split_app.ps1`, `patch_commas.ps1`, `fix_boundary.ps1`, `find_methods.ps1`) are one-off tooling from the `app.js` → `js/` split. They are not part of the build, and re-running them would overwrite hand-edits.
 
 ## Runtime architecture
 
 Everything hangs off one class, `BHSSoccerApp`, assembled across files at load time in this order:
 
-1. `js/data.js` — `DEFAULT_BHS_DATA` seed object (school, players, schedule, drillsBank, coaches, dailyThoughts, soccerCategories).
-2. `js/diagrammer.js` — the `SoccerTacticalBoard` canvas class.
-3. `js/app.core.js` — defines `BHSSoccerApp`: constructor, `init()`, `loadData()`/`saveData()`, `syncFromSupabase()`, `switchView()`/`renderCurrentView()`.
-4. `js/views/*.js`, `js/admin.js`, `js/utils.js` — each does `Object.assign(BHSSoccerApp.prototype, { ... })` to bolt methods on. **Script order in `index.html` matters**: the class must exist before any prototype extension runs.
-5. `js/utils.js` also boots the app — `initApp()` sets `window.app = new BHSSoccerApp()` on DOM ready.
+1. `public/js/data.js` — dead weight now; `loadData()` in `app.core.js` no longer references it. (The dormant `src/data.ts` still mirrors its old seed-object shape — see the Phase 2 note above.)
+2. `public/js/diagrammer.js` — the `SoccerTacticalBoard` canvas class.
+3. `public/js/app.core.js` — defines `BHSSoccerApp`: constructor, `init()`, `loadData()`/`saveData()`, `syncFromSupabase()`, `switchView()`/`renderCurrentView()`.
+4. `public/js/views/*.js`, `public/js/admin.js`, `public/js/utils.js` — each does `Object.assign(BHSSoccerApp.prototype, { ... })` to bolt methods on. **Script order in `index.html` matters**: the class must exist before any prototype extension runs.
+5. `public/js/utils.js` also boots the app — `initApp()` sets `window.app = new BHSSoccerApp()` on DOM ready, after awaiting `window.authReady` from `src/main.ts`.
 
-The TypeScript port mirrors this exactly: `src/app.core.ts` exports the class, and each view module pairs its `Object.assign(BHSSoccerApp.prototype, {...})` with a `declare module '../app.core' { interface BHSSoccerApp { ... } }` augmentation. When adding a method to a ported module, add both the implementation and the interface signature, and type the receiver as `methodName(this: BHSSoccerApp)`.
+The dormant `src/app.core.ts` mirrors the pre-migration shape of this file (see the Phase 2 note above) but is not part of the live module graph; `src/main.ts` is the actual TypeScript entry point, and it only wires up auth (`src/auth.ts`), RBAC (`src/auth/permissions.ts`), and the Supabase client (`src/data/supabase.ts`) as globals for `public/js/` to consume.
 
 **Views are wired to the DOM through the global `app` plus inline handlers.** `index.html` (1.2k lines of markup and modals) is full of `onclick="app.openPlayerModal(...)"`, and the rendered template strings contain more of the same. Renaming a prototype method means grepping `index.html` and every view's template strings; nothing checks that boundary.
 
@@ -59,15 +65,15 @@ The TypeScript port mirrors this exactly: `src/app.core.ts` exports the class, a
 
 ### Data flow
 
-`DEFAULT_BHS_DATA` → `localStorage['bhs_soccer_app_data']` (loaded in the constructor, written back by `saveData()` after every mutation) → optionally overwritten by `syncFromSupabase()` during `init()` when `window.supabaseService.isConfigured()`.
+Postgres is the source of truth. `loadData()` in `app.core.js` returns empty collections (no seed object, no `localStorage` read); `saveData()` is an intentional no-op — every mutation already writes through `window.supabaseService`, and a reload repopulates state. `syncFromSupabase()` populates `this.data` from Postgres during `init()` when `window.supabaseService.isConfigured()`.
 
-Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `diagram_data`); app state is **camelCase**. There is no ORM — every field is hand-mapped, on read in `syncFromSupabase()` and on write in each `upsert*` method of `supabaseClient.js`. Adding a column means editing both sides. Soft deletes are a repo-wide convention: rows carry `is_deleted` and readers filter on it.
+Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `diagram_data`); app state is **camelCase**. There is no ORM — every field is hand-mapped, on read in `syncFromSupabase()` and on write in each `upsert*` method of `src/data/supabase.ts`. Adding a column means editing both sides. Soft deletes are a repo-wide convention: rows carry `is_deleted` and readers filter on it.
 
-`supabaseClient.js` exposes a single `SupabaseService` instance as `window.supabaseService`. Credentials resolve in order: `window.ENV_SUPABASE_URL` / `ENV_SUPABASE_ANON_KEY` → `localStorage['bhs_supabase_url' / 'bhs_supabase_anon_key']` (settable at runtime from the admin panel via `setCredentials`) → a hardcoded project URL and anon key in the file. If none produce a valid client, every service method returns `null` and callers silently fall back to localStorage data — so "nothing loaded from the DB" is usually an unconfigured client, not a query bug.
+`src/data/supabase.ts` exports a single `SupabaseService` instance that `src/main.ts` assigns to `window.supabaseService`. Credentials resolve in order: `window.ENV_SUPABASE_URL` / `ENV_SUPABASE_ANON_KEY` → `localStorage['bhs_supabase_url' / 'bhs_supabase_anon_key']` (settable at runtime from the admin panel via `setCredentials`) → a hardcoded project URL and anon key in the file. If none produce a valid client, every service method returns `null` — so "nothing loaded from the DB" is usually an unconfigured client, not a query bug.
 
 ### Auth & RBAC
 
-`auth.js` / `src/auth.ts` export a singleton `AuthManager` (`auth`) over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. Roles: `guest` / `player` / `coach` / `admin`. The guards used throughout the views — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; signup lands in a pending-approval state that a coach or admin clears via `approveProfile`/`rejectProfile`. `auth.subscribe()` re-renders the current view on any auth change.
+`src/auth.ts` exports a singleton `AuthManager` (`auth`) over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. `src/main.ts` assigns it to `window.auth` and exposes `window.authReady` (a promise `app.core.js` awaits before rendering) and `window.can` (RBAC helper from `src/auth/permissions.ts`). Roles: `guest` / `player` / `coach` / `admin`. The guards used throughout the views — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; signup lands in a pending-approval state that a coach or admin clears via `approveProfile`/`rejectProfile`. `auth.subscribe()` re-renders the current view on any auth change.
 
 These client-side guards are UI affordances only. **Real enforcement lives in the RLS policies** in `supabase_migration_auth.sql`; a new privileged operation needs a policy there, not just an `isCoach()` check.
 
@@ -88,7 +94,7 @@ Prefer adding a new dated migration file over editing an already-applied script.
 
 ### Import/export
 
-`js/admin.js` implements an 11-table XLSX import/export engine on the CDN globals `XLSX` (SheetJS) and `JSZip` — single workbook, per-table files, or a zipped package. `Resouces/CSV/` (note the spelling) holds reference exports and templates matching those table shapes.
+`public/js/admin.js` implements an 11-table XLSX import/export engine on the CDN globals `XLSX` (SheetJS) and `JSZip` — single workbook, per-table files, or a zipped package. `Resouces/CSV/` (note the spelling) holds reference exports and templates matching those table shapes.
 
 ## Conventions
 

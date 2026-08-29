@@ -1,15 +1,15 @@
 $files = @(
-    'js\data.js',
-    'js\diagrammer.js',
-    'js\app.core.js',
-    'js\views\home.view.js',
-    'js\views\roster.view.js',
-    'js\views\schedule.view.js',
-    'js\views\matrix.view.js',
-    'js\views\planner.view.js',
-    'js\views\coaches.view.js',
-    'js\admin.js',
-    'js\utils.js'
+    'public\js\data.js',
+    'public\js\diagrammer.js',
+    'public\js\app.core.js',
+    'public\js\views\home.view.js',
+    'public\js\views\roster.view.js',
+    'public\js\views\schedule.view.js',
+    'public\js\views\matrix.view.js',
+    'public\js\views\planner.view.js',
+    'public\js\views\coaches.view.js',
+    'public\js\admin.js',
+    'public\js\utils.js'
 )
 
 $allOk = $true
