@@ -71,11 +71,20 @@ class BHSSoccerApp {
    * photo — clearing a field requires writing an explicit empty value some
    * other way, not omitting the column.
    *
+   * When a matched record's existing value and the incoming value are both
+   * plain objects (e.g. `seasonStats`), they are merged key-by-key rather than
+   * replaced wholesale: incoming keys overwrite (unless blank), but stored keys
+   * the sheet doesn't mention survive. That's what lets a `Name + Goals` sheet
+   * update `goals` on a matched player without wiping `seasonStats.games`.
+   * Arrays and non-plain values still replace wholesale.
+   *
    * Returns the records to persist, plus counts for the status line.
    */
   upsertByKey(collection, incoming, keyOf, defaults) {
     const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
     const blank = (v) => v == null || (typeof v === 'string' && v.trim() === '');
+    const isPlainObject = (v) =>
+      v != null && typeof v === 'object' && !Array.isArray(v);
     const keyFor = (rec) => {
       const k = keyOf(rec);
       return Array.isArray(k) ? k.map(norm).join('|') : norm(k);
@@ -83,7 +92,13 @@ class BHSSoccerApp {
     const applyDefaults = (row) => {
       if (defaults) {
         for (const [prop, v] of Object.entries(defaults)) {
-          if (row[prop] === undefined) row[prop] = v;
+          if (row[prop] === undefined) {
+            // Clone plain-object/array defaults so every inserted row gets its
+            // own copy — otherwise every record inserted in one import shares
+            // the same object reference, and one in-place edit silently
+            // changes several records at once.
+            row[prop] = (v != null && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
+          }
         }
       }
       return row;
@@ -121,7 +136,18 @@ class BHSSoccerApp {
       const target = collection[idx];
       for (const [prop, v] of Object.entries(row)) {
         if (prop === 'id' || blank(v)) continue;   // never let an import rewrite the id
-        target[prop] = v;
+        if (isPlainObject(v) && isPlainObject(target[prop])) {
+          // Merge one level deep so stored keys the sheet doesn't mention
+          // (e.g. seasonStats.games) survive instead of being wiped by a
+          // wholesale replacement.
+          const merged = { ...target[prop] };
+          for (const [k, mv] of Object.entries(v)) {
+            if (!blank(mv)) merged[k] = mv;
+          }
+          target[prop] = merged;
+        } else {
+          target[prop] = v;
+        }
       }
       toPersist.push(target);
       updated++;

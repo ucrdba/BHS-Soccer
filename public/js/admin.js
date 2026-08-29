@@ -1184,26 +1184,34 @@ Object.assign(BHSSoccerApp.prototype, {
               isDeleted: false, is_deleted: false
             };
             const imported = rows.filter(r => r.Name).map(r => {
-              const isGoalkeeper = toStr(r.Position).includes('Goalkeeper');
-              const statSupplied = opt(r.Goals) !== undefined || opt(r.Assists) !== undefined
-                || opt(r.Saves) !== undefined || opt(r.CleanSheets) !== undefined;
-              const ratingSupplied = opt(r.Tech) !== undefined || opt(r.Tactical) !== undefined
-                || opt(r.Physical) !== undefined || opt(r.Mental) !== undefined;
+              // Build seasonStats/ratings from whichever columns the sheet
+              // actually supplied — not from a shape chosen by the sheet's
+              // Position column, which only reads the sheet and never the
+              // stored record. upsertByKey's deep merge (app.core.js) then
+              // folds these into the existing object one key at a time, so a
+              // partial sheet can't clobber stats it didn't mention.
+              const stats = {};
+              if (optI(r.Goals)       !== undefined) stats.goals       = optI(r.Goals);
+              if (optI(r.Assists)     !== undefined) stats.assists     = optI(r.Assists);
+              if (optI(r.Saves)       !== undefined) stats.saves       = optI(r.Saves);
+              if (optI(r.CleanSheets) !== undefined) stats.cleanSheets = optI(r.CleanSheets);
+              const seasonStats = Object.keys(stats).length ? stats : undefined;
+
+              const ratings = {};
+              if (optI(r.Tech)     !== undefined) ratings.technical = optI(r.Tech);
+              if (optI(r.Tactical) !== undefined) ratings.tactical  = optI(r.Tactical);
+              if (optI(r.Physical) !== undefined) ratings.physical  = optI(r.Physical);
+              if (optI(r.Mental)   !== undefined) ratings.mental    = optI(r.Mental);
+              const ratingsOut = Object.keys(ratings).length ? ratings : undefined;
+
               return {
                 id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
                 number: optI(r.Number),
                 name: toStr(r.Name), position: opt(r.Position),
                 classYear: opt(r.Class || r.ClassYear), height: opt(r.Height),
                 photo: opt(r.Photo || r.PhotoUrl),
-                // Omit `games` entirely when built here rather than resetting it to 1.
-                seasonStats: statSupplied
-                  ? (isGoalkeeper
-                    ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0 }
-                    : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0 })
-                  : undefined,
-                ratings: ratingSupplied
-                  ? { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 }
-                  : undefined,
+                seasonStats,
+                ratings: ratingsOut,
                 // matrixStats intentionally not set here: that legacy shape
                 // ({wins,losses,points,rank,drillScore}) is unused by Phase 3 and
                 // clobbers the derived standings syncFromSupabase joins onto the player.
@@ -1218,13 +1226,17 @@ Object.assign(BHSSoccerApp.prototype, {
             }
           } else if (activeTarget === 'schedule') {
             const scheduleDefaults = {
-              time: '6:00 PM', location: 'Home - Cougar Stadium', isHome: true,
+              location: 'Home - Cougar Stadium', isHome: true,
               status: 'UPCOMING', score: null, isDeleted: false, is_deleted: false
             };
             const imported = rows.filter(r => r.Opponent).map(r => ({
               id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               date: toStr(r.Date).toUpperCase(),
-              time: opt(r.Time),
+              // `time` is part of the [date, time] composite key upsertByDateTime
+              // keys on, so it must be defaulted here, before the key is
+              // computed — not in `defaults`, which is only applied after a row
+              // is determined to be a new insert.
+              time: toStr(r.Time) || '6:00 PM',
               opponent: toStr(r.Opponent),
               location: opt(r.Location),
               isHome: opt(r.Home) !== undefined ? (opt(r.Home).toLowerCase() !== 'away') : undefined,
