@@ -371,6 +371,11 @@ Place this after the players block, before the closing of the `try`:
       // the player. Left-join them on: a player with no logged results produces
       // no standings row, and must still appear on the leaderboard as 0/0/0
       // rather than disappearing from it.
+      //
+      // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
+      // players mapping above (app.core.js:234). Leave that line alone — the
+      // column is still read by the roster export — this simply overwrites the
+      // in-memory value with the derived one.
       const dbStandings = await window.supabaseService.fetchMatrixStandings('bhs');
       const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
       const unrankedFrom = (dbStandings || []).length + 1;
@@ -438,12 +443,26 @@ Games-played is what makes the percentage interpretable: 100% from one match is 
 Replace the `.sort(...).map(...)` block (currently lines 41-60) with:
 
 ```js
-                ${(this.data.players || [])
+                ${(() => {
+                  // Hoisted: computing this inside the map would rescan every
+                  // player for every row.
+                  const leaderPts = Math.max(1, ...(this.data.players || []).map(x => x.matrixStats?.points || 0));
+                  return (this.data.players || [])
                   .filter(p => !p.is_deleted && !p.isDeleted)
                   .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
                   .map(p => {
-                    const m = p.matrixStats || { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: 999 };
-                    const leaderPts = Math.max(1, ...(this.data.players || []).map(x => x.matrixStats?.points || 0));
+                    // Per-key defaults, not `p.matrixStats || {...}`. A player added
+                    // through the UI before the next sync carries the OLD shape
+                    // ({wins, losses, points, rank, drillScore}) with no games,
+                    // draws or winPct — an object-level fallback would not fire and
+                    // the row would render `undefined`.
+                    const ms = p.matrixStats || {};
+                    const m = {
+                      wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
+                      games: ms.games || 0, points: ms.points || 0,
+                      winPct: (ms.winPct === undefined ? null : ms.winPct),
+                      rank: ms.rank || 999
+                    };
                     const barPct = Math.round((m.points / leaderPts) * 100);
                     return `
                   <tr>
@@ -463,7 +482,8 @@ Replace the `.sort(...).map(...)` block (currently lines 41-60) with:
                       </div>
                     </td>
                   </tr>`;
-                  }).join('')}
+                  }).join('');
+                })()}
 ```
 
 The bar now shows points relative to the leader rather than the removed `drillScore`. A player with no games shows `—`, not `0.0%`.
