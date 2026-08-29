@@ -113,13 +113,6 @@ Object.assign(BHSSoccerApp.prototype, {
     const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
     const pending = this._pendingApprovals || [];
 
-    const sampleUsers = [
-      { id: 'user_coach_bob', name: 'Coach Bob', role: 'Coach', icon: '👔', desc: 'Head Coach: full practice planning, match crud, roster & ratings' },
-      { id: 'user_admin_sam', name: 'Admin Sam', role: 'Admin', icon: '⚡', desc: 'Athletic Director: full system & administrative control' },
-      { id: 'user_player_alex', name: 'Alex Rivera (#10)', role: 'Player', icon: '⚽', desc: 'Varsity Player: roster viewing, schedule & ratings matrix' },
-      { id: 'user_guest', name: 'Public Visitor', role: 'Guest', icon: '👤', desc: 'Fan / Public: public matches, schedule & basic team bios' }
-    ];
-
     const container = document.getElementById('adminModalContent');
     if (!container) return;
 
@@ -136,27 +129,17 @@ Object.assign(BHSSoccerApp.prototype, {
         ${!isGuest ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="app.handleSignOut()">🚪 Sign Out</button>` : `<span class="badge badge-gold">PUBLIC ACCESS</span>`}
       </div>
 
-      <!-- Section 1: Active User Role Switcher -->
+      <!-- Section 1: Active User Account -->
       <details class="admin-accordion">
         <summary class="admin-accordion-summary">
-          <span>🔑 ACTIVE USER ACCOUNT &amp; ROLE SWITCHER</span>
+          <span>🔑 ACTIVE USER ACCOUNT</span>
           <span class="badge badge-gold">${currentUser.name} (${currentUser.role.toUpperCase()})</span>
         </summary>
         <div class="admin-accordion-content">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            ${sampleUsers.map(u => {
-              const isActive = currentUser && currentUser.id === u.id;
-              return `
-                <div onclick="app.switchUserRole('${u.id}')" style="cursor: pointer; background: ${isActive ? 'rgba(0, 71, 171, 0.35)' : 'rgba(0, 0, 0, 0.25)'}; border: ${isActive ? '2px solid var(--bhs-gold-accent)' : '1px solid var(--bhs-navy-border)'}; border-radius: 8px; padding: 12px; transition: all 0.2s ease;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <strong style="color: #FFF; font-size: 0.95rem;">${u.icon} ${u.name}</strong>
-                    ${isActive ? `<span class="badge badge-gold">ACTIVE</span>` : `<span class="badge badge-secondary" style="font-size:0.7rem;">SWITCH</span>`}
-                  </div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">${u.desc}</div>
-                </div>
-              `;
-            }).join('')}
-          </div>
+          <p class="text-muted" style="font-size: 0.85rem; margin: 0;">
+            Signed in as <strong style="color:#FFF;">${currentUser.email}</strong>.
+            Roles are assigned by an administrator and cannot be changed from this panel.
+          </p>
         </div>
       </details>
 
@@ -363,74 +346,6 @@ Object.assign(BHSSoccerApp.prototype, {
         </details>
       ` : ''}
     `;
-  },
-
-  async runAuthDiagnosticTest() {
-    let report = [];
-
-    // Test 1: Auth Engine
-    if (window.auth) {
-      report.push('✅ 1. AuthManager Engine: Active & Operational');
-    } else {
-      report.push('❌ 1. AuthManager Engine: Missing');
-    }
-
-    // Test 2: User Registration & OTP Generation
-    const testEmail = `test_coach_${Date.now().toString().slice(-4)}@beaumont.edu`;
-    const regRes = window.auth.registerUser({
-      name: 'Diagnostic Coach',
-      email: testEmail,
-      password: 'TestPassword123!',
-      role: 'coach'
-    });
-
-    if (regRes.success && regRes.requiresVerification) {
-      report.push(`✅ 2. Registration Flow: Account created (${testEmail}). OTP Code generated: ${regRes.otpCode}. Status: pending_verification`);
-
-      // Test 3: OTP Code Verification
-      const verifyRes = window.auth.verifyUserOtp(testEmail, regRes.otpCode);
-      if (verifyRes.success && verifyRes.status === 'pending_approval') {
-        report.push(`✅ 3. OTP Verification: Code verified. Account status moved to: pending_approval`);
-
-        // Test 4: Coach Approval Queue
-        const pending = window.auth.getPendingApprovals();
-        const found = pending.find(u => u.email === testEmail);
-        if (found) {
-          report.push(`✅ 4. Coach Approval Queue: Request found in pending queue.`);
-
-          // Test 5: Approval Execution
-          const approveOk = window.auth.approveUserAccess(found.id);
-          if (approveOk) {
-            report.push(`✅ 5. Access Approval: Coach Bob approved request. User account status: ACTIVE.`);
-
-            // Test 6: User Login
-            const loginRes = window.auth.loginUser(testEmail, 'TestPassword123!');
-            if (loginRes.success && loginRes.user.status === 'active') {
-              report.push(`✅ 6. Login Check: User successfully signed in. Role: ${loginRes.user.role.toUpperCase()}`);
-            } else {
-              report.push(`❌ 6. Login Check failed.`);
-            }
-          } else {
-            report.push(`❌ 5. Access Approval failed.`);
-          }
-        } else {
-          report.push(`❌ 4. Coach Approval Queue check failed.`);
-        }
-      } else {
-        report.push(`❌ 3. OTP Verification failed.`);
-      }
-    } else {
-      report.push(`❌ 2. Registration Flow failed.`);
-    }
-
-    // Test 7: Supabase Integration Check
-    if (window.supabaseService && window.supabaseService.isConfigured()) {
-      report.push('⚡ 7. Supabase Cloud Connection: Connected & Active.');
-    } else {
-      report.push('📦 7. Supabase Cloud Connection: Operating in Local Fallback Mode (LocalStorage).');
-    }
-
-    alert('🧪 AUTHENTICATION & APPROVAL DIAGNOSTIC TEST RESULTS:\n\n' + report.join('\n\n'));
   },
 
   saveSupabaseCredentials(url, key) {
@@ -746,12 +661,6 @@ Object.assign(BHSSoccerApp.prototype, {
     } else {
       alert(`📦 School Profile saved for "${name} ${mascot}" in LocalStorage!`);
     }
-  },
-
-  switchUserRole(userId) {
-    window.auth.switchRole(userId);
-    this.renderAdminModalContent();
-    this.renderCurrentView();
   },
 
   async openAdminModal() {

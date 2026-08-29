@@ -126,14 +126,8 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   attachDynamicListeners() {
-    // Role switcher choices inside modal
-    document.querySelectorAll('.role-switch-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const userId = card.getAttribute('data-userid');
-        window.auth.switchRole(userId);
-        this.closeModals();
-      });
-    });
+    // No dynamic listeners at present. Retained because renderCurrentView()
+    // calls this after every view swap.
   },
 
   parseMatchDateTime(dateStr, timeStr) {
