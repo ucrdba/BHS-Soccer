@@ -1183,9 +1183,11 @@ Every call site was made await-ready in the previous four tasks, so this is a fl
 import { supabaseService } from './data/supabase';
 import { auth } from './auth';
 
+// src/globals.d.ts ALREADY declares `Window.supabaseService`. Re-declaring it
+// here is a TS2717 duplicate-property conflict, not a redundancy the compiler
+// tolerates — Task 7 hit exactly this. Declare only the globals this file adds.
 declare global {
   interface Window {
-    supabaseService?: typeof supabaseService;
     auth: typeof auth;
     authReady: Promise<void>;
   }
