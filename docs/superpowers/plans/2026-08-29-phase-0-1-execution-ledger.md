@@ -784,3 +784,16 @@ happened — that is unfinished plan work, not a deferral.
  CLOSED: the Task 1 dist carry-forward was re-verified — dist/index.html has no dangling script
  references.
 Final fix wave: ONE dispatch, all items. Then exactly one scoped re-review.
+
+=== POST-MERGE: RLS MIGRATION APPLIED AND VERIFIED (2026-08-29) ===
+The human applied supabase/migrations/0001_tighten_profiles_select.sql via the Supabase SQL
+editor. Controller verified against the live database:
+  BEFORE (baseline probe): anonymous read of public.profiles returned 2 rows, exposing id, role,
+    status and email for every user of the site.
+  AFTER: returns [] — 0 rows visible to anon.
+  REGRESSION CHECK: all eight anon-readable tables unchanged from baseline — players 7,
+    schedule 6, drills_bank 10, soccer_categories 25, coaches 2, practice_plans 27, schools 7,
+    roles 4. Nothing over-tightened.
+Task 14's outstanding human step is therefore CLOSED. The remaining unverified items are the
+browser checks: sign-in against the live database, wrong-password rejection, the guest path, the
+empty daily_thoughts state, and the offline path.
