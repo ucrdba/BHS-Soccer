@@ -4,6 +4,13 @@
 
 Object.assign(BHSSoccerApp.prototype, {
 
+  async handleSignOut() {
+    await window.auth.logout();
+    this.updateAuthUI();
+    this.renderCurrentView();
+    this.closeModals();
+  },
+
   renderPlayerAccountModalContent() {
     const currentUser = window.auth.getCurrentUser();
     const container = document.getElementById('adminModalContent');
@@ -85,7 +92,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
       <!-- Action Buttons -->
       <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--bhs-navy-border); padding-top: 16px;">
-        <button class="btn btn-secondary" onclick="window.auth.logout(); app.updateAuthUI(); app.renderCurrentView(); app.closeModals();">🚪 Sign Out</button>
+        <button class="btn btn-secondary" onclick="app.handleSignOut()">🚪 Sign Out</button>
         <button class="btn btn-gold" onclick="app.closeModals(); app.switchView('roster');">👥 View Team Roster</button>
       </div>
     `;
@@ -126,7 +133,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <div style="font-size: 0.75rem; color: var(--text-muted);">${currentUser.email || 'Team Account'} &bull; <span style="color: var(--bhs-gold-accent); text-transform: uppercase; font-weight: 700;">${currentUser.role}</span></div>
           </div>
         </div>
-        ${!isGuest ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.auth.logout(); app.updateAuthUI(); app.renderCurrentView(); app.closeModals();">🚪 Sign Out</button>` : `<span class="badge badge-gold">PUBLIC ACCESS</span>`}
+        ${!isGuest ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="app.handleSignOut()">🚪 Sign Out</button>` : `<span class="badge badge-gold">PUBLIC ACCESS</span>`}
       </div>
 
       <!-- Section 1: Active User Role Switcher -->
