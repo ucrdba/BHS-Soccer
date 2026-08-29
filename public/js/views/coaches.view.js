@@ -153,7 +153,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (ok) {
       this.updateAuthUI();
       this.renderCurrentView();
-      this.renderAdminModalContent();
+      await this.openAdminModal();
       alert('🎉 User access approved successfully!');
     }
   },
@@ -161,7 +161,7 @@ Object.assign(BHSSoccerApp.prototype, {
   async rejectUserAccess(userId) {
     const ok = await window.auth.rejectUserAccess(userId);
     if (ok) {
-      this.renderAdminModalContent();
+      await this.openAdminModal();
       alert('User request rejected.');
     }
   }
