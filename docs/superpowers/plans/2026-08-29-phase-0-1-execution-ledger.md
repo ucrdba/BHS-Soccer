@@ -867,3 +867,46 @@ could not have existed under the fake auth, which ignored the password field ent
 ALSO: Supabase's built-in email sender rate-limits password recovery after a few sends, and the
 app surfaces the raw provider error to the user. Real auth brings real failure modes that need
 real handling.
+
+=== POST-PLAN WORK (same session, outside the Phase 0-1 plan) ===
+Feature work done after the plan completed, at the human's request:
+  - Player and coach photo placeholders. Roster card and player modal previously rendered a bare
+    <img src> with no fallback, so a player without a photo showed a broken-image icon; all 12
+    players had an empty photo_url. Artwork supplied by the human (assets/profile.png), processed
+    to public/img/{player,coach}-placeholder.png — trimmed, squared, 192px, recoloured for the
+    dark card theme (players: royal-blue ground with silver figure; coaches: navy ground with
+    gold figure, matching their gold card border). 758 KB -> ~23 KB each.
+    Placed under public/ deliberately: Vite only emits assets referenced from index.html, so a
+    runtime path under assets/ resolves in dev and 404s in a production build. Verified both.
+  - Removed the Unsplash stock-photo defaults from the add-player, add-coach and edit-coach
+    forms AND from the players import path. These were not cosmetic: both live coaches had the
+    stock URL saved in photo_url, so the app had been storing a stranger's face as their photo.
+  - Import/export UI: the "Import Data" card stacked two sets of identically-labelled controls —
+    template-download buttons and the import-target dropdown — under one heading. Added explicit
+    Step 1 / Step 2 headings after the human hit exactly this confusion.
+  - Import now UPSERTS instead of always appending. Every branch generated a fresh id per row and
+    pushed, so the Supabase helpers (which only send an id when it is a real UUID) always
+    inserted; re-importing a file duplicated every record. Added upsertByKey(collection,
+    incoming, keyOf) with upsertByName and upsertByDateTime wrappers. Matching is normalised per
+    key part (trimmed, case-insensitive). On a match the EXISTING id is kept, which is what makes
+    the write an update. Only columns the file actually supplied are written, so a sheet of just
+    Name + Goals updates scores without clearing positions, ratings or photos.
+    Applied to: players, coaches, drills, profiles (name) and schedule (date + time).
+    Categories already upserted by name.
+    22 behavioural checks written and passing across the two helpers.
+
+OUTSTANDING — the human said they will come back to these:
+  - PLAN import still appends. Needs a composite key: plan-name + drill-name, and possibly the
+    time slot too, since the same drill can legitimately appear twice in one practice plan.
+  - THOUGHTS import still appends. No natural key exists. Candidates are the thought text itself
+    (fragile — fixing a typo would create a new record) or coach + date. Needs a decision.
+  Both are a two-line change now that upsertByKey takes a key function.
+
+  ALSO OUTSTANDING, flagged to the human, not actioned (a data change in their database):
+  - Both live coaches still have the Unsplash stock URL saved in coaches.photo_url, so the
+    Coaches view will keep showing a stranger until those rows are cleared:
+      update public.coaches set photo_url = ''
+       where photo_url like 'https://images.unsplash.com/%';
+  - Date-format caution: existing schedule rows hold whatever format Postgres has. If the
+    spreadsheet writes dates differently (2026-09-05 vs SEP 5) the upsert will not match and will
+    insert duplicates. Export the schedule and re-import it unchanged first to confirm.
