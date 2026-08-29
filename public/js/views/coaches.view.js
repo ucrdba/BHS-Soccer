@@ -83,7 +83,7 @@ Object.assign(BHSSoccerApp.prototype, {
       alert(`🎉 Welcome back, ${res.user.name}!`);
     } else {
       if (res.isPendingVerification) {
-        this.openVerifyTab(res.user.email, res.user.verificationCode);
+        this.openVerifyTab(res.user.email);
       } else if (feedback) {
         feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
       }
@@ -100,7 +100,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const res = await window.auth.registerUser({ name, email, password, role });
     if (res.success) {
       if (res.requiresVerification) {
-        this.openVerifyTab(email, res.otpCode);
+        this.openVerifyTab(email);
       } else {
         this.updateAuthUI();
         this.renderCurrentView();
@@ -114,14 +114,14 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  openVerifyTab(email, otpCode) {
+  openVerifyTab(email) {
     this.switchAuthTab('verify');
     this.pendingVerifyEmail = email;
     const targetEl = document.getElementById('verifyTargetEmail');
     const bannerEl = document.getElementById('simulatedCodeBanner');
     if (targetEl) targetEl.textContent = email;
-    if (bannerEl && otpCode) {
-      bannerEl.innerHTML = `⚡ DEMO VERIFICATION OTP CODE: <span style="font-size:1.1rem; letter-spacing:2px;">${otpCode}</span> (or enter 123456)`;
+    if (bannerEl) {
+      bannerEl.textContent = 'We emailed you a 6-digit verification code. Enter it below.';
     }
   },
 

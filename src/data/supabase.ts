@@ -17,9 +17,23 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
+// `initSupabaseClient()` runs at module-evaluation time. Once `window.auth`
+// and `window.authReady` come from this module graph, a `localStorage` read
+// that throws (blocked site data — sandboxed iframe, browser privacy
+// settings) would abort module evaluation entirely and leave every global
+// this graph assigns unset. Guard the read so a blocked storage API degrades
+// to "no cloud DB", not "no app".
+function readStoredCredential(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 function getSupabaseUrl(): string {
   return (window as any).ENV_SUPABASE_URL
-    || localStorage.getItem('bhs_supabase_url')
+    || readStoredCredential('bhs_supabase_url')
     || 'https://arsigevpgpbqluqbnhjr.supabase.co';
 }
 
@@ -31,7 +45,7 @@ function getSupabaseUrl(): string {
 // Value copied verbatim from getSupabaseAnonKey() in supabaseClient.js.
 function getSupabaseAnonKey(): string {
   return (window as any).ENV_SUPABASE_ANON_KEY
-    || localStorage.getItem('bhs_supabase_anon_key')
+    || readStoredCredential('bhs_supabase_anon_key')
     || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw';
 }
 

@@ -37,6 +37,8 @@ class BHSSoccerApp {
   }
 
   async init() {
+    await window.authReady;
+
     window.auth.subscribe(() => {
       this.updateAuthUI();
       this.renderCurrentView();
