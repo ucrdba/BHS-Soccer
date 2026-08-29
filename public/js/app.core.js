@@ -53,11 +53,6 @@ class BHSSoccerApp {
   }
 
   /**
-   * A player's photo, or the silhouette placeholder when none is set.
-   * Treats null, undefined and whitespace-only strings alike — imports and
-   * manual edits all leave photo_url as an empty string rather than null.
-   */
-  /**
    * Merge imported rows into a collection, keyed on name, so re-importing the
    * same file updates records instead of duplicating them.
    *
@@ -125,6 +120,11 @@ class BHSSoccerApp {
     return this.upsertByKey(collection, incoming, (r) => (r ? [r.date, r.time] : ['', '']));
   }
 
+  /**
+   * A player's photo, or the silhouette placeholder when none is set.
+   * Treats null, undefined and whitespace-only strings alike — imports and
+   * manual edits all leave photo_url as an empty string rather than null.
+   */
   photoOrPlaceholder(url, kind = 'player') {
     if (url && String(url).trim()) return url;
     return kind === 'coach' ? COACH_SILHOUETTE : PLAYER_SILHOUETTE;
