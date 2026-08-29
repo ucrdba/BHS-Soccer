@@ -1045,6 +1045,21 @@ class SupabaseService {
     return attemptData ? attemptData[0] : null;
   }
 
+  async fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client!.from('roles').select('name,permissions');
+      if (error) {
+        console.warn('Supabase fetchRoles notice:', error.message);
+        return null;
+      }
+      return data;
+    } catch (e) {
+      console.warn('Supabase fetchRoles exception:', e);
+      return null;
+    }
+  }
+
   async fetchQuizResults(): Promise<any> {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!

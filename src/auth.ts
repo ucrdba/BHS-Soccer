@@ -8,7 +8,6 @@ import type {
   AppUser, UserRole,
   LoginResult, RegisterResult, OtpVerifyResult
 } from './types';
-import './globals';
 
 const ROLES = {
   GUEST: 'guest' as UserRole,

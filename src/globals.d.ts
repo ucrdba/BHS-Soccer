@@ -50,6 +50,7 @@ declare global {
     approveProfile(userId: string): Promise<Record<string, any> | null>;
     rejectProfile(userId: string): Promise<Record<string, any> | null>;
     fetchPendingApprovals(schoolCode?: string): Promise<Record<string, any>[] | null>;
+    fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
   }
 
   interface Window {
