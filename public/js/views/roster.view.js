@@ -127,7 +127,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   filterRoster(filter) {
     // Update active chip styling
-    document.querySelectorAll('.filter-chip').forEach(chip => {
+    document.querySelectorAll('.filter-chip[data-filter]').forEach(chip => {
       chip.classList.toggle('active', chip.getAttribute('data-filter') === filter);
     });
 

@@ -1082,6 +1082,11 @@ Object.assign(BHSSoccerApp.prototype, {
     reader.onload = async (e) => {
       try {
         const toStr = (v) => String(v ?? '').trim();
+        // undefined (not '' or 0) when the sheet has no such column, so upsertByKey's
+        // blank-skip can distinguish "not supplied" from "supplied as empty".
+        const opt = (v) => { const s = (v == null ? '' : String(v)).trim(); return s === '' ? undefined : s; };
+        const optI = (v) => { const s = opt(v); return s === undefined ? undefined : (parseInt(s, 10) || 0); };
+        const optB = (v) => { const s = opt(v); return s === undefined ? undefined : s.toLowerCase() === 'true'; };
         let totalCount = 0;
         let totalUpdated = 0, totalInserted = 0;
 
@@ -1105,6 +1110,20 @@ Object.assign(BHSSoccerApp.prototype, {
           wb.SheetNames.forEach(sName => {
             workbookSheets[sName] = XLSX.utils.sheet_to_json(wb.Sheets[sName], { defval: '' });
           });
+        }
+
+        // Re-read from Postgres before merging. this.data may already be stale
+        // (another user's edit, or a manual change in the SQL editor) before this
+        // import ever touches it, and a stale copy is exactly what lets a blank
+        // sheet column preserve a stale value and write it straight back. This
+        // protects the merge about to happen; the post-write sync below protects
+        // only the *next* import.
+        if (window.supabaseService?.isConfigured()) {
+          try {
+            await this.syncFromSupabase();
+          } catch (syncErr) {
+            console.warn('Pre-import re-sync notice:', syncErr);
+          }
         }
 
         const sheetsToProcess = target === 'all'
@@ -1158,54 +1177,79 @@ Object.assign(BHSSoccerApp.prototype, {
             const resU = this.upsertByName(this.data.userProfiles, imported);
             totalCount += imported.length; totalUpdated += resU.updated; totalInserted += resU.inserted;
           } else if (activeTarget === 'players') {
-            const imported = rows.filter(r => r.Name).map(r => ({
-              id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-              number: parseInt(r.Number) || 0,
-              name: toStr(r.Name), position: toStr(r.Position) || 'Midfielder',
-              classYear: toStr(r.Class || r.ClassYear) || 'Junior', height: toStr(r.Height) || "5'10\"",
-              photo: toStr(r.Photo || r.PhotoUrl),
-              seasonStats: toStr(r.Position).includes('Goalkeeper')
-                ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
-                : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
-              ratings: { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 },
-              matrixStats: { wins: 0, losses: 0, points: 0, rank: 99, drillScore: 0 },
-              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
-              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
-            }));
-            const resP = this.upsertByName(this.data.players, imported);
+            const playerDefaults = {
+              number: 0, position: 'Midfielder', classYear: 'Junior', height: "5'10\"",
+              ratings: { technical: 80, tactical: 80, physical: 80, mental: 80 },
+              seasonStats: { goals: 0, assists: 0, games: 1 },
+              isDeleted: false, is_deleted: false
+            };
+            const imported = rows.filter(r => r.Name).map(r => {
+              const isGoalkeeper = toStr(r.Position).includes('Goalkeeper');
+              const statSupplied = opt(r.Goals) !== undefined || opt(r.Assists) !== undefined
+                || opt(r.Saves) !== undefined || opt(r.CleanSheets) !== undefined;
+              const ratingSupplied = opt(r.Tech) !== undefined || opt(r.Tactical) !== undefined
+                || opt(r.Physical) !== undefined || opt(r.Mental) !== undefined;
+              return {
+                id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+                number: optI(r.Number),
+                name: toStr(r.Name), position: opt(r.Position),
+                classYear: opt(r.Class || r.ClassYear), height: opt(r.Height),
+                photo: opt(r.Photo || r.PhotoUrl),
+                // Omit `games` entirely when built here rather than resetting it to 1.
+                seasonStats: statSupplied
+                  ? (isGoalkeeper
+                    ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0 }
+                    : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0 })
+                  : undefined,
+                ratings: ratingSupplied
+                  ? { technical: parseInt(r.Tech)||80, tactical: parseInt(r.Tactical)||80, physical: parseInt(r.Physical)||80, mental: parseInt(r.Mental)||80 }
+                  : undefined,
+                // matrixStats intentionally not set here: that legacy shape
+                // ({wins,losses,points,rank,drillScore}) is unused by Phase 3 and
+                // clobbers the derived standings syncFromSupabase joins onto the player.
+                isDeleted: optB(r.IsDeleted),
+                is_deleted: optB(r.IsDeleted)
+              };
+            });
+            const resP = this.upsertByName(this.data.players, imported, playerDefaults);
             totalCount += imported.length; totalUpdated += resP.updated; totalInserted += resP.inserted;
             if (window.supabaseService?.isConfigured()) {
               for (const p of resP.toPersist) await window.supabaseService.upsertPlayer('bhs', p);
             }
           } else if (activeTarget === 'schedule') {
+            const scheduleDefaults = {
+              time: '6:00 PM', location: 'Home - Cougar Stadium', isHome: true,
+              status: 'UPCOMING', score: null, isDeleted: false, is_deleted: false
+            };
             const imported = rows.filter(r => r.Opponent).map(r => ({
               id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               date: toStr(r.Date).toUpperCase(),
-              time: toStr(r.Time) || '6:00 PM',
+              time: opt(r.Time),
               opponent: toStr(r.Opponent),
-              location: toStr(r.Location) || 'Home - Cougar Stadium',
-              isHome: toStr(r.Home).toLowerCase() !== 'away',
-              status: (toStr(r.Status) || 'UPCOMING').toUpperCase(),
-              score: toStr(r.Score) || null,
-              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
-              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+              location: opt(r.Location),
+              isHome: opt(r.Home) !== undefined ? (opt(r.Home).toLowerCase() !== 'away') : undefined,
+              status: opt(r.Status) ? toStr(r.Status).toUpperCase() : undefined,
+              score: opt(r.Score),
+              isDeleted: optB(r.IsDeleted),
+              is_deleted: optB(r.IsDeleted)
             }));
-            const resS = this.upsertByDateTime(this.data.schedule, imported);
+            const resS = this.upsertByDateTime(this.data.schedule, imported, scheduleDefaults);
             totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
               for (const m of resS.toPersist) await window.supabaseService.upsertMatch('bhs', m);
             }
           } else if (activeTarget === 'drills') {
+            const drillDefaults = { category: 'General', isDeleted: false, is_deleted: false };
             const imported = rows.filter(r => r.Name || r.DrillName).map(r => ({
               id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               name: toStr(r.Name || r.DrillName),
-              category: toStr(r.Category) || 'General',
+              category: opt(r.Category),
               coachNotes: toStr(r.CoachNotes || r.coach_notes),
-              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
-              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+              isDeleted: optB(r.IsDeleted),
+              is_deleted: optB(r.IsDeleted)
             }));
             if (!this.data.drillsBank) this.data.drillsBank = [];
-            const resD = this.upsertByName(this.data.drillsBank, imported);
+            const resD = this.upsertByName(this.data.drillsBank, imported, drillDefaults);
             totalCount += imported.length; totalUpdated += resD.updated; totalInserted += resD.inserted;
             if (window.supabaseService?.isConfigured()) {
               for (const d of resD.toPersist) await window.supabaseService.upsertDrillBankItem('bhs', d);
@@ -1223,20 +1267,21 @@ Object.assign(BHSSoccerApp.prototype, {
             this.data.currentPracticePlan.push(...imported);
             totalCount += imported.length;
           } else if (activeTarget === 'coaches') {
+            const coachDefaults = { level: 'Staff', isDeleted: false, is_deleted: false };
             const imported = rows.filter(r => r.Name).map(r => ({
               id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               name: toStr(r.Name),
-              level: toStr(r.Level) || 'Staff',
+              level: opt(r.Level),
               phone: toStr(r.Phone),
               email: toStr(r.Email),
               address: toStr(r.Address),
               bio: toStr(r.Bio),
               photo: toStr(r.Photo || r.PhotoUrl),
-              isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
-              is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
+              isDeleted: optB(r.IsDeleted),
+              is_deleted: optB(r.IsDeleted)
             }));
             if (!this.data.coaches) this.data.coaches = [];
-            const resC = this.upsertByName(this.data.coaches, imported);
+            const resC = this.upsertByName(this.data.coaches, imported, coachDefaults);
             totalCount += imported.length; totalUpdated += resC.updated; totalInserted += resC.inserted;
             if (window.supabaseService?.isConfigured()) {
               for (const c of resC.toPersist) await window.supabaseService.upsertCoach('bhs', c);
@@ -1299,12 +1344,10 @@ Object.assign(BHSSoccerApp.prototype, {
 
         this.saveData();
 
-        // Re-read from Postgres before rendering. The upsert merges against
-        // this.data, so if the database changed out from under us — another
-        // user, or a manual edit in the SQL editor — that copy is stale, and a
-        // blank column in the sheet would preserve a stale value and write it
-        // straight back. Re-syncing makes the next import merge against what is
-        // actually stored.
+        // Re-read from Postgres before rendering. This protects the *next*
+        // import (and any other view) from merging against what this import
+        // just wrote plus whatever mutated this.data while it ran — the
+        // pre-import sync above is what protects this import's own merge.
         if (window.supabaseService?.isConfigured()) {
           if (status) status.textContent = '⏳ Imported. Re-syncing from the database…';
           try {

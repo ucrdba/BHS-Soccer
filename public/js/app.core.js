@@ -62,18 +62,31 @@ class BHSSoccerApp {
    * rather than an insert — the Supabase upsert helpers only send an id when it
    * is a real UUID, so a locally-generated id like "p_1724..." always inserts.
    *
-   * Only keys the file actually supplied are written. A blank or absent column
-   * leaves the current value alone, so a sheet of just Name + Goals updates
-   * scores without clearing positions, ratings or photos.
+   * A column the sheet omits — or leaves empty — is not written to an existing
+   * record: only keys the file actually supplied reach `target[prop]` below, so
+   * a sheet of just Name + Goals updates scores without clearing positions,
+   * ratings or photos. `defaults` is applied only when a row is newly inserted
+   * (never on an update), so a wholly missing sheet still produces a complete
+   * new record. One consequence: a blank Photo cell can never clear a stored
+   * photo — clearing a field requires writing an explicit empty value some
+   * other way, not omitting the column.
    *
    * Returns the records to persist, plus counts for the status line.
    */
-  upsertByKey(collection, incoming, keyOf) {
+  upsertByKey(collection, incoming, keyOf, defaults) {
     const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
     const blank = (v) => v == null || (typeof v === 'string' && v.trim() === '');
     const keyFor = (rec) => {
       const k = keyOf(rec);
       return Array.isArray(k) ? k.map(norm).join('|') : norm(k);
+    };
+    const applyDefaults = (row) => {
+      if (defaults) {
+        for (const [prop, v] of Object.entries(defaults)) {
+          if (row[prop] === undefined) row[prop] = v;
+        }
+      }
+      return row;
     };
 
     const index = new Map();
@@ -87,8 +100,18 @@ class BHSSoccerApp {
 
     for (const row of incoming) {
       const k = keyFor(row);
+      if (!k || !k.replace(/\|/g, '')) {
+        // Blank key: can't match an existing record, and must not be indexed —
+        // indexing it would make every later blank-key row merge into this one.
+        applyDefaults(row);
+        collection.push(row);
+        toPersist.push(row);
+        inserted++;
+        continue;
+      }
       const idx = index.get(k);
       if (idx === undefined) {
+        applyDefaults(row);
         collection.push(row);
         index.set(k, collection.length - 1);
         toPersist.push(row);
@@ -108,16 +131,16 @@ class BHSSoccerApp {
   }
 
   /** Records identified by a single name column: players, coaches, drills, profiles. */
-  upsertByName(collection, incoming) {
-    return this.upsertByKey(collection, incoming, (r) => (r ? r.name : ''));
+  upsertByName(collection, incoming, defaults) {
+    return this.upsertByKey(collection, incoming, (r) => (r ? r.name : ''), defaults);
   }
 
   /**
    * Fixtures are identified by when they kick off, not by opponent — a season
    * can meet the same opponent home and away.
    */
-  upsertByDateTime(collection, incoming) {
-    return this.upsertByKey(collection, incoming, (r) => (r ? [r.date, r.time] : ['', '']));
+  upsertByDateTime(collection, incoming, defaults) {
+    return this.upsertByKey(collection, incoming, (r) => (r ? [r.date, r.time] : ['', '']), defaults);
   }
 
   /**
@@ -242,9 +265,12 @@ class BHSSoccerApp {
       // rather than disappearing from it.
       //
       // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
-      // players mapping above (app.core.js:234). Leave that line alone — the
-      // column is still read by the roster export — this simply overwrites the
-      // in-memory value with the derived one.
+      // players mapping above (app.core.js:234). Leave that line alone — it is
+      // retained only so `player.matrixStats` stays populated for the roster
+      // card and leaderboard between syncs; the `matrix_stats` column itself is
+      // unread elsewhere (the players export does not touch it) and is slated
+      // to be dropped in Phase 2. This block simply overwrites the in-memory
+      // value with the derived one.
       const dbStandings = await window.supabaseService.fetchMatrixStandings('bhs');
       const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
       const unrankedFrom = (dbStandings || []).length + 1;
