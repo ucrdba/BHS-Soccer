@@ -4,9 +4,13 @@ const LEGACY_KEY = 'bhs_soccer_app_data';
 export type CacheEntry<T> = { rows: T[]; fetchedAt: number };
 
 export function readCache<T>(name: string): CacheEntry<T> | null {
-  const raw = localStorage.getItem(PREFIX + name);
-  if (raw === null) return null;
+  // getItem must be INSIDE the try: in a sandboxed iframe or a browser with
+  // site data blocked, the localStorage accessor itself throws SecurityError —
+  // it is not only setItem that can fail. A cache miss is survivable; a throw
+  // out of this function would crash the boot path.
   try {
+    const raw = localStorage.getItem(PREFIX + name);
+    if (raw === null) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.rows)) return null;
     return { rows: parsed.rows as T[], fetchedAt: parsed.fetchedAt };

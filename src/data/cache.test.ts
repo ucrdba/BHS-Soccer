@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readCache, writeCache, backupLegacyBlob } from './cache';
 
 beforeEach(() => localStorage.clear());
@@ -16,6 +16,17 @@ describe('cache', () => {
   it('returns null rather than throwing on corrupt JSON', () => {
     localStorage.setItem('bhs.cache.v1.players', '{not json');
     expect(readCache('players')).toBeNull();
+  });
+
+  // Storage access itself can throw, not just parsing — a sandboxed iframe or a
+  // browser with site data blocked throws SecurityError from getItem.
+  it('returns null rather than throwing when storage access itself fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(() => readCache('players')).not.toThrow();
+    expect(readCache('players')).toBeNull();
+    spy.mockRestore();
   });
 
   it('writes under a versioned key', () => {
