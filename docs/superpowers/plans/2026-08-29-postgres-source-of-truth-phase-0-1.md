@@ -20,6 +20,7 @@
 - **Cache keys are versioned:** `bhs.cache.v1.<collection>`.
 - **All view-file edits are in `public/js/` after Task 1.** Paths in tasks 8–13 reflect the post-move location.
 - **Line numbers in this plan are pre-edit.** Tasks 9, 10 and 11 all modify `public/js/admin.js` in sequence, so each edit shifts the lines beneath it. Always locate the edit site by the quoted symbol name or comment text given in the task, never by the line number alone. Re-grep before editing.
+- **Never create `src/data/index.ts`.** The pre-existing seed module `src/data.ts` coexists with the new `src/data/` directory, and `src/app.core.ts:13` imports it as `'./data'`. Under `moduleResolution: "bundler"` that resolves to `data.ts` only because no `data/index.ts` exists; adding one would silently redirect that import. Always import the new modules by explicit filename — `'./data/cache'`, `'./data/store'`, `'./data/repo'`, `'./data/supabase'`.
 - **No top-level `await` in `src/main.ts`.** Whether top-level await delays `DOMContentLoaded` is subtle; the app must not depend on it. Asynchronous boot work chains onto `window.authReady`, which `app.core.js` awaits explicitly.
 - **Phases 2–4 are out of scope:** entity-by-entity repository migration, matrix schema and standings view, quiz and thoughts import.
 
