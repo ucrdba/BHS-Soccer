@@ -7,24 +7,17 @@
 /**
  * Placeholder shown when a player has no photo.
  *
- * Deliberately an inline data: URI rather than a file under assets/. Vite only
- * emits assets it can see referenced from index.html, so a runtime path like
- * "assets/player.svg" resolves in dev and 404s in a production build. A data
- * URI cannot break, costs no request, and works offline.
+ * Lives under public/ rather than assets/ on purpose. Vite only emits assets it
+ * can see referenced from index.html, so a runtime path like
+ * "assets/profile.png" resolves in dev and 404s in a production build.
+ * Everything under public/ is copied verbatim to the dist root, which is the
+ * same mechanism that makes public/js/*.js work.
  *
- * Colours come from the team palette: navy ground, cyan figure, gold ball.
+ * Generated from assets/profile.png: transparent margins trimmed, squared,
+ * resized to 192px and stored as grey+alpha — every pixel is black, so the RGB
+ * channels were redundant. 758 KB -> 20 KB.
  */
-const PLAYER_SILHOUETTE = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="No player photo">
-  <rect width="120" height="120" fill="#0A1428"/>
-  <g fill="#38BDF8">
-    <circle cx="60" cy="30" r="13"/>
-    <path d="M60 46c-11 0-19 6-22 16l-7 22a5 5 0 0 0 9 3l7-19 2 15-9 26a5 5 0 0 0 9 4l11-27 8 21a5 5 0 0 0 10-3l-9-25 2-16 6 17a5 5 0 0 0 9-3l-6-19c-3-10-11-16-22-16z"/>
-  </g>
-  <circle cx="93" cy="99" r="12" fill="#FFD700"/>
-  <path d="M93 90l6 4-2 7h-8l-2-7z" fill="#0A1428"/>
-</svg>
-`.trim());
+const PLAYER_SILHOUETTE = 'img/player-placeholder.png';
 
 class BHSSoccerApp {
   constructor() {
