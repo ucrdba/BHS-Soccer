@@ -272,6 +272,13 @@ Object.assign(BHSSoccerApp.prototype, {
                 Download a template first, fill in your data, then upload CSV or Multi-Sheet Excel files.
               </p>
 
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--bhs-gold-accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                Step 1 &mdash; Download a blank template
+              </div>
+              <p class="text-muted" style="font-size: 0.78rem; margin: 0 0 8px 0;">
+                These buttons <strong>save a file</strong> to your computer. They do not import anything.
+              </p>
+
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px;">
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('all')" style="font-size:0.75rem; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 All Tables Template</button>
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Players</button>
@@ -282,6 +289,10 @@ Object.assign(BHSSoccerApp.prototype, {
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts</button>
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('quiz')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Quiz</button>
                 <button class="btn btn-secondary" onclick="app.downloadTemplate('categories')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Categories</button>
+              </div>
+
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--bhs-cyan-accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                Step 2 &mdash; Choose what you are importing, then pick your file
               </div>
 
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
