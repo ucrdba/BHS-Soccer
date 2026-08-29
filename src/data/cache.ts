@@ -34,10 +34,18 @@ export function writeCache<T>(name: string, rows: T[], fetchedAt: number): void 
  * null if there was nothing to back up.
  */
 export function backupLegacyBlob(): string | null {
-  const raw = localStorage.getItem(LEGACY_KEY);
-  if (raw === null) return null;
-  const key = `${LEGACY_KEY}.backup.${new Date().toISOString().slice(0, 10)}`;
-  localStorage.setItem(key, raw);
-  localStorage.removeItem(LEGACY_KEY);
-  return key;
+  // Guarded for the same reason as readCache — and it matters more here,
+  // because main.ts calls this during boot. If setItem throws (quota), we
+  // return before removeItem, so a blob we could not back up is never
+  // destroyed.
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw === null) return null;
+    const key = `${LEGACY_KEY}.backup.${new Date().toISOString().slice(0, 10)}`;
+    localStorage.setItem(key, raw);
+    localStorage.removeItem(LEGACY_KEY);
+    return key;
+  } catch {
+    return null;
+  }
 }

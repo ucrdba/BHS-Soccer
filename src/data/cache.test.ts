@@ -39,6 +39,17 @@ describe('cache', () => {
     expect(readCache('players')).toEqual({ rows: [], fetchedAt: 500 });
   });
 
+  it('returns null rather than throwing when backup storage access fails', () => {
+    localStorage.setItem('bhs_soccer_app_data', '{"players":[]}');
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    expect(() => backupLegacyBlob()).not.toThrow();
+    spy.mockRestore();
+    // The blob must survive a failed backup rather than being destroyed.
+    expect(localStorage.getItem('bhs_soccer_app_data')).toBe('{"players":[]}');
+  });
+
   it('backs up the legacy blob without importing it, and only once', () => {
     localStorage.setItem('bhs_soccer_app_data', '{"players":[]}');
     const key = backupLegacyBlob();
