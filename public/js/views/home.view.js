@@ -90,7 +90,7 @@ Object.assign(BHSSoccerApp.prototype, {
                 </div>
               </div>
               <div style="margin-top: 14px; pt-8; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
-                <span>— ${activeThought.coachName || 'Coach Bob Miller'}</span>
+                ${activeThought.coachName ? `<span>— ${activeThought.coachName}</span>` : ''}
                 <span class="badge badge-coach">HEAD COACH</span>
               </div>
             </div>

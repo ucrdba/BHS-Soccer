@@ -264,7 +264,7 @@ Object.assign(BHSSoccerApp.prototype, {
     return thoughts.find(t => t.isActive) || thoughts[0] || {
       id: 'dt_default',
       coachId: 'c1',
-      coachName: 'Coach Bob Miller',
+      coachName: '',
       text: 'No coach thoughts entered for today.',
       isActive: true
     };
@@ -458,7 +458,7 @@ Object.assign(BHSSoccerApp.prototype, {
       ${isLeaderboard ? this.renderQuizLeaderboardHTML() : `
         <div style="background: rgba(0, 71, 171, 0.2); border: 1px solid var(--bhs-navy-border); padding: 12px 14px; border-radius: 8px; margin-bottom: 16px;">
           <div style="font-size: 0.78rem; color: var(--bhs-gold-accent); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
-            📌 Today's Tactical Focus (${activeThought.coachName || 'Coach Bob Miller'})
+            📌 Today's Tactical Focus${activeThought.coachName ? ` (${activeThought.coachName})` : ''}
           </div>
           <div style="font-size: 0.86rem; color: #FFF; font-style: italic; line-height: 1.4; max-height: 75px; overflow-y: auto;">
             "${activeThought.text}"

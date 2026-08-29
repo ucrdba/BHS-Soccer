@@ -31,7 +31,12 @@ class BHSSoccerApp {
   }
 
   saveData() {
-    localStorage.setItem('bhs_soccer_app_data', JSON.stringify(this.data));
+    // Intentionally does nothing. Postgres is the source of truth: every mutation
+    // already writes through supabaseService, and a reload repopulates via
+    // syncFromSupabase(). loadData() no longer reads localStorage, so writing the
+    // legacy `bhs_soccer_app_data` blob here would only recreate the key that
+    // backupLegacyBlob() removes at boot. Per-collection caching under
+    // bhs.cache.v1.* is the repository layer's job in the next phase.
   }
 
   async init() {
