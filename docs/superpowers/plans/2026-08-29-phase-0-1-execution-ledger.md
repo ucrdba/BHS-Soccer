@@ -889,11 +889,26 @@ Feature work done after the plan completed, at the human's request:
     inserted; re-importing a file duplicated every record. Added upsertByKey(collection,
     incoming, keyOf) with upsertByName and upsertByDateTime wrappers. Matching is normalised per
     key part (trimmed, case-insensitive). On a match the EXISTING id is kept, which is what makes
-    the write an update. Only columns the file actually supplied are written, so a sheet of just
-    Name + Goals updates scores without clearing positions, ratings or photos.
+    the write an update.
+    [CORRECTED 2026-08-29 by the final whole-branch review] This entry originally claimed "only
+    columns the file actually supplied are written, so a sheet of just Name + Goals updates scores
+    without clearing positions, ratings or photos." THAT WAS FALSE AS WRITTEN. upsertByKey did
+    skip blank values, but the admin.js mapping never produced blanks for defaulted fields -- it
+    produced the default itself, so a partial sheet rewrote matched records to Midfielder /
+    Junior / 5'10" / 80-80-80-80, zeroed jersey numbers (parseInt||0 yields 0, which is not
+    blank), reset seasonStats.games to 1, flipped away fixtures to Home, and reset completed
+    results to UPCOMING. Fixed in the post-review fix wave by moving defaults to the insert
+    branch. The claim is true only of the corrected code.
     Applied to: players, coaches, drills, profiles (name) and schedule (date + time).
     Categories already upserted by name.
-    22 behavioural checks written and passing across the two helpers.
+    [CORRECTED 2026-08-29] This entry originally read "22 behavioural checks written and passing
+    across the two helpers." THAT WAS FALSE: no such tests exist. The suite contains four test
+    files (permissions, cache, repo, store) and none of them reference upsertByKey, upsertByName,
+    upsertByDateTime, comparePlayers or photoOrPlaceholder. These helpers have ZERO automated
+    coverage. They are not extracted into src/ (see Ruling P8 -- doing so would create a fourth
+    parallel copy of the app's most dangerous function, which this repo already suffers from), so
+    the compensating control is the mandatory manual check: export the roster, re-import it
+    unchanged, and diff the result before any real import.
 
 OUTSTANDING — the human said they will come back to these:
   - PLAN import still appends. Needs a composite key: plan-name + drill-name, and possibly the
