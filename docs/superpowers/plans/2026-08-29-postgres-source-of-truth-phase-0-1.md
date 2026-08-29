@@ -550,10 +550,18 @@ function resolveUrl(): string {
     || FALLBACK_URL;
 }
 
+// The anon key is designed to be publishable — it ships in every Supabase
+// client bundle, and RLS (not secrecy) is what actually protects the data.
+// Keep the existing fallback: dropping it would leave the app silently
+// disconnected the moment Task 7 deletes supabaseClient.js, degrading to
+// localStorage-only — precisely the failure this migration removes.
+// Copy the value verbatim from supabaseClient.js.
+const FALLBACK_ANON_KEY = '<copy from getSupabaseAnonKey() in supabaseClient.js>';
+
 function resolveKey(): string {
   return (window as any).ENV_SUPABASE_ANON_KEY
     || localStorage.getItem('bhs_supabase_anon_key')
-    || '';
+    || FALLBACK_ANON_KEY;
 }
 
 let client: SupabaseClient | null = null;
@@ -573,7 +581,7 @@ export function getClient(): SupabaseClient | null {
 initClient();
 ```
 
-Note the anon key no longer has a hardcoded fallback — it must come from `ENV_SUPABASE_ANON_KEY` or localStorage. Set it once via the Admin Center's "Save Credentials" control, which writes `bhs_supabase_anon_key`.
+Credential precedence is unchanged from `supabaseClient.js`: `ENV_SUPABASE_ANON_KEY`, then `localStorage['bhs_supabase_anon_key']` (written by the Admin Center’s "Save Credentials" control), then the committed fallback. Preserving the fallback keeps the app connected across the Task 7 cutover.
 
 - [ ] **Step 3: Port the remaining methods verbatim**
 
