@@ -544,6 +544,19 @@ Copy each method from `supabaseClient.js` into a `supabaseService` object export
 
 `isConfigured`, `setCredentials`, `signUpUser`, `signInUser`, `signOutUser`, `getSession`, `onAuthStateChange`, `verifyOtp`, `fetchOwnProfile`, `getSchoolUuid`, `upsertProfile`, `approveProfile`, `rejectProfile`, `fetchPendingApprovals`, `testProfileInsert`, `runFullDatabaseDiagnostic`, `fetchPlayers`, `fetchSchedule`, `upsertMatch`, `deleteMatch`, `fetchPracticePlans`, `saveFullPracticePlan`, `savePracticePlanItem`, `upsertPracticePlanItem`, `deletePracticePlanItem`, `fetchSoccerCategories`, `upsertSoccerCategory`, `fetchDrillsBank`, `upsertDrillBankItem`, `deleteDrillBankItem`, `upsertPlayer`, `deletePlayer`, `fetchSchool`, `fetchSchools`, `upsertSchool`, `fetchCoaches`, `upsertCoach`, `deleteCoach`, `fetchDailyThoughts`, `fetchLatestDailyThoughts`, `upsertDailyThought`, `deleteDailyThought`, `setActiveDailyThought`, `saveQuizAttempt`, `fetchQuizResults`.
 
+**Also port the internal helper `isUuid(str)`.** It is not part of the public surface and
+`src/globals.d.ts` does not declare it, but nine methods call `this.isUuid(...)` —
+`getSchoolUuid`, `upsertMatch`, `savePracticePlanItem`, `upsertSoccerCategory`,
+`upsertDrillBankItem`, `upsertPlayer`, `upsertSchool`, `upsertCoach`, and
+`saveFullPracticePlan`. Omitting it produces `this.isUuid is not a function` across every
+write path. Verify after porting:
+
+```bash
+grep -c "isUuid" src/data/supabase.ts
+```
+
+Expected: 10 (one definition plus nine call sites).
+
 - [ ] **Step 4: Verify it type-checks**
 
 Run: `npm run typecheck`
