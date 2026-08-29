@@ -62,20 +62,20 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  quickLogin(email, password) {
+  async quickLogin(email, password) {
     const emailInput = document.getElementById('loginEmail');
     const passwordInput = document.getElementById('loginPassword');
     if (emailInput) emailInput.value = email;
     if (passwordInput) passwordInput.value = password || 'password';
-    this.handleSignIn();
+    await this.handleSignIn();
   },
 
-  handleSignIn() {
+  async handleSignIn() {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const feedback = document.getElementById('authFormFeedback');
 
-    const res = window.auth.loginUser(email, password);
+    const res = await window.auth.loginUser(email, password);
     if (res.success) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -90,14 +90,14 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  handleRegister() {
+  async handleRegister() {
     const name = document.getElementById('regName').value;
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPassword').value;
     const role = document.getElementById('regRole').value;
     const feedback = document.getElementById('authFormFeedback');
 
-    const res = window.auth.registerUser({ name, email, password, role });
+    const res = await window.auth.registerUser({ name, email, password, role });
     if (res.success) {
       if (res.requiresVerification) {
         this.openVerifyTab(email, res.otpCode);
@@ -125,12 +125,12 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  handleVerifyOtp() {
+  async handleVerifyOtp() {
     const code = document.getElementById('verifyOtpCode').value;
     const feedback = document.getElementById('authFormFeedback');
     const email = this.pendingVerifyEmail || document.getElementById('regEmail').value || document.getElementById('loginEmail').value;
 
-    const res = window.auth.verifyUserOtp(email, code);
+    const res = await window.auth.verifyUserOtp(email, code);
     if (res.success) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -148,8 +148,8 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  approveUserAccess(userId) {
-    const ok = window.auth.approveUserAccess(userId);
+  async approveUserAccess(userId) {
+    const ok = await window.auth.approveUserAccess(userId);
     if (ok) {
       this.updateAuthUI();
       this.renderCurrentView();
@@ -158,8 +158,8 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  rejectUserAccess(userId) {
-    const ok = window.auth.rejectUserAccess(userId);
+  async rejectUserAccess(userId) {
+    const ok = await window.auth.rejectUserAccess(userId);
     if (ok) {
       this.renderAdminModalContent();
       alert('User request rejected.');
