@@ -1236,6 +1236,22 @@ Object.assign(BHSSoccerApp.prototype, {
         }
 
         this.saveData();
+
+        // Re-read from Postgres before rendering. The upsert merges against
+        // this.data, so if the database changed out from under us — another
+        // user, or a manual edit in the SQL editor — that copy is stale, and a
+        // blank column in the sheet would preserve a stale value and write it
+        // straight back. Re-syncing makes the next import merge against what is
+        // actually stored.
+        if (window.supabaseService?.isConfigured()) {
+          if (status) status.textContent = '⏳ Imported. Re-syncing from the database…';
+          try {
+            await this.syncFromSupabase();
+          } catch (syncErr) {
+            console.warn('Post-import re-sync notice:', syncErr);
+          }
+        }
+
         this.renderCurrentView();
         if (status) status.textContent = `✅ Imported ${totalCount} records — ${totalUpdated} updated, ${totalInserted} added.`;
       } catch (err) {
