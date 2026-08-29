@@ -726,8 +726,70 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   openAddDrillModal() {
+    const players = (this.data.players || [])
+      .filter(p => !p.is_deleted && !p.isDeleted)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    const playerOptions = players
+      .map(p => `<option value="${p.id}">${p.name}${p.number ? ' (#' + p.number + ')' : ''}</option>`)
+      .join('');
+
+    const drillOptions = '<option value="">— none —</option>' + (this.data.drillsBank || [])
+      .filter(d => !d.is_deleted && !d.isDeleted)
+      .map(d => `<option value="${d.id}">${d.name}</option>`)
+      .join('');
+
+    const a = document.getElementById('matrixPlayerA');
+    const b = document.getElementById('matrixPlayerB');
+    const drill = document.getElementById('matrixDrill');
+    const when = document.getElementById('matrixOccurredOn');
+    const err = document.getElementById('matrixFormError');
+
+    if (a) a.innerHTML = playerOptions;
+    if (b) b.innerHTML = playerOptions;
+    if (drill) drill.innerHTML = drillOptions;
+    if (when) when.value = new Date().toISOString().slice(0, 10);
+    if (err) err.textContent = '';
+
+    // Default B to a different player so the "same player twice" guard is not
+    // the first thing a coach meets.
+    if (b && b.options.length > 1) b.selectedIndex = 1;
+
+    if (players.length < 2 && err) {
+      err.textContent = 'At least two players are needed to record a head-to-head result.';
+    }
+
     const modal = document.getElementById('addDrillScoreModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  async submitMatrixResult() {
+    const err = document.getElementById('matrixFormError');
+    const set = (msg) => { if (err) err.textContent = msg; };
+
+    const playerAId = document.getElementById('matrixPlayerA')?.value;
+    const playerBId = document.getElementById('matrixPlayerB')?.value;
+    const outcome   = document.getElementById('matrixOutcome')?.value;
+    const drillId   = document.getElementById('matrixDrill')?.value || null;
+    const scoreText = document.getElementById('matrixScoreText')?.value.trim();
+    const occurredOn = document.getElementById('matrixOccurredOn')?.value;
+
+    if (!playerAId || !playerBId) return set('Pick both players.');
+    if (playerAId === playerBId) return set('A player cannot play themselves. Pick two different players.');
+    if (!occurredOn) return set('Pick the date the result happened.');
+
+    set('Recording…');
+    const res = await window.supabaseService.logMatrixResult('bhs', {
+      playerAId, playerBId, outcome, drillId, scoreText, occurredOn
+    });
+
+    if (!res.ok) return set(res.error || 'Could not record that result.');
+
+    // Standings are derived in Postgres, so the leaderboard only changes after
+    // a re-read. Without this the coach records a result and sees nothing move.
+    await this.syncFromSupabase();
+    this.renderCurrentView();
+    this.closeModals();
   },
 
   // ─── Import / Export ─────────────────────────────────────────────────────

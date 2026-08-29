@@ -88,35 +88,43 @@
   <div id="addDrillScoreModal" class="modal-overlay">
     <div class="modal-window">
       <div class="modal-header">
-        <h3>RECORD DRILL SCORE</h3>
+        <h3>RECORD DRILL RESULT</h3>
         <button class="close-btn">&times;</button>
       </div>
-      <form onsubmit="event.preventDefault(); alert('Practice drill score logged successfully! Matrix leaderboard updated.'); app.closeModals();">
+      <form onsubmit="event.preventDefault(); app.submitMatrixResult();">
         <div class="form-group">
-          <label>Select Practice Drill</label>
-          <select class="form-control">
-            <option>1v1 Gauntlet (Continuous)</option>
-            <option>2v2 Flying Scrimmage with Bumpers</option>
-            <option>Finishing under High Pressure</option>
-            <option>12-Minute Cooper Fitness Test</option>
+          <label>Drill (optional)</label>
+          <select class="form-control" id="matrixDrill"></select>
+        </div>
+        <div class="form-group">
+          <label>Player A</label>
+          <select class="form-control" id="matrixPlayerA" required></select>
+        </div>
+        <div class="form-group">
+          <label>Player B</label>
+          <select class="form-control" id="matrixPlayerB" required></select>
+        </div>
+        <div class="form-group">
+          <label>Result</label>
+          <select class="form-control" id="matrixOutcome" required>
+            <option value="a">Player A won</option>
+            <option value="b">Player B won</option>
+            <option value="draw">Draw</option>
           </select>
+          <p class="text-muted" style="font-size:0.78rem; margin:6px 0 0 0;">
+            Win 3 points, draw 1, loss 0. Ranking is by total points.
+          </p>
         </div>
         <div class="form-group">
-          <label>Winning Player / Pair</label>
-          <select class="form-control">
-            <option>Alex Rivera (#10)</option>
-            <option>Marcus Vance (#7)</option>
-            <option>Ethan Thorne (#4)</option>
-            <option>Mateo Sandoval (#1)</option>
-            <option>Lucas Sterling (#6)</option>
-            <option>Jordan Brooks (#9)</option>
-          </select>
+          <label>Score (optional)</label>
+          <input type="text" class="form-control" id="matrixScoreText" placeholder="e.g. 3 - 2" />
         </div>
         <div class="form-group">
-          <label>Points Earned</label>
-          <input type="number" class="form-control" value="3" min="1" max="10" />
+          <label>Date</label>
+          <input type="date" class="form-control" id="matrixOccurredOn" required />
         </div>
-        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Update Practice Matrix Ranks</button>
+        <div id="matrixFormError" style="color: var(--color-danger); font-size:0.85rem; margin-bottom:8px;"></div>
+        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Record Result</button>
       </form>
     </div>
   </div>
