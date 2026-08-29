@@ -396,7 +396,9 @@ describe('resolveFetch', () => {
     expect(s.rows).toEqual([]);
   });
 
-  it('is ready with zero rows on an invalid session when there is no cache to mask it', () => {
+  // Same guard as above, but with no cache present — proves the invalid-session
+  // check fires on its own rather than only when cached rows exist to compare against.
+  it('is error on an invalid session even when there is no cache to fall back to', () => {
     const s = resolveFetch({
       result: { ok: true, rows: [] }, cached: null, sessionValid: false, now: 200,
     });
