@@ -797,3 +797,43 @@ editor. Controller verified against the live database:
 Task 14's outstanding human step is therefore CLOSED. The remaining unverified items are the
 browser checks: sign-in against the live database, wrong-password rejection, the guest path, the
 empty daily_thoughts state, and the offline path.
+
+=== LIVE BROWSER VERIFICATION (2026-08-29) — first time this branch ran in a browser ===
+Dev server started; Vite 8 forwards client console messages to the terminal, which finally
+closed the "nothing has run in a browser" gap without browser automation.
+
+VERIFIED PASSING:
+  - The app boots and is NOT an inert shell. It executes JS and makes live Supabase calls, so
+    src/main.ts evaluated and window.supabaseService installed. This was the top-ranked residual
+    risk (P25's failure signature) and it is now disproven by observation, not inference.
+  - / , /src/main.ts and /js/app.core.js all serve 200.
+  - *** WRONG-PASSWORD REJECTION CONFIRMED *** — console shows
+    "Supabase Auth signIn notice: Invalid login credentials" on a bad-password attempt.
+    signInWithPassword is genuinely checking the password. The fake auth this branch replaced
+    accepted ANY password, so this is the headline behavioural change of the whole plan,
+    verified live.
+  - No ReferenceError, no unhandled rejection, no module-resolution failure in the console.
+
+CONFIRMED DEFECT (was static analysis, now observed):
+  - The final review's cross-cutting finding C4 is real and fires on every page load:
+    `Supabase fetchDailyThoughts error: {"code":"22P02","message":"invalid input syntax for
+    type uuid: \"bhs\""}`. The schema declares school_id UUID; supabase.ts passes the literal
+    string 'bhs' with no getSchoolUuid() call. daily_thoughts can be neither read nor written.
+    Pre-existing, faithfully ported, outside this plan's scope — but no longer hypothetical.
+
+*** NEW PHASE 2 CARRY-FORWARD: the password-reset flow has no landing point in the app ***
+Found while the human tried to obtain a password for testing. Supabase's recovery email
+redirects to the configured Site URL with the token in the URL fragment
+(#access_token=...&type=recovery). supabase-js consumes it silently (detectSessionInUrl defaults
+to true) and establishes a recovery session — but the application has NO handling for it
+whatsoever: grep across src/ and public/js/ finds no `type=recovery`, no `PASSWORD_RECOVERY`
+event handler, no `updateUser`, and no `resetPasswordForEmail`. There is no "forgot password"
+entry point either.
+Consequence: anyone clicking a recovery link lands on the home page with a live recovery session
+and no way to use it. The reset silently dead-ends. The only workaround today is calling
+`window.supabaseService.client.auth.updateUser({ password })` from the browser console.
+This is not a regression — the fake auth had no passwords at all, so no reset flow was possible.
+It is a hole that only exists BECAUSE auth is now genuinely real, and it belongs with the auth
+work rather than the data work. Phase 2 should add: a "Forgot password?" link calling
+resetPasswordForEmail, a PASSWORD_RECOVERY branch in the onAuthStateChange handler, and a
+set-new-password form. Note src/auth.ts currently exposes no method for any of these.
