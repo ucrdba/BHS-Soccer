@@ -19,6 +19,13 @@
  */
 const PLAYER_SILHOUETTE = 'img/player-placeholder.png';
 
+/**
+ * The same figure in the coaching palette — navy ground, gold figure — so a
+ * coach without a photo is distinguishable at a glance from a player without
+ * one, and sits inside the gold border the coach cards already use.
+ */
+const COACH_SILHOUETTE = 'img/coach-placeholder.png';
+
 class BHSSoccerApp {
   constructor() {
     this.data = this.loadData();
@@ -50,8 +57,9 @@ class BHSSoccerApp {
    * Treats null, undefined and whitespace-only strings alike — imports and
    * manual edits all leave photo_url as an empty string rather than null.
    */
-  photoOrPlaceholder(url) {
-    return (url && String(url).trim()) ? url : PLAYER_SILHOUETTE;
+  photoOrPlaceholder(url, kind = 'player') {
+    if (url && String(url).trim()) return url;
+    return kind === 'coach' ? COACH_SILHOUETTE : PLAYER_SILHOUETTE;
   }
 
   saveData() {

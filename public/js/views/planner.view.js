@@ -716,7 +716,7 @@ Object.assign(BHSSoccerApp.prototype, {
               ` : ''}
 
               <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                <img src="${c.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--bhs-gold-accent); object-fit: cover;" alt="${c.name}" />
+                <img src="${this.photoOrPlaceholder(c.photo, 'coach')}" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--bhs-gold-accent); object-fit: cover;" alt="${c.name}" />
                 <div>
                   <h3 style="color: #FFF; font-size: 1.25rem; margin-bottom: 4px;">${c.name}</h3>
                   <span class="badge badge-coach">${c.level}</span>
@@ -995,7 +995,10 @@ Object.assign(BHSSoccerApp.prototype, {
       phone: data.phone.trim(),
       address: data.address.trim(),
       email: data.email.trim(),
-      photo: data.photo?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      // Stored empty rather than defaulted to a stock photo: assigning a random
+      // stranger's face makes a coach without a photo look like they have one.
+      // The coaches view renders the silhouette placeholder instead.
+      photo: (data.photo || '').trim(),
       bio: data.bio?.trim() || ''
     };
 
@@ -1045,7 +1048,7 @@ Object.assign(BHSSoccerApp.prototype, {
       phone: document.getElementById('editCoachPhone').value.trim(),
       email: document.getElementById('editCoachEmail').value.trim(),
       address: document.getElementById('editCoachAddress').value.trim(),
-      photo: document.getElementById('editCoachPhoto').value.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      photo: document.getElementById('editCoachPhoto').value.trim(),
       bio: document.getElementById('editCoachBio').value.trim()
     };
 
