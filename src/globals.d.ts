@@ -51,6 +51,9 @@ declare global {
     rejectProfile(userId: string): Promise<Record<string, any> | null>;
     fetchPendingApprovals(schoolCode?: string): Promise<Record<string, any>[] | null>;
     fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
+    fetchMatrixStandings(schoolId?: string): Promise<Record<string, any>[] | null>;
+    fetchMatrixLogs(schoolId?: string): Promise<Record<string, any>[] | null>;
+    logMatrixResult(schoolId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
   }
 
   interface Window {

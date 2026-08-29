@@ -1080,6 +1080,75 @@ class SupabaseService {
     }
   }
 
+  async fetchMatrixStandings(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const uuid = await this.getSchoolUuid(schoolId);
+      if (!uuid) return null;
+      const { data, error } = await this.client!
+        .from('matrix_standings')
+        .select('*')
+        .eq('school_id', uuid);
+      if (error) { console.warn('Supabase fetchMatrixStandings notice:', error.message); return null; }
+      return data;
+    } catch (e) {
+      console.warn('Supabase fetchMatrixStandings exception:', e);
+      return null;
+    }
+  }
+
+  async fetchMatrixLogs(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const uuid = await this.getSchoolUuid(schoolId);
+      if (!uuid) return null;
+      const { data, error } = await this.client!
+        .from('matrix_logs')
+        .select('*')
+        .eq('school_id', uuid)
+        .eq('is_deleted', false)
+        .order('occurred_on', { ascending: false });
+      if (error) { console.warn('Supabase fetchMatrixLogs notice:', error.message); return null; }
+      return data;
+    } catch (e) {
+      console.warn('Supabase fetchMatrixLogs exception:', e);
+      return null;
+    }
+  }
+
+  async logMatrixResult(schoolId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    try {
+      const uuid = await this.getSchoolUuid(schoolId);
+      if (!uuid) return { ok: false, error: 'Could not resolve the school.' };
+
+      const payload: Record<string, any> = {
+        school_id: uuid,
+        player_a_id: result.playerAId,
+        player_b_id: result.playerBId,
+        outcome: result.outcome,
+        score_text: result.scoreText || null,
+        occurred_on: result.occurredOn || new Date().toISOString().slice(0, 10),
+      };
+      if (result.drillId && this.isUuid(result.drillId)) payload.drill_id = result.drillId;
+
+      const { data, error } = await this.client!.from('matrix_logs').insert([payload]).select();
+      if (error) {
+        console.warn('Supabase logMatrixResult notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      // An RLS denial returns no error and no rows. Report it rather than
+      // letting the caller show a success message for a write that vanished.
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that write. Coach or admin access is required.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase logMatrixResult exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async fetchQuizResults(): Promise<any> {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
