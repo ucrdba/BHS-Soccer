@@ -20,6 +20,10 @@ Object.assign(BHSSoccerApp.prototype, {
           <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
             ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddPlayerModal()">+ Add New Player</button>` : ''}
             <div class="filters-bar">
+              <span class="filter-chip ${this.rosterSort !== 'name' ? 'active' : ''}" data-sort="number" onclick="app.sortRoster('number')" title="Sort by jersey number">#&nbsp;Number</span>
+              <span class="filter-chip ${this.rosterSort === 'name' ? 'active' : ''}" data-sort="name" onclick="app.sortRoster('name')" title="Sort alphabetically">A&ndash;Z&nbsp;Name</span>
+            </div>
+            <div class="filters-bar">
               <span class="filter-chip active" data-filter="ALL" onclick="app.filterRoster('ALL')">All Players</span>
               <span class="filter-chip" data-filter="FWD" onclick="app.filterRoster('FWD')">Forwards</span>
               <span class="filter-chip" data-filter="MID" onclick="app.filterRoster('MID')">Midfielders</span>
@@ -30,8 +34,8 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
 
         <div id="rosterGrid" class="roster-grid">
-          ${(this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted).map(p => `
-            <div class="player-card" data-player-id="${p.id}" data-position="${p.position}">
+          ${this.sortedPlayers().map(p => `
+            <div class="player-card" data-player-id="${p.id}" data-position="${p.position}" data-number="${p.number || 0}" data-name="${(p.name || '').replace(/"/g, '&quot;')}">
               <div class="player-card-header" onclick="app.openPlayerModal('${p.id}')">
                 <span class="jersey-number">#${p.number}</span>
                 <img src="${this.photoOrPlaceholder(p.photo)}" class="player-photo" alt="${p.name}" />
@@ -69,6 +73,56 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
       </div>
     `;
+  },
+
+  /**
+   * Compare two players by the current sort. Unnumbered players (0, blank or
+   * missing) always sort last regardless of direction — a squad list led by a
+   * run of #0 cards reads as broken data rather than as a roster.
+   */
+  comparePlayers(a, b, by) {
+    if (by === 'name') {
+      return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    }
+    const na = parseInt(a.number, 10) || 0;
+    const nb = parseInt(b.number, 10) || 0;
+    if (!na !== !nb) return na ? -1 : 1;   // exactly one is unnumbered — it goes last
+    if (na !== nb) return na - nb;
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  },
+
+  /** Live players in the currently selected order. Defaults to jersey number. */
+  sortedPlayers() {
+    const by = this.rosterSort === 'name' ? 'name' : 'number';
+    return (this.data.players || [])
+      .filter(p => !p.is_deleted && !p.isDeleted)
+      .slice()
+      .sort((a, b) => this.comparePlayers(a, b, by));
+  },
+
+  /**
+   * Reorders the cards already in the DOM rather than re-rendering, so the
+   * active position filter — which lives in each card's inline display style —
+   * survives a sort change.
+   */
+  sortRoster(by) {
+    this.rosterSort = (by === 'name') ? 'name' : 'number';
+
+    document.querySelectorAll('.filter-chip[data-sort]').forEach(chip => {
+      chip.classList.toggle('active', chip.getAttribute('data-sort') === this.rosterSort);
+    });
+
+    const grid = document.getElementById('rosterGrid');
+    if (!grid) return;
+
+    Array.from(grid.querySelectorAll('.player-card'))
+      .map(card => ({
+        card,
+        name: card.getAttribute('data-name') || '',
+        number: parseInt(card.getAttribute('data-number'), 10) || 0
+      }))
+      .sort((a, b) => this.comparePlayers(a, b, this.rosterSort))
+      .forEach(entry => grid.appendChild(entry.card));
   },
 
   filterRoster(filter) {
