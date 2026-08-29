@@ -1493,19 +1493,33 @@ that pattern rather than breaking the encapsulation: add a `fetchRoles()` method
   }
 ```
 
-Then in `src/main.ts`, replace the `window.authReady = auth.init();` line from Task 12 with:
+Then in `src/main.ts`, extend the existing `window.authReady` chain. **Task 12's fix round
+already attached a `.catch()` to it**, and the order matters: the `.then()` must come *before*
+the `.catch()`, so that a roles-load failure is caught too. If you append `.then()` after the
+existing `.catch()`, a rejected `fetchRoles()` would reject `window.authReady` — and because
+`app.core.js` awaits that promise above `bindEvents()` and `renderCurrentView()`, the app would
+render a static shell with no event handlers. That is the exact bug Task 12's `.catch()` was
+added to prevent; do not reintroduce it through the back door.
 
 ```ts
 import { supabaseService } from './data/supabase';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 
-window.authReady = auth.init().then(async () => {
-  const rows = await supabaseService.fetchRoles();
-  setRoles((rows as RoleRow[]) ?? []);
-});
+window.authReady = auth.init()
+  .then(async () => {
+    const rows = await supabaseService.fetchRoles();
+    setRoles((rows as RoleRow[]) ?? []);
+  })
+  .catch((err) => {
+    console.error('Auth initialisation failed; continuing as guest.', err);
+  });
 
 window.can = can;
 ```
+
+`fetchRoles()` returns `null` rather than throwing when the client is unconfigured, and
+`canFor` fails closed on an empty roles list, so an unreachable database denies permissions
+rather than granting them.
 
 Add `can: typeof can` to the `Window` interface declaration.
 
