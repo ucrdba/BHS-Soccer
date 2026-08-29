@@ -1203,7 +1203,47 @@ window.auth = auth;
 window.authReady = auth.init();
 ```
 
-- [ ] **Step 2: Await the session before the first render**
+- [ ] **Step 2: Harden the credential getters against blocked storage**
+
+`src/data/supabase.ts` calls `initSupabaseClient()` at module-evaluation time, and its two
+credential getters read `localStorage` unguarded:
+
+```ts
+function getSupabaseUrl(): string {
+  return (window as any).ENV_SUPABASE_URL
+    || localStorage.getItem('bhs_supabase_url')
+    || '...';
+}
+```
+
+This was faithfully ported from `supabaseClient.js` and is not a regression — but its
+consequence changes here. A classic script that throws kills only itself; a **module** that
+throws during evaluation never assigns any of its globals. Once `window.auth` and
+`window.authReady` come from this module graph, a `SecurityError` from blocked site data
+(sandboxed iframe, browser privacy settings) stops being "no database" and becomes "no app":
+every `window.auth.*` call site throws.
+
+Wrap the storage read in each getter, preserving the precedence order exactly:
+
+```ts
+function readStoredCredential(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseUrl(): string {
+  return (window as any).ENV_SUPABASE_URL
+    || readStoredCredential('bhs_supabase_url')
+    || 'https://arsigevpgpbqluqbnhjr.supabase.co';
+}
+```
+
+Apply the same change to `getSupabaseAnonKey()`, leaving its fallback key untouched.
+
+- [ ] **Step 3: Await the session before the first render**
 
 `auth.init()` restores the session asynchronously. Without this, the first `updateAuthUI()` and `renderCurrentView()` run against a guest session and a signed-in user briefly sees the public view.
 
@@ -1221,7 +1261,7 @@ In `public/js/app.core.js`, at the top of `init()` (line 39), add the await befo
 
 Leave the remainder of `init()` unchanged.
 
-- [ ] **Step 3: Remove the fake implementation**
+- [ ] **Step 4: Remove the fake implementation**
 
 ```bash
 git rm auth.js
@@ -1229,7 +1269,7 @@ git rm auth.js
 
 In `index.html`, delete the `<script src="./auth.js"></script>` line.
 
-- [ ] **Step 4: Remove the demo OTP banner**
+- [ ] **Step 5: Remove the demo OTP banner**
 
 The fake auth returned a verification code to the client, and the UI displayed it. Real
 Supabase Auth emails the code instead: `AppUser` has no `verificationCode` field and
@@ -1268,25 +1308,25 @@ Verify no demo-code path survives:
 Run: `grep -rn "otpCode\|verificationCode\|123456" public/js/`
 Expected: no output. (`admin.js`'s uses were deleted with the fake self-test in Task 11.)
 
-- [ ] **Step 5: Verify no call site was missed**
+- [ ] **Step 6: Verify no call site was missed**
 
 Run: `grep -rn "window\.auth\." public/js/ index.html | grep -v "await\|async"`
 
 Inspect each hit. Getters (`getCurrentUser`, `getRole`, `isCoach`, `isAdmin`, `canAccessRatings`, `isLoggedIn`, `subscribe`) are synchronous in `src/auth.ts` and correctly appear here. Any of the seven async methods appearing without `await` is a bug from Tasks 8–10.
 
-- [ ] **Step 6: Verify sign-in against the real database**
+- [ ] **Step 7: Verify sign-in against the real database**
 
 Run: `npm run dev`. Sign in with the existing `admin`/`active` account (use Supabase password reset if the credential is unknown).
 Expected: the header shows the admin role, and restricted tabs unlock. A wrong password must now be rejected — the fake implementation accepted any password, so verify this explicitly.
 
-- [ ] **Step 7: Verify the guest path**
+- [ ] **Step 8: Verify the guest path**
 
 Sign out. Expected: the roster and schedule still render for an anonymous visitor; matrix and planner show the restricted-access guard.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add index.html src/main.ts public/js/app.core.js public/js/views/coaches.view.js
+git add index.html src/main.ts src/data/supabase.ts public/js/app.core.js public/js/views/coaches.view.js
 git commit -m "feat: replace fake client-side auth with real Supabase Auth"
 ```
 
