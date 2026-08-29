@@ -837,3 +837,33 @@ It is a hole that only exists BECAUSE auth is now genuinely real, and it belongs
 work rather than the data work. Phase 2 should add: a "Forgot password?" link calling
 resetPasswordForEmail, a PASSWORD_RECOVERY branch in the onAuthStateChange handler, and a
 set-new-password form. Note src/auth.ts currently exposes no method for any of these.
+
+=== AUTH CHAIN VERIFIED END TO END (2026-08-29, live against production Supabase) ===
+The plan's single biggest unverified item — and the one the final review ranked #1 in residual
+risk — is now confirmed working:
+  signInWithPassword -> session established (error undefined, session true, user 51f6a114-...)
+  getUser()          -> resolves the auth user
+  profiles read      -> returns the row UNDER the newly tightened RLS policy
+  mapProfileRowToAppUser -> window.auth.getCurrentUser() reports role 'admin'
+Wrong-password rejection was observed four separate times ("Invalid login credentials"), and a
+correct password is accepted. The fake auth this branch replaced never checked passwords at all,
+so this is the plan's headline behavioural change, verified by observation.
+
+The earlier "Account profile could not be loaded" was NOT reproduced, and everything it could
+have been was ruled out individually: the RLS policy returns the row when tested under the real
+identity via set local role/request.jwt.claims; auth.users and profiles ids match; aud and role
+are 'authenticated'; no deleted_at or banned_until; exactly one email identity; and the bcrypt
+hash verifies. Most probable cause was a transient race during the recovery-link session, with
+getUser() and the onAuthStateChange handler in flight together — the re-entrancy hazard the
+Task 12 review identified, which the setTimeout mitigates but does not fully serialise.
+Commit 0bd8544 instruments both previously-silent failure paths in fetchOwnProfile (a failed
+getUser(), and maybeSingle() returning zero rows under RLS), so a recurrence will name its own
+cause instead of surfacing only as "Account profile could not be loaded".
+
+NEW PHASE 2 CARRY-FORWARD: the sign-in FORM submits something other than what is typed —
+signInWithPassword called directly from the console with the same credentials succeeds, while
+the form fails with "Invalid login credentials". Browser autofill is the likely culprit. This
+could not have existed under the fake auth, which ignored the password field entirely.
+ALSO: Supabase's built-in email sender rate-limits password recovery after a few sends, and the
+app surfaces the raw provider error to the user. Real auth brings real failure modes that need
+real handling.
