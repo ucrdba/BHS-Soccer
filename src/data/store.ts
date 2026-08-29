@@ -9,9 +9,17 @@ export interface CollectionState<T> {
   error: string | null;
 }
 
+// Each variant declares the other's key as optional-undefined. This repo's
+// tsconfig sets `strict: false` (so the ported JS typechecks without a
+// rewrite), and under `strictNullChecks: false` a boolean-literal discriminant
+// does NOT narrow a generic union — `result.error` after `if (result.ok)`
+// fails to compile. Declaring both keys on both variants makes the access
+// resolve while the discriminant still documents intent. Do not "simplify"
+// this back to a bare two-member union, and do not turn on `strict` to make
+// it work: that would break the ported supabaseClient code.
 export type FetchResult<T> =
-  | { ok: true; rows: T[] }
-  | { ok: false; error: string };
+  | { ok: true; rows: T[]; error?: undefined }
+  | { ok: false; rows?: undefined; error: string };
 
 export function initialState<T>(): CollectionState<T> {
   return { rows: [], status: 'loading', fetchedAt: null, error: null };
