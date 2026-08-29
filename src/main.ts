@@ -22,4 +22,10 @@ window.auth = auth;
 // than blocking module evaluation with a top-level await. Whether top-level
 // await delays DOMContentLoaded is subtle enough that the app should not
 // depend on it — app.core.js awaits this explicitly instead.
-window.authReady = auth.init();
+//
+// A rejected auth.init() must not take the app down with it: app.core.js awaits
+// this promise above bindEvents/renderCurrentView, so an unhandled rejection
+// would leave a static shell with no event handlers. Degrade to a guest session.
+window.authReady = auth.init().catch((err) => {
+  console.error('Auth initialisation failed; continuing as guest.', err);
+});

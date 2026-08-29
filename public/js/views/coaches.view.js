@@ -62,14 +62,6 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  async quickLogin(email, password) {
-    const emailInput = document.getElementById('loginEmail');
-    const passwordInput = document.getElementById('loginPassword');
-    if (emailInput) emailInput.value = email;
-    if (passwordInput) passwordInput.value = password || 'password';
-    await this.handleSignIn();
-  },
-
   async handleSignIn() {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;

@@ -39,7 +39,18 @@ class BHSSoccerApp {
   async init() {
     await window.authReady;
 
-    window.auth.subscribe(() => {
+    // supabase-js fires onAuthStateChange on its own schedule (TOKEN_REFRESHED,
+    // and SIGNED_IN/INITIAL_SESSION when a tab regains visibility), not only on
+    // user action as the previous fake auth did. renderCurrentView() replaces
+    // innerHTML, which would wipe an in-progress practice plan or the tactical
+    // canvas. Only react when the identity actually changed.
+    const authKeyOf = (u) => (u ? `${u.id}:${u.role}:${u.status}` : 'none');
+    let lastAuthKey = authKeyOf(window.auth.getCurrentUser());
+
+    window.auth.subscribe((user) => {
+      const key = authKeyOf(user);
+      if (key === lastAuthKey) return;
+      lastAuthKey = key;
       this.updateAuthUI();
       this.renderCurrentView();
     });
