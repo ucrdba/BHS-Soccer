@@ -236,6 +236,31 @@ class BHSSoccerApp {
           }));
       }
 
+      // Matrix standings are derived in Postgres from matrix_logs, not stored on
+      // the player. Left-join them on: a player with no logged results produces
+      // no standings row, and must still appear on the leaderboard as 0/0/0
+      // rather than disappearing from it.
+      //
+      // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
+      // players mapping above (app.core.js:234). Leave that line alone — the
+      // column is still read by the roster export — this simply overwrites the
+      // in-memory value with the derived one.
+      const dbStandings = await window.supabaseService.fetchMatrixStandings('bhs');
+      const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
+      const unrankedFrom = (dbStandings || []).length + 1;
+
+      this.data.players.forEach(p => {
+        const s = standingsById.get(p.id);
+        p.matrixStats = s
+          ? {
+              wins: s.wins || 0, draws: s.draws || 0, losses: s.losses || 0,
+              games: s.games || 0, points: s.points || 0,
+              winPct: s.win_pct === null || s.win_pct === undefined ? null : Number(s.win_pct),
+              rank: s.rank
+            }
+          : { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: unrankedFrom };
+      });
+
       const dbSchedule = await window.supabaseService.fetchSchedule('bhs');
       if (dbSchedule && dbSchedule.length > 0) {
         this.data.schedule = dbSchedule.map(s => ({
