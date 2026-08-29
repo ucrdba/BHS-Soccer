@@ -228,7 +228,7 @@ Object.assign(BHSSoccerApp.prototype, {
           <div class="admin-accordion-content">
             ${!isCoachOrAdmin ? `
               <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: #FFF; margin-bottom: 12px;">
-                🔒 File import/export actions are reserved for Coach and Admin roles. Switch to <strong>Coach Bob</strong> or <strong>Admin Sam</strong> above to enable full import/export functions.
+                🔒 File import/export actions are reserved for Coach and Admin roles. Sign in with a coach or administrator account to enable them.
               </div>
             ` : ''}
 
