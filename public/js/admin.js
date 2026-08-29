@@ -104,6 +104,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const isGuest = !currentUser || currentUser.role === 'guest';
     const isCoachOrAdmin = window.auth.isCoach() || window.auth.isAdmin();
+    const pending = this._pendingApprovals || [];
 
     const sampleUsers = [
       { id: 'user_coach_bob', name: 'Coach Bob', role: 'Coach', icon: '👔', desc: 'Head Coach: full practice planning, match crud, roster & ratings' },
@@ -202,14 +203,14 @@ Object.assign(BHSSoccerApp.prototype, {
         <details class="admin-accordion">
           <summary class="admin-accordion-summary">
             <span>👥 PENDING USER APPROVAL QUEUE</span>
-            <span class="badge badge-gold">${window.auth.getPendingApprovals().length} REQUESTS</span>
+            <span class="badge badge-gold">${pending.length} REQUESTS</span>
           </summary>
           <div class="admin-accordion-content">
-            ${window.auth.getPendingApprovals().length === 0 ? `
+            ${pending.length === 0 ? `
               <p class="text-muted" style="font-size: 0.85rem; margin: 0;">No pending account authorization requests. New signups requiring Coach/Player access will appear here.</p>
             ` : `
               <div style="display:flex; flex-direction:column; gap:10px;">
-                ${window.auth.getPendingApprovals().map(p => `
+                ${pending.map(p => `
                   <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 8px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div>
                       <strong style="color:#FFF; display:block; font-size:0.9rem;">${p.name}</strong>
@@ -746,7 +747,8 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderCurrentView();
   },
 
-  openAdminModal() {
+  async openAdminModal() {
+    this._pendingApprovals = (await window.auth.getPendingApprovals()) || [];
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
