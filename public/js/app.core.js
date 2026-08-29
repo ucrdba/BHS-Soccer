@@ -73,37 +73,56 @@ class BHSSoccerApp {
    *
    * Returns the records to persist, plus counts for the status line.
    */
-  upsertByName(collection, incoming) {
-    const key = (v) => String(v == null ? '' : v).trim().toLowerCase();
+  upsertByKey(collection, incoming, keyOf) {
+    const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
     const blank = (v) => v == null || (typeof v === 'string' && v.trim() === '');
+    const keyFor = (rec) => {
+      const k = keyOf(rec);
+      return Array.isArray(k) ? k.map(norm).join('|') : norm(k);
+    };
 
-    const byName = new Map();
+    const index = new Map();
     collection.forEach((existing, i) => {
-      if (existing && existing.name) byName.set(key(existing.name), i);
+      const k = keyFor(existing);
+      if (k && k.replace(/\|/g, '')) index.set(k, i);
     });
 
     const toPersist = [];
     let updated = 0, inserted = 0;
 
     for (const row of incoming) {
-      const idx = byName.get(key(row.name));
+      const k = keyFor(row);
+      const idx = index.get(k);
       if (idx === undefined) {
         collection.push(row);
-        byName.set(key(row.name), collection.length - 1);
+        index.set(k, collection.length - 1);
         toPersist.push(row);
         inserted++;
         continue;
       }
       const target = collection[idx];
-      for (const [k, v] of Object.entries(row)) {
-        if (k === 'id' || blank(v)) continue;   // never let an import rewrite the id
-        target[k] = v;
+      for (const [prop, v] of Object.entries(row)) {
+        if (prop === 'id' || blank(v)) continue;   // never let an import rewrite the id
+        target[prop] = v;
       }
       toPersist.push(target);
       updated++;
     }
 
     return { toPersist, updated, inserted };
+  }
+
+  /** Records identified by a single name column: players, coaches, drills, profiles. */
+  upsertByName(collection, incoming) {
+    return this.upsertByKey(collection, incoming, (r) => (r ? r.name : ''));
+  }
+
+  /**
+   * Fixtures are identified by when they kick off, not by opponent — a season
+   * can meet the same opponent home and away.
+   */
+  upsertByDateTime(collection, incoming) {
+    return this.upsertByKey(collection, incoming, (r) => (r ? [r.date, r.time] : ['', '']));
   }
 
   photoOrPlaceholder(url, kind = 'player') {

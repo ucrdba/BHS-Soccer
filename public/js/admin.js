@@ -1128,10 +1128,10 @@ Object.assign(BHSSoccerApp.prototype, {
               isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
-            this.data.schedule.push(...imported);
-            totalCount += imported.length;
+            const resS = this.upsertByDateTime(this.data.schedule, imported);
+            totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const m of imported) await window.supabaseService.upsertMatch('bhs', m);
+              for (const m of resS.toPersist) await window.supabaseService.upsertMatch('bhs', m);
             }
           } else if (activeTarget === 'drills') {
             const imported = rows.filter(r => r.Name || r.DrillName).map(r => ({
