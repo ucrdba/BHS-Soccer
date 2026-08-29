@@ -213,7 +213,7 @@ git commit -m "test: add Vitest with jsdom environment"
 Replace the contents of `src/data/cache.test.ts`:
 
 ```ts
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readCache, writeCache, backupLegacyBlob } from './cache';
 
 beforeEach(() => localStorage.clear());
@@ -231,6 +231,17 @@ describe('cache', () => {
   it('returns null rather than throwing on corrupt JSON', () => {
     localStorage.setItem('bhs.cache.v1.players', '{not json');
     expect(readCache('players')).toBeNull();
+  });
+
+  // Storage access itself can throw, not just parsing — a sandboxed iframe or a
+  // browser with site data blocked throws SecurityError from getItem.
+  it('returns null rather than throwing when storage access itself fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(() => readCache('players')).not.toThrow();
+    expect(readCache('players')).toBeNull();
+    spy.mockRestore();
   });
 
   it('writes under a versioned key', () => {
@@ -269,9 +280,13 @@ const LEGACY_KEY = 'bhs_soccer_app_data';
 export type CacheEntry<T> = { rows: T[]; fetchedAt: number };
 
 export function readCache<T>(name: string): CacheEntry<T> | null {
-  const raw = localStorage.getItem(PREFIX + name);
-  if (raw === null) return null;
+  // getItem must be INSIDE the try: in a sandboxed iframe or a browser with
+  // site data blocked, the localStorage accessor itself throws SecurityError —
+  // it is not only setItem that can fail. A cache miss is survivable; a throw
+  // out of this function would crash the boot path.
   try {
+    const raw = localStorage.getItem(PREFIX + name);
+    if (raw === null) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.rows)) return null;
     return { rows: parsed.rows as T[], fetchedAt: parsed.fetchedAt };
@@ -307,7 +322,7 @@ export function backupLegacyBlob(): string | null {
 - [ ] **Step 4: Run to verify they pass**
 
 Run: `npm test`
-Expected: 6 tests pass.
+Expected: 7 tests pass.
 
 - [ ] **Step 5: Commit**
 
