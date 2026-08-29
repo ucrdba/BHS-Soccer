@@ -155,13 +155,31 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     try {
       const { data: userData, error: userError } = await this.client!.auth.getUser();
-      if (userError || !userData?.user) return null;
+      if (userError || !userData?.user) {
+        // This branch used to return null silently, which made a failed profile
+        // load indistinguishable from an RLS denial — the caller only reports
+        // "Account profile could not be loaded". Log which one it actually was.
+        console.error(
+          'Supabase fetchOwnProfile: getUser() failed —',
+          userError ? userError.message : 'no user on the session',
+        );
+        return null;
+      }
       const { data, error } = await this.client!
         .from('profiles')
         .select('*')
         .eq('id', userData.user.id)
         .maybeSingle();
       if (error) { console.error('Supabase fetchOwnProfile error:', error.message); return null; }
+      if (!data) {
+        // maybeSingle() returns { data: null, error: null } when RLS filters the
+        // row out — a silent zero-row result. Distinguish it from a query error.
+        console.error(
+          'Supabase fetchOwnProfile: no profiles row visible for auth user',
+          userData.user.id,
+          '— either no such row exists, or RLS denied it.',
+        );
+      }
       return data;
     } catch (e) {
       console.error('Supabase fetchOwnProfile exception:', e);
