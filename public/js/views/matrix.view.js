@@ -31,34 +31,54 @@ Object.assign(BHSSoccerApp.prototype, {
                 <tr>
                   <th>RANK</th>
                   <th>PLAYER</th>
-                  <th>POS</th>
-                  <th>PRACTICE WINS</th>
-                  <th>WIN %</th>
-                  <th>MATRIX INDEX</th>
+                  <th>GP</th>
+                  <th>W-D-L</th>
+                  <th>PTS</th>
+                  <th>%</th>
                 </tr>
               </thead>
               <tbody>
-                ${(this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted).sort((a,b) => (a.matrixStats?.rank || 99) - (b.matrixStats?.rank || 99)).map(p => `
+                ${(() => {
+                  // Hoisted: computing this inside the map would rescan every
+                  // player for every row.
+                  const leaderPts = Math.max(1, ...(this.data.players || []).map(x => x.matrixStats?.points || 0));
+                  return (this.data.players || [])
+                  .filter(p => !p.is_deleted && !p.isDeleted)
+                  .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
+                  .map(p => {
+                    // Per-key defaults, not `p.matrixStats || {...}`. A player added
+                    // through the UI before the next sync carries the OLD shape
+                    // (wins, losses, points, rank, and the removed blended index)
+                    // with no games, draws or winPct — an object-level fallback
+                    // would not fire and the row would render `undefined`.
+                    const ms = p.matrixStats || {};
+                    const m = {
+                      wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
+                      games: ms.games || 0, points: ms.points || 0,
+                      winPct: (ms.winPct === undefined ? null : ms.winPct),
+                      rank: ms.rank || 999
+                    };
+                    const barPct = Math.round((m.points / leaderPts) * 100);
+                    return `
                   <tr>
                     <td>
-                      <div class="rank-pill ${p.matrixStats.rank <= 3 ? 'rank-' + p.matrixStats.rank : 'rank-other'}">
-                        ${p.matrixStats.rank}
-                      </div>
+                      ${m.games === 0
+                        ? '<div class="rank-pill rank-other">&mdash;</div>'
+                        : `<div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">${m.rank}</div>`}
                     </td>
+                    <td><strong>${p.name}</strong> <span class="text-muted">#${p.number || '—'}</span></td>
+                    <td>${m.games}</td>
+                    <td>${m.wins} - ${m.draws} - ${m.losses}</td>
+                    <td><strong>${m.points}</strong></td>
                     <td>
-                      <strong>${p.name}</strong> <span class="text-muted">(#${p.number})</span>
-                    </td>
-                    <td><span class="badge-pos">${p.position}</span></td>
-                    <td>${p.matrixStats.wins} W - ${p.matrixStats.losses} L</td>
-                    <td>${((p.matrixStats.wins / (p.matrixStats.wins + p.matrixStats.losses)) * 100).toFixed(1)}%</td>
-                    <td>
-                      <strong>${p.matrixStats.drillScore}</strong>
+                      ${m.winPct === null ? '<span class="text-muted">—</span>' : m.winPct.toFixed(1) + '%'}
                       <div class="score-progress">
-                        <div class="score-bar" style="width: ${p.matrixStats.drillScore}%;"></div>
+                        <div class="score-bar" style="width: ${barPct}%;"></div>
                       </div>
                     </td>
-                  </tr>
-                `).join('')}
+                  </tr>`;
+                  }).join('');
+                })()}
               </tbody>
             </table>
           </div>
