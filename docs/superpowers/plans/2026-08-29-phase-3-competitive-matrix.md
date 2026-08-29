@@ -522,7 +522,7 @@ git commit -m "feat: leaderboard shows GP, W-D-L, points and percentage"
 ### Task 6: Replace the stub form
 
 **Files:**
-- Modify: `index.html:88-121`
+- Modify: `index.html:88-122` (the whole `#addDrillScoreModal` block)
 - Modify: `public/js/admin.js` (`openAddDrillModal`, around line 728)
 
 **Interfaces:**
@@ -533,7 +533,11 @@ The current form is a stub. Its `onsubmit` is `alert('Practice drill score logge
 
 - [ ] **Step 1: Replace the modal markup**
 
-Replace lines 88-121 of `index.html` entirely:
+Replace the whole `#addDrillScoreModal` block. **Locate it by its id, not by line number** —
+it currently spans lines 88 to 122, and the block ends with THREE closing tags in sequence:
+`</form>`, then `</div>` for `.modal-window`, then `</div>` for `.modal-overlay`. Deleting one
+too few leaves a stray `</div>` that silently breaks the page structure for everything after it;
+one too many closes a parent element early. Count them before and after.
 
 ```html
   <div id="addDrillScoreModal" class="modal-overlay">
