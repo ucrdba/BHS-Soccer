@@ -467,9 +467,9 @@ Replace the `.sort(...).map(...)` block (currently lines 41-60) with:
                     return `
                   <tr>
                     <td>
-                      <div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">
-                        ${m.rank}
-                      </div>
+                      ${m.games === 0
+                        ? '<div class="rank-pill rank-other">&mdash;</div>'
+                        : `<div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">${m.rank}</div>`}
                     </td>
                     <td><strong>${p.name}</strong> <span class="text-muted">#${p.number || '—'}</span></td>
                     <td>${m.games}</td>
@@ -486,7 +486,13 @@ Replace the `.sort(...).map(...)` block (currently lines 41-60) with:
                 })()}
 ```
 
-The bar now shows points relative to the leader rather than the removed `drillScore`. A player with no games shows `—`, not `0.0%`.
+The bar now shows points relative to the leader rather than the removed `drillScore`. A player with no games shows `—` for BOTH rank and percentage, not `0.0%` and not a number.
+
+The rank dash matters more than it looks. `syncFromSupabase` assigns unlogged players
+`rank = dbStandings.length + 1`, which is `1` when nothing has been logged yet — so without this
+guard every player on the roster would be badged **#1** the first time a coach opens the
+leaderboard. Rendering a dash when `games === 0` says "not ranked yet", which is the truth. The
+numeric rank is still used for sorting, so unlogged players continue to sort below ranked ones.
 
 - [ ] **Step 3: Confirm no reference to the removed field survives**
 
