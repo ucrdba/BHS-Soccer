@@ -57,6 +57,55 @@ class BHSSoccerApp {
    * Treats null, undefined and whitespace-only strings alike — imports and
    * manual edits all leave photo_url as an empty string rather than null.
    */
+  /**
+   * Merge imported rows into a collection, keyed on name, so re-importing the
+   * same file updates records instead of duplicating them.
+   *
+   * Matching is trimmed and case-insensitive: " john smith " matches "John Smith".
+   *
+   * On a match the EXISTING id is kept. That is what makes the write an update
+   * rather than an insert — the Supabase upsert helpers only send an id when it
+   * is a real UUID, so a locally-generated id like "p_1724..." always inserts.
+   *
+   * Only keys the file actually supplied are written. A blank or absent column
+   * leaves the current value alone, so a sheet of just Name + Goals updates
+   * scores without clearing positions, ratings or photos.
+   *
+   * Returns the records to persist, plus counts for the status line.
+   */
+  upsertByName(collection, incoming) {
+    const key = (v) => String(v == null ? '' : v).trim().toLowerCase();
+    const blank = (v) => v == null || (typeof v === 'string' && v.trim() === '');
+
+    const byName = new Map();
+    collection.forEach((existing, i) => {
+      if (existing && existing.name) byName.set(key(existing.name), i);
+    });
+
+    const toPersist = [];
+    let updated = 0, inserted = 0;
+
+    for (const row of incoming) {
+      const idx = byName.get(key(row.name));
+      if (idx === undefined) {
+        collection.push(row);
+        byName.set(key(row.name), collection.length - 1);
+        toPersist.push(row);
+        inserted++;
+        continue;
+      }
+      const target = collection[idx];
+      for (const [k, v] of Object.entries(row)) {
+        if (k === 'id' || blank(v)) continue;   // never let an import rewrite the id
+        target[k] = v;
+      }
+      toPersist.push(target);
+      updated++;
+    }
+
+    return { toPersist, updated, inserted };
+  }
+
   photoOrPlaceholder(url, kind = 'player') {
     if (url && String(url).trim()) return url;
     return kind === 'coach' ? COACH_SILHOUETTE : PLAYER_SILHOUETTE;

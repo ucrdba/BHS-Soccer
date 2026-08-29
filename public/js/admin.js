@@ -1021,6 +1021,7 @@ Object.assign(BHSSoccerApp.prototype, {
       try {
         const toStr = (v) => String(v ?? '').trim();
         let totalCount = 0;
+        let totalUpdated = 0, totalInserted = 0;
 
         let workbookSheets = {};
 
@@ -1092,15 +1093,15 @@ Object.assign(BHSSoccerApp.prototype, {
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
             if (!this.data.userProfiles) this.data.userProfiles = [];
-            this.data.userProfiles.push(...imported);
-            totalCount += imported.length;
+            const resU = this.upsertByName(this.data.userProfiles, imported);
+            totalCount += imported.length; totalUpdated += resU.updated; totalInserted += resU.inserted;
           } else if (activeTarget === 'players') {
             const imported = rows.filter(r => r.Name).map(r => ({
               id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               number: parseInt(r.Number) || 0,
               name: toStr(r.Name), position: toStr(r.Position) || 'Midfielder',
               classYear: toStr(r.Class || r.ClassYear) || 'Junior', height: toStr(r.Height) || "5'10\"",
-              photo: toStr(r.Photo || r.PhotoUrl) || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+              photo: toStr(r.Photo || r.PhotoUrl),
               seasonStats: toStr(r.Position).includes('Goalkeeper')
                 ? { saves: parseInt(r.Saves)||0, cleanSheets: parseInt(r.CleanSheets)||0, games: 1 }
                 : { goals: parseInt(r.Goals)||0, assists: parseInt(r.Assists)||0, games: 1 },
@@ -1109,10 +1110,10 @@ Object.assign(BHSSoccerApp.prototype, {
               isDeleted: toStr(r.IsDeleted).toLowerCase() === 'true',
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
-            this.data.players.push(...imported);
-            totalCount += imported.length;
+            const resP = this.upsertByName(this.data.players, imported);
+            totalCount += imported.length; totalUpdated += resP.updated; totalInserted += resP.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const p of imported) await window.supabaseService.upsertPlayer('bhs', p);
+              for (const p of resP.toPersist) await window.supabaseService.upsertPlayer('bhs', p);
             }
           } else if (activeTarget === 'schedule') {
             const imported = rows.filter(r => r.Opponent).map(r => ({
@@ -1142,10 +1143,10 @@ Object.assign(BHSSoccerApp.prototype, {
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
             if (!this.data.drillsBank) this.data.drillsBank = [];
-            this.data.drillsBank.push(...imported);
-            totalCount += imported.length;
+            const resD = this.upsertByName(this.data.drillsBank, imported);
+            totalCount += imported.length; totalUpdated += resD.updated; totalInserted += resD.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const d of imported) await window.supabaseService.upsertDrillBankItem('bhs', d);
+              for (const d of resD.toPersist) await window.supabaseService.upsertDrillBankItem('bhs', d);
             }
           } else if (activeTarget === 'plan') {
             const imported = rows.filter(r => r.DrillName || r.drill || r.Name || r.name).map(r => ({
@@ -1173,10 +1174,10 @@ Object.assign(BHSSoccerApp.prototype, {
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
             if (!this.data.coaches) this.data.coaches = [];
-            this.data.coaches.push(...imported);
-            totalCount += imported.length;
+            const resC = this.upsertByName(this.data.coaches, imported);
+            totalCount += imported.length; totalUpdated += resC.updated; totalInserted += resC.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const c of imported) await window.supabaseService.upsertCoach('bhs', c);
+              for (const c of resC.toPersist) await window.supabaseService.upsertCoach('bhs', c);
             }
           } else if (activeTarget === 'thoughts') {
             const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
@@ -1236,7 +1237,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
         this.saveData();
         this.renderCurrentView();
-        if (status) status.textContent = `✅ Successfully imported ${totalCount} records across your database tables!`;
+        if (status) status.textContent = `✅ Imported ${totalCount} records — ${totalUpdated} updated, ${totalInserted} added.`;
       } catch (err) {
         console.error('Import error:', err);
         if (status) status.textContent = `❌ Import failed: ${err.message}`;
