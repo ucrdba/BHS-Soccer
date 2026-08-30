@@ -201,6 +201,16 @@ makes more pressing, since more coaches means more reason to remove one.
 
 ## Migrating the existing data
 
+> **[REVISED 2026-08-30, during execution.]** The project owner stated that the current data is
+> reproducible and does not need protecting. The two-migration split described below — and the
+> apply/deploy/verify/drop sequence it required — existed solely to keep a bad copy recoverable,
+> so it has been collapsed into a single `0005`. The copy into `team_players` still happens before
+> the old columns are dropped, because that is how the new tables get populated, not merely how
+> data is preserved. The one rule that survives: **apply the migration at merge time, not before**,
+> since it breaks the deployed application's roster the moment it lands. The subsection below is
+> left in place as the reasoning that was superseded rather than deleted.
+
+
 The live data is small — 11 players (all Beaumont), 1 schedule row, 2 coaches, 0 matrix logs — so
 this is a schema change against almost no data. The migration performs every step; nothing is
 moved by hand.
