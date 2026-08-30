@@ -14,7 +14,7 @@ A single-page web app for the Beaumont High School (CA) Cougars soccer program: 
 npm run dev        # vite dev server, opens browser
 npm run build      # tsc (typecheck) + vite build -> dist/
 npm run typecheck  # tsc --noEmit over src/ only
-npm test           # vitest — 25 tests, config in vitest.config.mts
+npm test           # vitest — 80 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every public/js/*.js file
@@ -22,7 +22,7 @@ powershell -File check_syntax.ps1   # node --check every public/js/*.js file
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (25 tests).
+- `npm test` — Vitest unit tests (80 tests).
 - `npm run typecheck` — `tsc --noEmit` over `src/` **only**; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -71,6 +71,12 @@ Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `
 
 `src/data/supabase.ts` exports a single `SupabaseService` instance that `src/main.ts` assigns to `window.supabaseService`. Credentials resolve in order: `window.ENV_SUPABASE_URL` / `ENV_SUPABASE_ANON_KEY` → `localStorage['bhs_supabase_url' / 'bhs_supabase_anon_key']` (settable at runtime from the admin panel via `setCredentials`) → a hardcoded project URL and anon key in the file. If none produce a valid client, every service method returns `null` — so "nothing loaded from the DB" is usually an unconfigured client, not a query bug.
 
+### Teams
+
+`schools` holds organizations — a school or a club, distinguished by `kind`. `teams` belong to a school; `team_players` is the membership and carries everything that varies by team (number, position, season stats, ratings), so `players` is pure identity and one person can appear on a school team and a club team with separate statistics. `unique (school_id, player_id)` on the membership enforces one team per organization, and a composite foreign key to `teams (id, school_id)` stops that column drifting from its team's.
+
+The active team is a per-device preference in `localStorage` under `bhs_active_team_id`, resolved by `resolveActiveTeam` in `src/data/team-scope.ts`. Writes are team-scoped through `public.is_team_coach()`; reads stay public. Phase 2 surfaces — practice plans, drills, daily thoughts, quiz, categories, and the `coaches` display table — are still school-scoped.
+
 ### Auth & RBAC
 
 `src/auth.ts` exports a singleton `AuthManager` (`auth`) over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. `src/main.ts` assigns it to `window.auth` and exposes `window.authReady` (a promise `app.core.js` awaits before rendering) and `window.can` (RBAC helper from `src/auth/permissions.ts`). Roles: `guest` / `player` / `coach` / `admin`. The guards used throughout the views — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; signup lands in a pending-approval state that a coach or admin clears via `approveProfile`/`rejectProfile`. `auth.subscribe()` re-renders the current view on any auth change.
@@ -85,6 +91,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 2. `schema_roles.sql` — `roles` table with JSONB granular permissions.
 3. `seed_data.sql` — BHS demo data.
 4. `supabase_migration_auth.sql` — **supersedes** the RLS story in the first two files (it says so explicitly; they are left as historical provisioning scripts). Adds the `handle_new_user`/`handle_user_confirmed` triggers, `SECURITY DEFINER` helpers (`current_profile_role()`, etc.) that avoid RLS self-recursion, a column-guard trigger blocking self-service role/status escalation, and per-table read/write policies. Its first step **deletes all `public.profiles` rows** to re-link the table to `auth.users`.
+5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS, and the `current_profile_role()` status fix.
 
 Prefer adding a new dated migration file over editing an already-applied script.
 
