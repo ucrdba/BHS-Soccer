@@ -1162,6 +1162,9 @@ Object.assign(BHSSoccerApp.prototype, {
         const optB = (v) => { const s = opt(v); return s === undefined ? undefined : s.toLowerCase() === 'true'; };
         let totalCount = 0;
         let totalUpdated = 0, totalInserted = 0, totalRejected = 0;
+        // Sheets skipped for a reason the coach needs to hear. Collected rather
+        // than written straight to the status line, which the summary overwrites.
+        const warnings = [];
 
         /**
          * Writes each row and counts the ones the database refused.
@@ -1317,6 +1320,23 @@ Object.assign(BHSSoccerApp.prototype, {
               totalRejected += await persistAll(resP.toPersist, p => window.supabaseService.upsertPlayer('bhs', p));
             }
           } else if (activeTarget === 'schedule') {
+            // Fixtures are matched on [date, time], so a sheet with no Time
+            // column cannot match anything: every row would key as "AUG 14,
+            // 2026|" and insert as a duplicate of a fixture that already
+            // exists. Defaulting the time does not save it either — stored
+            // times vary (6:30 PM, 5:00 PM, and FINAL on completed games), so
+            // any single default still mismatches most rows. Refuse instead,
+            // rather than silently duplicating the schedule.
+            const headerHasTime = rows.some(r => Object.prototype.hasOwnProperty.call(r, 'Time'));
+            if (!headerHasTime && rows.length > 0) {
+              // `continue`, not `return`: an "all tables" import must not lose
+              // its other sheets because this one is unusable.
+              warnings.push('Schedule sheet skipped — it has no Time column. Fixtures are matched '
+                + 'on Date + Time, so importing it would duplicate every fixture rather than update '
+                + 'it. Export the schedule and edit that file; the export always includes Time.');
+              continue;
+            }
+
             const scheduleDefaults = {
               location: 'Home - Cougar Stadium', isHome: true,
               status: 'UPCOMING', score: null, isDeleted: false, is_deleted: false
@@ -1468,8 +1488,10 @@ Object.assign(BHSSoccerApp.prototype, {
           const rejected = totalRejected
             ? `, ${totalRejected} rejected by the database (see the browser console)`
             : '';
-          status.textContent = `${totalRejected ? '⚠️' : '✅'} Imported ${totalCount} records — `
-            + `${totalUpdated} updated, ${totalInserted} added${rejected}.`;
+          const flagged = totalRejected || warnings.length;
+          status.textContent = `${flagged ? '⚠️' : '✅'} Imported ${totalCount} records — `
+            + `${totalUpdated} updated, ${totalInserted} added${rejected}.`
+            + (warnings.length ? ' ' + warnings.join(' ') : '');
         }
       } catch (err) {
         console.error('Import error:', err);

@@ -443,9 +443,24 @@ Object.assign(BHSSoccerApp.prototype, {
     const container = document.getElementById('quizModalContent');
     if (!container) return;
 
-    const currentUser = window.auth.getCurrentUser() || { name: 'Alex Rivera (#10)', id: 'p_guest' };
+    // An attempt is attributed to a person, so it needs a real one. This used to
+    // fall back to a demo player, which meant a signed-out visitor's attempt was
+    // written to the database under a name belonging to nobody.
+    const currentUser = window.auth.getCurrentUser();
     const modal = document.getElementById('takeQuizModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+
+    if (!currentUser) {
+      container.innerHTML = `
+        <div style="padding:20px; text-align:center;">
+          <h3 style="color:var(--bhs-gold-accent); margin-bottom:10px;">Sign in to take the quiz</h3>
+          <p style="color:var(--text-muted); font-size:0.9rem; line-height:1.6;">
+            Quiz attempts are recorded against your player profile, so you need to be
+            signed in before you can start. The Daily Thought itself is open to everyone.
+          </p>
+        </div>`;
+      return;
+    }
 
     const isLeaderboard = tab === 'leaderboard';
 
@@ -585,7 +600,20 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   async submitQuizAnswer() {
-    const currentUser = window.auth.getCurrentUser() || { name: 'Alex Rivera (#10)', id: 'p_guest' };
+    // Guarded again here rather than trusting the modal: openTakeQuizModal is
+    // not the only way this can be reached, and the consequence of a missing
+    // check is a database row attributed to a player who does not exist.
+    const currentUser = window.auth.getCurrentUser();
+    if (!currentUser) {
+      const resultDiv = document.getElementById('quizScoreResult');
+      if (resultDiv) {
+        resultDiv.innerHTML = `
+          <div style="background:rgba(234,179,8,0.25); border:2px solid var(--bhs-gold-accent); padding:16px; border-radius:10px; text-align:center;">
+            <strong>Sign in to record your score.</strong>
+          </div>`;
+      }
+      return;
+    }
 
     const q1 = document.querySelector('input[name="q1"]:checked')?.value;
     const q2 = document.querySelector('input[name="q2"]:checked')?.value;
@@ -619,8 +647,8 @@ Object.assign(BHSSoccerApp.prototype, {
     if (!this.data.quizAttempts) this.data.quizAttempts = [];
     const attemptRecord = {
       attempt_id: Date.now(),
-      player_id: currentUser.id || 'p_guest',
-      player_name: currentUser.name || 'Alex Rivera (#10)',
+      player_id: currentUser.id,
+      player_name: currentUser.name,
       score: score,
       total_questions: totalQuestions,
       percentage: percentage,

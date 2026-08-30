@@ -1022,10 +1022,19 @@ class SupabaseService {
   async saveQuizAttempt(playerData: any = {}, answers: any[] = [], score: number = 0, totalQuestions: number = 5): Promise<any> {
     if (!this.isConfigured()) return null;
 
+    // An attempt names a person, so refuse to invent one. This previously fell
+    // back to a demo player, which wrote attempts to the database attributed to
+    // somebody who does not exist. The UI guards this too; this is the layer
+    // that actually touches the table, so it guards independently.
+    if (!playerData?.id || !playerData?.name) {
+      console.warn('saveQuizAttempt refused: no signed-in player to attribute the attempt to.');
+      return null;
+    }
+
     const percentage = Math.round((score / (totalQuestions || 1)) * 100);
     const attemptPayload: Record<string, any> = {
-      player_id: playerData.id || 'p_guest',
-      player_name: playerData.name || 'Alex Rivera (#10)',
+      player_id: playerData.id,
+      player_name: playerData.name,
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
       score: score,
