@@ -409,14 +409,31 @@ Object.assign(BHSSoccerApp.prototype, {
         try {
           const players = this.data.players || [];
           let playerSuccess = 0;
-          for (const p of players) {
-            const res = await window.supabaseService.upsertPlayer(schoolCode, p);
-            if (res) {
-              if (res.id) p.id = res.id;
-              playerSuccess++;
+          const teamId = this.activeTeamId;
+          const team = (this.data.teams || []).find(t => t.id === teamId);
+          if (!teamId || !team) {
+            // Local players carry no team column — a sync can only land them on
+            // the team currently selected. Refuse rather than guess.
+            report.push('⚠️ 👥 Players Roster skipped — no team is selected. Choose a team in the header first; synced players join that team.');
+          } else {
+            for (const p of players) {
+              const identity = await window.supabaseService.upsertPlayerIdentity(p);
+              let ok = false;
+              if (identity && identity.id) {
+                p.id = identity.id;
+                const memRes = await window.supabaseService.upsertTeamMembership(teamId, team.school_id, {
+                  player_id: identity.id,
+                  number: p.number,
+                  position: p.position,
+                  season_stats: p.seasonStats || p.season_stats,
+                  ratings: p.ratings
+                });
+                ok = !!(memRes && memRes.ok);
+              }
+              if (ok) playerSuccess++;
             }
+            report.push(`✅ 👥 Players Roster: ${playerSuccess} / ${players.length} players synced to DB`);
           }
-          report.push(`✅ 👥 Players Roster: ${playerSuccess} / ${players.length} players synced to DB`);
         } catch (e) {
           report.push(`❌ 👥 Players Roster Exception: ${e.message}`);
         }
@@ -426,7 +443,7 @@ Object.assign(BHSSoccerApp.prototype, {
           const matches = this.data.schedule || [];
           let matchSuccess = 0;
           for (const m of matches) {
-            const res = await window.supabaseService.upsertMatch(schoolCode, m);
+            const res = await window.supabaseService.upsertMatch(this.activeTeamId, m);
             if (res) {
               if (res.id) m.id = res.id;
               matchSuccess++;
@@ -854,7 +871,7 @@ Object.assign(BHSSoccerApp.prototype, {
     set(logId ? 'Saving…' : 'Recording…');
     const res = logId
       ? await window.supabaseService.updateMatrixResult(logId, payload)
-      : await window.supabaseService.logMatrixResult('bhs', payload);
+      : await window.supabaseService.logMatrixResult(this.activeTeamId, payload);
 
     if (!res.ok) return set(res.error || (logId ? 'Could not save that change.' : 'Could not record that result.'));
 
@@ -1272,6 +1289,12 @@ Object.assign(BHSSoccerApp.prototype, {
             const resU = this.upsertByName(this.data.userProfiles, imported);
             totalCount += imported.length; totalUpdated += resU.updated; totalInserted += resU.inserted;
           } else if (activeTarget === 'players') {
+            if (!this.activeTeamId) {
+              // The sheet has no team column, so rows can only land on the team
+              // currently selected. Refuse rather than guess.
+              warnings.push('Players sheet skipped — no team is selected. Choose a team in the header first; imported players join that team.');
+              continue;
+            }
             const playerDefaults = {
               number: 0, position: 'Midfielder', classYear: 'Junior', height: "5'10\"",
               ratings: { technical: 80, tactical: 80, physical: 80, mental: 80 },
@@ -1317,7 +1340,23 @@ Object.assign(BHSSoccerApp.prototype, {
             const resP = this.upsertByName(this.data.players, imported, playerDefaults);
             totalCount += imported.length; totalUpdated += resP.updated; totalInserted += resP.inserted;
             if (window.supabaseService?.isConfigured()) {
-              totalRejected += await persistAll(resP.toPersist, p => window.supabaseService.upsertPlayer('bhs', p));
+              const importTeamId = this.activeTeamId;
+              const importTeam = (this.data.teams || []).find(t => t.id === importTeamId);
+              // Count a row as rejected if either write fails, so the status
+              // line stays honest about what actually landed in the database.
+              totalRejected += await persistAll(resP.toPersist, async p => {
+                const identity = await window.supabaseService.upsertPlayerIdentity(p);
+                if (!identity || !identity.id) return false;
+                p.id = identity.id;
+                const memRes = await window.supabaseService.upsertTeamMembership(importTeamId, importTeam?.school_id, {
+                  player_id: identity.id,
+                  number: p.number,
+                  position: p.position,
+                  season_stats: p.seasonStats,
+                  ratings: p.ratings
+                });
+                return !!(memRes && memRes.ok);
+              });
             }
           } else if (activeTarget === 'schedule') {
             // Fixtures are matched on [date, time], so a sheet with no Time
@@ -1360,7 +1399,7 @@ Object.assign(BHSSoccerApp.prototype, {
             const resS = this.upsertByDateTime(this.data.schedule, imported, scheduleDefaults);
             totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
-              totalRejected += await persistAll(resS.toPersist, m => window.supabaseService.upsertMatch('bhs', m));
+              totalRejected += await persistAll(resS.toPersist, m => window.supabaseService.upsertMatch(this.activeTeamId, m));
             }
           } else if (activeTarget === 'drills') {
             const drillDefaults = { category: 'General', isDeleted: false, is_deleted: false };

@@ -146,14 +146,18 @@ Object.assign(BHSSoccerApp.prototype, {
     this.data.schedule.push(newMatch);
     this.saveData();
 
+    let saved = true;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      const cloudRes = await window.supabaseService.upsertMatch(this.data.school?.code || 'bhs', newMatch);
+      const cloudRes = await window.supabaseService.upsertMatch(this.activeTeamId, newMatch);
       if (cloudRes && cloudRes.id) newMatch.id = cloudRes.id;
+      else saved = false;
     }
 
     this.renderCurrentView();
     this.closeModals();
-    alert(`✅ SUCCESS!\n\nMatch vs "${newMatch.opponent}" added to Schedule & Database!`);
+    alert(saved
+      ? `✅ SUCCESS!\n\nMatch vs "${newMatch.opponent}" added to Schedule & Database!`
+      : `⚠️ Match vs "${newMatch.opponent}" was added to this screen but NOT saved to the database.\n\nIt will disappear on reload. Check the browser console.`);
   },
 
   openEditMatchModal(matchId) {
@@ -204,13 +208,17 @@ Object.assign(BHSSoccerApp.prototype, {
       this.data.schedule[idx] = updated;
       this.saveData();
 
+      let saved = true;
       if (window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.upsertMatch(this.data.school?.code || 'bhs', updated);
+        const cloudRes = await window.supabaseService.upsertMatch(this.activeTeamId, updated);
+        if (!(cloudRes && cloudRes.id)) saved = false;
       }
 
       this.renderCurrentView();
       this.closeModals();
-      alert(`✅ SUCCESS!\n\nMatch changes for vs "${updated.opponent}" saved to Schedule & Database!`);
+      alert(saved
+        ? `✅ SUCCESS!\n\nMatch changes for vs "${updated.opponent}" saved to Schedule & Database!`
+        : `⚠️ Match changes for vs "${updated.opponent}" were applied to this screen but NOT saved to the database.\n\nThey will be lost on reload. Check the browser console.`);
     }
   },
 

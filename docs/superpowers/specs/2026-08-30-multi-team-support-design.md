@@ -225,7 +225,12 @@ moved by hand.
    `matrix_stats` and `school_id` from `players`. Splitting this is the point: a bad copy stays
    recoverable instead of destructive.
 
-JV and club teams are then created through the UI, empty.
+JV and club teams are **not** created through the UI — no such form exists in Phase 1.
+`teams_write` and `team_coaches_write` are admin-only policies with no corresponding write path in
+`src/data/supabase.ts` and no form in the app, so a JV or club team is created (empty) and its
+coach assigned directly in the Supabase SQL editor; see the runbook for the exact statements.
+Building that creation surface is Phase 2 work — it is a real UI surface with its own permissions
+questions and deserves its own review.
 
 ### The order of operations matters
 

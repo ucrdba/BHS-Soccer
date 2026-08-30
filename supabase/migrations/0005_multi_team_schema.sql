@@ -78,14 +78,24 @@ create table if not exists public.team_players (
   is_deleted   boolean default false,
   created_at   timestamptz default now(),
   -- Composite FK: school_id must agree with the team's own school_id.
-  foreign key (team_id, school_id) references public.teams (id, school_id),
-  unique (team_id, player_id),
-  -- The central rule: one team per organization, several organizations.
-  unique (school_id, player_id)
+  foreign key (team_id, school_id) references public.teams (id, school_id)
 );
 
 create index if not exists team_players_team_idx   on public.team_players (team_id);
 create index if not exists team_players_player_idx on public.team_players (player_id);
+
+-- Both uniques must ignore soft-deleted rows. As plain constraints they would
+-- count a removed membership, so a player taken off Varsity could never be added
+-- to JV -- 23505, invisible on both rosters, with no way out from the UI.
+create unique index if not exists team_players_one_per_team
+  on public.team_players (team_id, player_id)
+  where not coalesce(is_deleted, false);
+
+-- The central rule: one team per organization, several organizations. Also
+-- partial, for the same reason as above.
+create unique index if not exists team_players_one_team_per_school
+  on public.team_players (school_id, player_id)
+  where not coalesce(is_deleted, false);
 
 -- ─── 4. team_coaches ───────────────────────────────────────────────────────
 
@@ -128,11 +138,21 @@ security definer
 stable
 set search_path = public
 as $$
+  -- The role check must wrap the membership check, not sit beside it: section 5
+  -- above makes current_profile_role() fall back to 'guest' once status is not
+  -- 'active', so that revoking a coach actually revokes them. An `exists` branch
+  -- on team_coaches alone would bypass that fallback entirely -- a rejected
+  -- profile with a surviving team_coaches row would keep full write on that
+  -- team, and team_coaches_write is admin-only, so there would be no other way
+  -- to revoke it. Do not simplify this back to a plain `or`.
   select public.current_profile_role() = 'admin'
-      or exists (
-        select 1 from public.team_coaches tc
-        where tc.team_id = target_team_id
-          and tc.profile_id = auth.uid()
+      or (
+        public.current_profile_role() in ('coach', 'admin')
+        and exists (
+          select 1 from public.team_coaches tc
+          where tc.team_id = target_team_id
+            and tc.profile_id = auth.uid()
+        )
       );
 $$;
 

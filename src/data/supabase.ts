@@ -899,9 +899,21 @@ class SupabaseService {
 
   /**
    * Puts a player on a team. Returns { ok, error } because the interesting
-   * failure is not an outage: unique (school_id, player_id) rejects a player
-   * who is already on another team in this same organization, which the design
+   * failure is not an outage: the partial unique index
+   * team_players_one_team_per_school rejects a player who is already on
+   * another (non-removed) team in this same organization, which the design
    * forbids on purpose. The caller shows that message to a coach.
+   *
+   * This is NOT a PostgREST `.upsert(..., { onConflict: 'team_id,player_id' })`
+   * on purpose. team_players_one_per_team / team_players_one_team_per_school
+   * are PARTIAL unique indexes (`where not coalesce(is_deleted, false)`), so a
+   * removed membership never blocks re-adding that player elsewhere. Postgres
+   * only infers a partial index as an ON CONFLICT arbiter when the statement
+   * carries the identical predicate, and PostgREST's `on_conflict` parameter
+   * has no way to express one -- pointing it at these columns raises 42P10
+   * ("no unique or exclusion constraint matching the ON CONFLICT
+   * specification"), not a clean upsert. So this looks up the live row by
+   * hand and updates it, falling back to insert.
    */
   async upsertTeamMembership(
     teamId: string,
@@ -923,8 +935,24 @@ class SupabaseService {
       if (membership.ratings) payload.ratings = membership.ratings;
       if (membership.id && this.isUuid(membership.id)) payload.id = membership.id;
 
-      const { data, error } = await this.client!
-        .from('team_players').upsert([payload], { onConflict: 'team_id,player_id' }).select();
+      if (!payload.id) {
+        const { data: existing, error: findErr } = await this.client!
+          .from('team_players')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('player_id', membership.player_id)
+          .or('is_deleted.is.null,is_deleted.eq.false')
+          .maybeSingle();
+        if (findErr) {
+          console.warn('Supabase upsertTeamMembership lookup notice:', findErr.message);
+          return { ok: false, error: findErr.message };
+        }
+        if (existing && existing.id) payload.id = existing.id;
+      }
+
+      const { data, error } = payload.id
+        ? await this.client!.from('team_players').update(payload).eq('id', payload.id).select()
+        : await this.client!.from('team_players').insert([payload]).select();
       if (error) {
         console.warn('Supabase upsertTeamMembership notice:', error.message);
         // 23505 is the unique violation. Say which rule was hit rather than

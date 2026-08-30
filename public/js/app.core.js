@@ -327,13 +327,11 @@ class BHSSoccerApp {
         // no standings row, and must still appear on the leaderboard as 0/0/0
         // rather than disappearing from it.
         //
-        // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
-        // players mapping above (app.core.js:234). Leave that line alone — it is
-        // retained only so `player.matrixStats` stays populated for the roster
-        // card and leaderboard between syncs; the `matrix_stats` column itself is
-        // unread elsewhere (the players export does not touch it) and is slated
-        // to be dropped in Phase 2. This block simply overwrites the in-memory
-        // value with the derived one.
+        // The players mapping above (from fetchTeamRoster) sets no `matrixStats`
+        // of its own — `matrix_stats` is a `players` column `0005` drops, and
+        // per-team standings live in Postgres, derived from matrix_logs, not
+        // stored on the player or the membership row. This block is what
+        // populates `player.matrixStats` for the roster card and leaderboard.
         const dbStandings = await window.supabaseService.fetchMatrixStandings(this.activeTeamId);
         const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
         const unrankedFrom = (dbStandings || []).length + 1;
@@ -357,20 +355,23 @@ class BHSSoccerApp {
         // the panel that renders it resolves player names against this.data.players.
         this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs(this.activeTeamId)) || [];
 
+        // Assigned unconditionally, like the roster and matrix logs above: an
+        // empty team must produce an empty schedule. Guarding this on
+        // `dbSchedule.length > 0` let a team switch leave the previous team's
+        // fixtures in place — Varsity's schedule rendering under JV's name
+        // after switching to an empty JV team.
         const dbSchedule = await window.supabaseService.fetchSchedule(this.activeTeamId);
-        if (dbSchedule && dbSchedule.length > 0) {
-          this.data.schedule = dbSchedule.map(s => ({
-            id: s.id,
-            date: s.match_date,
-            time: s.match_time,
-            opponent: s.opponent,
-            location: s.location,
-            status: s.status,
-            isHome: s.is_home,
-            score: s.score,
-            result: s.result
-          }));
-        }
+        this.data.schedule = (dbSchedule || []).map(s => ({
+          id: s.id,
+          date: s.match_date,
+          time: s.match_time,
+          opponent: s.opponent,
+          location: s.location,
+          status: s.status,
+          isHome: s.is_home,
+          score: s.score,
+          result: s.result
+        }));
       }
 
       const dbPlans = await window.supabaseService.fetchPracticePlans('bhs');

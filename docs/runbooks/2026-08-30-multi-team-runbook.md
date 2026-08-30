@@ -83,6 +83,28 @@ Expected: success, no rows returned.
 
 ---
 
+## Step 2b — Create a second team (no UI for this in Phase 1)
+
+`0005` creates exactly one team (Varsity), and no code creates another: `teams_write` and
+`team_coaches_write` are admin-only policies with no write path in `src/data/supabase.ts` and no
+form in the app. Creating a JV or club team and assigning a coach to it is done here, by hand, as
+`postgres` (or an active admin) in the SQL editor. Building that creation UI is Phase 2 work.
+
+```sql
+-- Create a second team and put yourself on it. Until a second team exists the
+-- switcher does not render (it hides below two teams) and multi-team behaviour
+-- cannot be observed at all.
+insert into public.teams (school_id, name, season)
+select id, 'JV', '2026' from public.schools where code = 'bhs';
+
+insert into public.team_coaches (team_id, profile_id)
+select t.id, p.id
+  from public.teams t, public.profiles p
+ where t.name = 'JV' and p.role in ('coach','admin') and p.status = 'active';
+```
+
+---
+
 ## Step 3 — Fixtures for checks 1–4
 
 Checks 1–4 below need a second team in BHS, a team in a different school, and **two** fixture
@@ -141,9 +163,9 @@ a real failure, but not the one this check is for. Testing the constraint itself
 a role RLS doesn't apply to.
 
 Player A is already on JV Fixture (from Step 3). Try to also put them on Varsity — a
-**different team, same school** — so this trips `unique (school_id, player_id)` specifically,
-without also colliding with `unique (team_id, player_id)` (the target team differs, so that
-constraint has nothing to say here):
+**different team, same school** — so this trips the `team_players_one_team_per_school` partial
+unique index specifically, without also colliding with `team_players_one_per_team` (the target
+team differs, so that index has nothing to say here):
 
 ```sql
 insert into public.team_players (team_id, school_id, player_id)
@@ -155,13 +177,17 @@ values (
 ```
 
 **Expected:** fails — `ERROR 23505: duplicate key value violates unique constraint
-"team_players_school_id_player_id_key"`.
+"team_players_one_team_per_school"`.
 
-**If the constraint is missing or scoped wrong:** the statement returns `INSERT 0 1` — no error at
+**If the index is missing or scoped wrong:** the statement returns `INSERT 0 1` — no error at
 all. The same player now has two live rows in the same school, and the one-team-per-organization
 rule is not enforced; rosters will diverge from there. A passing run must show the `23505` error
-naming `team_players_school_id_player_id_key`, not merely "the statement completed" — and not the
-`team_players_team_id_player_id_key` constraint, which this insert does not touch.
+naming `team_players_one_team_per_school`, not merely "the statement completed" — and not the
+`team_players_one_per_team` index, which this insert does not touch.
+
+Note both are **partial** unique indexes (`where not coalesce(is_deleted, false)`), not table
+constraints — they ignore soft-deleted rows on purpose, so removing a player from Varsity and
+re-adding them to JV does not permanently collide with their old, soft-deleted membership.
 
 ### 2. The same player, a different school, succeeds
 
@@ -182,7 +208,7 @@ rollback;
 
 **Expected:** succeeds inside the transaction (`INSERT 0 1`), then is rolled back.
 
-**If it fails instead:** `unique (school_id, player_id)` is scoped too broadly (for example, a
+**If it fails instead:** `team_players_one_team_per_school` is scoped too broadly (for example, a
 bare `unique (player_id)`, or the wrong column pairing) and is blocking a legitimate second
 membership in a different organization. That failure would mean the entire "one person, several
 teams across organizations" feature — the reason this schema exists — does not work.
@@ -192,9 +218,9 @@ teams across organizations" feature — the reason this schema exists — does n
 **Identity:** `postgres`.
 
 Uses player **B** — the one Step 3 left with no membership anywhere — specifically so this insert
-cannot also collide with `unique (team_id, player_id)` or `unique (school_id, player_id)`. If it
+cannot also collide with `team_players_one_per_team` or `team_players_one_team_per_school`. If it
 used player A (already on JV Fixture, same team_id this statement targets), a failure could mean
-either constraint fired, telling you nothing about the FK specifically.
+either index fired, telling you nothing about the FK specifically.
 
 ```sql
 insert into public.team_players (team_id, school_id, player_id)
@@ -209,7 +235,7 @@ values (
 constraint "team_players_team_id_school_id_fkey"`.
 
 **If it succeeds instead:** `team_players.school_id` can drift from the team it actually names,
-and check 1's `unique (school_id, player_id)` guard becomes meaningless — it would be enforcing
+and check 1's `team_players_one_team_per_school` guard becomes meaningless — it would be enforcing
 uniqueness against a value that no longer reliably identifies the organization.
 
 ### 4. `is_team_coach` gates writes per team, not globally
