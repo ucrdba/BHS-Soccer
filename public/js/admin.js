@@ -1161,7 +1161,26 @@ Object.assign(BHSSoccerApp.prototype, {
         const optI = (v) => { const s = opt(v); return s === undefined ? undefined : (parseInt(s, 10) || 0); };
         const optB = (v) => { const s = opt(v); return s === undefined ? undefined : s.toLowerCase() === 'true'; };
         let totalCount = 0;
-        let totalUpdated = 0, totalInserted = 0;
+        let totalUpdated = 0, totalInserted = 0, totalRejected = 0;
+
+        /**
+         * Writes each row and counts the ones the database refused.
+         *
+         * The upsert helpers log the error and return null rather than throwing,
+         * so a bare `for (...) await upsert(...)` loop cannot tell a stored row
+         * from a rejected one — and the status line would report a clean import
+         * for rows that never landed. That became reachable the moment a unique
+         * index went on players(school_id, lower(name)): re-importing a name that
+         * belongs to a soft-deleted player now raises 23505 instead of silently
+         * inserting a duplicate. Better, but only if somebody says so.
+         */
+        const persistAll = async (rows, write) => {
+          let rejected = 0;
+          for (const row of rows || []) {
+            if (!(await write(row))) rejected++;
+          }
+          return rejected;
+        };
 
         let workbookSheets = {};
 
@@ -1295,7 +1314,7 @@ Object.assign(BHSSoccerApp.prototype, {
             const resP = this.upsertByName(this.data.players, imported, playerDefaults);
             totalCount += imported.length; totalUpdated += resP.updated; totalInserted += resP.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const p of resP.toPersist) await window.supabaseService.upsertPlayer('bhs', p);
+              totalRejected += await persistAll(resP.toPersist, p => window.supabaseService.upsertPlayer('bhs', p));
             }
           } else if (activeTarget === 'schedule') {
             const scheduleDefaults = {
@@ -1321,7 +1340,7 @@ Object.assign(BHSSoccerApp.prototype, {
             const resS = this.upsertByDateTime(this.data.schedule, imported, scheduleDefaults);
             totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const m of resS.toPersist) await window.supabaseService.upsertMatch('bhs', m);
+              totalRejected += await persistAll(resS.toPersist, m => window.supabaseService.upsertMatch('bhs', m));
             }
           } else if (activeTarget === 'drills') {
             const drillDefaults = { category: 'General', isDeleted: false, is_deleted: false };
@@ -1337,7 +1356,7 @@ Object.assign(BHSSoccerApp.prototype, {
             const resD = this.upsertByName(this.data.drillsBank, imported, drillDefaults);
             totalCount += imported.length; totalUpdated += resD.updated; totalInserted += resD.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const d of resD.toPersist) await window.supabaseService.upsertDrillBankItem('bhs', d);
+              totalRejected += await persistAll(resD.toPersist, d => window.supabaseService.upsertDrillBankItem('bhs', d));
             }
           } else if (activeTarget === 'plan') {
             const imported = rows.filter(r => r.DrillName || r.drill || r.Name || r.name).map(r => ({
@@ -1369,7 +1388,7 @@ Object.assign(BHSSoccerApp.prototype, {
             const resC = this.upsertByName(this.data.coaches, imported, coachDefaults);
             totalCount += imported.length; totalUpdated += resC.updated; totalInserted += resC.inserted;
             if (window.supabaseService?.isConfigured()) {
-              for (const c of resC.toPersist) await window.supabaseService.upsertCoach('bhs', c);
+              totalRejected += await persistAll(resC.toPersist, c => window.supabaseService.upsertCoach('bhs', c));
             }
           } else if (activeTarget === 'thoughts') {
             const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
@@ -1443,7 +1462,15 @@ Object.assign(BHSSoccerApp.prototype, {
         }
 
         this.renderCurrentView();
-        if (status) status.textContent = `✅ Imported ${totalCount} records — ${totalUpdated} updated, ${totalInserted} added.`;
+        if (status) {
+          // A rejection is not a failed import, but it is not a clean one either:
+          // say so plainly rather than reporting only what succeeded.
+          const rejected = totalRejected
+            ? `, ${totalRejected} rejected by the database (see the browser console)`
+            : '';
+          status.textContent = `${totalRejected ? '⚠️' : '✅'} Imported ${totalCount} records — `
+            + `${totalUpdated} updated, ${totalInserted} added${rejected}.`;
+        }
       } catch (err) {
         console.error('Import error:', err);
         if (status) status.textContent = `❌ Import failed: ${err.message}`;
