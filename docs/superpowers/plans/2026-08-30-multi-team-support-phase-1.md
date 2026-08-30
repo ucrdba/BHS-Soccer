@@ -873,11 +873,55 @@ git commit -m "feat: team switcher grouped by organization"
 
 ---
 
-## Task 5: Search-first add-player
+## Task 5: Player CRUD against the new model, and search-first add
+
+> **[EXPANDED 2026-08-30 during execution.]** This task originally covered only the search-first
+> add flow. Task 2's review found that no task in this plan rewires the *existing* player CRUD:
+> `roster.view.js:187` (`addPlayer`) and `:266` (`saveEditPlayer`) both call
+> `upsertPlayer('bhs', …)`, which writes `number`, `season_stats`, `ratings`, `matrix_stats` and
+> `school_id` — every one of which `0005` drops. After the migration those calls fail with "column
+> does not exist", the error is swallowed into `console.error`, and the form silently does nothing.
+> This task now owns the whole player-write surface, so one reviewer sees every path at once —
+> which is the vantage point that would have caught the omission in the first place.
 
 **Files:**
 - Modify: `public/js/views/roster.view.js`
 - Modify: `index.html`
+
+**Additional requirement — rewire the existing player writes.**
+
+`addPlayer(playerData)` must create the person and the membership in sequence: call
+`upsertPlayerIdentity({ name, classYear, height, photo })`, take the returned `id`, then call
+`upsertTeamMembership(this.activeTeamId, team.school_id, { player_id, number, position })`.
+
+There is **no transaction across those two writes**. If the membership write fails, the result is a
+person who exists on no team. That is recoverable rather than corrupt — `searchPlayersByName` finds
+them, so the coach can complete the add on a second attempt — but it must be *said*, not silently
+left:
+
+```js
+    if (!identity || !identity.id) { window.alert('Could not create that player.'); return; }
+    const res = await window.supabaseService.upsertTeamMembership(teamId, schoolId, {
+      player_id: identity.id, number: parseInt(playerData.number) || null, position: playerData.position
+    });
+    if (!res.ok) {
+      // The person now exists but is on no team. Say so plainly: the coach can
+      // finish the job from the search-first flow rather than creating a duplicate.
+      window.alert((res.error || 'Could not add them to this team.') +
+        '
+
+The player was created but is not on a team yet — add them from "Already in the system?".');
+      return;
+    }
+```
+
+`saveEditPlayer(playerId, playerData)` splits the same way: identity fields
+(`name`, `classYear`, `height`, `photo`) go to `upsertPlayerIdentity`; per-team fields
+(`number`, `position`, `seasonStats`, `ratings`) go to `upsertTeamMembership` for the active team.
+
+`deletePlayer(playerId)` must soft-delete the **membership**, not the person — removing someone
+from varsity must not remove them from their club team. Set `is_deleted` on the `team_players` row
+for the active team only.
 
 **Interfaces:**
 - Consumes: `searchPlayersByName(query)` from Task 2; `this.activeTeamId` from Task 3.
