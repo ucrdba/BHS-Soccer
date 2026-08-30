@@ -634,7 +634,10 @@ class BHSSoccerApp {
     } else if (this.currentView === 'coaches') {
       container.innerHTML = this.renderCoachesView();
     }
-    
+
+    const switcherMount = document.getElementById('teamSwitcherMount');
+    if (switcherMount) switcherMount.innerHTML = this.renderTeamSwitcher();
+
     this.attachDynamicListeners();
   }
 }

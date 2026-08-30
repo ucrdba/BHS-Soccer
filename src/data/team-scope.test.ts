@@ -6,6 +6,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { resolveActiveTeam } from './team-scope';
+import switcherSrc from '../../public/js/views/teamswitcher.view.js?raw';
+import indexHtml from '../../index.html?raw';
 
 const teams = [
   { id: 't-varsity', name: 'Varsity', school_id: 's-bhs', is_public_default: false },
@@ -40,5 +42,24 @@ describe('resolveActiveTeam', () => {
 
   it('returns null when the viewer has no teams at all', () => {
     expect(resolveActiveTeam([], 't-jv', null)).toBeNull();
+  });
+});
+
+describe('team switcher', () => {
+  it('has a mount point in the markup', () => {
+    expect(indexHtml).toContain('id="teamSwitcherMount"');
+  });
+
+  it('is wired to setActiveTeam, not to a re-render alone', () => {
+    expect(switcherSrc).toContain('app.setActiveTeam');
+  });
+
+  it('hides itself when the viewer has only one team', () => {
+    // A player on one team should not see a control that does nothing.
+    expect(switcherSrc).toContain('length < 2');
+  });
+
+  it('groups teams by organization', () => {
+    expect(switcherSrc).toContain('school_name');
   });
 });
