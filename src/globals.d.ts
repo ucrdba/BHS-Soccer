@@ -28,7 +28,7 @@ declare global {
     fetchSchools(): Promise<Partial<School>[] | null>;
     fetchDrillsBank(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchPlayers(schoolCode: string): Promise<Record<string, any>[] | null>;
-    fetchSchedule(schoolCode: string): Promise<Record<string, any>[] | null>;
+    fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
     fetchPracticePlans(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchCoaches(schoolCode: string): Promise<Partial<Coach>[] | null>;
     fetchDailyThoughts(schoolCode: string): Promise<Partial<DailyThought>[] | null>;
@@ -36,8 +36,16 @@ declare global {
     upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string }): Promise<Record<string, any> | null>;
     upsertPlayer(schoolCode: string, player: unknown): Promise<{ id?: string } | null>;
     deletePlayer(playerId: string): Promise<unknown>;
-    upsertMatch(schoolCode: string, match: unknown): Promise<{ id?: string } | null>;
+    upsertMatch(teamId: string, match: unknown): Promise<{ id?: string } | null>;
     deleteMatch(matchId: string): Promise<unknown>;
+
+    // Multi-team support (Phase 1)
+    fetchTeamsForViewer(): Promise<Record<string, any>[] | null>;
+    fetchPublicDefaultTeamId(): Promise<string | null>;
+    fetchTeamRoster(teamId: string): Promise<Record<string, any>[] | null>;
+    searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
+    upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;
+    upsertTeamMembership(teamId: string, schoolId: string, membership: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
 
     // Real Supabase Auth
     signUpUser(email: string, password: string, metadata?: Record<string, any>): Promise<SupabaseAuthResult | null>;
@@ -51,9 +59,9 @@ declare global {
     rejectProfile(userId: string): Promise<Record<string, any> | null>;
     fetchPendingApprovals(schoolCode?: string): Promise<Record<string, any>[] | null>;
     fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
-    fetchMatrixStandings(schoolId?: string): Promise<Record<string, any>[] | null>;
-    fetchMatrixLogs(schoolId?: string): Promise<Record<string, any>[] | null>;
-    logMatrixResult(schoolId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
+    fetchMatrixStandings(teamId: string): Promise<Record<string, any>[] | null>;
+    fetchMatrixLogs(teamId: string): Promise<Record<string, any>[] | null>;
+    logMatrixResult(teamId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
     updateMatrixResult(id: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
     deleteMatrixResult(id: string): Promise<{ ok: boolean; error?: string }>;
   }

@@ -502,19 +502,110 @@ class SupabaseService {
     return data;
   }
 
-  async fetchSchedule(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+  /** Teams the current viewer may switch between: their own if signed in, else the public default. */
+  async fetchTeamsForViewer(): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured()) return null;
-    let query = this.client!.from('schedule').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true }) as any;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (schoolUuid) query = query.eq('school_id', schoolUuid);
-    const { data, error } = await query;
+    try {
+      const { data: session } = await this.client!.auth.getSession();
+      const uid = session?.session?.user?.id;
+
+      let ids: string[] | null = null;
+      if (uid) {
+        // team_coaches.profile_id IS the auth uid, but team_players.player_id
+        // references players(id) — a different table. The link between a signed-in
+        // person and their player row is profiles.player_id, so it has to be
+        // resolved first. Comparing uid to player_id directly never matches, and
+        // the failure is silent: the player just sees the public default team.
+        const { data: prof } = await this.client!
+          .from('profiles').select('player_id').eq('id', uid).maybeSingle();
+        const playerId = prof?.player_id || null;
+
+        const [{ data: coached }, { data: played }] = await Promise.all([
+          this.client!.from('team_coaches').select('team_id').eq('profile_id', uid),
+          playerId
+            ? this.client!.from('team_players').select('team_id').eq('player_id', playerId)
+            : Promise.resolve({ data: [] as any[] })
+        ]);
+        const merged = [...(coached || []), ...(played || [])].map((r: any) => r.team_id);
+        if (merged.length > 0) ids = Array.from(new Set(merged));
+      }
+
+      let q = this.client!
+        .from('teams')
+        .select('id, school_id, name, season, is_public_default, schools(name, kind)')
+        .eq('is_deleted', false);
+      // No membership: a signed-out visitor, or someone on no team. Both see
+      // the public default rather than an empty app.
+      if (ids) q = q.in('id', ids); else q = q.eq('is_public_default', true);
+
+      const { data, error } = await q;
+      if (error) { console.warn('Supabase fetchTeamsForViewer notice:', error.message); return null; }
+      return (data || []).map((t: any) => ({
+        id: t.id, school_id: t.school_id, name: t.name, season: t.season,
+        is_public_default: t.is_public_default,
+        school_name: t.schools?.name || '', school_kind: t.schools?.kind || 'school'
+      })).sort((a, b) => (a.school_name + a.name).localeCompare(b.school_name + b.name));
+    } catch (e) {
+      console.warn('Supabase fetchTeamsForViewer exception:', e);
+      return null;
+    }
+  }
+
+  /** The team a signed-out visitor (or anyone with no team of their own) sees. */
+  async fetchPublicDefaultTeamId(): Promise<string | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const { data, error } = await this.client!
+        .from('teams')
+        .select('id')
+        .eq('is_public_default', true)
+        .eq('is_deleted', false)
+        .maybeSingle();
+      if (error) { console.warn('Supabase fetchPublicDefaultTeamId notice:', error.message); return null; }
+      return data?.id || null;
+    } catch (e) {
+      console.warn('Supabase fetchPublicDefaultTeamId exception:', e);
+      return null;
+    }
+  }
+
+  async fetchTeamRoster(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
+    const { data, error } = await this.client!
+      .from('team_players')
+      .select('id, team_id, school_id, number, position, season_stats, ratings, is_deleted, players(id, name, class_year, height, photo_url)')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false);
+    if (error) { console.warn('Supabase fetchTeamRoster notice:', error.message); return null; }
+    return data;
+  }
+
+  /** Name search for the add-player flow, so a second team reuses an existing person. */
+  async searchPlayersByName(query: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const q = String(query || '').trim();
+    if (q.length < 2) return [];
+    const { data, error } = await this.client!
+      .from('players').select('id, name, class_year, photo_url')
+      .ilike('name', `%${q}%`).limit(10);
+    if (error) { console.warn('Supabase searchPlayersByName notice:', error.message); return null; }
+    return data;
+  }
+
+  async fetchSchedule(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
+    const { data, error } = await this.client!
+      .from('schedule')
+      .select('*')
+      .or('is_deleted.is.null,is_deleted.eq.false')
+      .eq('team_id', teamId)
+      .order('created_at', { ascending: true });
     if (error) { console.error('Supabase fetchSchedule error:', error); return null; }
     return data;
   }
 
-  async upsertMatch(schoolId: string, match: any): Promise<{ id?: string } | null> {
+  async upsertMatch(teamId: string, match: any): Promise<{ id?: string } | null> {
     if (!this.isConfigured()) return null;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload: Record<string, any> = {
       opponent: match.opponent,
       match_date: match.date || match.match_date,
@@ -526,7 +617,7 @@ class SupabaseService {
       result: match.result || null,
       is_deleted: match.is_deleted || match.isDeleted || false
     };
-    if (schoolUuid) payload.school_id = schoolUuid;
+    if (teamId) payload.team_id = teamId;
     if (match.id && this.isUuid(match.id)) payload.id = match.id;
     const { data, error } = await this.client!
       .from('schedule')
@@ -780,6 +871,77 @@ class SupabaseService {
       .select();
     if (error) console.error('Supabase upsertPlayer error:', error);
     return data ? data[0] : null;
+  }
+
+  /**
+   * Writes only the identity columns a player row still owns once per-team
+   * data (number, position, season_stats, ratings, matrix_stats, school_id)
+   * has moved to team_players. Same upsert shape as upsertPlayer.
+   */
+  async upsertPlayerIdentity(player: any): Promise<{ id?: string } | null> {
+    if (!this.isConfigured()) return null;
+    const payload: Record<string, any> = {
+      name: player.name,
+      class_year: player.classYear || player.class_year || 'Senior',
+      height: player.height || '',
+      photo_url: player.photo || player.photo_url || null
+    };
+    if (player.id && this.isUuid(player.id)) payload.id = player.id;
+
+    const { data, error } = await this.client!
+      .from('players')
+      .upsert([payload])
+      .select();
+    if (error) { console.warn('Supabase upsertPlayerIdentity notice:', error.message); return null; }
+    return data ? data[0] : null;
+  }
+
+  /**
+   * Puts a player on a team. Returns { ok, error } because the interesting
+   * failure is not an outage: unique (school_id, player_id) rejects a player
+   * who is already on another team in this same organization, which the design
+   * forbids on purpose. The caller shows that message to a coach.
+   */
+  async upsertTeamMembership(
+    teamId: string,
+    schoolId: string,
+    membership: Record<string, any>
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !schoolId) return { ok: false, error: 'No team selected.' };
+    try {
+      const payload: Record<string, any> = {
+        team_id: teamId,
+        school_id: schoolId,
+        player_id: membership.player_id,
+        number: membership.number ?? null,
+        position: membership.position ?? null,
+        is_deleted: false
+      };
+      if (membership.season_stats) payload.season_stats = membership.season_stats;
+      if (membership.ratings) payload.ratings = membership.ratings;
+      if (membership.id && this.isUuid(membership.id)) payload.id = membership.id;
+
+      const { data, error } = await this.client!
+        .from('team_players').upsert([payload], { onConflict: 'team_id,player_id' }).select();
+      if (error) {
+        console.warn('Supabase upsertTeamMembership notice:', error.message);
+        // 23505 is the unique violation. Say which rule was hit rather than
+        // handing a coach a Postgres error code.
+        if (error.code === '23505') {
+          return { ok: false, error: 'That player is already on another team in this organization.' };
+        }
+        return { ok: false, error: error.message };
+      }
+      // An RLS denial returns no error and no rows, so zero rows is a refusal.
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. You must coach this team.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase upsertTeamMembership exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
   }
 
   async deletePlayer(playerId: string): Promise<any> {
@@ -1089,15 +1251,13 @@ class SupabaseService {
     }
   }
 
-  async fetchMatrixStandings(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
-    if (!this.isConfigured()) return null;
+  async fetchMatrixStandings(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
     try {
-      const uuid = await this.getSchoolUuid(schoolId);
-      if (!uuid) return null;
       const { data, error } = await this.client!
         .from('matrix_standings')
         .select('*')
-        .eq('school_id', uuid);
+        .eq('team_id', teamId);
       if (error) { console.warn('Supabase fetchMatrixStandings notice:', error.message); return null; }
       return data;
     } catch (e) {
@@ -1106,15 +1266,13 @@ class SupabaseService {
     }
   }
 
-  async fetchMatrixLogs(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
-    if (!this.isConfigured()) return null;
+  async fetchMatrixLogs(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
     try {
-      const uuid = await this.getSchoolUuid(schoolId);
-      if (!uuid) return null;
       const { data, error } = await this.client!
         .from('matrix_logs')
         .select('*')
-        .eq('school_id', uuid)
+        .eq('team_id', teamId)
         .eq('is_deleted', false)
         .order('occurred_on', { ascending: false });
       if (error) { console.warn('Supabase fetchMatrixLogs notice:', error.message); return null; }
@@ -1125,14 +1283,12 @@ class SupabaseService {
     }
   }
 
-  async logMatrixResult(schoolId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }> {
+  async logMatrixResult(teamId: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId) return { ok: false, error: 'No team selected.' };
     try {
-      const uuid = await this.getSchoolUuid(schoolId);
-      if (!uuid) return { ok: false, error: 'Could not resolve the school.' };
-
       const payload: Record<string, any> = {
-        school_id: uuid,
+        team_id: teamId,
         player_a_id: result.playerAId,
         player_b_id: result.playerBId,
         outcome: result.outcome,
