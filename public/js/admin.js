@@ -1359,6 +1359,13 @@ Object.assign(BHSSoccerApp.prototype, {
               });
             }
           } else if (activeTarget === 'schedule') {
+            if (!this.activeTeamId) {
+              // The sheet has no team column, so rows can only land on the team
+              // currently selected. Refuse rather than guess.
+              warnings.push('Schedule sheet skipped — no team is selected. Choose a team in the header first; imported fixtures join that team.');
+              continue;
+            }
+
             // Fixtures are matched on [date, time], so a sheet with no Time
             // column cannot match anything: every row would key as "AUG 14,
             // 2026|" and insert as a duplicate of a fixture that already

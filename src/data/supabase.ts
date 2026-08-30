@@ -607,6 +607,9 @@ class SupabaseService {
 
   async upsertMatch(teamId: string, match: any): Promise<{ id?: string } | null> {
     if (!this.isConfigured()) return null;
+    // Without a team the row is invisible to every read that follows, and the
+    // caller would report success over a permanent silent loss.
+    if (!teamId) { console.warn('upsertMatch: no team selected; refusing to write an unscoped fixture.'); return null; }
     const payload: Record<string, any> = {
       opponent: match.opponent,
       match_date: match.date || match.match_date,

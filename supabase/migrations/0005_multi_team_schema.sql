@@ -248,18 +248,23 @@ select t.id, p.id
 on conflict (team_id, profile_id) do nothing;
 
 -- Every existing player joins it, carrying their per-team data across
--- unchanged. Re-runnable only before any player is moved to a different team:
--- the ON CONFLICT clause below only catches a (team_id, player_id) collision,
--- not the (school_id, player_id) constraint that actually enforces
--- one-team-per-organization, so re-running this after a player has moved
--- teams aborts with 23505.
+-- unchanged. team_players_one_per_team / team_players_one_team_per_school are
+-- PARTIAL unique indexes (they ignore soft-deleted rows), and Postgres will
+-- not infer a partial index as an ON CONFLICT arbiter from a bare column list
+-- -- doing so raises 42P10. There is no non-partial index left on these
+-- columns to infer instead, so this uses the unqualified `on conflict do
+-- nothing`, which needs no arbiter at all. That also means it is re-runnable
+-- only before any player is moved to a different team: an unqualified
+-- `do nothing` skips a row on ANY conflict on this table, including the one
+-- the (school_id, player_id) index enforces, so re-running this after a
+-- player has moved teams silently does nothing rather than erroring.
 insert into public.team_players (team_id, school_id, player_id, number, position, season_stats, ratings, is_deleted)
 select t.id, p.school_id, p.id, p.number, p.position, p.season_stats, p.ratings, coalesce(p.is_deleted, false)
   from public.players p
   join public.teams t
     on t.school_id = p.school_id and t.name = 'Varsity'
  where p.school_id = '7ebbe980-b87e-421f-a11f-788ca2519504'
-on conflict (team_id, player_id) do nothing;
+on conflict do nothing;
 
 -- Existing fixtures and results belong to that team.
 update public.schedule    s set team_id = t.id from public.teams t
