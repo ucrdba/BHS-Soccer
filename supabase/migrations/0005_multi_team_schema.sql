@@ -6,21 +6,35 @@
 -- NUMBERING: 0004 belongs to the parked feat/google-signin-allowlist branch and
 -- is deliberately skipped here so the two branches cannot collide.
 --
--- THIS IS MIGRATION A OF TWO, AND THE ORDER MATTERS:
---   1. apply this file          2. deploy the application change
---   3. run the runbook checks   4. only then apply 0006
--- Applying this without deploying the code leaves the app writing to
--- players.number and players.season_stats, which 0006 then deletes silently.
+-- APPLY THIS AT MERGE TIME, NOT BEFORE.
 --
--- Rollback, in this order:
---   1. restore matrix_standings from 0003
---   2. alter table public.schedule    drop column team_id;
---      alter table public.matrix_logs drop column team_id;
---   3. drop table if exists public.team_players, public.team_coaches, public.teams cascade;
---   4. drop function if exists public.is_team_coach(uuid);
---   5. alter table public.schools drop column kind;
---   6. restore current_profile_role() from supabase_migration_auth.sql section 2
---   Nothing in this file drops a column holding data, so a rollback loses nothing.
+-- This used to be split across two files so a bad copy of the existing rows
+-- stayed recoverable. The project owner has since said the current data is
+-- reproducible and does not need protecting, which removes that split's whole
+-- justification -- see docs/superpowers/specs/2026-08-30-multi-team-support-design.md
+-- and the plan's ledger for the decision. One migration now.
+--
+-- The one consequence that survives the collapse is not about data, it is
+-- about timing: this migration drops players.number, players.season_stats and
+-- the rest (final section, below) in the same breath as it creates the new
+-- tables. The currently deployed application still reads those columns, so
+-- from the moment this is applied until the application change ships, the
+-- live site's roster is broken. There is no window to manage and nothing to
+-- sequence -- just do not apply this to a database whose application has not
+-- been updated yet.
+--
+-- The same window also empties the Matrix panel: this migration drops and
+-- recreates matrix_standings with team_id in place of school_id, and the
+-- currently-deployed fetchMatrixStandings queries .eq('school_id', ...),
+-- which errors from the moment this lands. That error is swallowed into a
+-- console.warn returning null, so the panel goes quietly blank rather than
+-- throwing. Same window as the roster breakage above, not a second one.
+--
+-- Rollback: there is none, once applied. The final section drops
+-- players.number/position/season_stats/ratings/matrix_stats/school_id and
+-- schedule.school_id/matrix_logs.school_id; those columns are the only copy
+-- of that data. Restoring the pre-migration schema after this has run means
+-- restoring from a backup taken before it ran.
 
 -- ─── 1. schools: say what the table actually holds ─────────────────────────
 
@@ -174,9 +188,9 @@ create policy "team_coaches_write" on public.team_coaches
 
 -- ─── 8. Rescope schedule and matrix_logs ───────────────────────────────────
 --
--- team_id is ADDED here and school_id is LEFT IN PLACE. 0006 drops school_id
--- after the code ships -- keeping both columns is what makes the deploy window
--- survivable.
+-- team_id is added alongside school_id rather than in its place: the data
+-- migration below (section 9) needs the old column to know which team a row
+-- belongs to, and the final section drops it once that backfill is done.
 
 alter table public.schedule    add column if not exists team_id uuid references public.teams(id) on delete cascade;
 alter table public.matrix_logs add column if not exists team_id uuid references public.teams(id) on delete cascade;
@@ -187,7 +201,11 @@ alter table public.matrix_logs add column if not exists team_id uuid references 
 update public.schools set kind = 'school' where code in ('bhs','abc');
 update public.schools set kind = 'club'   where code = 'vhs';
 
--- Diagnostics cruft from the admin panel. No dependent rows.
+-- Diagnostics cruft from the admin panel. This DELETE cascades: players,
+-- schedule, matrix_logs, profiles and drills_bank all declare
+-- school_id ... on delete cascade against schools. Confirm the diagnostic
+-- schools are actually empty first -- see the pre-flight in the runbook's
+-- Step 1.
 delete from public.schools where code like 'diag\_%';
 
 -- Beaumont's existing squad becomes Varsity, and it is what the public sees.
@@ -195,7 +213,26 @@ insert into public.teams (school_id, name, season, is_public_default)
 values ('7ebbe980-b87e-421f-a11f-788ca2519504', 'Varsity', '2026', true)
 on conflict (school_id, name) do nothing;
 
--- Every existing player joins it, carrying their per-team data across unchanged.
+-- Existing coaches keep the access they have today. Without this,
+-- is_team_coach() is true only for admins the moment the application change
+-- ships, and team_coaches_write is admin-only -- so a coach could not restore
+-- their own access. A manual runbook step here would be a step someone
+-- forgets, so it happens in the migration instead.
+insert into public.team_coaches (team_id, profile_id)
+select t.id, p.id
+  from public.profiles p
+  join public.teams t
+    on t.school_id = '7ebbe980-b87e-421f-a11f-788ca2519504' and t.name = 'Varsity'
+ where p.role in ('coach','admin')
+   and p.status = 'active'
+on conflict (team_id, profile_id) do nothing;
+
+-- Every existing player joins it, carrying their per-team data across
+-- unchanged. Re-runnable only before any player is moved to a different team:
+-- the ON CONFLICT clause below only catches a (team_id, player_id) collision,
+-- not the (school_id, player_id) constraint that actually enforces
+-- one-team-per-organization, so re-running this after a player has moved
+-- teams aborts with 23505.
 insert into public.team_players (team_id, school_id, player_id, number, position, season_stats, ratings, is_deleted)
 select t.id, p.school_id, p.id, p.number, p.position, p.season_stats, p.ratings, coalesce(p.is_deleted, false)
   from public.players p
@@ -254,3 +291,24 @@ select player_id,
  group by player_id, team_id;
 
 grant select on public.matrix_standings to anon, authenticated;
+
+-- ─── 11. Drop what team_players and team_id now own ────────────────────────
+--
+-- These are the originals that section 9 copied into team_players (and that
+-- schedule.team_id / matrix_logs.team_id now replace as the way those rows
+-- are scoped). This used to be a separate follow-up migration, applied only
+-- after the application change shipped and the runbook's checks passed --
+-- see the header: that gap existed to protect the data being dropped here,
+-- and the project owner has said that protection is no longer needed. There
+-- is no rollback past this point.
+
+alter table public.players
+  drop column if exists number,
+  drop column if exists position,
+  drop column if exists season_stats,
+  drop column if exists ratings,
+  drop column if exists matrix_stats,
+  drop column if exists school_id;
+
+alter table public.schedule    drop column if exists school_id;
+alter table public.matrix_logs drop column if exists school_id;
