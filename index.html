@@ -88,10 +88,14 @@
   <div id="addDrillScoreModal" class="modal-overlay">
     <div class="modal-window">
       <div class="modal-header">
-        <h3>RECORD DRILL RESULT</h3>
+        <h3 id="matrixModalTitle">RECORD DRILL RESULT</h3>
         <button class="close-btn">&times;</button>
       </div>
       <form onsubmit="event.preventDefault(); app.submitMatrixResult();">
+        <!-- Empty when recording, set to the row's id when editing. Cleared at
+             the top of openAddDrillModal so a prior edit cannot make the next
+             "Record" overwrite that result instead of adding a new one. -->
+        <input type="hidden" id="matrixLogId" value="" />
         <div class="form-group">
           <label>Drill (optional)</label>
           <select class="form-control" id="matrixDrill"></select>
@@ -124,7 +128,7 @@
           <input type="date" class="form-control" id="matrixOccurredOn" required />
         </div>
         <div id="matrixFormError" style="color: var(--color-danger); font-size:0.85rem; margin-bottom:8px;"></div>
-        <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 10px;">💾 Record Result</button>
+        <button type="submit" class="btn btn-gold" id="matrixSubmitBtn" style="width: 100%; margin-top: 10px;">💾 Record Result</button>
       </form>
     </div>
   </div>

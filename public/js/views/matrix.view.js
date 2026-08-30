@@ -6,6 +6,76 @@
 
 Object.assign(BHSSoccerApp.prototype, {
 
+  /**
+   * The individual results behind the leaderboard, with edit and delete.
+   *
+   * Points are derived in Postgres rather than stored, and the argument for
+   * that design is that correcting a mis-entered result re-derives every rank.
+   * That argument only holds if there is somewhere to correct it — otherwise a
+   * typo needs the SQL editor. This panel is that somewhere.
+   *
+   * Coach-only, and rendered from `this.data.matrixLogs`, which syncFromSupabase
+   * populates in the database's snake_case.
+   */
+  renderMatrixResultsPanel() {
+    const logs = this.data.matrixLogs || [];
+
+    // Resolve ids to names once rather than scanning the roster per row.
+    const byId = new Map((this.data.players || []).map(p => [p.id, p]));
+    const nameOf = (id) => {
+      const p = byId.get(id);
+      if (!p) return '<span class="text-muted">(removed player)</span>';
+      return `${p.name}${p.number ? ' <span class="text-muted">#' + p.number + '</span>' : ''}`;
+    };
+    const drillById = new Map((this.data.drillsBank || []).map(d => [d.id, d]));
+
+    if (logs.length === 0) {
+      return `
+        <div class="table-title" style="margin-top:24px;">
+          <h3 style="color:#FFF">LOGGED RESULTS</h3>
+        </div>
+        <p style="color:var(--text-muted); font-size:0.85rem; padding:8px 0;">
+          No results recorded yet. Use <strong>+ Record Practice Drill Scores</strong> above; every
+          result you log here is what the leaderboard is calculated from.
+        </p>`;
+    }
+
+    return `
+      <div class="table-title" style="margin-top:24px;">
+        <h3 style="color:#FFF">LOGGED RESULTS</h3>
+        <span class="badge badge-coach">${logs.length} RECORDED</span>
+      </div>
+      <table class="matrix-table">
+        <thead>
+          <tr><th>DATE</th><th>RESULT</th><th>SCORE</th><th>DRILL</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${logs.map(l => {
+            const a = nameOf(l.player_a_id);
+            const b = nameOf(l.player_b_id);
+            // Mark the winner rather than making the reader decode 'a'/'b'.
+            const verdict = l.outcome === 'draw'
+              ? `${a} <span class="text-muted">drew with</span> ${b}`
+              : l.outcome === 'a'
+                ? `<strong style="color:var(--bhs-gold-accent);">${a}</strong> <span class="text-muted">beat</span> ${b}`
+                : `<strong style="color:var(--bhs-gold-accent);">${b}</strong> <span class="text-muted">beat</span> ${a}`;
+            const drill = drillById.get(l.drill_id);
+            return `
+          <tr>
+            <td style="white-space:nowrap;">${l.occurred_on || '—'}</td>
+            <td>${verdict}</td>
+            <td>${l.score_text || '<span class="text-muted">—</span>'}</td>
+            <td>${drill ? drill.name : '<span class="text-muted">—</span>'}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn-card-edit" onclick="app.openAddDrillModal('${l.id}')">✏️ Edit</button>
+              <button class="btn-card-delete" onclick="app.deleteMatrixResult('${l.id}')">🗑️ Delete</button>
+            </td>
+          </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  },
+
   renderMatrixView() {
     const isCoach = window.auth.isCoach();
 
@@ -81,6 +151,8 @@ Object.assign(BHSSoccerApp.prototype, {
                 })()}
               </tbody>
             </table>
+
+            ${isCoach ? this.renderMatrixResultsPanel() : ''}
           </div>
 
           <div>

@@ -725,7 +725,19 @@ Object.assign(BHSSoccerApp.prototype, {
     modal.classList.add('active');
   },
 
-  openAddDrillModal() {
+  /**
+   * Opens the result form. With a logId it edits that result; without one it
+   * records a new result.
+   *
+   * The hidden matrixLogId is cleared FIRST, before any early return. If a
+   * previous edit left it set, "Record" would silently overwrite that result
+   * instead of adding one — a data-loss bug with no visible symptom, so the
+   * reset must not depend on the modal having been closed a particular way.
+   */
+  openAddDrillModal(logId) {
+    const idField = document.getElementById('matrixLogId');
+    if (idField) idField.value = '';
+
     const players = (this.data.players || [])
       .filter(p => !p.is_deleted && !p.isDeleted)
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -759,8 +771,63 @@ Object.assign(BHSSoccerApp.prototype, {
       err.textContent = 'At least two players are needed to record a head-to-head result.';
     }
 
+    // Edit mode: prefill from the stored row and relabel the form. Done after
+    // the selects are populated, since setting .value before the options exist
+    // silently leaves the field on its first entry.
+    const heading = document.getElementById('matrixModalTitle');
+    const submitBtn = document.getElementById('matrixSubmitBtn');
+    const log = logId ? (this.data.matrixLogs || []).find(l => l.id === logId) : null;
+
+    if (log) {
+      if (idField) idField.value = log.id;
+      if (a) a.value = log.player_a_id;
+      if (b) b.value = log.player_b_id;
+      if (drill) drill.value = log.drill_id || '';
+      if (when) when.value = log.occurred_on || '';
+      const outcome = document.getElementById('matrixOutcome');
+      const score = document.getElementById('matrixScoreText');
+      if (outcome) outcome.value = log.outcome;
+      if (score) score.value = log.score_text || '';
+      if (heading) heading.textContent = 'EDIT RECORDED RESULT';
+      if (submitBtn) submitBtn.textContent = '💾 Save Changes';
+    } else {
+      if (heading) heading.textContent = 'RECORD DRILL RESULT';
+      if (submitBtn) submitBtn.textContent = '💾 Record Result';
+      if (logId && err) {
+        // The id came from a rendered row, so this means state moved underneath
+        // the panel — better to say so than to silently open a blank new-result
+        // form the coach believes is an edit.
+        err.textContent = 'That result is no longer available. Reload and try again.';
+      }
+    }
+
     const modal = document.getElementById('addDrillScoreModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  /**
+   * Soft-deletes a logged result after confirmation. The standings view filters
+   * on is_deleted, so the points it contributed disappear on the next sync.
+   */
+  async deleteMatrixResult(logId) {
+    const log = (this.data.matrixLogs || []).find(l => l.id === logId);
+    if (!log) return;
+
+    const byId = new Map((this.data.players || []).map(p => [p.id, p]));
+    const nm = (id) => (byId.get(id) || {}).name || 'a removed player';
+    const ok = window.confirm(
+      `Delete the result between ${nm(log.player_a_id)} and ${nm(log.player_b_id)} on ${log.occurred_on}?\n\n` +
+      `Both players' points and ranks will be recalculated without it.`
+    );
+    if (!ok) return;
+
+    const res = await window.supabaseService.deleteMatrixResult(logId);
+    if (!res.ok) {
+      window.alert(res.error || 'Could not delete that result.');
+      return;
+    }
+    await this.syncFromSupabase();
+    this.renderCurrentView();
   },
 
   async submitMatrixResult() {
@@ -778,12 +845,18 @@ Object.assign(BHSSoccerApp.prototype, {
     if (playerAId === playerBId) return set('A player cannot play themselves. Pick two different players.');
     if (!occurredOn) return set('Pick the date the result happened.');
 
-    set('Recording…');
-    const res = await window.supabaseService.logMatrixResult('bhs', {
-      playerAId, playerBId, outcome, drillId, scoreText, occurredOn
-    });
+    // An id here means the form was opened on an existing result: update it
+    // rather than logging a second one. Both paths return {ok, error}, because
+    // an RLS denial produces no error and no rows on either.
+    const logId = document.getElementById('matrixLogId')?.value || '';
+    const payload = { playerAId, playerBId, outcome, drillId, scoreText, occurredOn };
 
-    if (!res.ok) return set(res.error || 'Could not record that result.');
+    set(logId ? 'Saving…' : 'Recording…');
+    const res = logId
+      ? await window.supabaseService.updateMatrixResult(logId, payload)
+      : await window.supabaseService.logMatrixResult('bhs', payload);
+
+    if (!res.ok) return set(res.error || (logId ? 'Could not save that change.' : 'Could not record that result.'));
 
     // Standings are derived in Postgres, so the leaderboard only changes after
     // a re-read. Without this the coach records a result and sees nothing move.

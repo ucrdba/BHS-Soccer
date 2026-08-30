@@ -1149,6 +1149,72 @@ class SupabaseService {
     }
   }
 
+  /**
+   * Correct an already-logged result.
+   *
+   * school_id is deliberately NOT in the payload: a result cannot change which
+   * school it belongs to, and omitting it means an edit cannot silently move a
+   * row out of the school whose standings it feeds.
+   *
+   * drill_id IS always written, unlike on insert, so that clearing the drill
+   * ("— none —") actually clears it rather than leaving the old value behind.
+   */
+  async updateMatrixResult(id: string, result: Record<string, any>): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!id || !this.isUuid(id)) return { ok: false, error: 'That result has no database id, so it cannot be edited.' };
+    try {
+      const payload: Record<string, any> = {
+        player_a_id: result.playerAId,
+        player_b_id: result.playerBId,
+        outcome: result.outcome,
+        score_text: result.scoreText || null,
+        occurred_on: result.occurredOn || new Date().toISOString().slice(0, 10),
+        drill_id: (result.drillId && this.isUuid(result.drillId)) ? result.drillId : null,
+      };
+
+      const { data, error } = await this.client!
+        .from('matrix_logs').update(payload).eq('id', id).select();
+      if (error) {
+        console.warn('Supabase updateMatrixResult notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      // Same reasoning as logMatrixResult: an RLS denial on UPDATE returns no
+      // error and no rows, so zero rows is a refusal, not a no-op success.
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. Coach or admin access is required.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase updateMatrixResult exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
+  /**
+   * Soft-delete a result, following the repo-wide is_deleted convention. The
+   * matrix_standings view filters on it, so the points and ranks it fed
+   * re-derive on the next read with no further work.
+   */
+  async deleteMatrixResult(id: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!id || !this.isUuid(id)) return { ok: false, error: 'That result has no database id, so it cannot be deleted.' };
+    try {
+      const { data, error } = await this.client!
+        .from('matrix_logs').update({ is_deleted: true }).eq('id', id).select();
+      if (error) {
+        console.warn('Supabase deleteMatrixResult notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that delete. Coach or admin access is required.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase deleteMatrixResult exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async fetchQuizResults(): Promise<any> {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!

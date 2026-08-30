@@ -313,6 +313,13 @@ class BHSSoccerApp {
           : { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: unrankedFrom };
       });
 
+      // The individual results behind those standings. Kept in state so a coach
+      // can correct a mis-entered result: the standings view derives points from
+      // these rows, so a leaderboard that cannot be corrected is a leaderboard
+      // that is wrong forever. Stored snake_case as the database returns it —
+      // the panel that renders it resolves player names against this.data.players.
+      this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs('bhs')) || [];
+
       const dbSchedule = await window.supabaseService.fetchSchedule('bhs');
       if (dbSchedule && dbSchedule.length > 0) {
         this.data.schedule = dbSchedule.map(s => ({
