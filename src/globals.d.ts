@@ -46,6 +46,7 @@ declare global {
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;
     upsertTeamMembership(teamId: string, schoolId: string, membership: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
+    deleteTeamMembership(teamId: string, playerId: string): Promise<{ ok: boolean; error?: string }>;
 
     // Real Supabase Auth
     signUpUser(email: string, password: string, metadata?: Record<string, any>): Promise<SupabaseAuthResult | null>;

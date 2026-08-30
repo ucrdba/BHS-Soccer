@@ -945,6 +945,39 @@ class SupabaseService {
     }
   }
 
+  /**
+   * Removes a player from ONE team. Soft-deletes the membership, never the
+   * person: the same player may be on a club team, and deleting the identity
+   * row would remove them from that too.
+   *
+   * Returns { ok, error } like the other writes — an RLS denial comes back with
+   * no error and no rows, so a null return could not distinguish "you do not
+   * coach this team" from "it worked".
+   */
+  async deleteTeamMembership(teamId: string, playerId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !playerId) return { ok: false, error: 'No team or player given.' };
+    try {
+      const { data, error } = await this.client!
+        .from('team_players')
+        .update({ is_deleted: true })
+        .eq('team_id', teamId)
+        .eq('player_id', playerId)
+        .select();
+      if (error) {
+        console.warn('Supabase deleteTeamMembership notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. You must coach this team.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase deleteTeamMembership exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async deletePlayer(playerId: string): Promise<any> {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!

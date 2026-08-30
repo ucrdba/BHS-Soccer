@@ -217,50 +217,41 @@ describe('saveEditPlayer', () => {
 });
 
 describe('deletePlayer', () => {
-  it('soft-deletes the team_players membership for the active team, not the players identity row', async () => {
+  it('calls deleteTeamMembership for the active team, not the players identity delete', async () => {
     const app = makeApp();
     app.data.players = [{ id: 'p-1' }];
 
-    const eqPlayer = vi.fn(async () => ({ error: null }));
-    const eqTeam = vi.fn(() => ({ eq: eqPlayer }));
-    const update = vi.fn(() => ({ eq: eqTeam }));
-    const from = vi.fn(() => ({ update }));
+    const deleteTeamMembership = vi.fn(async () => ({ ok: true }));
     const deletePlayerIdentity = vi.fn(async () => null);
     (window as any).supabaseService = {
       isConfigured: () => true,
-      client: { from },
+      deleteTeamMembership,
       deletePlayer: deletePlayerIdentity
     };
 
     await app.deletePlayer('p-1');
 
-    expect(from).toHaveBeenCalledWith('team_players');
-    expect(update).toHaveBeenCalledWith({ is_deleted: true });
-    expect(eqTeam).toHaveBeenCalledWith('team_id', 't-varsity');
-    expect(eqPlayer).toHaveBeenCalledWith('player_id', 'p-1');
+    expect(deleteTeamMembership).toHaveBeenCalledWith('t-varsity', 'p-1');
     // The identity-level delete (which would remove the person from every
     // team) must never be reached from this path.
     expect(deletePlayerIdentity).not.toHaveBeenCalled();
     expect(app.syncFromSupabase).toHaveBeenCalled();
   });
 
-  it('alerts and does not refresh when the membership update fails', async () => {
+  it('alerts and does not refresh when the membership delete fails', async () => {
     const app = makeApp();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     app.data.players = [{ id: 'p-1' }];
 
-    const eqPlayer = vi.fn(async () => ({ error: { message: 'RLS denied' } }));
-    const eqTeam = vi.fn(() => ({ eq: eqPlayer }));
-    const update = vi.fn(() => ({ eq: eqTeam }));
-    const from = vi.fn(() => ({ update }));
     (window as any).supabaseService = {
       isConfigured: () => true,
-      client: { from }
+      deleteTeamMembership: vi.fn(async () => ({ ok: false, error: 'You must coach this team.' }))
     };
 
     await app.deletePlayer('p-1');
 
     expect(alertSpy).toHaveBeenCalled();
+    expect(String(alertSpy.mock.calls[0][0])).toContain('You must coach this team.');
     expect(app.syncFromSupabase).not.toHaveBeenCalled();
   });
 });

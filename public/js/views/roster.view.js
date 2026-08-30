@@ -369,45 +369,29 @@ Object.assign(BHSSoccerApp.prototype, {
 
   /**
    * Removes the player from THIS team only, by soft-deleting their
-   * `team_players` row — never the shared `players` identity row. Deleting
-   * the identity would also drop them from every other team they play for
-   * (e.g. a club team), which defeats the one-person, multi-team model this
-   * migration introduces.
-   *
-   * There is no dedicated service method for a team_players soft-delete:
-   * `upsertTeamMembership()` always writes `is_deleted: false` (it only knows
-   * how to add/reactivate a membership), and `supabaseService.deletePlayer()`
-   * soft-deletes the shared `players` row across every team. Adding a proper
-   * method belongs in src/data/supabase.ts, which is out of scope for this
-   * task, so this reaches the Supabase client directly for one narrowly
-   * targeted update — see task-5-report.md for the follow-up recommendation.
+   * `team_players` row via `deleteTeamMembership()` — never the shared
+   * `players` identity row (`supabaseService.deletePlayer()`, which would
+   * drop them from every team they play for, e.g. a club team too). This
+   * defeats the whole point of the one-person, multi-team model otherwise.
    */
   async deletePlayer(playerId) {
     const player = this.data.players.find(p => p.id === playerId);
     if (!player) return;
 
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      window.alert('Cloud database is not configured; cannot remove that player.');
+      return;
+    }
     const teamId = this.activeTeamId;
-    if (window.supabaseService && window.supabaseService.isConfigured() && teamId) {
-      if (!window.supabaseService.client) {
-        window.alert('Could not remove that player from this team.');
-        return;
-      }
-      try {
-        const { error } = await window.supabaseService.client
-          .from('team_players')
-          .update({ is_deleted: true })
-          .eq('team_id', teamId)
-          .eq('player_id', playerId);
-        if (error) {
-          console.error('Supabase soft-delete team_players error:', error);
-          window.alert('Could not remove that player from this team.');
-          return;
-        }
-      } catch (e) {
-        console.error('Supabase soft-delete team_players exception:', e);
-        window.alert('Could not remove that player from this team.');
-        return;
-      }
+    if (!teamId) {
+      window.alert('No active team selected.');
+      return;
+    }
+
+    const res = await window.supabaseService.deleteTeamMembership(teamId, playerId);
+    if (!res || !res.ok) {
+      window.alert((res && res.error) || 'Could not remove that player from this team.');
+      return;
     }
 
     await this.syncFromSupabase();
