@@ -915,6 +915,17 @@
         phys: document.getElementById('newPlayerPhys').value,
         ment: document.getElementById('newPlayerMent').value
       });">
+        <div class="form-group">
+          <label>Already in the system?</label>
+          <input type="text" id="playerSearchInput" class="form-control"
+                 placeholder="Type a name to search existing players"
+                 oninput="app.searchExistingPlayers()" />
+          <div id="playerSearchResults" style="margin-top:6px;"></div>
+          <p class="text-muted" style="font-size:0.78rem; margin:6px 0 0 0;">
+            A player who already plays for another team should be added from here,
+            not retyped — that keeps one person with one photo across both teams.
+          </p>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
           <div class="form-group">
             <label>Jersey #</label>

@@ -158,35 +158,105 @@ Object.assign(BHSSoccerApp.prototype, {
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   },
 
+  /**
+   * Adding a player is now two writes with no transaction between them:
+   * upsertPlayerIdentity() creates the person (name/classYear/height/photo —
+   * the only columns `players` still owns after 0005), then
+   * upsertTeamMembership() puts them on the active team (number/position/
+   * seasonStats/ratings — everything that varies by team, on `team_players`).
+   * If the membership write fails, the person now exists on no team. That is
+   * recoverable, not corrupt: searchPlayersByName() finds them, so the coach
+   * can finish the job from "Already in the system?" on a second attempt —
+   * but it must be said plainly, not swallowed into console.error the way
+   * the pre-migration upsertPlayer('bhs', …) call silently was.
+   */
   async addPlayer(playerData) {
-    const newPlayer = {
-      id: 'p_' + Date.now(),
-      number: parseInt(playerData.number),
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      window.alert('Cloud database is not configured; cannot add a player.');
+      return;
+    }
+
+    const teamId = this.activeTeamId;
+    const team = (this.data.teams || []).find(t => t.id === teamId);
+    if (!teamId || !team) {
+      window.alert('No active team selected.');
+      return;
+    }
+
+    const seasonStats = playerData.position.includes('Goalkeeper')
+      ? { saves: parseInt(playerData.stat1 || 0), cleanSheets: parseInt(playerData.stat2 || 0), games: 1 }
+      : { goals: parseInt(playerData.stat1 || 0), assists: parseInt(playerData.stat2 || 0), games: 1 };
+    const ratings = {
+      technical: parseInt(playerData.tech || 80),
+      tactical: parseInt(playerData.tact || 80),
+      physical: parseInt(playerData.phys || 80),
+      mental: parseInt(playerData.ment || 80)
+    };
+
+    const identity = await window.supabaseService.upsertPlayerIdentity({
       name: playerData.name,
-      position: playerData.position,
       classYear: playerData.classYear,
       height: playerData.height || "5'10\"",
       // Stored empty rather than defaulted to a stock photo: assigning a random
       // stranger's face makes a player without a photo look like they have one.
       // The roster and player modal render the silhouette placeholder instead.
-      photo: (playerData.photo || '').trim(),
-      seasonStats: playerData.position.includes('Goalkeeper') ? { saves: parseInt(playerData.stat1 || 0), cleanSheets: parseInt(playerData.stat2 || 0), games: 1 } : { goals: parseInt(playerData.stat1 || 0), assists: parseInt(playerData.stat2 || 0), games: 1 },
-      ratings: {
-        technical: parseInt(playerData.tech || 80),
-        tactical: parseInt(playerData.tact || 80),
-        physical: parseInt(playerData.phys || 80),
-        mental: parseInt(playerData.ment || 80)
-      },
-      matrixStats: { wins: 0, losses: 0, points: 0, rank: this.data.players.length + 1, drillScore: 75.0 }
-    };
+      photo: (playerData.photo || '').trim()
+    });
+    if (!identity || !identity.id) { window.alert('Could not create that player.'); return; }
 
-    this.data.players.push(newPlayer);
-    this.saveData();
-
-    if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.upsertPlayer('bhs', newPlayer);
+    const res = await window.supabaseService.upsertTeamMembership(teamId, team.school_id, {
+      player_id: identity.id,
+      number: parseInt(playerData.number) || null,
+      position: playerData.position,
+      season_stats: seasonStats,
+      ratings: ratings
+    });
+    if (!res.ok) {
+      // The person now exists but is on no team. Say so plainly: the coach can
+      // finish the job from the search-first flow rather than creating a duplicate.
+      window.alert((res.error || 'Could not add them to this team.') +
+        '\n\nThe player was created but is not on a team yet — add them from "Already in the system?".');
+      return;
     }
 
+    await this.syncFromSupabase();
+    this.renderCurrentView();
+    this.closeModals();
+  },
+
+  async searchExistingPlayers() {
+    const input = document.getElementById('playerSearchInput');
+    const out = document.getElementById('playerSearchResults');
+    if (!input || !out) return;
+
+    const results = await window.supabaseService.searchPlayersByName(input.value);
+    if (!results || results.length === 0) { out.innerHTML = ''; return; }
+
+    // Anyone already on this team is filtered out — adding them again would be
+    // rejected by unique (team_id, player_id) and the error would be opaque.
+    const onTeam = new Set((this.data.players || []).map(p => p.id));
+    const rows = results.filter(r => !onTeam.has(r.id));
+    if (rows.length === 0) { out.innerHTML = '<span class="text-muted" style="font-size:0.8rem;">Already on this team.</span>'; return; }
+
+    out.innerHTML = rows.map(r => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border:1px solid var(--bhs-navy-border); border-radius:6px; margin-bottom:4px;">
+        <span>${r.name} <span class="text-muted" style="font-size:0.78rem;">${r.class_year || ''}</span></span>
+        <button type="button" class="btn-card-edit" onclick="app.addExistingPlayerToTeam('${r.id}')">Add to this team</button>
+      </div>`).join('');
+  },
+
+  async addExistingPlayerToTeam(playerId) {
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) return;
+
+    const res = await window.supabaseService.upsertTeamMembership(this.activeTeamId, team.school_id, { player_id: playerId });
+    if (!res || res.ok === false) {
+      // The likeliest cause is unique (school_id, player_id): they are already
+      // on another team in this same organization, which the design forbids.
+      window.alert((res && res.error) || 'Could not add that player. They may already be on another team in this organization.');
+      return;
+    }
+    await this.syncFromSupabase();
     this.renderCurrentView();
     this.closeModals();
   },
@@ -235,55 +305,112 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
+  /**
+   * Same identity/membership split as addPlayer(): name, classYear, height
+   * and photo are the person's, so they go to upsertPlayerIdentity(); number,
+   * position, seasonStats and ratings vary by team, so they go to
+   * upsertTeamMembership() for the active team only. A failure on either
+   * write is surfaced with window.alert() rather than swallowed — the
+   * pre-migration upsertPlayer('bhs', …) call errored on columns 0005 drops
+   * and left the form looking like it had silently done nothing.
+   */
   async saveEditPlayer(playerId, playerData) {
-    const idx = this.data.players.findIndex(p => p.id === playerId);
-    if (idx !== -1) {
-      const existing = this.data.players[idx];
-      existing.number = parseInt(playerData.number);
-      existing.name = playerData.name;
-      existing.position = playerData.position;
-      existing.classYear = playerData.classYear;
-      existing.height = playerData.height;
-      existing.photo = playerData.photo;
-
-      if (playerData.position.includes('Goalkeeper')) {
-        existing.seasonStats = { saves: parseInt(playerData.stat1), cleanSheets: parseInt(playerData.stat2), games: existing.seasonStats.games || 1 };
-      } else {
-        existing.seasonStats = { goals: parseInt(playerData.stat1), assists: parseInt(playerData.stat2), games: existing.seasonStats.games || 1 };
-      }
-
-      existing.ratings = {
-        technical: parseInt(playerData.tech),
-        tactical: parseInt(playerData.tact),
-        physical: parseInt(playerData.phys),
-        mental: parseInt(playerData.ment)
-      };
-
-      this.data.players[idx] = existing;
-      this.saveData();
-
-      if (window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.upsertPlayer('bhs', existing);
-      }
-
-      this.renderCurrentView();
-      this.closeModals();
+    if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+      window.alert('Cloud database is not configured; cannot save changes.');
+      return;
     }
+
+    const idx = this.data.players.findIndex(p => p.id === playerId);
+    if (idx === -1) return;
+    const existing = this.data.players[idx];
+
+    const seasonStats = playerData.position.includes('Goalkeeper')
+      ? { saves: parseInt(playerData.stat1), cleanSheets: parseInt(playerData.stat2), games: existing.seasonStats.games || 1 }
+      : { goals: parseInt(playerData.stat1), assists: parseInt(playerData.stat2), games: existing.seasonStats.games || 1 };
+    const ratings = {
+      technical: parseInt(playerData.tech),
+      tactical: parseInt(playerData.tact),
+      physical: parseInt(playerData.phys),
+      mental: parseInt(playerData.ment)
+    };
+
+    const identity = await window.supabaseService.upsertPlayerIdentity({
+      id: playerId,
+      name: playerData.name,
+      classYear: playerData.classYear,
+      height: playerData.height,
+      photo: playerData.photo
+    });
+    if (!identity || !identity.id) { window.alert("Could not save that player's profile."); return; }
+
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) { window.alert('No active team selected.'); return; }
+
+    const res = await window.supabaseService.upsertTeamMembership(this.activeTeamId, team.school_id, {
+      player_id: identity.id,
+      number: parseInt(playerData.number) || null,
+      position: playerData.position,
+      season_stats: seasonStats,
+      ratings: ratings
+    });
+    if (!res.ok) {
+      // The person's profile saved; only this team's jersey number, position
+      // and stats did not. Say so rather than letting the coach believe
+      // nothing was saved at all.
+      window.alert((res.error || 'Could not save this team\'s roster info.') +
+        '\n\nTheir profile was updated, but jersey number, position and stats on this team were not.');
+      return;
+    }
+
+    await this.syncFromSupabase();
+    this.renderCurrentView();
+    this.closeModals();
   },
 
+  /**
+   * Removes the player from THIS team only, by soft-deleting their
+   * `team_players` row — never the shared `players` identity row. Deleting
+   * the identity would also drop them from every other team they play for
+   * (e.g. a club team), which defeats the one-person, multi-team model this
+   * migration introduces.
+   *
+   * There is no dedicated service method for a team_players soft-delete:
+   * `upsertTeamMembership()` always writes `is_deleted: false` (it only knows
+   * how to add/reactivate a membership), and `supabaseService.deletePlayer()`
+   * soft-deletes the shared `players` row across every team. Adding a proper
+   * method belongs in src/data/supabase.ts, which is out of scope for this
+   * task, so this reaches the Supabase client directly for one narrowly
+   * targeted update — see task-5-report.md for the follow-up recommendation.
+   */
   async deletePlayer(playerId) {
     const player = this.data.players.find(p => p.id === playerId);
     if (!player) return;
 
-    // Soft delete player (sets is_deleted = true in database, preserves record)
-    player.isDeleted = true;
-    this.data.players = this.data.players.filter(p => p.id !== playerId);
-    this.saveData();
-
-    if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.deletePlayer(playerId);
+    const teamId = this.activeTeamId;
+    if (window.supabaseService && window.supabaseService.isConfigured() && teamId) {
+      if (!window.supabaseService.client) {
+        window.alert('Could not remove that player from this team.');
+        return;
+      }
+      try {
+        const { error } = await window.supabaseService.client
+          .from('team_players')
+          .update({ is_deleted: true })
+          .eq('team_id', teamId)
+          .eq('player_id', playerId);
+        if (error) {
+          console.error('Supabase soft-delete team_players error:', error);
+          window.alert('Could not remove that player from this team.');
+          return;
+        }
+      } catch (e) {
+        console.error('Supabase soft-delete team_players exception:', e);
+        window.alert('Could not remove that player from this team.');
+        return;
+      }
     }
 
+    await this.syncFromSupabase();
     this.renderCurrentView();
     this.closeModals();
   }
