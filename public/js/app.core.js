@@ -49,6 +49,7 @@ class BHSSoccerApp {
       teams: [],
       players: [],
       schedule: [],
+      matrixLogs: [],
       drillsBank: [],
       currentPracticePlan: [],
       savedPlans: [],
@@ -245,12 +246,16 @@ class BHSSoccerApp {
         ? window.resolveActiveTeam(this.data.teams, stored, publicDefault)
         : ((this.data.teams[0] || {}).id || null);
 
-      // A viewer with no teams at all is a legitimate state, not an error: an
-      // empty roster renders, the switcher hides, and nothing throws.
-      if (!this.activeTeamId) {
+      // A viewer with no team is legitimate -- and this branch is also reached
+      // when fetchTeamsForViewer transiently fails, which is why it must not
+      // gate the fetches below. school, schools, drillsBank, practicePlans,
+      // coaches, dailyThoughts and soccerCategories are not team-scoped; a
+      // network blip on one table should not blank all of them.
+      const hasTeam = !!this.activeTeamId;
+      if (!hasTeam) {
         this.data.players = [];
         this.data.schedule = [];
-        return;
+        this.data.matrixLogs = [];
       }
 
       // Sync School Profile & Multi-tenant Schools list from Supabase DB
@@ -298,68 +303,74 @@ class BHSSoccerApp {
       this.saveData();
       this.updateHeaderBranding();
 
-      const roster = await window.supabaseService.fetchTeamRoster(this.activeTeamId);
-      this.data.players = (roster || []).map(m => ({
-        id: m.players?.id,
-        membershipId: m.id,
-        name: m.players?.name,
-        classYear: m.players?.class_year,
-        height: m.players?.height,
-        photo: m.players?.photo_url,
-        number: m.number,
-        position: m.position,
-        seasonStats: m.season_stats || {},
-        ratings: m.ratings || {}
-      })).filter(p => p.id);
+      // Team-scoped: skip when there is no active team so a transient
+      // fetchTeamsForViewer failure doesn't throw trying to fetch with an
+      // undefined teamId. hasTeam is false, the resulting empty collections
+      // set above already stand.
+      if (hasTeam) {
+        const roster = await window.supabaseService.fetchTeamRoster(this.activeTeamId);
+        this.data.players = (roster || []).map(m => ({
+          id: m.players?.id,
+          membershipId: m.id,
+          name: m.players?.name,
+          classYear: m.players?.class_year,
+          height: m.players?.height,
+          photo: m.players?.photo_url,
+          number: m.number,
+          position: m.position,
+          seasonStats: m.season_stats || {},
+          ratings: m.ratings || {}
+        })).filter(p => p.id);
 
-      // Matrix standings are derived in Postgres from matrix_logs, not stored on
-      // the player. Left-join them on: a player with no logged results produces
-      // no standings row, and must still appear on the leaderboard as 0/0/0
-      // rather than disappearing from it.
-      //
-      // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
-      // players mapping above (app.core.js:234). Leave that line alone — it is
-      // retained only so `player.matrixStats` stays populated for the roster
-      // card and leaderboard between syncs; the `matrix_stats` column itself is
-      // unread elsewhere (the players export does not touch it) and is slated
-      // to be dropped in Phase 2. This block simply overwrites the in-memory
-      // value with the derived one.
-      const dbStandings = await window.supabaseService.fetchMatrixStandings(this.activeTeamId);
-      const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
-      const unrankedFrom = (dbStandings || []).length + 1;
+        // Matrix standings are derived in Postgres from matrix_logs, not stored on
+        // the player. Left-join them on: a player with no logged results produces
+        // no standings row, and must still appear on the leaderboard as 0/0/0
+        // rather than disappearing from it.
+        //
+        // This supersedes the `matrixStats: p.matrix_stats || {}` assignment in the
+        // players mapping above (app.core.js:234). Leave that line alone — it is
+        // retained only so `player.matrixStats` stays populated for the roster
+        // card and leaderboard between syncs; the `matrix_stats` column itself is
+        // unread elsewhere (the players export does not touch it) and is slated
+        // to be dropped in Phase 2. This block simply overwrites the in-memory
+        // value with the derived one.
+        const dbStandings = await window.supabaseService.fetchMatrixStandings(this.activeTeamId);
+        const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
+        const unrankedFrom = (dbStandings || []).length + 1;
 
-      this.data.players.forEach(p => {
-        const s = standingsById.get(p.id);
-        p.matrixStats = s
-          ? {
-              wins: s.wins || 0, draws: s.draws || 0, losses: s.losses || 0,
-              games: s.games || 0, points: s.points || 0,
-              winPct: s.win_pct === null || s.win_pct === undefined ? null : Number(s.win_pct),
-              rank: s.rank
-            }
-          : { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: unrankedFrom };
-      });
+        this.data.players.forEach(p => {
+          const s = standingsById.get(p.id);
+          p.matrixStats = s
+            ? {
+                wins: s.wins || 0, draws: s.draws || 0, losses: s.losses || 0,
+                games: s.games || 0, points: s.points || 0,
+                winPct: s.win_pct === null || s.win_pct === undefined ? null : Number(s.win_pct),
+                rank: s.rank
+              }
+            : { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: unrankedFrom };
+        });
 
-      // The individual results behind those standings. Kept in state so a coach
-      // can correct a mis-entered result: the standings view derives points from
-      // these rows, so a leaderboard that cannot be corrected is a leaderboard
-      // that is wrong forever. Stored snake_case as the database returns it —
-      // the panel that renders it resolves player names against this.data.players.
-      this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs(this.activeTeamId)) || [];
+        // The individual results behind those standings. Kept in state so a coach
+        // can correct a mis-entered result: the standings view derives points from
+        // these rows, so a leaderboard that cannot be corrected is a leaderboard
+        // that is wrong forever. Stored snake_case as the database returns it —
+        // the panel that renders it resolves player names against this.data.players.
+        this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs(this.activeTeamId)) || [];
 
-      const dbSchedule = await window.supabaseService.fetchSchedule(this.activeTeamId);
-      if (dbSchedule && dbSchedule.length > 0) {
-        this.data.schedule = dbSchedule.map(s => ({
-          id: s.id,
-          date: s.match_date,
-          time: s.match_time,
-          opponent: s.opponent,
-          location: s.location,
-          status: s.status,
-          isHome: s.is_home,
-          score: s.score,
-          result: s.result
-        }));
+        const dbSchedule = await window.supabaseService.fetchSchedule(this.activeTeamId);
+        if (dbSchedule && dbSchedule.length > 0) {
+          this.data.schedule = dbSchedule.map(s => ({
+            id: s.id,
+            date: s.match_date,
+            time: s.match_time,
+            opponent: s.opponent,
+            location: s.location,
+            status: s.status,
+            isHome: s.is_home,
+            score: s.score,
+            result: s.result
+          }));
+        }
       }
 
       const dbPlans = await window.supabaseService.fetchPracticePlans('bhs');
