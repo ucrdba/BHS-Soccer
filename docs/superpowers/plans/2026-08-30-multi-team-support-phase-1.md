@@ -506,9 +506,20 @@ In `src/data/supabase.ts`, add these alongside the existing fetches. Follow the 
 
       let ids: string[] | null = null;
       if (uid) {
+        // team_coaches.profile_id IS the auth uid, but team_players.player_id
+        // references players(id) — a different table. The link between a signed-in
+        // person and their player row is profiles.player_id, so it has to be
+        // resolved first. Comparing uid to player_id directly never matches, and
+        // the failure is silent: the player just sees the public default team.
+        const { data: prof } = await this.client!
+          .from('profiles').select('player_id').eq('id', uid).maybeSingle();
+        const playerId = prof?.player_id || null;
+
         const [{ data: coached }, { data: played }] = await Promise.all([
           this.client!.from('team_coaches').select('team_id').eq('profile_id', uid),
-          this.client!.from('team_players').select('team_id').eq('player_id', uid)
+          playerId
+            ? this.client!.from('team_players').select('team_id').eq('player_id', playerId)
+            : Promise.resolve({ data: [] as any[] })
         ]);
         const merged = [...(coached || []), ...(played || [])].map((r: any) => r.team_id);
         if (merged.length > 0) ids = Array.from(new Set(merged));
