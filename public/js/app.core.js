@@ -26,11 +26,17 @@ const PLAYER_SILHOUETTE = 'img/player-placeholder.png';
  */
 const COACH_SILHOUETTE = 'img/coach-placeholder.png';
 
+// Which team the viewer is looking at. A per-device UI preference, so it lives
+// in localStorage rather than in profiles — storing it server-side would mean a
+// write on every switch.
+const ACTIVE_TEAM_KEY = 'bhs_active_team_id';
+
 class BHSSoccerApp {
   constructor() {
     this.data = this.loadData();
     this.currentView = 'home';
     this.activeFilter = 'ALL';
+    this.activeTeamId = null;
     this.diagrammer = new SoccerTacticalBoard(this);
     this.masterDiagrammer = new SoccerTacticalBoard(this);
     this.init();
@@ -40,6 +46,7 @@ class BHSSoccerApp {
     return {
       school: null,
       schools: [],
+      teams: [],
       players: [],
       schedule: [],
       drillsBank: [],
@@ -188,6 +195,14 @@ class BHSSoccerApp {
     // bhs.cache.v1.* is the repository layer's job in the next phase.
   }
 
+  async setActiveTeam(teamId) {
+    if (!teamId || teamId === this.activeTeamId) return;
+    this.activeTeamId = teamId;
+    try { localStorage.setItem(ACTIVE_TEAM_KEY, teamId); } catch (e) { /* private mode */ }
+    await this.syncFromSupabase();
+    this.renderCurrentView();
+  }
+
   async init() {
     await window.authReady;
 
@@ -221,6 +236,23 @@ class BHSSoccerApp {
 
   async syncFromSupabase() {
     try {
+      // Every fetch below is scoped to one team, so resolve it first.
+      this.data.teams = (await window.supabaseService.fetchTeamsForViewer()) || [];
+      let stored = null;
+      try { stored = localStorage.getItem(ACTIVE_TEAM_KEY); } catch (e) { /* private mode */ }
+      const publicDefault = (this.data.teams.find(t => t.is_public_default) || {}).id || null;
+      this.activeTeamId = window.resolveActiveTeam
+        ? window.resolveActiveTeam(this.data.teams, stored, publicDefault)
+        : ((this.data.teams[0] || {}).id || null);
+
+      // A viewer with no teams at all is a legitimate state, not an error: an
+      // empty roster renders, the switcher hides, and nothing throws.
+      if (!this.activeTeamId) {
+        this.data.players = [];
+        this.data.schedule = [];
+        return;
+      }
+
       // Sync School Profile & Multi-tenant Schools list from Supabase DB
       const currentCode = this.data.school?.code || 'bhs';
       const dbSchool = await window.supabaseService.fetchSchool(currentCode);
@@ -266,24 +298,19 @@ class BHSSoccerApp {
       this.saveData();
       this.updateHeaderBranding();
 
-      const dbPlayers = await window.supabaseService.fetchPlayers('bhs');
-      if (dbPlayers && dbPlayers.length > 0) {
-        this.data.players = dbPlayers
-          .filter(p => !p.is_deleted)
-          .map(p => ({
-            id: p.id,
-            number: p.number,
-            name: p.name,
-            position: p.position,
-            classYear: p.class_year,
-            height: p.height,
-            photo: p.photo_url,
-            seasonStats: p.season_stats || {},
-            ratings: p.ratings || {},
-            matrixStats: p.matrix_stats || {},
-            isDeleted: p.is_deleted || false
-          }));
-      }
+      const roster = await window.supabaseService.fetchTeamRoster(this.activeTeamId);
+      this.data.players = (roster || []).map(m => ({
+        id: m.players?.id,
+        membershipId: m.id,
+        name: m.players?.name,
+        classYear: m.players?.class_year,
+        height: m.players?.height,
+        photo: m.players?.photo_url,
+        number: m.number,
+        position: m.position,
+        seasonStats: m.season_stats || {},
+        ratings: m.ratings || {}
+      })).filter(p => p.id);
 
       // Matrix standings are derived in Postgres from matrix_logs, not stored on
       // the player. Left-join them on: a player with no logged results produces
@@ -297,7 +324,7 @@ class BHSSoccerApp {
       // unread elsewhere (the players export does not touch it) and is slated
       // to be dropped in Phase 2. This block simply overwrites the in-memory
       // value with the derived one.
-      const dbStandings = await window.supabaseService.fetchMatrixStandings('bhs');
+      const dbStandings = await window.supabaseService.fetchMatrixStandings(this.activeTeamId);
       const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
       const unrankedFrom = (dbStandings || []).length + 1;
 
@@ -318,9 +345,9 @@ class BHSSoccerApp {
       // these rows, so a leaderboard that cannot be corrected is a leaderboard
       // that is wrong forever. Stored snake_case as the database returns it —
       // the panel that renders it resolves player names against this.data.players.
-      this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs('bhs')) || [];
+      this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs(this.activeTeamId)) || [];
 
-      const dbSchedule = await window.supabaseService.fetchSchedule('bhs');
+      const dbSchedule = await window.supabaseService.fetchSchedule(this.activeTeamId);
       if (dbSchedule && dbSchedule.length > 0) {
         this.data.schedule = dbSchedule.map(s => ({
           id: s.id,

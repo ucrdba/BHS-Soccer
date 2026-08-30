@@ -3,6 +3,7 @@ import { supabaseService } from './data/supabase';
 import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 import { backupLegacyBlob } from './data/cache';
+import { resolveActiveTeam } from './data/team-scope';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -15,11 +16,13 @@ declare global {
     auth: typeof auth;
     authReady: Promise<void>;
     can: typeof can;
+    resolveActiveTeam: typeof resolveActiveTeam;
   }
 }
 
 window.supabaseService = supabaseService;
 window.auth = auth;
+window.resolveActiveTeam = resolveActiveTeam;
 
 // The pre-migration monolithic localStorage blob is seed-contaminated (it was
 // written by the old loadData() that substituted DEFAULT_BHS_DATA into empty
