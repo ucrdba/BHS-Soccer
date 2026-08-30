@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { resolveActiveTeam } from './team-scope';
 
 const teams = [
-  { id: 't-varsity', name: 'Varsity', school_id: 's-bhs', is_public_default: true },
-  { id: 't-jv',      name: 'JV',      school_id: 's-bhs', is_public_default: false },
+  { id: 't-varsity', name: 'Varsity', school_id: 's-bhs', is_public_default: false },
+  { id: 't-jv',      name: 'JV',      school_id: 's-bhs', is_public_default: true  },
   { id: 't-club',    name: 'U16',     school_id: 's-rev', is_public_default: false }
 ];
 
@@ -25,11 +25,17 @@ describe('resolveActiveTeam', () => {
   });
 
   it('falls back to the public default when nothing is stored', () => {
-    expect(resolveActiveTeam(teams, null, 't-varsity')).toBe('t-varsity');
+    // 't-jv' is the flagged default here, and it is NOT teams[0] — this only
+    // passes if the resolver actually consults is_public_default rather than
+    // just returning the first team in the list.
+    expect(resolveActiveTeam(teams, null, 't-jv')).toBe('t-jv');
   });
 
   it('falls back to the first available team when there is no public default', () => {
-    expect(resolveActiveTeam(teams, null, null)).toBe('t-varsity');
+    // A separate fixture with no team flagged, so this exercises the final
+    // fallback (teams[0]) rather than accidentally hitting the flag above.
+    const noDefaultTeams = teams.map((t) => ({ ...t, is_public_default: false }));
+    expect(resolveActiveTeam(noDefaultTeams, null, null)).toBe('t-varsity');
   });
 
   it('returns null when the viewer has no teams at all', () => {

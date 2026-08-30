@@ -41,7 +41,7 @@ declare global {
 
     // Multi-team support (Phase 1)
     fetchTeamsForViewer(): Promise<Record<string, any>[] | null>;
-    fetchPublicDefaultTeamId(): Promise<string | null>;
+    fetchPublicDefaultTeamId(schoolId?: string): Promise<string | null>;
     fetchTeamRoster(teamId: string): Promise<Record<string, any>[] | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;

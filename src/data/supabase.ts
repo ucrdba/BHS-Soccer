@@ -552,17 +552,17 @@ class SupabaseService {
   }
 
   /** The team a signed-out visitor (or anyone with no team of their own) sees. */
-  async fetchPublicDefaultTeamId(): Promise<string | null> {
+  async fetchPublicDefaultTeamId(schoolId?: string): Promise<string | null> {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client!
-        .from('teams')
-        .select('id')
-        .eq('is_public_default', true)
-        .eq('is_deleted', false)
-        .maybeSingle();
+      // Uniqueness is per organization, not global: teams_one_public_default_per_school
+      // is a partial unique index on (school_id). Without a school filter this can
+      // legitimately match several rows, so take the first rather than demanding one.
+      let q = this.client!.from('teams').select('id').eq('is_public_default', true).eq('is_deleted', false);
+      if (schoolId) q = q.eq('school_id', schoolId);
+      const { data, error } = await q.limit(1);
       if (error) { console.warn('Supabase fetchPublicDefaultTeamId notice:', error.message); return null; }
-      return data?.id || null;
+      return data && data[0] ? data[0].id : null;
     } catch (e) {
       console.warn('Supabase fetchPublicDefaultTeamId exception:', e);
       return null;
@@ -587,6 +587,7 @@ class SupabaseService {
     if (q.length < 2) return [];
     const { data, error } = await this.client!
       .from('players').select('id, name, class_year, photo_url')
+      .eq('is_deleted', false)
       .ilike('name', `%${q}%`).limit(10);
     if (error) { console.warn('Supabase searchPlayersByName notice:', error.message); return null; }
     return data;
