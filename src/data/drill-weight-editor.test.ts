@@ -121,3 +121,52 @@ describe('upsertDrillBankItem persists the matrix weight and measure', () => {
     expect(payload().measure).toBe('head_to_head');
   });
 });
+
+import appCoreSrc from '../../public/js/app.core.js?raw';
+import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
+
+const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+
+describe('weights editor', () => {
+  let app: any;
+
+  beforeEach(() => {
+    const w = globalThis as any;
+    w.auth = {
+      isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
+      canAccessRatings: () => true, subscribe: () => {},
+      getCurrentUser: () => ({ id: 'u1', role: 'admin', status: 'active' }),
+      getRole: () => 'admin'
+    };
+    w.can = () => true;
+    w.supabaseService = { isConfigured: () => false };
+    const ctor = new Function(
+      [strip(appCoreSrc), strip(sessionSrc)].join('\n;\n') + '\nreturn BHSSoccerApp;'
+    )() as any;
+    app = Object.create(ctor.prototype);
+    app._weightDrills = [
+      { id: 'd1', name: "Cooper's Test", category: 'Fitness', points: 1.5, measure: 'count_high' },
+      { id: 'd2', name: '1v1 Gauntlet', category: 'Technical', points: 3, measure: 'head_to_head' }
+    ];
+  });
+
+  it('lists every drill with its current weight', () => {
+    const html = app.renderWeightsRows();
+    expect(html).toContain("Cooper's Test");
+    expect(html).toContain('value="1.5"');
+    expect(html).toContain('1v1 Gauntlet');
+  });
+
+  it('preselects each drill\'s measurement type', () => {
+    const html = app.renderWeightsRows();
+    const cooperBlock = html.slice(html.indexOf('weightMeasure_d1'), html.indexOf('</select>', html.indexOf('weightMeasure_d1')));
+    expect(cooperBlock).toContain('value="count_high" selected');
+  });
+
+  it('says so when there are no drills to weight', () => {
+    // An empty panel reads as "loading". A coach with no drills needs telling
+    // to add one first.
+    app._weightDrills = [];
+    expect(app.renderWeightsRows()).toContain('No exercises');
+  });
+});

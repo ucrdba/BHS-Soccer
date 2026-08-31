@@ -86,7 +86,12 @@ Object.assign(BHSSoccerApp.prototype, {
             <h2>🏆 COMPETITIVE RATING MATRIX</h2>
             <p>Objective practice competition tracker modeling competitive player performance ratings and rankings.</p>
           </div>
-          ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddDrillModal()">+ Record Practice Drill Scores</button>` : ''}
+          ${isCoach ? `
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-gold" onclick="app.openAddDrillModal()">+ Record Practice Drill Scores</button>
+              <!-- Task 6 adds "Record a session" here -->
+              <button class="btn btn-secondary" onclick="app.openWeightsModal()">⚖️ Exercise weights</button>
+            </div>` : ''}
         </div>
 
         <div class="matrix-grid">
