@@ -118,3 +118,10 @@ scratch/
 # Throwaway test fixtures — invented names, seeded accounts with known passwords.
 # Useful locally, not something the repo should carry.
 Resouces/CSV/dummyData/
+
+# Local reference material and scratch assets — source documents for the daily
+# thoughts and quiz content, an ad-hoc password-reset script, and a stray image.
+# The app reads none of them; the content that ships lives in Postgres.
+Resouces/Thoughts4TheDay/
+Resouces/SQL/resetPassword.sql
+assets/soccerPlayer.png
