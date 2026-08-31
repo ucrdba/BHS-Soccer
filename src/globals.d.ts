@@ -49,7 +49,7 @@ declare global {
     fetchAssignableCoaches(): Promise<Record<string, any>[] | null>;
     assignCoachToTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
-    createTeam(schoolId: string, name: string): Promise<{ id?: string } | null>;
+    createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;
     upsertTeamMembership(teamId: string, schoolId: string, membership: Record<string, any>): Promise<{ ok: boolean; error?: string }>;

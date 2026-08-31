@@ -699,10 +699,12 @@ class SupabaseService {
     }
   }
 
-  async createTeam(schoolId: string, name: string): Promise<{ id?: string } | null> {
+  async createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null> {
     if (!this.isConfigured() || !schoolId || !name) return null;
+    const payload: Record<string, any> = { school_id: schoolId, name, is_deleted: false };
+    if (season) payload.season = season;
     const { data, error } = await this.client!
-      .from('teams').insert([{ school_id: schoolId, name, is_deleted: false }]).select();
+      .from('teams').insert([payload]).select();
     if (error) { console.warn('Supabase createTeam notice:', error.message); return null; }
     return data && data[0] ? data[0] : null;
   }

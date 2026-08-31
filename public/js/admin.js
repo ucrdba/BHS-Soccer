@@ -787,12 +787,13 @@ Object.assign(BHSSoccerApp.prototype, {
     const set = (m) => { if (err) err.textContent = m; };
     const schoolId = document.getElementById('newTeamOrg')?.value;
     const name = (document.getElementById('newTeamName')?.value || '').trim();
+    const season = (document.getElementById('newTeamSeason')?.value || '').trim();
 
     if (!schoolId) return set('Pick an organization.');
     if (!name) return set('Give the team a name.');
 
     set('Creating...');
-    const created = await window.supabaseService.createTeam(schoolId, name);
+    const created = await window.supabaseService.createTeam(schoolId, name, season || undefined);
     if (!created || !created.id) {
       return set('Could not create that team. Only an admin can, and the name must be unique within the organization.');
     }
