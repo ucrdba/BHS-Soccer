@@ -44,6 +44,11 @@ declare global {
     fetchPublicDefaultTeamId(schoolId?: string): Promise<string | null>;
     fetchTeamRoster(teamId: string): Promise<Record<string, any>[] | null>;
     fetchAllPlayerIdentities(): Promise<Record<string, any>[] | null>;
+    fetchAllTeams(): Promise<Record<string, any>[] | null>;
+    fetchTeamCoaches(): Promise<Record<string, any>[] | null>;
+    fetchAssignableCoaches(): Promise<Record<string, any>[] | null>;
+    assignCoachToTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
+    removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     createTeam(schoolId: string, name: string): Promise<{ id?: string } | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;

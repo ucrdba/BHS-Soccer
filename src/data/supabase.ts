@@ -602,6 +602,103 @@ class SupabaseService {
    * non-admin rather than throwing — the importer reports those rows as skipped
    * instead of failing the whole sheet.
    */
+  /**
+   * Every team in every organization, for the admin management panel.
+   *
+   * Distinct from fetchTeamsForViewer, which returns only the teams the signed-in
+   * person belongs to — an admin managing assignments has to see teams they do
+   * not coach, including ones with no coach at all.
+   */
+  async fetchAllTeams(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('teams')
+      .select('id, school_id, name, season, is_public_default, schools(name, kind)')
+      .eq('is_deleted', false);
+    if (error) { console.warn('Supabase fetchAllTeams notice:', error.message); return null; }
+    return (data || []).map((t: any) => ({
+      id: t.id, school_id: t.school_id, name: t.name, season: t.season,
+      is_public_default: t.is_public_default,
+      school_name: t.schools?.name || '', school_kind: t.schools?.kind || 'school'
+    })).sort((a, b) => (a.school_name + a.name).localeCompare(b.school_name + b.name));
+  }
+
+  /** Who coaches what, with names, for the management panel. */
+  async fetchTeamCoaches(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('team_coaches').select('team_id, profile_id, profiles(name, email, role, status)');
+    if (error) { console.warn('Supabase fetchTeamCoaches notice:', error.message); return null; }
+    return (data || []).map((r: any) => ({
+      team_id: r.team_id, profile_id: r.profile_id,
+      name: r.profiles?.name || '(unknown)', email: r.profiles?.email || '',
+      role: r.profiles?.role || '', status: r.profiles?.status || ''
+    }));
+  }
+
+  /**
+   * Profiles eligible to coach a team. Active coaches and admins only — a
+   * pending or rejected profile must not be assignable, or the assignment would
+   * grant access the status was meant to withhold.
+   */
+  async fetchAssignableCoaches(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('profiles').select('id, name, email, role')
+      .in('role', ['coach', 'admin']).eq('status', 'active')
+      .order('name', { ascending: true });
+    if (error) { console.warn('Supabase fetchAssignableCoaches notice:', error.message); return null; }
+    return data;
+  }
+
+  /** Grants a coach write access to one team. Admin-only by RLS. */
+  async assignCoachToTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !profileId) return { ok: false, error: 'Pick a team and a coach.' };
+    try {
+      const { data, error } = await this.client!
+        .from('team_coaches').upsert([{ team_id: teamId, profile_id: profileId }], { onConflict: 'team_id,profile_id' }).select();
+      if (error) {
+        console.warn('Supabase assignCoachToTeam notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      // An RLS denial returns no error and no rows; team_coaches_write is
+      // admin-only, so this is the expected refusal for a coach-level user.
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. Only an admin can assign coaches.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase assignCoachToTeam exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
+  /**
+   * Revokes a coach's access to one team. A hard delete, not a soft one:
+   * team_coaches carries no is_deleted column, and a surviving row is exactly
+   * what is_team_coach() reads.
+   */
+  async removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !profileId) return { ok: false, error: 'No team or coach given.' };
+    try {
+      const { data, error } = await this.client!
+        .from('team_coaches').delete().eq('team_id', teamId).eq('profile_id', profileId).select();
+      if (error) {
+        console.warn('Supabase removeCoachFromTeam notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. Only an admin can remove coaches.' };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('Supabase removeCoachFromTeam exception:', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async createTeam(schoolId: string, name: string): Promise<{ id?: string } | null> {
     if (!this.isConfigured() || !schoolId || !name) return null;
     const { data, error } = await this.client!

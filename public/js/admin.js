@@ -145,6 +145,8 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
       </details>
 
+      ${this.renderTeamAdminSection()}
+
       <!-- Section 2: School & Club Profile Settings -->
       <details class="admin-accordion">
         <summary class="admin-accordion-summary">
@@ -693,8 +695,147 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
+  /**
+   * Team management. Admin-only, because teams_write and team_coaches_write are
+   * admin-only by RLS -- rendering these controls for a coach would offer an
+   * action the database will refuse.
+   */
+  renderTeamAdminSection() {
+    if (!window.auth.isAdmin()) return '';
+
+    const teams = this._allTeams || [];
+    const coaches = this._teamCoaches || [];
+    const assignable = this._assignableCoaches || [];
+    const orgs = (this.data.schools || []).length
+      ? this.data.schools
+      : [...new Map(teams.map(t => [t.school_id, { id: t.school_id, name: t.school_name }])).values()];
+
+    const byOrg = new Map();
+    teams.forEach(t => {
+      const key = t.school_name || 'Organization';
+      if (!byOrg.has(key)) byOrg.set(key, []);
+      byOrg.get(key).push(t);
+    });
+
+    const teamRows = Array.from(byOrg.entries()).map(([org, list]) => `
+      <div style="margin-bottom:14px;">
+        <div style="color:var(--bhs-gold-accent); font-size:0.8rem; font-weight:700; margin-bottom:6px;">${org}</div>
+        ${list.map(t => {
+          const staff = coaches.filter(c => c.team_id === t.id);
+          return `
+          <div style="background:rgba(0,0,0,0.25); border:1px solid var(--bhs-navy-border); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <strong style="color:#FFF; font-size:0.9rem;">${t.name}${t.season ? ' <span class="text-muted" style="font-weight:400;">' + t.season + '</span>' : ''}</strong>
+              ${t.is_public_default ? '<span class="badge badge-gold">PUBLIC DEFAULT</span>' : ''}
+            </div>
+            <div style="margin-top:6px; font-size:0.8rem;">
+              ${staff.length === 0
+                ? '<span class="text-muted">No coaches assigned &mdash; nobody can edit this team.</span>'
+                : staff.map(c => `
+                    <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid var(--bhs-navy-border); border-radius:6px; padding:3px 8px; margin:0 6px 6px 0;">
+                      ${c.name}
+                      <button class="btn-card-delete" style="padding:0 5px; font-size:0.75rem;"
+                              onclick="app.removeCoachFromTeam('${t.id}','${c.profile_id}')" title="Remove">&times;</button>
+                    </span>`).join('')}
+            </div>
+            <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+              <select id="assignCoach_${t.id}" class="form-control" style="max-width:220px; font-size:0.8rem;">
+                <option value="">&mdash; assign a coach &mdash;</option>
+                ${assignable
+                    .filter(a => !staff.some(c => c.profile_id === a.id))
+                    .map(a => `<option value="${a.id}">${a.name} (${a.role})</option>`).join('')}
+              </select>
+              <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;"
+                      onclick="app.assignCoachToTeam('${t.id}')">Assign</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`).join('');
+
+    return `
+      <details class="admin-accordion">
+        <summary class="admin-accordion-summary">
+          <span>&#128101; TEAMS &amp; COACH ASSIGNMENTS</span>
+          <span class="badge badge-coach">${teams.length} TEAM${teams.length === 1 ? '' : 'S'}</span>
+        </summary>
+        <div class="admin-accordion-content">
+          <p class="text-muted" style="font-size:0.8rem; margin:0 0 12px 0;">
+            A coach can only edit rosters, fixtures and Matrix results for teams listed against
+            their name here. Removing them takes that access away immediately.
+          </p>
+
+          ${teamRows || '<p class="text-muted" style="font-size:0.85rem;">No teams yet.</p>'}
+
+          <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:6px;">
+            <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:8px;">Create a team</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <select id="newTeamOrg" class="form-control" style="max-width:220px; font-size:0.8rem;">
+                ${orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+              </select>
+              <input type="text" id="newTeamName" class="form-control" style="max-width:160px; font-size:0.8rem;" placeholder="e.g. JV" />
+              <input type="text" id="newTeamSeason" class="form-control" style="max-width:100px; font-size:0.8rem;" placeholder="2026" />
+              <button class="btn btn-gold" style="padding:4px 12px; font-size:0.8rem;" onclick="app.createTeamFromAdmin()">+ Create</button>
+            </div>
+            <div id="teamAdminFeedback" style="color:var(--color-danger); font-size:0.8rem; margin-top:8px;"></div>
+          </div>
+        </div>
+      </details>`;
+  },
+
+  async createTeamFromAdmin() {
+    const err = document.getElementById('teamAdminFeedback');
+    const set = (m) => { if (err) err.textContent = m; };
+    const schoolId = document.getElementById('newTeamOrg')?.value;
+    const name = (document.getElementById('newTeamName')?.value || '').trim();
+
+    if (!schoolId) return set('Pick an organization.');
+    if (!name) return set('Give the team a name.');
+
+    set('Creating...');
+    const created = await window.supabaseService.createTeam(schoolId, name);
+    if (!created || !created.id) {
+      return set('Could not create that team. Only an admin can, and the name must be unique within the organization.');
+    }
+    await this.openAdminModal();
+  },
+
+  async assignCoachToTeam(teamId) {
+    const err = document.getElementById('teamAdminFeedback');
+    const profileId = document.getElementById('assignCoach_' + teamId)?.value;
+    if (!profileId) { if (err) err.textContent = 'Pick a coach to assign.'; return; }
+
+    const res = await window.supabaseService.assignCoachToTeam(teamId, profileId);
+    if (!res.ok) { if (err) err.textContent = res.error || 'Could not assign that coach.'; return; }
+    // Re-open rather than patch the DOM: the assignment changes what the team
+    // switcher shows for that person, and a stale panel would misreport access.
+    await this.openAdminModal();
+  },
+
+  async removeCoachFromTeam(teamId, profileId) {
+    const staff = (this._teamCoaches || []).filter(c => c.team_id === teamId);
+    if (staff.length === 1 && !window.confirm(
+      'This is the only coach on that team. Removing them leaves nobody able to edit its roster, fixtures or Matrix results.\n\nRemove anyway?')) return;
+
+    const res = await window.supabaseService.removeCoachFromTeam(teamId, profileId);
+    const err = document.getElementById('teamAdminFeedback');
+    if (!res.ok) { if (err) err.textContent = res.error || 'Could not remove that coach.'; return; }
+    await this.openAdminModal();
+  },
+
   async openAdminModal() {
     this._pendingApprovals = (await window.auth.getPendingApprovals()) || [];
+    // Team management reads across organizations, so it cannot reuse
+    // this.data.teams -- that holds only the teams the viewer belongs to.
+    if (window.auth.isAdmin() && window.supabaseService?.isConfigured()) {
+      const [allTeams, teamCoaches, assignable] = await Promise.all([
+        window.supabaseService.fetchAllTeams(),
+        window.supabaseService.fetchTeamCoaches(),
+        window.supabaseService.fetchAssignableCoaches()
+      ]);
+      this._allTeams = allTeams || [];
+      this._teamCoaches = teamCoaches || [];
+      this._assignableCoaches = assignable || [];
+    }
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
