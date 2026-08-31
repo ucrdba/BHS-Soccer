@@ -169,6 +169,23 @@ describe('renderTeamAdminSection', () => {
     expect(revBlock).toContain('club');
   });
 
+  it('labels every field, so an empty box is not mistaken for a filled one', () => {
+    // Placeholder grey reads as content against the dark panel. A coach read
+    // the example values as real ones, clicked Create, and got told to supply
+    // a name they thought was already there.
+    const html = app.renderTeamAdminSection();
+    for (const id of ['newOrgName', 'newOrgMascot', 'newOrgCode', 'newOrgKind', 'newTeamOrg', 'newTeamName', 'newTeamSeason']) {
+      expect(html).toContain(`for="${id}"`);
+    }
+  });
+
+  it('marks placeholders as examples rather than values', () => {
+    const html = app.renderTeamAdminSection();
+    expect(html).toContain('placeholder="e.g. Riverside Surf SC"');
+    expect(html).toContain('placeholder="e.g. rvsc"');
+    expect(html).toContain('placeholder="e.g. 2026"');
+  });
+
   it('handles having no teams at all without breaking', () => {
     app._allTeams = [];
     app._teamCoaches = [];

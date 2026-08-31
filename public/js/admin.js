@@ -781,28 +781,49 @@ Object.assign(BHSSoccerApp.prototype, {
               A school or a club. Teams belong to one, and a player may be on one team per
               organization &mdash; so a player can be on a school team and a club team at once.
             </p>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <input type="text" id="newOrgName" class="form-control" style="max-width:200px; font-size:0.8rem;" placeholder="Riverside Surf SC" />
-              <input type="text" id="newOrgMascot" class="form-control" style="max-width:130px; font-size:0.8rem;" placeholder="Surf" />
-              <input type="text" id="newOrgCode" class="form-control" style="max-width:90px; font-size:0.8rem;" placeholder="rvsc" />
-              <select id="newOrgKind" class="form-control" style="max-width:120px; font-size:0.8rem;">
-                <option value="school">School</option>
-                <option value="club">Club</option>
-              </select>
-              <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;" onclick="app.createOrganization()">+ Create</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+              <div>
+                <label for="newOrgName" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Name</label>
+                <input type="text" id="newOrgName" class="form-control" style="max-width:200px; font-size:0.8rem;" placeholder="e.g. Riverside Surf SC" />
+              </div>
+              <div>
+                <label for="newOrgMascot" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Mascot</label>
+                <input type="text" id="newOrgMascot" class="form-control" style="max-width:130px; font-size:0.8rem;" placeholder="e.g. Surf" />
+              </div>
+              <div>
+                <label for="newOrgCode" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Short code</label>
+                <input type="text" id="newOrgCode" class="form-control" style="max-width:90px; font-size:0.8rem;" placeholder="e.g. rvsc" />
+              </div>
+              <div>
+                <label for="newOrgKind" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Type</label>
+                <select id="newOrgKind" class="form-control" style="max-width:120px; font-size:0.8rem;">
+                  <option value="school">School</option>
+                  <option value="club">Club</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="app.createOrganization()">+ Create</button>
             </div>
             <div id="orgAdminFeedback" style="color:var(--color-danger); font-size:0.8rem; margin-top:8px;"></div>
           </div>
 
           <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:12px;">
             <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:8px;">Create a team</div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <select id="newTeamOrg" class="form-control" style="max-width:220px; font-size:0.8rem;">
-                ${orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
-              </select>
-              <input type="text" id="newTeamName" class="form-control" style="max-width:160px; font-size:0.8rem;" placeholder="e.g. JV" />
-              <input type="text" id="newTeamSeason" class="form-control" style="max-width:100px; font-size:0.8rem;" placeholder="2026" />
-              <button class="btn btn-gold" style="padding:4px 12px; font-size:0.8rem;" onclick="app.createTeamFromAdmin()">+ Create</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+              <div>
+                <label for="newTeamOrg" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Organization</label>
+                <select id="newTeamOrg" class="form-control" style="max-width:220px; font-size:0.8rem;">
+                  ${orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label for="newTeamName" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Team name</label>
+                <input type="text" id="newTeamName" class="form-control" style="max-width:160px; font-size:0.8rem;" placeholder="e.g. JV" />
+              </div>
+              <div>
+                <label for="newTeamSeason" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Season</label>
+                <input type="text" id="newTeamSeason" class="form-control" style="max-width:100px; font-size:0.8rem;" placeholder="e.g. 2026" />
+              </div>
+              <button class="btn btn-gold" style="padding:6px 12px; font-size:0.8rem;" onclick="app.createTeamFromAdmin()">+ Create</button>
             </div>
             <div id="teamAdminFeedback" style="color:var(--color-danger); font-size:0.8rem; margin-top:8px;"></div>
           </div>
