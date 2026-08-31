@@ -906,7 +906,11 @@ Object.assign(BHSSoccerApp.prototype, {
       .filter(p => !p.is_deleted && !p.isDeleted)
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
-    const playerOptions = players
+    // Leads with a blank so nothing is chosen by default. A pre-filled pair
+    // means one stray click records a result between two arbitrary players, and
+    // there is no way to correct a wrong entry from the roster view -- only from
+    // the LOGGED RESULTS panel, after you notice.
+    const playerOptions = '<option value="">— select a player —</option>' + players
       .map(p => `<option value="${p.id}">${p.name}${p.number ? ' (#' + p.number + ')' : ''}</option>`)
       .join('');
 
@@ -926,10 +930,6 @@ Object.assign(BHSSoccerApp.prototype, {
     if (drill) drill.innerHTML = drillOptions;
     if (when) when.value = new Date().toISOString().slice(0, 10);
     if (err) err.textContent = '';
-
-    // Default B to a different player so the "same player twice" guard is not
-    // the first thing a coach meets.
-    if (b && b.options.length > 1) b.selectedIndex = 1;
 
     if (players.length < 2 && err) {
       err.textContent = 'At least two players are needed to record a head-to-head result.';
