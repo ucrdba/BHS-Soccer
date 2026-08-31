@@ -232,8 +232,11 @@ begin
     values (fx_school, 'zzselfcheck', 'Self Check', 'Fixture', 'school');
   insert into public.teams (id, school_id, name)
     values (fx_team, fx_school, 'Self Check Team');
-  insert into public.players (id, name) values
-    (p_cesar, 'SelfCheck Cesar'), (p_caleb, 'SelfCheck Caleb'), (p_dylan, 'SelfCheck Dylan');
+  -- class_year is NOT NULL and 0005 did not drop it, unlike number/position.
+  insert into public.players (id, name, class_year) values
+    (p_cesar, 'SelfCheck Cesar', '2027'),
+    (p_caleb, 'SelfCheck Caleb', '2027'),
+    (p_dylan, 'SelfCheck Dylan', '2027');
 
   insert into public.drills_bank (id, school_id, name, duration, category, points, measure) values
     (d_cooper, fx_school, 'SelfCheck Coopers', '12 min', 'Fitness',  1.5, 'count_high'),
