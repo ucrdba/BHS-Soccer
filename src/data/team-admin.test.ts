@@ -186,6 +186,31 @@ describe('renderTeamAdminSection', () => {
     expect(html).toContain('placeholder="e.g. 2026"');
   });
 
+  it('stays expanded after an action re-renders the modal', () => {
+    // Every handler here calls openAdminModal(), which replaces innerHTML and
+    // resets <details> to closed. That made Create look like it did nothing.
+    expect(app.renderTeamAdminSection()).not.toContain('<details class="admin-accordion" open');
+    (app as any)._teamAdminOpen = true;
+    expect(app.renderTeamAdminSection()).toContain('open');
+  });
+
+  it('shows a success notice naming what was created', () => {
+    (app as any)._teamAdminNotice = 'Created "U14 Boys" in Legends FC.';
+    const html = app.renderTeamAdminSection();
+    // Naming the organization back is the point: the picker defaults to the
+    // first one, so a team can land somewhere the admin never chose.
+    expect(html).toContain('U14 Boys');
+    expect(html).toContain('Legends FC');
+  });
+
+  it('clears the notice so it does not repeat on the next render', () => {
+    // A stale "Created ..." banner on an unrelated re-render reads as a second
+    // team having been created.
+    (app as any)._teamAdminNotice = 'Created "U14 Boys" in Legends FC.';
+    app.renderTeamAdminSection();
+    expect(app.renderTeamAdminSection()).not.toContain('U14 Boys');
+  });
+
   it('handles having no teams at all without breaking', () => {
     app._allTeams = [];
     app._teamCoaches = [];

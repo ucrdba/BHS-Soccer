@@ -703,6 +703,11 @@ Object.assign(BHSSoccerApp.prototype, {
   renderTeamAdminSection() {
     if (!window.auth.isAdmin()) return '';
 
+    // Read-and-clear: a success notice belongs to the render that follows the
+    // action, not to every later re-render of the panel.
+    const notice = this._teamAdminNotice || '';
+    this._teamAdminNotice = '';
+
     const teams = this._allTeams || [];
     const coaches = this._teamCoaches || [];
     const assignable = this._assignableCoaches || [];
@@ -761,13 +766,17 @@ Object.assign(BHSSoccerApp.prototype, {
         }).join('')}
       </div>`).join('');
 
+    // Every action in this section re-renders the whole modal, which resets
+    // <details> to closed. Without this the panel snaps shut on Create and the
+    // result -- success or failure -- is hidden behind a collapsed header.
     return `
-      <details class="admin-accordion">
+      <details class="admin-accordion" ${this._teamAdminOpen ? 'open' : ''}>
         <summary class="admin-accordion-summary">
           <span>&#128101; TEAMS &amp; COACH ASSIGNMENTS</span>
           <span class="badge badge-coach">${teams.length} TEAM${teams.length === 1 ? '' : 'S'}</span>
         </summary>
         <div class="admin-accordion-content">
+          ${notice ? `<div style="background:rgba(46,160,67,0.12); border:1px solid rgba(46,160,67,0.5); color:#7ee2a8; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">&#10003; ${notice}</div>` : ''}
           <p class="text-muted" style="font-size:0.8rem; margin:0 0 12px 0;">
             A coach can only edit rosters, fixtures and Matrix results for teams listed against
             their name here. Removing them takes that access away immediately.
@@ -851,6 +860,8 @@ Object.assign(BHSSoccerApp.prototype, {
     // Re-sync rather than patch: the new organization has to reach
     // this.data.schools before the create-team picker can offer it.
     await this.syncFromSupabase();
+    this._teamAdminOpen = true;
+    this._teamAdminNotice = `Created ${kind} "${name}". Pick it under Organization to add a team to it.`;
     await this.openAdminModal();
   },
 
@@ -869,6 +880,11 @@ Object.assign(BHSSoccerApp.prototype, {
     if (!created || !created.id) {
       return set('Could not create that team. Only an admin can, and the name must be unique within the organization.');
     }
+    // Name the organization back. The picker defaults to the first one, so a
+    // team can silently land somewhere the admin did not intend.
+    const org = (this.data.schools || []).find(o => o.id === schoolId);
+    this._teamAdminOpen = true;
+    this._teamAdminNotice = `Created "${name}" in ${org?.name || 'that organization'}.`;
     await this.openAdminModal();
   },
 
@@ -882,6 +898,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (!res.ok) { if (err) err.textContent = res.error || 'Could not assign that coach.'; return; }
     // Re-open rather than patch the DOM: the assignment changes what the team
     // switcher shows for that person, and a stale panel would misreport access.
+    this._teamAdminOpen = true;
     await this.openAdminModal();
   },
 
@@ -893,6 +910,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const res = await window.supabaseService.removeCoachFromTeam(teamId, profileId);
     const err = document.getElementById('teamFeedback_' + teamId) || document.getElementById('teamAdminFeedback');
     if (!res.ok) { if (err) err.textContent = res.error || 'Could not remove that coach.'; return; }
+    this._teamAdminOpen = true;
     await this.openAdminModal();
   },
 
