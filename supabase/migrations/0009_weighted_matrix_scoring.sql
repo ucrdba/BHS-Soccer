@@ -27,8 +27,19 @@ begin;
 set role postgres;
 
 -- ─── 1. Weight and measure on the drill ────────────────────────────────────
--- points already exists as INT and is already edited in the drills library.
--- INT cannot hold 2.5, which is the whole point of the widening.
+-- The drills library has a weight field and renders it, but the LIVE
+-- drills_bank has no `points` column at all -- supabase_schema.sql declares
+-- `points INT DEFAULT 3` and `duration TEXT NOT NULL`, and the real table has
+-- neither. The static schema has drifted from the database. That is also why
+-- upsertDrillBankItem never wrote the field: there was nowhere to write it.
+--
+-- So add the column rather than assuming it. The ALTER that follows is a
+-- no-op when this ADD just created it, and does the real widening on any
+-- database where it already exists as INT -- INT cannot hold 2.5, which is
+-- the whole point. Written this way the migration is correct against both.
+
+alter table public.drills_bank
+  add column if not exists points numeric(3,1) default 3;
 
 alter table public.drills_bank
   alter column points type numeric(3,1) using points::numeric(3,1);
@@ -290,10 +301,12 @@ begin
     (p_caleb, 'SelfCheck Caleb', '2027'),
     (p_dylan, 'SelfCheck Dylan', '2027');
 
-  insert into public.drills_bank (id, school_id, name, duration, category, points, measure) values
-    (d_cooper, fx_school, 'SelfCheck Coopers', '12 min', 'Fitness',  1.5, 'count_high'),
-    (d_1v1,    fx_school, 'SelfCheck 1v1',     '20 min', 'Technical', 3.0, 'head_to_head'),
-    (d_ssg,    fx_school, 'SelfCheck SSG',     '20 min', 'Tactical',  2.5, 'win_loss');
+  -- No `duration`: supabase_schema.sql declares it NOT NULL but the live table
+  -- does not have the column. Verified against the running database.
+  insert into public.drills_bank (id, school_id, name, category, points, measure) values
+    (d_cooper, fx_school, 'SelfCheck Coopers', 'Fitness',   1.5, 'count_high'),
+    (d_1v1,    fx_school, 'SelfCheck 1v1',     'Technical', 3.0, 'head_to_head'),
+    (d_ssg,    fx_school, 'SelfCheck SSG',     'Tactical',  2.5, 'win_loss');
 
   -- 1v1: Cesar beats Caleb; Dylan draws with... nobody available, so Dylan's
   -- draw is against Caleb. Caleb therefore has two pairings, which the
