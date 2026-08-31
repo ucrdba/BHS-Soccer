@@ -34,6 +34,8 @@ Object.assign(BHSSoccerApp.prototype, {
     // Shared with the countdown, so the heading and the clock can never name
     // two different matches.
     const nextMatch = this.getNextMatch();
+    const scheduleState = this.scheduleState();
+    const lastPlayed = scheduleState === 'stale' ? this.lastPlayedMatch() : null;
     const countdown = this.getNextMatchCountdown();
     const cdDaysStr = countdown ? countdown.days : '00';
     const cdHoursStr = countdown ? countdown.hours : '00';
@@ -56,6 +58,12 @@ Object.assign(BHSSoccerApp.prototype, {
               ${nextMatch ? `
                 <h4>NEXT MATCH vs ${nextMatch.opponent.toUpperCase()}</h4>
                 <p>${nextMatch.isHome ? 'Home' : 'Away'} • ${nextMatch.location} | ${nextMatch.date}, ${nextMatch.time}</p>
+              ` : scheduleState === 'empty' ? `
+                <h4>SCHEDULE COMING SOON</h4>
+                <p>No fixtures have been added yet.${window.auth.isCoach() ? ' Add them from the Schedule tab.' : ''}</p>
+              ` : scheduleState === 'stale' ? `
+                <h4>NO UPCOMING FIXTURES</h4>
+                <p>${lastPlayed ? `Last match: ${lastPlayed.opponent} on ${lastPlayed.date}. ` : ''}${window.auth.isCoach() ? 'Add the next fixture, or record the result of the last one.' : 'Check back soon for the next match.'}</p>
               ` : `
                 <h4>SEASON COMPLETE</h4>
                 <p>All scheduled matches have been played. Final record: ${recordStr}</p>

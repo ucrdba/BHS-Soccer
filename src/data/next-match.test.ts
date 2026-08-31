@@ -202,6 +202,60 @@ describe('matchDateTime — the real date columns from migration 0008', () => {
   });
 });
 
+describe('scheduleState — why there is no next match', () => {
+  it('reports an upcoming fixture', () => {
+    app.data.schedule = [match('Yucaipa', 'SEP 4 2026')];
+    expect((app as any).scheduleState()).toBe('upcoming');
+  });
+
+  it('says the schedule is empty rather than that the season ended', () => {
+    // A team whose fixtures have not been entered yet has not finished
+    // anything. This is the state a brand-new team is in.
+    app.data.schedule = [];
+    expect((app as any).scheduleState()).toBe('empty');
+  });
+
+  it('reports a genuinely finished season', () => {
+    app.data.schedule = [
+      match('Played', 'AUG 20 2026', '4:00 PM', 'COMPLETED'),
+      match('Also played', 'AUG 28, 2026', '6:51 PM', 'COMPLETED')
+    ];
+    expect((app as any).scheduleState()).toBe('complete');
+  });
+
+  it('distinguishes a stale schedule from a completed season', () => {
+    // The live Varsity case: one fixture, played on AUG 28, never marked
+    // COMPLETED, and the rest of the season not yet entered. Calling that
+    // SEASON COMPLETE in the first week of September is exactly backwards.
+    app.data.schedule = [match('Palm Springs Indians', 'AUG 28, 2026', '6:51 PM')];
+    expect((app as any).scheduleState()).toBe('stale');
+  });
+
+  it('treats a part-recorded past schedule as stale, not complete', () => {
+    app.data.schedule = [
+      match('Written up', 'AUG 20 2026', '4:00 PM', 'COMPLETED'),
+      match('Not written up', 'AUG 28, 2026', '6:51 PM')
+    ];
+    expect((app as any).scheduleState()).toBe('stale');
+  });
+});
+
+describe('lastPlayedMatch', () => {
+  it('returns the most recent fixture by date', () => {
+    app.data.schedule = [
+      match('Older', 'AUG 20 2026'),
+      match('Most recent', 'AUG 28, 2026'),
+      match('Oldest', 'AUG 12 2026')
+    ];
+    expect((app as any).lastPlayedMatch().opponent).toBe('Most recent');
+  });
+
+  it('returns null when nothing has a readable date', () => {
+    app.data.schedule = [match('Mystery', 'sometime')];
+    expect((app as any).lastPlayedMatch()).toBeNull();
+  });
+});
+
 describe('getNextMatchCountdown', () => {
   it('counts down to the match getNextMatch chose', () => {
     app.data.schedule = [

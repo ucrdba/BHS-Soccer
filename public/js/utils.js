@@ -226,6 +226,37 @@ Object.assign(BHSSoccerApp.prototype, {
     return undated.length ? undated[0] : null;
   },
 
+  /**
+   * Why there is no next match, when there isn't one.
+   *
+   * The home page used to have two states -- a fixture, or "SEASON COMPLETE"
+   * -- so every other reason read as the season being over. At the start of a
+   * season, with one past friendly on the books and the rest of the fixtures
+   * not yet entered, that is precisely backwards.
+   *
+   * @returns 'upcoming' | 'empty' | 'complete' | 'stale'
+   */
+  scheduleState() {
+    const schedule = (this.data.schedule || []).filter(m => m);
+    if (this.getNextMatch()) return 'upcoming';
+    if (schedule.length === 0) return 'empty';
+    // Every fixture on record has been played AND written up.
+    if (schedule.every(m => m.status === 'COMPLETED')) return 'complete';
+    // Fixtures exist and are in the past, but were never marked COMPLETED.
+    // The season is not over; the schedule has just run out.
+    return 'stale';
+  },
+
+  /** The most recent match already played, for the 'stale' message. */
+  lastPlayedMatch() {
+    const dated = (this.data.schedule || [])
+      .filter(m => m)
+      .map(m => ({ m, t: this.matchDateTime(m) }))
+      .filter(x => x.t)
+      .sort((a, b) => b.t - a.t);
+    return dated.length ? dated[0].m : null;
+  },
+
   getNextMatchCountdown() {
     const nextMatch = this.getNextMatch();
     if (!nextMatch) return null;
