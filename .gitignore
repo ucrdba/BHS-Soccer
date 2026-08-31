@@ -114,3 +114,7 @@ sitemap.xml.gz
 # ==========================================
 .gemini/
 scratch/
+
+# Throwaway test fixtures — invented names, seeded accounts with known passwords.
+# Useful locally, not something the repo should carry.
+Resouces/CSV/dummyData/
