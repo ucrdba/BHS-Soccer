@@ -916,11 +916,11 @@ Object.assign(BHSSoccerApp.prototype, {
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'players') {
             fileName = '3_Roster_Players.xlsx'; sheetName = 'Players';
-            const rows = (this.data.players || []).map(p => ({ Number: p.number, Name: p.name, Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.players || []).map(p => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Number: p.number, Name: p.name, Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'schedule') {
             fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
-            const rows = (this.data.schedule || []).map(m => ({ Date: m.date, Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.schedule || []).map(m => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Date: m.date, Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'drills') {
             fileName = '5_Master_Drills_Library.xlsx'; sheetName = 'MasterDrills';
@@ -1141,11 +1141,11 @@ Object.assign(BHSSoccerApp.prototype, {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Profiles');
       XLSX.writeFile(wb, 'BHS_Profiles_Template.xlsx');
     } else if (type === 'players') {
-      const headers = [{ Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
+      const headers = [{ Team:'blank = current team', Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
       XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
     } else if (type === 'schedule') {
-      const headers = [{ Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE' }];
+      const headers = [{ Team:'blank = current team', Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
       XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
     } else if (type === 'drills') {
@@ -1161,6 +1161,55 @@ Object.assign(BHSSoccerApp.prototype, {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'SoccerCategories');
       XLSX.writeFile(wb, 'BHS_Soccer_Categories_Template.xlsx');
     }
+  },
+
+  /**
+   * Resolves an import row's Team column to a real team.
+   *
+   * Blank falls back to the active team, so every sheet written before this
+   * column existed keeps working unchanged. A name that matches an existing
+   * team in the same organization reuses it. A name that matches nothing is
+   * CREATED, which is what makes loading a season's worth of squads a single
+   * import rather than a round of SQL first.
+   *
+   * Two consequences worth knowing. Creating a team needs admin, because
+   * teams_write is admin-only — a coach importing a sheet that names a new team
+   * gets those rows skipped with a warning rather than the whole sheet failing.
+   * And a typo makes a team: "Varisty" becomes a fourth squad. That is the
+   * deliberate trade for not refusing the import.
+   *
+   * `cache` is a Map shared across one import so a 30-row sheet resolves each
+   * distinct team once, not thirty times.
+   */
+  async resolveImportTeam(name, cache, warnings) {
+    const active = (this.data.teams || []).find(t => t.id === this.activeTeamId) || null;
+    const wanted = String(name || '').trim();
+    if (!wanted) return active;
+
+    const key = wanted.toLowerCase();
+    if (cache.has(key)) return cache.get(key);
+
+    const existing = (this.data.teams || []).find(t =>
+      String(t.name || '').toLowerCase() === key &&
+      (!active || t.school_id === active.school_id));
+    if (existing) { cache.set(key, existing); return existing; }
+
+    if (!active) { cache.set(key, null); return null; }
+
+    const created = await window.supabaseService.createTeam(active.school_id, wanted);
+    if (!created || !created.id) {
+      warnings.push(`Team "${wanted}" does not exist and could not be created (admin access required) — rows naming it were skipped.`);
+      cache.set(key, null);
+      return null;
+    }
+    const team = {
+      id: created.id, school_id: active.school_id, name: wanted,
+      season: null, is_public_default: false,
+      school_name: active.school_name, school_kind: active.school_kind
+    };
+    this.data.teams.push(team);
+    cache.set(key, team);
+    return team;
   },
 
   async handleImportFile(file, target) {
@@ -1290,9 +1339,10 @@ Object.assign(BHSSoccerApp.prototype, {
             totalCount += imported.length; totalUpdated += resU.updated; totalInserted += resU.inserted;
           } else if (activeTarget === 'players') {
             if (!this.activeTeamId) {
-              // The sheet has no team column, so rows can only land on the team
-              // currently selected. Refuse rather than guess.
-              warnings.push('Players sheet skipped — no team is selected. Choose a team in the header first; imported players join that team.');
+              // Rows without a Team column land on the active team, and creating
+              // a named team needs one to borrow an organization from. With no
+              // team at all there is nothing to resolve against.
+              warnings.push('Players sheet skipped — no team is selected. Choose a team in the header first; rows without a Team column join it.');
               continue;
             }
             const playerDefaults = {
@@ -1334,35 +1384,51 @@ Object.assign(BHSSoccerApp.prototype, {
                 // ({wins,losses,points,rank,drillScore}) is unused by Phase 3 and
                 // clobbers the derived standings syncFromSupabase joins onto the player.
                 isDeleted: optB(r.IsDeleted),
-                is_deleted: optB(r.IsDeleted)
+                is_deleted: optB(r.IsDeleted),
+                // Which squad this row joins. Blank means the active team.
+                importTeamName: opt(r.Team)
               };
             });
-            const resP = this.upsertByName(this.data.players, imported, playerDefaults);
-            totalCount += imported.length; totalUpdated += resP.updated; totalInserted += resP.inserted;
+            totalCount += imported.length;
             if (window.supabaseService?.isConfigured()) {
-              const importTeamId = this.activeTeamId;
-              const importTeam = (this.data.teams || []).find(t => t.id === importTeamId);
-              // Count a row as rejected if either write fails, so the status
-              // line stays honest about what actually landed in the database.
-              totalRejected += await persistAll(resP.toPersist, async p => {
-                const identity = await window.supabaseService.upsertPlayerIdentity(p);
+              // Match people by name across the WHOLE identity table, not against
+              // this.data.players — that holds only the active team's roster, so a
+              // sheet putting someone on JV would miss their Varsity identity and
+              // mint a duplicate human.
+              const allIdentities = (await window.supabaseService.fetchAllPlayerIdentities()) || [];
+              const identityByName = new Map(allIdentities.map(r => [String(r.name || '').trim().toLowerCase(), r.id]));
+              const teamCache = new Map();
+
+              totalRejected += await persistAll(imported, async p => {
+                const team = await this.resolveImportTeam(p.importTeamName, teamCache, warnings);
+                if (!team) return false;
+
+                const nameKey = String(p.name || '').trim().toLowerCase();
+                const identity = await window.supabaseService.upsertPlayerIdentity(
+                  identityByName.has(nameKey) ? { ...p, id: identityByName.get(nameKey) } : p
+                );
                 if (!identity || !identity.id) return false;
-                p.id = identity.id;
-                const memRes = await window.supabaseService.upsertTeamMembership(importTeamId, importTeam?.school_id, {
+                // Remember it, so a sheet naming the same person on two teams
+                // reuses the identity created moments ago rather than duplicating.
+                identityByName.set(nameKey, identity.id);
+
+                const memRes = await window.supabaseService.upsertTeamMembership(team.id, team.school_id, {
                   player_id: identity.id,
                   number: p.number,
                   position: p.position,
                   season_stats: p.seasonStats,
                   ratings: p.ratings
                 });
-                return !!(memRes && memRes.ok);
+                if (memRes && memRes.ok) { totalInserted += 1; return true; }
+                if (memRes && memRes.error) warnings.push(`${p.name}: ${memRes.error}`);
+                return false;
               });
             }
           } else if (activeTarget === 'schedule') {
             if (!this.activeTeamId) {
-              // The sheet has no team column, so rows can only land on the team
-              // currently selected. Refuse rather than guess.
-              warnings.push('Schedule sheet skipped — no team is selected. Choose a team in the header first; imported fixtures join that team.');
+              // Rows without a Team column land on the active team, and creating
+              // a named team needs one to borrow an organization from.
+              warnings.push('Schedule sheet skipped — no team is selected. Choose a team in the header first; rows without a Team column join it.');
               continue;
             }
 
@@ -1401,12 +1467,19 @@ Object.assign(BHSSoccerApp.prototype, {
               status: opt(r.Status) ? toStr(r.Status).toUpperCase() : undefined,
               score: opt(r.Score),
               isDeleted: optB(r.IsDeleted),
-              is_deleted: optB(r.IsDeleted)
+              is_deleted: optB(r.IsDeleted),
+              // Which team's fixture this is. Blank means the active team.
+              importTeamName: opt(r.Team)
             }));
             const resS = this.upsertByDateTime(this.data.schedule, imported, scheduleDefaults);
             totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
-              totalRejected += await persistAll(resS.toPersist, m => window.supabaseService.upsertMatch(this.activeTeamId, m));
+              const schedTeamCache = new Map();
+              totalRejected += await persistAll(resS.toPersist, async m => {
+                const team = await this.resolveImportTeam(m.importTeamName, schedTeamCache, warnings);
+                if (!team) return false;
+                return !!(await window.supabaseService.upsertMatch(team.id, m));
+              });
             }
           } else if (activeTarget === 'drills') {
             const drillDefaults = { category: 'General', isDeleted: false, is_deleted: false };

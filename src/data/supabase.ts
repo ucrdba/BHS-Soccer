@@ -581,6 +581,35 @@ class SupabaseService {
   }
 
   /** Name search for the add-player flow, so a second team reuses an existing person. */
+  /**
+   * Every player identity, for the importer's name matching.
+   *
+   * The import has to reuse an existing person rather than create a second one,
+   * and it cannot match against this.data.players because that holds only the
+   * ACTIVE team's roster — a sheet putting someone on JV would not find their
+   * Varsity identity and would mint a duplicate human.
+   */
+  async fetchAllPlayerIdentities(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('players').select('id, name').eq('is_deleted', false);
+    if (error) { console.warn('Supabase fetchAllPlayerIdentities notice:', error.message); return null; }
+    return data;
+  }
+
+  /**
+   * Creates a team. teams_write is admin-only, so this returns null for a
+   * non-admin rather than throwing — the importer reports those rows as skipped
+   * instead of failing the whole sheet.
+   */
+  async createTeam(schoolId: string, name: string): Promise<{ id?: string } | null> {
+    if (!this.isConfigured() || !schoolId || !name) return null;
+    const { data, error } = await this.client!
+      .from('teams').insert([{ school_id: schoolId, name, is_deleted: false }]).select();
+    if (error) { console.warn('Supabase createTeam notice:', error.message); return null; }
+    return data && data[0] ? data[0] : null;
+  }
+
   async searchPlayersByName(query: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured()) return null;
     const q = String(query || '').trim();
