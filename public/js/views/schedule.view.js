@@ -7,13 +7,14 @@
 Object.assign(BHSSoccerApp.prototype, {
 
   renderScheduleView() {
+    const label = this.activeTeamLabel();
     const isCoachOrAdmin = true; // Always enable schedule management
     return `
       <div class="container">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <div>
             <h2 class="section-title">SCHEDULE &amp; GAME RESULTS</h2>
-            <p class="text-muted">Beaumont High School Cougars Season Fixtures &amp; Match Results</p>
+            <p class="text-muted">${label.org}${label.team ? " &mdash; " + label.team : ""} Season Fixtures &amp; Match Results</p>
           </div>
           <button class="btn btn-gold" onclick="app.openAddMatchModal()" style="font-weight:700;">➕ Add New Match</button>
         </div>

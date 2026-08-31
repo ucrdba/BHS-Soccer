@@ -101,7 +101,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <div class="section-header" style="margin-bottom: 16px;">
               <div>
                 <h2 class="section-title">SEASON SPOTLIGHT</h2>
-                <p class="text-muted">Beaumont Cougars 2026 Campaign Record</p>
+                <p class="text-muted">${this.activeTeamLabel().org} ${this.activeTeamLabel().season || "2026"} Campaign Record</p>
               </div>
               <button class="btn btn-primary" onclick="app.switchView('schedule')">Full Fixtures &amp; Results</button>
             </div>

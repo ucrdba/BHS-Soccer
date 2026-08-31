@@ -727,7 +727,7 @@ Object.assign(BHSSoccerApp.prototype, {
       <div class="container">
         <div class="section-header">
           <div>
-            <h2 class="section-title">BEAUMONT COUGARS COACHING STAFF</h2>
+            <h2 class="section-title">${this.activeTeamLabel().org.toUpperCase()} COACHING STAFF</h2>
             <p class="text-muted">Leadership, tactical direction &amp; player development team</p>
           </div>
           ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddCoachModal()">+ Add New Coach</button>` : ''}

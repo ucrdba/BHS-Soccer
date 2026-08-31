@@ -7,6 +7,7 @@
 Object.assign(BHSSoccerApp.prototype, {
 
   renderRosterView() {
+    const label = this.activeTeamLabel();
     const canAccessRatings = window.auth.canAccessRatings();
     const isCoach = window.auth.isCoach();
     
@@ -14,8 +15,8 @@ Object.assign(BHSSoccerApp.prototype, {
       <div class="container">
         <div class="section-header">
           <div>
-            <h2 class="section-title">BEAUMONT COUGARS ROSTER</h2>
-            <p class="text-muted">2026 Varsity Boys Soccer Squad</p>
+            <h2 class="section-title">${label.org.toUpperCase()} ROSTER</h2>
+            <p class="text-muted">${[label.season, label.team].filter(Boolean).join(' ')} Squad</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
             ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddPlayerModal()">+ Add New Player</button>` : ''}

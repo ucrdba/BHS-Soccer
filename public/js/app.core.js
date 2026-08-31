@@ -196,6 +196,28 @@ class BHSSoccerApp {
     // bhs.cache.v1.* is the repository layer's job in the next phase.
   }
 
+  /**
+   * How the active team should be named in page headings.
+   *
+   * Every heading used to be hardcoded to Beaumont Varsity, so a coach looking
+   * at a club U16 roster read "BEAUMONT COUGARS ROSTER / 2026 Varsity Boys
+   * Soccer Squad". The switcher groups by organization precisely because that
+   * distinction matters, and then the heading contradicted it.
+   *
+   * Falls back to the school record when no team is resolved, so a signed-out
+   * visitor mid-load never sees an empty heading.
+   */
+  activeTeamLabel() {
+    const t = (this.data.teams || []).find(x => x.id === this.activeTeamId);
+    const fallbackOrg = this.data.school?.name || 'Beaumont High School';
+    if (!t) return { org: fallbackOrg, team: '', season: '' };
+    return {
+      org: t.school_name || fallbackOrg,
+      team: t.name || '',
+      season: t.season || ''
+    };
+  }
+
   async setActiveTeam(teamId) {
     if (!teamId || teamId === this.activeTeamId) return;
     this.activeTeamId = teamId;
