@@ -728,6 +728,12 @@ class SupabaseService {
       .select('*')
       .or('is_deleted.is.null,is_deleted.eq.false')
       .eq('team_id', teamId)
+      // match_on is derived from match_date by a trigger (migration 0008).
+      // Ordering by the text column instead would sort SEP 11 before SEP 4,
+      // and created_at orders by when a fixture was entered, not when it is
+      // played. Unparseable dates sort last rather than to the front.
+      .order('match_on', { ascending: true, nullsFirst: false })
+      .order('kickoff_time', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
     if (error) { console.error('Supabase fetchSchedule error:', error); return null; }
     return data;

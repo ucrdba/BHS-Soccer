@@ -397,6 +397,11 @@ class BHSSoccerApp {
           id: s.id,
           date: s.match_date,
           time: s.match_time,
+          // Derived by a database trigger from the two above, and null when
+          // the text would not parse. Used for comparing and ordering; the
+          // text columns remain what the site displays.
+          matchOn: s.match_on || null,
+          kickoffTime: s.kickoff_time || null,
           opponent: s.opponent,
           location: s.location,
           status: s.status,

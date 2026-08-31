@@ -149,6 +149,59 @@ describe('getNextMatch', () => {
   });
 });
 
+describe('matchDateTime — the real date columns from migration 0008', () => {
+  it('uses match_on/kickoff_time when the database has supplied them', () => {
+    const d = (app as any).matchDateTime({ matchOn: '2026-09-04', kickoffTime: '16:00:00' });
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(8);   // September
+    expect(d.getDate()).toBe(4);
+    expect(d.getHours()).toBe(16);
+  });
+
+  it('reads the date in local time, not UTC', () => {
+    // new Date('2026-09-04') parses as UTC midnight, which is 3 Sep in
+    // California — every fixture would display a day early.
+    const d = (app as any).matchDateTime({ matchOn: '2026-09-04', kickoffTime: null });
+    expect(d.getDate()).toBe(4);
+  });
+
+  it('defaults to 6pm when only the date is known', () => {
+    const d = (app as any).matchDateTime({ matchOn: '2026-09-04', kickoffTime: null });
+    expect(d.getHours()).toBe(18);
+  });
+
+  it('falls back to the text columns when 0008 has not been applied', () => {
+    // The app has to keep working against a database that is a migration
+    // behind, or a deploy ordering mistake takes the schedule down.
+    const d = (app as any).matchDateTime({ date: 'SEP 4 2026', time: '4:00 PM' });
+    expect(d.getMonth()).toBe(8);
+    expect(d.getDate()).toBe(4);
+    expect(d.getHours()).toBe(16);
+  });
+
+  it('prefers the derived column over the text when both are present', () => {
+    // The trigger derives one from the other, so they should agree. If they
+    // ever do not, the normalised value is the trustworthy one.
+    const d = (app as any).matchDateTime({
+      matchOn: '2026-09-04', kickoffTime: '16:00:00', date: 'nonsense', time: 'nonsense'
+    });
+    expect(d.getDate()).toBe(4);
+  });
+
+  it('returns null for a row with no usable date at all', () => {
+    expect((app as any).matchDateTime({ date: 'sometime', time: '' })).toBeNull();
+    expect((app as any).matchDateTime(null)).toBeNull();
+  });
+
+  it('drives next-match selection from the derived columns', () => {
+    app.data.schedule = [
+      { opponent: 'Past', matchOn: '2026-08-28', kickoffTime: '18:51:00', status: 'UPCOMING' },
+      { opponent: 'Next', matchOn: '2026-09-04', kickoffTime: '16:00:00', status: 'UPCOMING' }
+    ];
+    expect(app.getNextMatch().opponent).toBe('Next');
+  });
+});
+
 describe('getNextMatchCountdown', () => {
   it('counts down to the match getNextMatch chose', () => {
     app.data.schedule = [

@@ -175,6 +175,32 @@ Object.assign(BHSSoccerApp.prototype, {
    * COMPLETED stayed pinned as "next" forever, with the countdown reading
    * 00/00/00 because its target was in the past.
    */
+  /**
+   * When a fixture happens, as a Date.
+   *
+   * Prefers match_on/kickoff_time, which a database trigger derives from the
+   * text columns (migration 0008) and which are therefore already normalised.
+   * Falls back to parsing the free text, so the app still works against a
+   * database where 0008 has not been applied.
+   */
+  matchDateTime(m) {
+    if (!m) return null;
+    if (m.matchOn) {
+      const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(m.matchOn));
+      if (d) {
+        // Split rather than new Date(iso): a bare ISO date parses as UTC and
+        // lands on the previous evening west of Greenwich, which would show
+        // the wrong day for every fixture.
+        const t = /^(\d{2}):(\d{2})/.exec(String(m.kickoffTime || ''));
+        return new Date(
+          Number(d[1]), Number(d[2]) - 1, Number(d[3]),
+          t ? Number(t[1]) : 18, t ? Number(t[2]) : 0
+        );
+      }
+    }
+    return this.parseMatchDateTime(m.date, m.time);
+  },
+
   getNextMatch() {
     const candidates = (this.data.schedule || []).filter(m => m && m.status !== 'COMPLETED');
     if (candidates.length === 0) return null;
@@ -187,7 +213,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const dated = [];
     const undated = [];
     candidates.forEach(m => {
-      const t = this.parseMatchDateTime(m.date, m.time);
+      const t = this.matchDateTime(m);
       if (t) dated.push({ m, t: t.getTime() });
       else undated.push(m);
     });
