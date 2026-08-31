@@ -287,6 +287,7 @@ class BHSSoccerApp {
         this.data.players = [];
         this.data.schedule = [];
         this.data.matrixLogs = [];
+        this._sessions = [];
       }
 
       // Sync School Profile & Multi-tenant Schools list from Supabase DB
@@ -396,6 +397,10 @@ class BHSSoccerApp {
         // that is wrong forever. Stored snake_case as the database returns it —
         // the panel that renders it resolves player names against this.data.players.
         this.data.matrixLogs = (await window.supabaseService.fetchMatrixLogs(this.activeTeamId)) || [];
+
+        // Sessions behind the standings, so a coach can delete a mis-entered
+        // one. Same reasoning as keeping matrixLogs in state.
+        this._sessions = (await window.supabaseService.fetchMatrixSessions(this.activeTeamId)) || [];
 
         // Assigned unconditionally, like the roster and matrix logs above: an
         // empty team must produce an empty schedule. Guarding this on

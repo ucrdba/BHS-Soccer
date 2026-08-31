@@ -164,3 +164,34 @@ describe('session grid', () => {
     expect(synced).toBe(true);
   });
 });
+
+describe('session history', () => {
+  it('lists recorded sessions newest first', () => {
+    app._sessions = [
+      { id: 's2', occurred_on: '2026-08-30', drills_bank: { name: "Cooper's" } },
+      { id: 's1', occurred_on: '2026-08-20', drills_bank: { name: 'SSG' } }
+    ];
+    const html = app.renderSessionHistory();
+    expect(html.indexOf("Cooper's")).toBeLessThan(html.indexOf('SSG'));
+  });
+
+  it('offers delete on each session', () => {
+    app._sessions = [{ id: 's1', occurred_on: '2026-08-20', drills_bank: { name: 'SSG' } }];
+    expect(app.renderSessionHistory()).toContain("app.removeSession('s1')");
+  });
+
+  it('says so when nothing has been recorded', () => {
+    app._sessions = [];
+    expect(app.renderSessionHistory()).toContain('No sessions');
+  });
+
+  it('asks before deleting, naming what will be lost', async () => {
+    // Deleting a session removes every result in it and re-ranks the table.
+    let asked = '';
+    (globalThis as any).confirm = (m: string) => { asked = m; return false; };
+    app._sessions = [{ id: 's1', occurred_on: '2026-08-20', drills_bank: { name: 'SSG' } }];
+    await app.removeSession('s1');
+    expect(asked).toContain('SSG');
+    expect(asked).toContain('2026-08-20');
+  });
+});

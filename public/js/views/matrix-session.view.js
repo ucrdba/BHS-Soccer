@@ -207,6 +207,51 @@ Object.assign(BHSSoccerApp.prototype, {
     await this.syncFromSupabase();
     this.renderCurrentView();
     this.closeModals();
+  },
+
+  /**
+   * The recorded sessions behind the leaderboard, newest first.
+   *
+   * Editing a past session is out of scope — delete and re-enter is the only
+   * correction path — so this list exists specifically to make delete
+   * reachable. A session's drill can itself have been deleted since, so
+   * `drills_bank` may come back null; fall back to a label rather than
+   * rendering "undefined".
+   */
+  renderSessionHistory() {
+    const sessions = (this._sessions || []).slice()
+      .sort((a, b) => String(b.occurred_on).localeCompare(String(a.occurred_on)));
+    if (sessions.length === 0) {
+      return '<p class="text-muted" style="font-size:0.85rem;">No sessions recorded yet.</p>';
+    }
+    return sessions.map(s => `
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px; font-size:0.8rem;">
+        <span style="flex:1; color:#FFF;">${s.drills_bank?.name || 'Exercise'}</span>
+        <span class="text-muted">${s.occurred_on}</span>
+        <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;"
+                onclick="app.removeSession('${s.id}')">Delete</button>
+      </div>`).join('');
+  },
+
+  /**
+   * Soft-delete a session. Editing one is out of scope, so this is the only
+   * correction path — which is exactly why it has to ask first: deleting takes
+   * every result in the session with it and re-ranks the table.
+   */
+  async removeSession(sessionId) {
+    const s = (this._sessions || []).find(x => x.id === sessionId);
+    if (!s) return;
+    const ok = window.confirm(
+      `Delete the ${s.drills_bank?.name || 'exercise'} session on ${s.occurred_on}?\n\n` +
+      `Every result in it is removed and the standings are re-scored.`
+    );
+    if (!ok) return;
+
+    const res = await window.supabaseService.deleteMatrixSession(sessionId);
+    if (!res.ok) { window.alert(res.error || 'Could not delete that session.'); return; }
+
+    await this.syncFromSupabase();
+    this.renderCurrentView();
   }
 
 });

@@ -29,6 +29,7 @@ beforeEach(() => {
   app = Object.create(ctor.prototype) as MatrixApp;
   app.data = { players: [], matrixLogs: [], drillsBank: [], currentPracticePlan: [] };
   (app as any).renderMatrixResultsPanel = () => '';
+  (app as any).renderSessionHistory = () => '';
   (app as any).activeTeamLabel = () => 'Varsity';
 });
 

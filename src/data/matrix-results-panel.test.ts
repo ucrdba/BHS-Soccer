@@ -23,6 +23,7 @@ import homeSrc from '../../public/js/views/home.view.js?raw';
 import rosterSrc from '../../public/js/views/roster.view.js?raw';
 import scheduleSrc from '../../public/js/views/schedule.view.js?raw';
 import matrixSrc from '../../public/js/views/matrix.view.js?raw';
+import matrixSessionSrc from '../../public/js/views/matrix-session.view.js?raw';
 import plannerSrc from '../../public/js/views/planner.view.js?raw';
 import coachesSrc from '../../public/js/views/coaches.view.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
@@ -40,7 +41,7 @@ beforeAll(() => {
   // utils.js is deliberately absent: it boots the app on DOM ready and starts
   // timers. These are pure render methods and need none of that.
   const sources = [dataSrc, diagrammerSrc, appCoreSrc, homeSrc, rosterSrc,
-                   scheduleSrc, matrixSrc, plannerSrc, coachesSrc, adminSrc];
+                   scheduleSrc, matrixSrc, matrixSessionSrc, plannerSrc, coachesSrc, adminSrc];
   const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
   const w = globalThis as any;
