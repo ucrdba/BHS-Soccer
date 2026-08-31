@@ -92,8 +92,28 @@ Applied by hand in the Supabase SQL editor, in this order:
 3. `seed_data.sql` — BHS demo data.
 4. `supabase_migration_auth.sql` — **supersedes** the RLS story in the first two files (it says so explicitly; they are left as historical provisioning scripts). Adds the `handle_new_user`/`handle_user_confirmed` triggers, `SECURITY DEFINER` helpers (`current_profile_role()`, etc.) that avoid RLS self-recursion, a column-guard trigger blocking self-service role/status escalation, and per-table read/write policies. Its first step **deletes all `public.profiles` rows** to re-link the table to `auth.users`.
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS, and the `current_profile_role()` status fix.
+6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived from the text columns by a trigger.
+7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the two `matrix_session*` tables, and the rewritten `matrix_standings`.
 
 Prefer adding a new dated migration file over editing an already-applied script.
+
+**`supabase_schema.sql` does not describe the live database. Verify columns against the running database before writing SQL or code that depends on them.** It is a historical provisioning script, and the drift is not confined to the RLS story item 4 already supersedes — three columns have been found wrong so far:
+
+| Declared in `supabase_schema.sql` | Actually |
+| --- | --- |
+| `drills_bank.points INT DEFAULT 3` | **does not exist** (added by `0009`) |
+| `drills_bank.duration TEXT NOT NULL` | **does not exist** |
+| `players.class_year TEXT NOT NULL` | exists, and `0005` did *not* drop it — unlike `number`/`position` |
+
+Each cost a failed migration or a rendering bug. Two habits avoid it:
+
+- A `select` naming a column returns PostgREST `42703` when it is missing, so probing one column at a time distinguishes "absent" from "empty table":
+  `curl -s "$URL/rest/v1/drills_bank?select=points&limit=1" -H "apikey: $KEY"`
+- A `select *` on any row lists the columns that really exist. Note this tells you nothing about nullability or defaults — `class_year` was found by reading `0005`'s drop list, not by listing columns.
+
+Migrations that add a column should therefore prefer `add column if not exists` over `alter column`, so they are correct against both the live database and the declared schema.
+
+The Supabase SQL editor may run as a role that is a **member** of `postgres` without defaulting to it. `ALTER TABLE` and `CREATE POLICY` check ownership rather than privilege, so they fail with `42501: must be owner of table …` even when the privilege is reachable. `set role postgres;` immediately after `begin;` fixes it — see the top of `0009`.
 
 ### Diagrammer
 
