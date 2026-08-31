@@ -31,6 +31,16 @@ declare global {
     fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
     fetchPracticePlans(schoolCode: string): Promise<Record<string, any>[] | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
+    fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
+    updateDrillWeights(rows: { id: string; points: number; measure: string }[]):
+      Promise<{ ok: boolean; error?: string; updated: number }>;
+    fetchMatrixSessions(teamId: string): Promise<Record<string, any>[] | null>;
+    saveMatrixSession(
+      teamId: string,
+      session: { id?: string; drillId: string; occurredOn: string; notes?: string },
+      results: { playerId: string; attendance: string; rawValue?: number | null; outcome?: string | null }[]
+    ): Promise<{ ok: boolean; error?: string; id?: string }>;
+    deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
     createSchool(code: string, name: string, kind: string, mascot: string): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchCoaches(schoolCode: string): Promise<Partial<Coach>[] | null>;
     fetchDailyThoughts(schoolCode: string): Promise<Partial<DailyThought>[] | null>;

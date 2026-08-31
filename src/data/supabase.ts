@@ -951,6 +951,156 @@ class SupabaseService {
     }
   }
 
+  private static readonly MEASURES = ['head_to_head', 'win_loss', 'count_high', 'time_low'];
+
+  async fetchDrillsForWeighting(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return null;
+    const { data, error } = await this.client!
+      .from('drills_bank')
+      .select('id, name, category, points, measure')
+      .eq('school_id', schoolUuid)
+      .eq('is_deleted', false)
+      .order('name', { ascending: true });
+    if (error) { console.warn('Supabase fetchDrillsForWeighting notice:', error.message); return null; }
+    return data;
+  }
+
+  /**
+   * Save a batch of drill weights. Validated here rather than relying on the
+   * CHECK constraint so a bad row is named in words instead of surfacing as a
+   * raw constraint violation half way through the batch.
+   */
+  async updateDrillWeights(
+    rows: { id: string; points: number; measure: string }[]
+  ): Promise<{ ok: boolean; error?: string; updated: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.', updated: 0 };
+    const list = rows || [];
+    if (list.length === 0) return { ok: true, updated: 0 };
+
+    for (const r of list) {
+      const n = Number(r.points);
+      if (!Number.isFinite(n) || n < 0 || n > 10) {
+        return { ok: false, error: `Weight for drill ${r.id} must be between 0 and 10.`, updated: 0 };
+      }
+      if (!SupabaseService.MEASURES.includes(r.measure)) {
+        return { ok: false, error: `"${r.measure}" is not a measurement type.`, updated: 0 };
+      }
+    }
+
+    let updated = 0;
+    for (const r of list) {
+      const { data, error } = await this.client!
+        .from('drills_bank')
+        .update({ points: Number(r.points), measure: r.measure })
+        .eq('id', r.id)
+        .select();
+      if (error) { console.warn('Supabase updateDrillWeights notice:', error.message); return { ok: false, error: error.message, updated }; }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that write. Coach or admin access is required.', updated };
+      }
+      updated++;
+    }
+    return { ok: true, updated };
+  }
+
+  async fetchMatrixSessions(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
+    const { data, error } = await this.client!
+      .from('matrix_sessions')
+      .select('id, drill_id, occurred_on, notes, drills_bank(name, points, measure)')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false)
+      .order('occurred_on', { ascending: false });
+    if (error) { console.warn('Supabase fetchMatrixSessions notice:', error.message); return null; }
+    return data;
+  }
+
+  /**
+   * Write one session and every result in it.
+   *
+   * A present player must supply a result: storing a present row with neither a
+   * value nor an outcome puts the drill's full weight into `available` while
+   * contributing nothing to `earned`, which scores them as though they had
+   * failed rather than as a gap in data entry.
+   */
+  async saveMatrixSession(
+    teamId: string,
+    session: { id?: string; drillId: string; occurredOn: string; notes?: string },
+    results: { playerId: string; attendance: string; rawValue?: number | null; outcome?: string | null }[]
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId) return { ok: false, error: 'No team selected.' };
+    if (!session?.drillId) return { ok: false, error: 'Pick the exercise this session was.' };
+    if (!session?.occurredOn) return { ok: false, error: 'Pick the date this session happened.' };
+
+    for (const r of results || []) {
+      if (r.attendance !== 'present') continue;
+      const hasValue = r.rawValue !== null && r.rawValue !== undefined && Number.isFinite(Number(r.rawValue));
+      const hasOutcome = !!r.outcome;
+      if (!hasValue && !hasOutcome) {
+        return { ok: false, error: `${r.playerId} is marked present but has no result. Enter one, or mark them absent.` };
+      }
+    }
+
+    // The drill decides how the session is scored, so a head_to_head drill has
+    // no session shape at all. Checked here rather than trusting the picker:
+    // the same day's competition must not be countable twice.
+    const { data: dRows } = await this.client!
+      .from('drills_bank').select('measure').eq('id', session.drillId).limit(1);
+    const measure = dRows && dRows[0] ? dRows[0].measure : null;
+    if (measure === 'head_to_head') {
+      return { ok: false, error: 'That exercise is recorded as 1v1 pairings, not as a session. Use Record Result instead.' };
+    }
+
+    const sessionRow: Record<string, any> = {
+      team_id: teamId, drill_id: session.drillId,
+      occurred_on: session.occurredOn, notes: session.notes || null, is_deleted: false
+    };
+    if (session.id && this.isUuid(session.id)) sessionRow.id = session.id;
+
+    const { data: sData, error: sErr } = await this.client!
+      .from('matrix_sessions').upsert([sessionRow]).select();
+    if (sErr) { console.warn('Supabase saveMatrixSession notice:', sErr.message); return { ok: false, error: sErr.message }; }
+    if (!sData || sData.length === 0) {
+      return { ok: false, error: 'The database refused that write. Only a coach of this team can record sessions.' };
+    }
+
+    const sessionId = sData[0].id;
+    const rows = (results || []).map(r => ({
+      session_id: sessionId,
+      player_id: r.playerId,
+      attendance: r.attendance,
+      raw_value: r.attendance === 'present' && r.rawValue !== null && r.rawValue !== undefined
+        ? Number(r.rawValue) : null,
+      outcome: r.attendance === 'present' ? (r.outcome || null) : null
+    }));
+
+    if (rows.length) {
+      const { data: rData, error: rErr } = await this.client!
+        .from('matrix_session_results')
+        .upsert(rows, { onConflict: 'session_id,player_id' })
+        .select();
+      if (rErr) { console.warn('Supabase saveMatrixSession results notice:', rErr.message); return { ok: false, error: rErr.message }; }
+      if (!rData || rData.length === 0) {
+        return { ok: false, error: 'The session saved but its results were refused. Check coach access for this team.' };
+      }
+    }
+    return { ok: true, id: sessionId };
+  }
+
+  async deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    const { data, error } = await this.client!
+      .from('matrix_sessions').update({ is_deleted: true }).eq('id', sessionId).select();
+    if (error) { console.warn('Supabase deleteMatrixSession notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that. Only a coach of this team can delete a session.' };
+    }
+    return { ok: true };
+  }
+
   async upsertSoccerCategory(schoolId: string = 'bhs', categoryObj: any = {}): Promise<any> {
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
