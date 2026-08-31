@@ -30,6 +30,7 @@ declare global {
     fetchPlayers(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
     fetchPracticePlans(schoolCode: string): Promise<Record<string, any>[] | null>;
+    upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     createSchool(code: string, name: string, kind: string, mascot: string): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchCoaches(schoolCode: string): Promise<Partial<Coach>[] | null>;
     fetchDailyThoughts(schoolCode: string): Promise<Partial<DailyThought>[] | null>;

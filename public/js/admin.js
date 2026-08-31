@@ -1481,6 +1481,63 @@ Object.assign(BHSSoccerApp.prototype, {
     return team;
   },
 
+  /**
+   * Reads CSV text into row objects keyed by the header row.
+   *
+   * Replaces a line.split(',') parser, which shredded any quoted field
+   * containing a comma -- and then silently shifted every column after it, so
+   * the damage arrived as wrong data rather than as a failed import. A quiz
+   * question is a sentence; so is a drill note, a location, and an
+   * explanation. Commas in them are normal, not an edge case.
+   *
+   * Handles quoted fields, commas and newlines inside quotes, escaped quotes
+   * ("" within a quoted field), CRLF and a UTF-8 BOM. A row shorter than the
+   * header is padded rather than dropped, so a trailing empty column does not
+   * cost a record.
+   */
+  parseCsvText(text) {
+    let src = String(text || '');
+    if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
+
+    const rows = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+
+      if (quoted) {
+        if (ch === '"') {
+          if (src[i + 1] === '"') { field += '"'; i++; }   // "" is one literal quote
+          else quoted = false;
+        } else {
+          field += ch;
+        }
+        continue;
+      }
+
+      if (ch === '"') { quoted = true; continue; }
+      if (ch === ',') { row.push(field); field = ''; continue; }
+      if (ch === '\r') continue;
+      if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; continue; }
+      field += ch;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+
+    if (rows.length === 0) return [];
+
+    const headers = rows[0].map(h => String(h).trim());
+    return rows.slice(1)
+      // A trailing newline leaves one empty cell behind; that is not a record.
+      .filter(r => r.some(v => String(v).trim() !== ''))
+      .map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (r[i] === undefined ? '' : String(r[i]).trim()); });
+        return obj;
+      });
+  },
+
   async handleImportFile(file, target) {
     if (!file) return;
     const status = document.getElementById('importStatus');
@@ -1523,16 +1580,7 @@ Object.assign(BHSSoccerApp.prototype, {
         let workbookSheets = {};
 
         if (file.name.endsWith('.csv')) {
-          const text = e.target.result;
-          const lines = text.trim().split('\n');
-          const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-          const rows = lines.slice(1).map(line => {
-            const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = vals[i] || '');
-            return obj;
-          });
-          workbookSheets[target || 'Sheet1'] = rows;
+          workbookSheets[target || 'Sheet1'] = this.parseCsvText(e.target.result);
         } else {
           if (typeof XLSX === 'undefined') throw new Error('SheetJS library not loaded');
           const data = new Uint8Array(e.target.result);
@@ -1851,6 +1899,56 @@ Object.assign(BHSSoccerApp.prototype, {
               for (const cat of imported) await window.supabaseService.upsertSoccerCategory('bhs', cat);
             }
             this.populateCategoryDropdowns();
+          } else if (activeTarget === 'quiz') {
+            // Accepts both header styles: the PascalCase the export template
+            // writes, and the snake_case of a straight table export from the
+            // database. Coaches reasonably feed back either one.
+            const pick = (r, ...keys) => {
+              for (const k of keys) {
+                if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return toStr(r[k]);
+              }
+              return '';
+            };
+
+            let quizAdded = 0;
+            for (const r of rows) {
+              const q = {
+                question_id: pick(r, 'QuestionId', 'question_id'),
+                question:    pick(r, 'QuestionText', 'Question', 'question'),
+                option_a:    pick(r, 'OptionA', 'option_a'),
+                option_b:    pick(r, 'OptionB', 'option_b'),
+                option_c:    pick(r, 'OptionC', 'option_c'),
+                option_d:    pick(r, 'OptionD', 'option_d'),
+                correct_option: pick(r, 'CorrectAnswer', 'CorrectOption', 'correct_option'),
+                explanation: pick(r, 'Explanation', 'explanation'),
+                category:    pick(r, 'Category', 'category'),
+                is_deleted:  pick(r, 'IsDeleted', 'is_deleted').toLowerCase() === 'true'
+              };
+              if (!q.question) continue;
+
+              if (!window.supabaseService?.isConfigured()) {
+                warnings.push('Quiz questions need the cloud database; nothing was written.');
+                break;
+              }
+              const res = await window.supabaseService.upsertQuizQuestion(q);
+              if (res.ok) {
+                quizAdded++;
+              } else {
+                totalRejected++;
+                // Name the question, truncated: "row 4 was rejected" is
+                // useless against a sheet the coach has to scroll.
+                warnings.push(`"${q.question.slice(0, 40)}…" rejected: ${res.error}`);
+              }
+            }
+            totalCount += quizAdded;
+            totalInserted += quizAdded;
+          } else {
+            // Every target in the dropdown must land in a branch above. When
+            // one does not, the loop used to fall straight through and report
+            // "Imported 0 records" with no error -- indistinguishable from an
+            // empty file, and the reason a quiz import looked like a bad CSV
+            // for as long as it did.
+            warnings.push(`Importing "${activeTarget}" is not supported yet — nothing was read from this sheet.`);
           }
         }
 

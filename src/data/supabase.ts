@@ -899,6 +899,58 @@ class SupabaseService {
     }
   }
 
+  /**
+   * Insert or update one quiz question.
+   *
+   * quiz_questions has no school_id -- the bank is shared -- so unlike
+   * upsertSoccerCategory there is no organization to resolve. correct_option
+   * carries a CHECK constraint for A/B/C/D, so anything else is rejected here
+   * with a sentence rather than surfacing as a raw constraint violation.
+   */
+  async upsertQuizQuestion(q: any = {}): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+
+    const text = String(q.question || '').trim();
+    if (!text) return { ok: false, error: 'The question text is empty.' };
+
+    const options = ['a', 'b', 'c', 'd'].map(k => String(q['option_' + k] || '').trim());
+    if (options.some(o => !o)) {
+      return { ok: false, error: 'All four options are required.' };
+    }
+
+    const correct = String(q.correct_option || '').trim().toUpperCase().charAt(0);
+    if (!['A', 'B', 'C', 'D'].includes(correct)) {
+      return { ok: false, error: `Correct answer must be A, B, C or D (found "${q.correct_option ?? ''}").` };
+    }
+
+    const payload: Record<string, any> = {
+      question: text,
+      option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+      correct_option: correct,
+      explanation: String(q.explanation || '').trim() || null,
+      category: String(q.category || '').trim() || 'Tactical',
+      is_deleted: q.is_deleted === true || String(q.is_deleted || '').toLowerCase() === 'true'
+    };
+    // A spreadsheet's "1" in the id column is a row number, not a key. Passing
+    // it would fail the uuid cast; letting the default fire is correct.
+    if (q.question_id && this.isUuid(q.question_id)) payload.question_id = q.question_id;
+
+    try {
+      const { data, error } = await this.client!
+        .from('quiz_questions').upsert([payload]).select();
+      if (error) {
+        console.warn('Supabase upsertQuizQuestion notice:', error.message);
+        return { ok: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that write. Coach or admin access is required.' };
+      }
+      return { ok: true, id: data[0].question_id };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async upsertSoccerCategory(schoolId: string = 'bhs', categoryObj: any = {}): Promise<any> {
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
