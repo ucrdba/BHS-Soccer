@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseCsv, normaliseRows, isServiceRoleKey, VALID_ROLES } from '../../scripts/invite-users.mjs';
+import { parseCsv, normaliseRows, isServiceRoleKey, VALID_ROLES, normaliseName, planPlayerLinks } from '../../scripts/invite-users.mjs';
 
 // btoa rather than Buffer: this tsconfig does not pick up @types/node, and
 // setting "types" would exclude the type packages the other suites rely on.
@@ -124,5 +124,112 @@ describe('isServiceRoleKey', () => {
     expect(isServiceRoleKey('not-a-jwt')).toBe(false);
     expect(isServiceRoleKey('a.!!!not-base64!!!.c')).toBe(false);
     expect(isServiceRoleKey(undefined as unknown as string)).toBe(false);
+  });
+});
+
+describe('normaliseName', () => {
+  it('folds case and surrounding whitespace', () => {
+    expect(normaliseName('  Cesar Alva  ')).toBe(normaliseName('cesar alva'));
+  });
+
+  it('folds accents, so one spelling in the CSV matches another in the roster', () => {
+    // The roster was typed by a coach, the CSV exported from somewhere else.
+    // "José Martínez" and "Jose Martinez" are the same seventeen-year-old.
+    expect(normaliseName('José Martínez')).toBe(normaliseName('Jose Martinez'));
+  });
+
+  it('drops apostrophes rather than splitting the word around them', () => {
+    // O'Brien and OBrien are one person. A space there would make them two.
+    expect(normaliseName("D'Angelo")).toBe(normaliseName('DAngelo'));
+    expect(normaliseName('O’Brien')).toBe(normaliseName('OBrien'));
+  });
+
+  it('turns other punctuation into a separator', () => {
+    expect(normaliseName('Smith-Jones')).toBe(normaliseName('Smith Jones'));
+  });
+
+  it('survives null and undefined without throwing', () => {
+    expect(normaliseName(undefined)).toBe('');
+    expect(normaliseName(null)).toBe('');
+  });
+});
+
+describe('planPlayerLinks', () => {
+  const players = [
+    { id: 'pl-cesar', name: 'Cesar Alva' },
+    { id: 'pl-caleb', name: 'Caleb Carver' },
+    { id: 'pl-jose', name: 'José Martínez' }
+  ];
+  const person = (name: string, email: string, role = 'player') => ({ name, email, role });
+
+  it('links a player whose name matches exactly one roster row', () => {
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'cesar@x.test')], players, []);
+    expect(plan.status).toBe('link');
+    expect(plan.playerId).toBe('pl-cesar');
+  });
+
+  it('matches across accent and case differences', () => {
+    const [plan] = planPlayerLinks([person('jose martinez', 'jose@x.test')], players, []);
+    expect(plan.status).toBe('link');
+    expect(plan.playerId).toBe('pl-jose');
+  });
+
+  it('skips coaches and guests, who have no player record', () => {
+    const plan = planPlayerLinks(
+      [person('Coach Bob', 'bob@x.test', 'coach'), person('Someone', 's@x.test', 'guest')],
+      players, []
+    );
+    expect(plan.map(p => p.status)).toEqual(['skip', 'skip']);
+  });
+
+  it('reports an unmatched name rather than linking nothing silently', () => {
+    // Silence here is the whole bug: the person signs in and sees the wrong
+    // team, and nothing anywhere says why.
+    const [plan] = planPlayerLinks([person('Nobody Here', 'no@x.test')], players, []);
+    expect(plan.status).toBe('unmatched');
+    expect(plan.playerId).toBeNull();
+  });
+
+  it('refuses to guess when two players share a name', () => {
+    const twins = [...players, { id: 'pl-cesar2', name: 'Cesar Alva' }];
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'cesar@x.test')], twins, []);
+    expect(plan.status).toBe('ambiguous');
+    expect(plan.playerId).toBeNull();
+    expect(plan.reason).toContain('2');
+  });
+
+  it('leaves an already-linked profile alone', () => {
+    // A link corrected by hand in the admin panel must survive a re-run.
+    const profiles = [{ id: 'pr-1', email: 'cesar@x.test', player_id: 'pl-someone-else' }];
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'cesar@x.test')], players, profiles);
+    expect(plan.status).toBe('already');
+  });
+
+  it('will not hand one players row to a second profile', () => {
+    // Two profiles pointing at one player means whoever signs in second sees
+    // the first person's team.
+    const profiles = [{ id: 'pr-1', email: 'someone@x.test', player_id: 'pl-cesar' }];
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'cesar@x.test')], players, profiles);
+    expect(plan.status).toBe('ambiguous');
+    expect(plan.reason).toContain('someone@x.test');
+  });
+
+  it('will not hand one players row to two people in the same batch', () => {
+    const batch = [person('Cesar Alva', 'a@x.test'), person('cesar  alva', 'b@x.test')];
+    const plan = planPlayerLinks(batch, players, []);
+    expect(plan[0].status).toBe('link');
+    expect(plan[1].status).toBe('ambiguous');
+  });
+
+  it('matches profiles by email case-insensitively', () => {
+    const profiles = [{ id: 'pr-1', email: 'Cesar@X.test', player_id: 'pl-cesar' }];
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'cesar@x.test')], players, profiles);
+    expect(plan.status).toBe('already');
+  });
+
+  it('handles empty inputs without throwing', () => {
+    expect(planPlayerLinks([], [], [])).toEqual([]);
+    const [plan] = planPlayerLinks([person('Cesar Alva', 'c@x.test')], [], []);
+    expect(plan.status).toBe('unmatched');
   });
 });

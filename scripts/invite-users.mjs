@@ -25,6 +25,16 @@
  * what the Admin panel's Approve button does one at a time. That keeps the
  * database triggers untouched.
  *
+ * `approve` also links each player's profile to their public.players row.
+ * profiles.player_id is the only connection between a signed-in person and
+ * their player record, and fetchTeamsForViewer resolves a player's teams
+ * through it — when it is null the person signs in fine and sees the public
+ * default team instead of their own, with no error anywhere. Matching is on
+ * name, folded for case, accents and punctuation. Anything short of exactly
+ * one unambiguous match is reported and left unlinked rather than guessed: a
+ * wrong link shows someone another team's roster. Existing links are never
+ * overwritten, so a correction made by hand survives a re-run.
+ *
  * CSV columns: Name, Email, Role   (role: coach | player | guest)
  */
 
@@ -125,6 +135,99 @@ export function normaliseRows(rawRows) {
 }
 
 /**
+ * Fold a name to a comparison key: case, accents, punctuation and repeated
+ * whitespace all removed. "José  Martínez-Cruz" and "jose martinez cruz" are
+ * the same person written by two different people into two different systems,
+ * which is exactly the situation this has to survive.
+ */
+export function normaliseName(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip diacritics
+    .toLowerCase()
+    // Apostrophes vanish rather than splitting a word: O'Brien and OBrien are
+    // one name. Every other separator becomes a space, so Smith-Jones matches
+    // Smith Jones.
+    .replace(/['‘’ʼ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Decide, for each invited person, which players row their profile should
+ * point at.
+ *
+ * profiles.player_id is the only link between a signed-in person and their
+ * player record, and fetchTeamsForViewer resolves a player's teams through it.
+ * When it is null the failure is silent: the player signs in successfully and
+ * sees the public default team instead of their own. So a wrong link is worse
+ * than no link — it shows someone another team's roster — and this never
+ * guesses. Anything short of exactly one unambiguous match is reported.
+ *
+ * @param people   normalised CSV rows ({ name, email, role })
+ * @param players  [{ id, name }] from public.players
+ * @param profiles [{ id, email, player_id }] existing profiles
+ * @returns [{ email, name, status, playerId, reason }]
+ *          status: 'link' | 'skip' | 'already' | 'ambiguous' | 'unmatched'
+ */
+export function planPlayerLinks(people, players, profiles) {
+  const byName = new Map();
+  (players || []).forEach(pl => {
+    const key = normaliseName(pl.name);
+    if (!key) return;
+    if (!byName.has(key)) byName.set(key, []);
+    byName.get(key).push(pl);
+  });
+
+  // A players row must not end up owned by two profiles: whoever signs in
+  // second would see the first person's team. Claims already in the database
+  // count, so a re-run cannot hand the same player to someone new.
+  const claimed = new Map();
+  (profiles || []).forEach(pr => {
+    if (pr.player_id) claimed.set(pr.player_id, pr.email || pr.id);
+  });
+
+  const profileByEmail = new Map(
+    (profiles || []).map(pr => [String(pr.email || '').toLowerCase(), pr])
+  );
+
+  return (people || []).map(person => {
+    const base = { email: person.email, name: person.name };
+
+    if (person.role !== 'player') {
+      return { ...base, status: 'skip', playerId: null, reason: `role is ${person.role}` };
+    }
+
+    const existing = profileByEmail.get(String(person.email).toLowerCase());
+    if (existing && existing.player_id) {
+      return { ...base, status: 'already', playerId: existing.player_id, reason: 'already linked' };
+    }
+
+    const matches = byName.get(normaliseName(person.name)) || [];
+    if (matches.length === 0) {
+      return { ...base, status: 'unmatched', playerId: null, reason: 'no players row with that name' };
+    }
+    if (matches.length > 1) {
+      return {
+        ...base, status: 'ambiguous', playerId: null,
+        reason: `${matches.length} players share that name — link this one by hand`
+      };
+    }
+
+    const owner = claimed.get(matches[0].id);
+    if (owner) {
+      return {
+        ...base, status: 'ambiguous', playerId: null,
+        reason: `that players row is already linked to ${owner}`
+      };
+    }
+
+    claimed.set(matches[0].id, person.email);
+    return { ...base, status: 'link', playerId: matches[0].id, reason: '' };
+  });
+}
+
+/**
  * Confirms a key is a service_role key by reading the JWT payload's role claim.
  * An anon key cannot invite users, and would otherwise fail per-row with an
  * opaque permission error after the batch had already started.
@@ -220,15 +323,51 @@ async function main(argv) {
   }
 
   console.log(`${people.length} person(s) from ${file}`);
+  const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  // Work out the profile -> players links before the dry-run branch, so a dry
+  // run shows exactly who would be linked to whom. Matching is the risky part
+  // of this pass; a dry run that hid it would be checking the wrong thing.
+  let linkPlan = [];
+  if (command === 'approve') {
+    const [{ data: players, error: pErr }, { data: profiles, error: prErr }] = await Promise.all([
+      supabase.from('players').select('id, name').eq('is_deleted', false),
+      supabase.from('profiles').select('id, email, player_id')
+    ]);
+    if (pErr || prErr) {
+      console.error(`Could not read players/profiles: ${(pErr || prErr).message}`);
+      process.exit(1);
+    }
+    linkPlan = planPlayerLinks(people, players || [], profiles || []);
+
+    const unresolved = linkPlan.filter(l => l.status === 'ambiguous' || l.status === 'unmatched');
+    if (unresolved.length) {
+      console.log('');
+      console.log('These people will be approved but NOT linked to a player record.');
+      console.log('They will sign in and see the public default team, not their own:');
+      console.log('');
+      unresolved.forEach(l => console.log(`  ${l.status.padEnd(10)} ${l.email.padEnd(34)} ${l.name} - ${l.reason}`));
+      console.log('');
+    }
+  }
+
+  const linkByEmail = new Map(linkPlan.map(l => [l.email, l]));
+
   if (!confirm) {
     console.log('\nDRY RUN — nothing will be sent or changed. Re-run with --confirm to apply.\n');
-    people.forEach(p => console.log(`  ${command === 'invite' ? 'invite' : 'approve'}  ${p.email.padEnd(34)} ${p.role.padEnd(7)} ${p.name}`));
+    people.forEach(p => {
+      const link = linkByEmail.get(p.email);
+      const note = link && link.status === 'link' ? `  -> links to player ${link.playerId.slice(0, 8)}`
+                 : link && link.status === 'already' ? '  -> already linked'
+                 : link && link.status !== 'skip' ? `  -> NOT linked (${link.reason})`
+                 : '';
+      console.log(`  ${command === 'invite' ? 'invite' : 'approve'}  ${p.email.padEnd(34)} ${p.role.padEnd(7)} ${p.name}${note}`);
+    });
     console.log('');
     return;
   }
 
-  const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-  let ok = 0, skipped = 0, failed = 0;
+  let ok = 0, skipped = 0, failed = 0, linked = 0;
 
   for (const p of people) {
     try {
@@ -267,6 +406,25 @@ async function main(argv) {
         } else {
           console.log(`  approved ${p.email} → ${p.role}`);
           ok++;
+
+          // Separate statement, and only where player_id is still null, so a
+          // link corrected by hand in the admin panel is never overwritten by
+          // a re-run of this script.
+          const link = linkByEmail.get(p.email);
+          if (link && link.status === 'link') {
+            const { data: ldata, error: lerr } = await supabase
+              .from('profiles')
+              .update({ player_id: link.playerId })
+              .eq('email', p.email)
+              .is('player_id', null)
+              .select();
+            if (lerr) {
+              console.error(`  WARN     ${p.email} — approved but not linked: ${lerr.message}`);
+            } else if (ldata && ldata.length) {
+              console.log(`  linked   ${p.email} → player ${link.playerId.slice(0, 8)}`);
+              linked++;
+            }
+          }
         }
       }
     } catch (e) {
@@ -276,6 +434,10 @@ async function main(argv) {
   }
 
   console.log(`\n${ok} ${command === 'invite' ? 'invited' : 'approved'}, ${skipped} skipped, ${failed} failed.`);
+  if (command === 'approve') {
+    const unlinked = linkPlan.filter(l => l.status === 'ambiguous' || l.status === 'unmatched').length;
+    console.log(`${linked} linked to a player record${unlinked ? `, ${unlinked} left unlinked - see above` : ''}.`);
+  }
   if (command === 'invite') {
     console.log('Once people have accepted their invites, run the approve pass:');
     console.log(`  node scripts/invite-users.mjs approve ${file} --confirm`);
