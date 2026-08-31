@@ -327,6 +327,7 @@ class BHSSoccerApp {
           duration: d.duration,
           category: d.category,
           points: d.points,
+          measure: d.measure || 'head_to_head',
           coachNotes: d.coach_notes || '',
           diagramImage: d.diagram_image || null,
           diagramData: d.diagram_data || null

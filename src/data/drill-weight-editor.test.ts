@@ -111,14 +111,30 @@ describe('upsertDrillBankItem persists the matrix weight and measure', () => {
     expect(payload().measure).toBe('time_low');
   });
 
-  it('falls back to head_to_head for a measure the column will not accept', async () => {
+  it('omits measure entirely for a value the column will not accept', async () => {
+    // Previously this defaulted the payload to 'head_to_head', which meant a
+    // caller passing garbage silently overwrote whatever measure the drill
+    // actually had. Sending nothing lets the existing column value (or its
+    // database default on insert) stand.
     await supabaseService.upsertDrillBankItem('bhs', { name: 'Bad Measure', points: 5, measure: 'nonsense' });
-    expect(payload().measure).toBe('head_to_head');
+    expect('measure' in payload()).toBe(false);
   });
 
-  it('defaults to head_to_head when no measure is supplied at all', async () => {
+  it('does not send measure at all when none was supplied', async () => {
+    // Regression: this used to default to 'head_to_head' in the payload, so
+    // any caller unaware of the field (an old form, a typo-fix save, the
+    // XLSX drills import) silently reverted the drill's real measure —
+    // de-scoring every session already recorded against it. The column has
+    // a database default for genuine inserts; an update must not clobber it.
     await supabaseService.upsertDrillBankItem('bhs', { name: 'No Measure', points: 5 });
-    expect(payload().measure).toBe('head_to_head');
+    expect('measure' in payload()).toBe(false);
+  });
+
+  it('writes the measure unchanged on an edit that only touches other fields', async () => {
+    // The exact C3 scenario: opening a drill in the library and saving a
+    // typo fix to its name must not touch measure, whatever it currently is.
+    await supabaseService.upsertDrillBankItem('bhs', { id: 'drill-1', name: 'Fixed Typo', points: 3 });
+    expect('measure' in payload()).toBe(false);
   });
 });
 

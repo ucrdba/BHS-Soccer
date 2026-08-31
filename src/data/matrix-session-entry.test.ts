@@ -32,7 +32,8 @@ beforeEach(() => {
     <input id="sessionDate" type="date" />
     <div id="sessionRows"></div>
     <div id="sessionError"></div>
-    <div id="matrixSessionModal"></div>`;
+    <div id="matrixSessionModal"></div>
+    <button id="sessionSaveBtn"></button>`;
 
   const w = globalThis as any;
   w.auth = {
@@ -96,6 +97,25 @@ describe('session grid', () => {
     expect(html).toContain('value="win"');
   });
 
+  it('defaults the win/draw/loss select to no result, not a win', () => {
+    // The select's first option used to be "Won" with nothing blank ahead of
+    // it, so a coach who scrolled past a player without touching their row
+    // silently awarded them a full-weight win. There must be a selected
+    // blank option ahead of "win".
+    app._sessionDrillId = 'd2';
+    document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
+    const select = document.getElementById('sessionOutcome_p1') as HTMLSelectElement;
+    expect(select.value).toBe('');
+  });
+
+  it('reads an untouched win/draw/loss player as no result, not a win', () => {
+    app._sessionDrillId = 'd2';
+    document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
+    const results = app.collectSessionResults();
+    // p1 and p2 are both left untouched (present, no outcome chosen).
+    expect(results.every((r: any) => r.outcome === null)).toBe(true);
+  });
+
   it('marks everyone present by default', () => {
     app._sessionDrillId = 'd1';
     document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
@@ -148,6 +168,36 @@ describe('session grid', () => {
     (document.getElementById('sessionDate') as HTMLInputElement).value = '2026-08-31';
     await app.saveSession();
     expect(document.getElementById('sessionError')!.textContent).toContain('p1');
+  });
+
+  it('disables the save button while the request is in flight, then re-enables it', async () => {
+    // A double-click while the first save is still pending must not fire a
+    // second saveMatrixSession call and double everyone's `available`.
+    let resolveSave!: (v: any) => void;
+    (globalThis as any).supabaseService.saveMatrixSession = () => new Promise(res => { resolveSave = res; });
+    app._sessionDrillId = 'd1';
+    document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
+    (document.getElementById('sessionDate') as HTMLInputElement).value = '2026-08-31';
+    (document.getElementById('sessionValue_p1') as HTMLInputElement).value = '2800';
+    (document.getElementById('sessionValue_p2') as HTMLInputElement).value = '2650';
+
+    const pending = app.saveSession();
+    const btn = document.getElementById('sessionSaveBtn') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    resolveSave({ ok: true, id: 's1' });
+    await pending;
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('re-enables the save button after a refused save too', async () => {
+    saveResult = { ok: false, error: 'p1 is marked present but has no result.' };
+    app._sessionDrillId = 'd1';
+    document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
+    (document.getElementById('sessionDate') as HTMLInputElement).value = '2026-08-31';
+    await app.saveSession();
+    const btn = document.getElementById('sessionSaveBtn') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
   });
 
   it('re-syncs after a successful save so the leaderboard moves', async () => {

@@ -121,11 +121,14 @@ Object.assign(BHSSoccerApp.prototype, {
                   .filter(p => !p.is_deleted && !p.isDeleted)
                   .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
                   .map(p => {
-                    // Per-key defaults, not `p.matrixStats || {...}`. A player added
-                    // through the UI before the next sync carries the OLD shape
-                    // (wins, losses, points, rank, and the removed blended index)
-                    // with no games, draws or winPct — an object-level fallback
-                    // would not fire and the row would render `undefined`.
+                    // Per-key defaults, not `p.matrixStats || {...}`. matrixStats is
+                    // populated in syncFromSupabase() by left-joining standings onto
+                    // the roster, so a player with no logged results at all gets no
+                    // matrixStats property rather than a zeroed one — an
+                    // object-level fallback covers that, but per-key defaults are
+                    // also what protects a partially-shaped object (e.g. missing
+                    // `exercises` while `wins`/`losses` are present) from rendering
+                    // `undefined` in any one cell.
                     const ms = p.matrixStats || {};
                     const m = {
                       wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,

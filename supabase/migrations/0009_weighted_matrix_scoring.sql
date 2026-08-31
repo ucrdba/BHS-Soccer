@@ -58,9 +58,13 @@ create index if not exists matrix_sessions_team_date
 alter table public.matrix_sessions        enable row level security;
 alter table public.matrix_session_results enable row level security;
 
-grant select, insert, update, delete
+grant select
   on public.matrix_sessions, public.matrix_session_results
   to anon, authenticated;
+
+grant insert, update, delete
+  on public.matrix_sessions, public.matrix_session_results
+  to authenticated;
 
 drop policy if exists "matrix_sessions_select" on public.matrix_sessions;
 create policy "matrix_sessions_select" on public.matrix_sessions
@@ -88,6 +92,34 @@ create policy "matrix_session_results_write" on public.matrix_session_results
              where s.id = session_id and public.is_team_coach(s.team_id))
   );
 
+-- ─── 3b. drills_bank read consistency for the standings view ───────────────
+--
+-- matrix_standings (section 4 below) joins drills_bank under
+-- security_invoker = true so that RLS on matrix_logs/matrix_sessions is
+-- correctly evaluated as the calling user. But drills_bank has TWO
+-- permissive select policies from supabase_migration_auth.sql section 6 —
+-- "drills_bank_select" (coalesce(is_deleted, false) = false) for everyone,
+-- and "drills_bank_write" (for all, coach/admin only) which also grants
+-- coaches select. Postgres OR's permissive policies together, so a coach
+-- can select soft-deleted rows and a player cannot. Joined into a
+-- security_invoker view, that means the drill's weight (and therefore the
+-- player's share) becomes reader-dependent: once a coach retires a drill
+-- that already has recorded results, players lose those sessions from the
+-- join and get scored at the coalesce(...,1.0) fallback weight while the
+-- coach still sees the drill's real weight. Same standings must mean the
+-- same numbers for everyone who looks at them, so the select policy is
+-- widened to `true` here.
+--
+-- This exposes soft-deleted drills' columns (name, category, coach_notes)
+-- to anon/authenticated select. That is not a new exposure in practice:
+-- those same columns are already anon-readable on every non-deleted drill
+-- today via this same policy family — only the is_deleted=false rows they
+-- could see before now includes is_deleted=true rows too. Reversible by
+-- re-running the coalesce(is_deleted, false) = false definition from
+-- supabase_migration_auth.sql section 6.
+drop policy if exists "drills_bank_select" on public.drills_bank;
+create policy "drills_bank_select" on public.drills_bank for select using (true);
+
 -- ─── 4. matrix_standings, rewritten ────────────────────────────────────────
 --
 -- Replaces the win-3/draw-1/loss-0 derivation from 0003 and 0005 section 10.
@@ -104,6 +136,11 @@ with h2h as (
   -- Each side of each logged 1v1 pairing. A pairing with no drill scores at
   -- weight 1.0: drill_id is nullable and the record modal offers "— none —",
   -- so refusing those would break a form that works today.
+  --
+  -- Deliberately, unlike 0005 section 10, there is no `and team_id is not
+  -- null` filter here: this view is already grouped by team_id, so a null
+  -- team_id row groups harmlessly on its own and is simply never selected
+  -- against a real team.
   select l.team_id,
          l.player_a_id as player_id,
          coalesce(d.points, 1.0) as weight,
@@ -136,7 +173,7 @@ ranked as (
            partition by r.session_id
            order by case when d.measure = 'time_low' then r.raw_value
                          else -r.raw_value end
-         ) as pr
+         )::numeric as pr
     from public.matrix_session_results r
     join public.matrix_sessions s on s.id = r.session_id
     join public.drills_bank    d on d.id = s.drill_id

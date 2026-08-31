@@ -139,6 +139,7 @@ Object.assign(BHSSoccerApp.prototype, {
           </span>
           ${measure === 'win_loss'
             ? `<select id="sessionOutcome_${p.id}" class="form-control" style="max-width:110px; font-size:0.8rem;">
+                 <option value="" selected>— result —</option>
                  <option value="win">Won</option>
                  <option value="draw">Drew</option>
                  <option value="loss">Lost</option>
@@ -195,18 +196,28 @@ Object.assign(BHSSoccerApp.prototype, {
     const occurredOn = document.getElementById('sessionDate')?.value;
     if (!occurredOn) return set('Pick the date this session happened.');
 
-    set('Saving…');
-    const res = await window.supabaseService.saveMatrixSession(
-      this.activeTeamId,
-      { drillId: this._sessionDrillId, occurredOn },
-      this.collectSessionResults()
-    );
-    if (!res.ok) return set(res.error || 'Could not save that session.');
+    // Disabled for the duration of the request so a double-click cannot fire
+    // two saveMatrixSession calls and double everyone's `available`. Always
+    // re-enabled, including on the failure path, or a refused save would
+    // leave the coach unable to try again without reopening the modal.
+    const btn = document.getElementById('sessionSaveBtn');
+    if (btn) btn.disabled = true;
+    try {
+      set('Saving…');
+      const res = await window.supabaseService.saveMatrixSession(
+        this.activeTeamId,
+        { drillId: this._sessionDrillId, occurredOn },
+        this.collectSessionResults()
+      );
+      if (!res.ok) return set(res.error || 'Could not save that session.');
 
-    // Standings are derived in Postgres, so nothing moves until a re-read.
-    await this.syncFromSupabase();
-    this.renderCurrentView();
-    this.closeModals();
+      // Standings are derived in Postgres, so nothing moves until a re-read.
+      await this.syncFromSupabase();
+      this.renderCurrentView();
+      this.closeModals();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   },
 
   /**

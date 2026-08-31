@@ -1021,9 +1021,12 @@ class SupabaseService {
    * Write one session and every result in it.
    *
    * A present player must supply a result: storing a present row with neither a
-   * value nor an outcome puts the drill's full weight into `available` while
-   * contributing nothing to `earned`, which scores them as though they had
-   * failed rather than as a gap in data entry.
+   * value nor an outcome does NOT score them as a failure — matrix_standings'
+   * `ranked` and `win_loss` CTEs filter on `raw_value is not null` /
+   * `outcome is not null`, so that row is dropped from `parts` entirely and
+   * the player is scored as though excused. The guard below still refuses
+   * the save, because a coach who marks someone "here" with no result meant
+   * to record something, not to quietly excuse them.
    */
   async saveMatrixSession(
     teamId: string,
@@ -1167,7 +1170,11 @@ class SupabaseService {
     // never reached the database. measure is new in migration 0009.
     const weight = Number(drill.points);
     if (Number.isFinite(weight)) payload.points = weight;
-    payload.measure = SupabaseService.MEASURES.includes(drill.measure) ? drill.measure : 'head_to_head';
+    // Conditional, not defaulted: a caller who never knew about `measure`
+    // (an old form, a typo-fix save, the XLSX drills import) must not be able
+    // to clobber a value it never supplied. The column carries its own
+    // database default ('head_to_head') for genuine inserts.
+    if (SupabaseService.MEASURES.includes(drill.measure)) payload.measure = drill.measure;
 
     if (drill.coachNotes) payload.coach_notes = drill.coachNotes;
     if (drill.diagramImage) payload.diagram_image = drill.diagramImage;
