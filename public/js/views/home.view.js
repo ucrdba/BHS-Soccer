@@ -31,7 +31,9 @@ Object.assign(BHSSoccerApp.prototype, {
     const recordStr = `${wins} - ${losses} - ${draws}`;
 
     // Next upcoming match & countdown
-    const nextMatch = this.data.schedule.find(m => m.status !== 'COMPLETED');
+    // Shared with the countdown, so the heading and the clock can never name
+    // two different matches.
+    const nextMatch = this.getNextMatch();
     const countdown = this.getNextMatchCountdown();
     const cdDaysStr = countdown ? countdown.days : '00';
     const cdHoursStr = countdown ? countdown.hours : '00';

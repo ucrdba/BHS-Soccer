@@ -164,8 +164,44 @@ Object.assign(BHSSoccerApp.prototype, {
     return null;
   },
 
+  /**
+   * The next match by DATE, not by row order.
+   *
+   * This used to be `schedule.find(m => m.status !== 'COMPLETED')`, which
+   * returns whichever row happens to sit first in the array. fetchSchedule
+   * orders by created_at, so that was really "the fixture typed in first" --
+   * and match_date is a TEXT column, so even ordering by it would put SEP 11
+   * before SEP 4. A match that had already been played but never marked
+   * COMPLETED stayed pinned as "next" forever, with the countdown reading
+   * 00/00/00 because its target was in the past.
+   */
+  getNextMatch() {
+    const candidates = (this.data.schedule || []).filter(m => m && m.status !== 'COMPLETED');
+    if (candidates.length === 0) return null;
+
+    // A match stays "next" for a few hours after kickoff, so the site does not
+    // flip to the following fixture while the game is still being played.
+    const GRACE_MS = 3 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const dated = [];
+    const undated = [];
+    candidates.forEach(m => {
+      const t = this.parseMatchDateTime(m.date, m.time);
+      if (t) dated.push({ m, t: t.getTime() });
+      else undated.push(m);
+    });
+
+    const upcoming = dated.filter(x => x.t + GRACE_MS > now).sort((a, b) => a.t - b.t);
+    if (upcoming.length) return upcoming[0].m;
+
+    // Nothing we could read is still ahead. A row whose date would not parse
+    // might be, so it beats announcing the season is over on a parse failure.
+    return undated.length ? undated[0] : null;
+  },
+
   getNextMatchCountdown() {
-    const nextMatch = this.data.schedule.find(m => m.status !== 'COMPLETED');
+    const nextMatch = this.getNextMatch();
     if (!nextMatch) return null;
 
     const targetDate = this.parseMatchDateTime(nextMatch.date, nextMatch.time);
