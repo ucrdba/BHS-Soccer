@@ -41,6 +41,15 @@ describe('drills library weight field (markup)', () => {
   });
 });
 
+describe('drills library rendering', () => {
+  it('omits the duration badge rather than rendering "undefined"', () => {
+    // duration is declared in supabase_schema.sql but does NOT exist on the
+    // live drills_bank, so d.duration is undefined for every real drill and
+    // the badge rendered the literal text "undefined" beside a stopwatch.
+    expect(plannerSrc).toContain('${d.duration ?');
+  });
+});
+
 describe('drills library weight field (wiring in planner.view.js)', () => {
   it('prefills both the weight and the measure when editing an existing drill', () => {
     expect(plannerSrc).toContain("document.getElementById('masterDrillFormMeasure').value = targetDrill.measure || 'head_to_head'");

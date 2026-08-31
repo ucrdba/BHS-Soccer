@@ -1859,7 +1859,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
               <strong style="color:#FFF; font-size:1.02rem;">${d.name}</strong>
               <span class="badge badge-coach">${d.category || 'General'}</span>
-              <span class="badge badge-win">⏱️ ${d.duration}</span>
+              ${d.duration ? `<span class="badge badge-win">⏱️ ${d.duration}</span>` : ''}
               <span class="badge badge-gold">⭐ ${Number(d.points ?? 3)} weight</span>
               ${d.diagramImage ? `<span class="badge badge-role">🎨 Diagram Attached</span>` : ''}
             </div>
