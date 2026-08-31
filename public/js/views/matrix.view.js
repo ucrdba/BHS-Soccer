@@ -101,17 +101,17 @@ Object.assign(BHSSoccerApp.prototype, {
                 <tr>
                   <th>RANK</th>
                   <th>PLAYER</th>
-                  <th>GP</th>
+                  <th>EX</th>
                   <th>W-D-L</th>
                   <th>PTS</th>
-                  <th>%</th>
+                  <th>AVAIL</th>
+                  <th>SHARE</th>
                 </tr>
               </thead>
               <tbody>
                 ${(() => {
-                  // Hoisted: computing this inside the map would rescan every
-                  // player for every row.
-                  const leaderPts = Math.max(1, ...(this.data.players || []).map(x => x.matrixStats?.points || 0));
+                  // Ranking is on share, which is already a percentage, so the
+                  // bar needs no leader to scale against.
                   return (this.data.players || [])
                   .filter(p => !p.is_deleted && !p.isDeleted)
                   .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
@@ -124,24 +124,28 @@ Object.assign(BHSSoccerApp.prototype, {
                     const ms = p.matrixStats || {};
                     const m = {
                       wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
-                      games: ms.games || 0, points: ms.points || 0,
-                      winPct: (ms.winPct === undefined ? null : ms.winPct),
+                      games: ms.games || 0, exercises: ms.exercises || 0,
+                      earned: Number(ms.earned || 0), available: Number(ms.available || 0),
+                      share: (ms.share === undefined ? null : ms.share),
                       rank: ms.rank || 999
                     };
-                    const barPct = Math.round((m.points / leaderPts) * 100);
+                    // The bar is share, not points: ranking is on share, so a
+                    // bar drawn from totals would disagree with the ordering.
+                    const barPct = m.share === null ? 0 : Math.round(m.share);
                     return `
                   <tr>
                     <td>
-                      ${m.games === 0
+                      ${m.exercises === 0
                         ? '<div class="rank-pill rank-other">&mdash;</div>'
                         : `<div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">${m.rank}</div>`}
                     </td>
                     <td><strong>${p.name}</strong> <span class="text-muted">#${p.number || '—'}</span></td>
-                    <td>${m.games}</td>
+                    <td>${m.exercises}</td>
                     <td>${m.wins} - ${m.draws} - ${m.losses}</td>
-                    <td><strong>${m.points}</strong></td>
+                    <td><strong>${m.earned.toFixed(2)}</strong></td>
+                    <td class="text-muted">${m.available.toFixed(2)}</td>
                     <td>
-                      ${m.winPct === null ? '<span class="text-muted">—</span>' : m.winPct.toFixed(1) + '%'}
+                      ${m.share === null ? '<span class="text-muted">&mdash;</span>' : m.share.toFixed(1) + '%'}
                       <div class="score-progress">
                         <div class="score-bar" style="width: ${barPct}%;"></div>
                       </div>

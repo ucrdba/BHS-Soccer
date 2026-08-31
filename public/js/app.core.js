@@ -370,14 +370,24 @@ class BHSSoccerApp {
 
         this.data.players.forEach(p => {
           const s = standingsById.get(p.id);
+          // Reads the new columns and falls back to the old ones. The view is
+          // rewritten by migration 0009, and this code deploys BEFORE that is
+          // applied — so for a short window it is reading the old shape. The
+          // fallback is what makes that window render zeros rather than
+          // `undefined`, and it costs one `??` per field.
           p.matrixStats = s
             ? {
                 wins: s.wins || 0, draws: s.draws || 0, losses: s.losses || 0,
-                games: s.games || 0, points: s.points || 0,
-                winPct: s.win_pct === null || s.win_pct === undefined ? null : Number(s.win_pct),
+                games: s.games || 0,
+                exercises: s.exercises ?? s.games ?? 0,
+                earned: Number(s.earned ?? s.points ?? 0),
+                available: Number(s.available ?? 0),
+                share: (s.share ?? s.win_pct) === null || (s.share ?? s.win_pct) === undefined
+                  ? null : Number(s.share ?? s.win_pct),
                 rank: s.rank
               }
-            : { wins: 0, draws: 0, losses: 0, games: 0, points: 0, winPct: null, rank: unrankedFrom };
+            : { wins: 0, draws: 0, losses: 0, games: 0, exercises: 0,
+                earned: 0, available: 0, share: null, rank: unrankedFrom };
         });
 
         // The individual results behind those standings. Kept in state so a coach
