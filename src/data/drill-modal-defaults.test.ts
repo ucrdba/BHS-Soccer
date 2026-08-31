@@ -22,13 +22,21 @@ interface DrillApp {
   data: Record<string, any>;
   activeTeamId: string | null;
   openAddDrillModal(logId?: string): void;
+  submitMatrixResult(): Promise<void>;
+  syncFromSupabase(): Promise<void>;
+  renderCurrentView(): void;
+  closeModals(): void;
 }
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
 let app: DrillApp;
+let closed: boolean;
+let logged: any[];
 
 beforeEach(() => {
+  closed = false;
+  logged = [];
   document.body.innerHTML = `
     <div id="addDrillScoreModal">
       <h3 id="matrixModalTitle"></h3>
@@ -53,13 +61,20 @@ beforeEach(() => {
     getRole: () => 'admin'
   };
   w.can = () => true;
-  w.supabaseService = { isConfigured: () => false };
+  w.supabaseService = {
+    isConfigured: () => false,
+    logMatrixResult: async (_teamId: string, payload: any) => { logged.push(payload); return { ok: true }; },
+    updateMatrixResult: async (_id: string, payload: any) => { logged.push(payload); return { ok: true }; }
+  };
 
   const ctor = new Function(
     [strip(appCoreSrc), strip(adminSrc)].join('\n;\n') + '\nreturn BHSSoccerApp;'
   )() as { prototype: DrillApp };
 
   app = Object.create(ctor.prototype) as DrillApp;
+  app.syncFromSupabase = async () => {};
+  app.renderCurrentView = () => {};
+  app.closeModals = () => { closed = true; };
   app.activeTeamId = 't-varsity';
   app.data = {
     players: [
@@ -114,6 +129,90 @@ describe('record-a-result modal defaults', () => {
     expect(sel('matrixPlayerA').value).toBe('p1');
     expect(sel('matrixPlayerB').value).toBe('p3');
     expect(sel('matrixDrill').value).toBe('d1');
+  });
+
+  it('stays open after recording, so several results can be entered at once', async () => {
+    // A coach runs one drill and comes away with a dozen head-to-heads. The
+    // form used to close on every save, and reopening it lost the drill and
+    // the date each time.
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    expect(closed).toBe(false);
+    expect(logged).toHaveLength(1);
+  });
+
+  it('clears both players so the next result cannot repeat the last one', async () => {
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    expect(sel('matrixPlayerA').value).toBe('');
+    expect(sel('matrixPlayerB').value).toBe('');
+  });
+
+  it('keeps the drill and the date, which do not change between results', async () => {
+    app.openAddDrillModal();
+    sel('matrixDrill').value = 'd1';
+    (document.getElementById('matrixOccurredOn') as HTMLInputElement).value = '2026-08-30';
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    expect(sel('matrixDrill').value).toBe('d1');
+    expect((document.getElementById('matrixOccurredOn') as HTMLInputElement).value).toBe('2026-08-30');
+  });
+
+  it('confirms each result and counts them', async () => {
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    const msg = document.getElementById('matrixFormError')!;
+    expect(msg.textContent).toContain('Cesar Alva');
+    expect(msg.textContent).toContain('1 result');
+
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p3';
+    await app.submitMatrixResult();
+    expect(msg.textContent).toContain('2 results');
+  });
+
+  it('resets the count when the form is reopened', async () => {
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p3';
+    await app.submitMatrixResult();
+    expect(document.getElementById('matrixFormError')!.textContent).toContain('1 result');
+  });
+
+  it('still closes after editing an existing result', async () => {
+    // An edit is one deliberate correction, not a run of entries.
+    app.data.matrixLogs = [{
+      id: 'log-1', player_a_id: 'p1', player_b_id: 'p3',
+      outcome: 'a', score_text: '', occurred_on: '2026-08-20', drill_id: null
+    }];
+    app.openAddDrillModal('log-1');
+    await app.submitMatrixResult();
+    expect(closed).toBe(true);
+  });
+
+  it('reports a refusal in red rather than claiming success', async () => {
+    (globalThis as any).supabaseService.logMatrixResult =
+      async () => ({ ok: false, error: 'Only a coach of this team can record results.' });
+    app.openAddDrillModal();
+    sel('matrixPlayerA').value = 'p1';
+    sel('matrixPlayerB').value = 'p2';
+    await app.submitMatrixResult();
+    const msg = document.getElementById('matrixFormError')!;
+    expect(msg.textContent).toContain('Only a coach');
+    expect(msg.style.color).toContain('danger');
+    // A refusal must not leave the players cleared, or the coach retypes them.
+    expect(sel('matrixPlayerA').value).toBe('p1');
   });
 
   it('clears a previous edit when reopened for a new result', () => {

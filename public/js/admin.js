@@ -1015,7 +1015,11 @@ Object.assign(BHSSoccerApp.prototype, {
     if (b) b.innerHTML = playerOptions;
     if (drill) drill.innerHTML = drillOptions;
     if (when) when.value = new Date().toISOString().slice(0, 10);
-    if (err) err.textContent = '';
+    if (err) { err.textContent = ''; err.style.color = 'var(--color-danger)'; }
+
+    // "3 results this session" must count this opening of the form, not every
+    // result the coach has ever entered.
+    this._matrixRecordedCount = 0;
 
     if (players.length < 2 && err) {
       err.textContent = 'At least two players are needed to record a head-to-head result.';
@@ -1082,7 +1086,13 @@ Object.assign(BHSSoccerApp.prototype, {
 
   async submitMatrixResult() {
     const err = document.getElementById('matrixFormError');
-    const set = (msg) => { if (err) err.textContent = msg; };
+    // The one message slot has to carry successes too now that the form stays
+    // open, so it colours itself rather than always shouting in red.
+    const set = (msg, ok = false) => {
+      if (!err) return;
+      err.textContent = msg;
+      err.style.color = ok ? 'var(--bhs-cyan-accent)' : 'var(--color-danger)';
+    };
 
     const playerAId = document.getElementById('matrixPlayerA')?.value;
     const playerBId = document.getElementById('matrixPlayerB')?.value;
@@ -1112,7 +1122,33 @@ Object.assign(BHSSoccerApp.prototype, {
     // a re-read. Without this the coach records a result and sees nothing move.
     await this.syncFromSupabase();
     this.renderCurrentView();
-    this.closeModals();
+
+    // An edit is one deliberate correction, so it closes. Recording is not:
+    // a coach runs a drill and comes away with a dozen head-to-heads to enter,
+    // and reopening the form between each one loses the drill and the date
+    // every time.
+    if (logId) { this.closeModals(); return; }
+
+    const nameOf = (id) => ((this.data.players || []).find(pl => pl.id === id) || {}).name || 'player';
+    const pairing = `${nameOf(playerAId)} v ${nameOf(playerBId)}`;
+    this._matrixRecordedCount = (this._matrixRecordedCount || 0) + 1;
+
+    const a = document.getElementById('matrixPlayerA');
+    const b = document.getElementById('matrixPlayerB');
+    const score = document.getElementById('matrixScoreText');
+    const outcomeEl = document.getElementById('matrixOutcome');
+
+    // Clear what changes between results. The drill and the date deliberately
+    // survive: they are the same for every result from one session, and having
+    // to retype them is the friction that made this a one-at-a-time form.
+    if (a) a.value = '';
+    if (b) b.value = '';
+    if (score) score.value = '';
+    if (outcomeEl) outcomeEl.selectedIndex = 0;
+
+    const n = this._matrixRecordedCount;
+    set(`Recorded ${pairing}. ${n} result${n === 1 ? '' : 's'} this session — add another, or close when you are done.`, true);
+    if (a) a.focus();
   },
 
   // ─── Import / Export ─────────────────────────────────────────────────────
