@@ -1860,7 +1860,7 @@ Object.assign(BHSSoccerApp.prototype, {
               <strong style="color:#FFF; font-size:1.02rem;">${d.name}</strong>
               <span class="badge badge-coach">${d.category || 'General'}</span>
               <span class="badge badge-win">⏱️ ${d.duration}</span>
-              <span class="badge badge-gold">⭐ ${d.points || 3} Pts</span>
+              <span class="badge badge-gold">⭐ ${Number(d.points ?? 3)} weight</span>
               ${d.diagramImage ? `<span class="badge badge-role">🎨 Diagram Attached</span>` : ''}
             </div>
             ${d.coachNotes ? `<p style="color:var(--text-muted); font-size:0.82rem; margin:4px 0 0 0;">${d.coachNotes}</p>` : ''}
@@ -1889,6 +1889,7 @@ Object.assign(BHSSoccerApp.prototype, {
     document.getElementById('masterDrillFormCategory').value = 'Tactical / Attacking';
     document.getElementById('masterDrillFormDuration').value = '20 min';
     document.getElementById('masterDrillFormPoints').value = 3;
+    document.getElementById('masterDrillFormMeasure').value = 'head_to_head';
     document.getElementById('masterDrillFormNotes').value = '';
 
     const titleEl = document.getElementById('masterDrillFormTitle');
@@ -1902,7 +1903,8 @@ Object.assign(BHSSoccerApp.prototype, {
         document.getElementById('masterDrillFormName').value = targetDrill.name;
         document.getElementById('masterDrillFormCategory').value = targetDrill.category || 'Tactical / Attacking';
         document.getElementById('masterDrillFormDuration').value = targetDrill.duration || '20 min';
-        document.getElementById('masterDrillFormPoints').value = targetDrill.points || 3;
+        document.getElementById('masterDrillFormPoints').value = targetDrill.points ?? 3;
+        document.getElementById('masterDrillFormMeasure').value = targetDrill.measure || 'head_to_head';
         document.getElementById('masterDrillFormNotes').value = targetDrill.coachNotes || '';
         if (titleEl) titleEl.textContent = '✏️ EDIT MASTER DRILL';
       }
@@ -1957,7 +1959,8 @@ Object.assign(BHSSoccerApp.prototype, {
     const name = (document.getElementById('masterDrillFormName')?.value || '').trim();
     const category = document.getElementById('masterDrillFormCategory')?.value || 'General';
     const duration = (document.getElementById('masterDrillFormDuration')?.value || '20 min').trim();
-    const points = parseInt(document.getElementById('masterDrillFormPoints')?.value || 3, 10);
+    const points = parseFloat(document.getElementById('masterDrillFormPoints')?.value);
+    const measure = document.getElementById('masterDrillFormMeasure')?.value || 'head_to_head';
     const coachNotes = (document.getElementById('masterDrillFormNotes')?.value || '').trim();
 
     if (!name) {
@@ -1974,7 +1977,8 @@ Object.assign(BHSSoccerApp.prototype, {
     drillObj.name = name;
     drillObj.category = category;
     drillObj.duration = duration;
-    drillObj.points = points;
+    drillObj.points = Number.isFinite(points) ? points : 3;
+    drillObj.measure = measure;
     drillObj.coachNotes = coachNotes;
 
     // Export pitch diagram drawings & elements

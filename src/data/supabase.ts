@@ -1162,6 +1162,13 @@ class SupabaseService {
     if (schoolUuid) payload.school_id = schoolUuid;
     if (drill.id && this.isUuid(drill.id)) payload.id = drill.id;
 
+    // points is the matrix weight. It was previously read from the form and
+    // then dropped on the floor here, so a weight set in the drills library
+    // never reached the database. measure is new in migration 0009.
+    const weight = Number(drill.points);
+    if (Number.isFinite(weight)) payload.points = weight;
+    payload.measure = SupabaseService.MEASURES.includes(drill.measure) ? drill.measure : 'head_to_head';
+
     if (drill.coachNotes) payload.coach_notes = drill.coachNotes;
     if (drill.diagramImage) payload.diagram_image = drill.diagramImage;
     if (drill.diagramData) payload.diagram_data = drill.diagramData;
