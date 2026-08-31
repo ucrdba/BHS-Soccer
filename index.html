@@ -367,6 +367,30 @@
     </div>
   </div>
 
+  <!-- Record a Matrix Session Modal -->
+  <div id="matrixSessionModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>📋 RECORD A SESSION</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px;">
+        <div>
+          <label for="sessionDrill" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted);">Exercise</label>
+          <select id="sessionDrill" class="form-control" style="max-width:260px; font-size:0.8rem;"
+                  onchange="app.openSessionModal(this.value)"></select>
+        </div>
+        <div>
+          <label for="sessionDate" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted);">Date</label>
+          <input type="date" id="sessionDate" class="form-control" style="max-width:160px; font-size:0.8rem;" />
+        </div>
+      </div>
+      <div id="sessionRows"></div>
+      <div id="sessionError" style="color:var(--color-danger); font-size:0.85rem; margin-top:8px;"></div>
+      <button class="btn btn-gold" style="width:100%; margin-top:10px;" onclick="app.saveSession()">💾 Save session</button>
+    </div>
+  </div>
+
   <!-- Live Database Diagnostic Test Results Modal -->
   <div id="dbDiagnosticModal" class="modal-overlay" style="display:none; z-index: 10600;">
     <div class="modal-window" style="max-width: 880px; border: 1px solid var(--bhs-gold-accent); max-height: 90vh; overflow-y: auto;">

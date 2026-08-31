@@ -89,7 +89,7 @@ Object.assign(BHSSoccerApp.prototype, {
           ${isCoach ? `
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-gold" onclick="app.openAddDrillModal()">+ Record Practice Drill Scores</button>
-              <!-- Task 6 adds "Record a session" here -->
+              <button class="btn btn-gold" onclick="app.openSessionModal()">📋 Record a session</button>
               <button class="btn btn-secondary" onclick="app.openWeightsModal()">⚖️ Exercise weights</button>
             </div>` : ''}
         </div>

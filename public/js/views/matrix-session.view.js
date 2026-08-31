@@ -73,6 +73,140 @@ Object.assign(BHSSoccerApp.prototype, {
     await this.syncFromSupabase();
     this.renderCurrentView();
     set(`Saved ${res.updated} exercise${res.updated === 1 ? '' : 's'}. Standings re-scored.`, true);
+  },
+
+  /**
+   * Drills that are recorded as a session.
+   *
+   * head_to_head is deliberately excluded: those are entered as pairings in the
+   * Record Result modal, and offering both routes for one drill would let the
+   * same day's competition be counted twice.
+   */
+  sessionDrillOptions() {
+    return (this.data.drillsBank || [])
+      .filter(d => !d.is_deleted && !d.isDeleted && (d.measure || 'head_to_head') !== 'head_to_head')
+      .map(d => `<option value="${d.id}"${this._sessionDrillId === d.id ? ' selected' : ''}>${d.name}</option>`)
+      .join('');
+  },
+
+  sessionDrill() {
+    return (this.data.drillsBank || []).find(d => d.id === this._sessionDrillId) || null;
+  },
+
+  async openSessionModal(drillId) {
+    this._sessionDrillId = drillId || this._sessionDrillId || '';
+    const err = document.getElementById('sessionError');
+    if (err) err.textContent = '';
+
+    const picker = document.getElementById('sessionDrill');
+    if (picker) {
+      picker.innerHTML = '<option value="">— pick an exercise —</option>' + this.sessionDrillOptions();
+      picker.value = this._sessionDrillId;
+    }
+    const when = document.getElementById('sessionDate');
+    if (when && !when.value) when.value = new Date().toISOString().slice(0, 10);
+
+    const rows = document.getElementById('sessionRows');
+    if (rows) rows.innerHTML = this.renderSessionRows();
+
+    const modal = document.getElementById('matrixSessionModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  renderSessionRows() {
+    const drill = this.sessionDrill();
+    if (!drill) {
+      return '<p class="text-muted" style="font-size:0.85rem;">Pick an exercise to load the squad.</p>';
+    }
+    const players = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
+    if (players.length === 0) {
+      return '<p class="text-muted" style="font-size:0.85rem;">This team has no players yet.</p>';
+    }
+
+    const measure = drill.measure || 'count_high';
+    const hint = measure === 'time_low' ? 'seconds — lower wins'
+               : measure === 'win_loss' ? 'result'
+               : 'number — higher wins';
+
+    return `
+      <p class="text-muted" style="font-size:0.78rem; margin:0 0 8px 0;">
+        ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
+      </p>
+      ${players.map(p => `
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+          <span style="flex:1; color:#FFF; font-size:0.85rem;">
+            ${p.name} <span class="text-muted">#${p.number || '—'}</span>
+          </span>
+          ${measure === 'win_loss'
+            ? `<select id="sessionOutcome_${p.id}" class="form-control" style="max-width:110px; font-size:0.8rem;">
+                 <option value="win">Won</option>
+                 <option value="draw">Drew</option>
+                 <option value="loss">Lost</option>
+               </select>`
+            : `<input type="number" id="sessionValue_${p.id}" class="form-control" step="any"
+                      style="max-width:110px; font-size:0.8rem;" />`}
+          <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
+            <option value="present">Here</option>
+            <option value="excused">Excused</option>
+            <option value="unexcused">No-show</option>
+          </select>
+        </div>`).join('')}`;
+  },
+
+  /**
+   * Read the grid. Split out from saveSession so the DOM reading can be tested
+   * without a service call standing in the way.
+   *
+   * An absent player's input/select can still hold a value the coach typed
+   * before switching their attendance (e.g. entered 2800, then marked them
+   * excused) — that stale entry is never read for a non-present player, so a
+   * result is only ever sent for someone who was actually present.
+   */
+  collectSessionResults() {
+    const drill = this.sessionDrill();
+    const measure = drill ? (drill.measure || 'count_high') : 'count_high';
+    return (this.data.players || [])
+      .filter(p => !p.is_deleted && !p.isDeleted)
+      .map(p => {
+        const attendance = document.getElementById(`sessionAttend_${p.id}`)?.value || 'present';
+        if (attendance !== 'present') {
+          return { playerId: p.id, attendance, rawValue: null, outcome: null };
+        }
+        if (measure === 'win_loss') {
+          return { playerId: p.id, attendance, rawValue: null,
+                   outcome: document.getElementById(`sessionOutcome_${p.id}`)?.value || null };
+        }
+        const raw = document.getElementById(`sessionValue_${p.id}`)?.value;
+        const n = parseFloat(raw);
+        return { playerId: p.id, attendance,
+                 rawValue: Number.isFinite(n) ? n : null, outcome: null };
+      });
+  },
+
+  async saveSession() {
+    const err = document.getElementById('sessionError');
+    const set = (m, ok = false) => {
+      if (!err) return;
+      err.textContent = m;
+      err.style.color = ok ? 'var(--bhs-cyan-accent)' : 'var(--color-danger)';
+    };
+
+    if (!this._sessionDrillId) return set('Pick the exercise this session was.');
+    const occurredOn = document.getElementById('sessionDate')?.value;
+    if (!occurredOn) return set('Pick the date this session happened.');
+
+    set('Saving…');
+    const res = await window.supabaseService.saveMatrixSession(
+      this.activeTeamId,
+      { drillId: this._sessionDrillId, occurredOn },
+      this.collectSessionResults()
+    );
+    if (!res.ok) return set(res.error || 'Could not save that session.');
+
+    // Standings are derived in Postgres, so nothing moves until a re-read.
+    await this.syncFromSupabase();
+    this.renderCurrentView();
+    this.closeModals();
   }
 
 });
