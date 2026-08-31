@@ -11,6 +11,21 @@
 
 begin;
 
+-- The Supabase SQL editor may run as a role that is a MEMBER of postgres
+-- without defaulting to it. ALTER TABLE and CREATE POLICY both check
+-- ownership rather than privilege, so they fail with
+--   42501: must be owner of table drills_bank
+-- even though the privilege is reachable. Adopting the role for the
+-- transaction fixes it; commit releases it.
+--
+-- If this line itself errors with "permission denied to set role", the editor
+-- session is not a member of postgres. In that case apply the three
+-- ownership-requiring changes through the dashboard's table editor --
+-- drills_bank.points to numeric(3,1), the new drills_bank.measure column, and
+-- the drills_bank_select policy in section 3b -- and re-run this file with
+-- sections 1 and 3b commented out.
+set role postgres;
+
 -- ─── 1. Weight and measure on the drill ────────────────────────────────────
 -- points already exists as INT and is already edited in the drills library.
 -- INT cannot hold 2.5, which is the whole point of the widening.
