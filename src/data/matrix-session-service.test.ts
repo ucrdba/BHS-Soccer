@@ -5,6 +5,14 @@ import { supabaseService } from './supabase';
 let captured: { table: string; op: string; rows?: any[]; }[];
 let opError: { code?: string; message: string } | null;
 let opRows: Record<string, any>[];
+// Per-table overrides, needed for saveMatrixSession's rollback test: that path
+// makes three round trips (drills_bank select, matrix_sessions upsert,
+// matrix_session_results upsert) and needs the *last* one to fail while the
+// first two succeed with the shared `opRows` default. Only set an override
+// for a table when a test genuinely needs a different answer for it than the
+// rest of the calls in that test get.
+let tableRows: Record<string, Record<string, any>[]>;
+let tableErrors: Record<string, { code?: string; message: string }>;
 
 const svc = supabaseService as any;
 
@@ -12,6 +20,8 @@ beforeEach(() => {
   captured = [];
   opError = null;
   opRows = [{ id: 'sess-1' }];
+  tableRows = {};
+  tableErrors = {};
   svc.isConfigured = () => true;
   svc.client = {
     from(table: string) {
@@ -25,7 +35,11 @@ beforeEach(() => {
         in()                { return api; },
         order()             { return api; },
         limit()             { return api; },
-        then(res: any)      { return Promise.resolve({ data: opError ? null : opRows, error: opError }).then(res); }
+        then(res: any) {
+          const err = Object.prototype.hasOwnProperty.call(tableErrors, table) ? tableErrors[table] : opError;
+          const data = err ? null : (Object.prototype.hasOwnProperty.call(tableRows, table) ? tableRows[table] : opRows);
+          return Promise.resolve({ data, error: err }).then(res);
+        }
       };
       return api;
     }
@@ -92,6 +106,22 @@ describe('saveMatrixSession', () => {
     );
     expect(res.ok).toBe(false);
     expect(res.error).toContain('coach');
+  });
+
+  it('soft-deletes the session it just created when the results write is refused', async () => {
+    // PostgREST gives no transaction across the two round trips. Leaving the
+    // session behind here would not be inert (it still has a drill_id, so
+    // matrix_standings would join it), and would also leave the caller with
+    // no id to retry into, so a resubmit would insert a second orphan.
+    tableRows['matrix_session_results'] = [];
+    const res = await supabaseService.saveMatrixSession(
+      't1', { drillId: 'd1', occurredOn: '2026-08-31' },
+      [{ playerId: 'p1', attendance: 'present', rawValue: 1 }]
+    );
+    expect(res.ok).toBe(false);
+    const rollback = captured.find(c => c.table === 'matrix_sessions' && c.op === 'update');
+    expect(rollback).toBeDefined();
+    expect(rollback!.rows![0].is_deleted).toBe(true);
   });
 });
 

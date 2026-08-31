@@ -1082,9 +1082,23 @@ class SupabaseService {
         .from('matrix_session_results')
         .upsert(rows, { onConflict: 'session_id,player_id' })
         .select();
-      if (rErr) { console.warn('Supabase saveMatrixSession results notice:', rErr.message); return { ok: false, error: rErr.message }; }
-      if (!rData || rData.length === 0) {
-        return { ok: false, error: 'The session saved but its results were refused. Check coach access for this team.' };
+      if (rErr || !rData || rData.length === 0) {
+        // Roll back by hand: PostgREST gives us no transaction across two
+        // round trips, and a session with no results is not inert — it still
+        // joins drills_bank in matrix_standings. Leaving it would also make a
+        // retry insert a second one, since the caller has no id to reuse.
+        try {
+          await this.client!.from('matrix_sessions')
+            .update({ is_deleted: true }).eq('id', sessionId);
+        } catch (cleanupErr) {
+          // Nothing further to be done if the rollback itself fails; the
+          // original write failure below is still reported honestly.
+        }
+        if (rErr) console.warn('Supabase saveMatrixSession results notice:', rErr.message);
+        return {
+          ok: false,
+          error: rErr ? rErr.message : 'The session saved but its results were refused. Check coach access for this team.'
+        };
       }
     }
     return { ok: true, id: sessionId };
