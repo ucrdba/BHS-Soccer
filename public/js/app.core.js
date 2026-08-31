@@ -221,6 +221,15 @@ class BHSSoccerApp {
       lastAuthKey = key;
       this.updateAuthUI();
       this.renderCurrentView();
+
+      // Signing in changes WHICH DATA this person can see, not just how the
+      // chrome is painted, so an auth change has to re-fetch. Before multi-team
+      // nothing in this.data was user-scoped and a re-render was enough; now a
+      // coach who signs in on a page that loaded signed-out would keep the
+      // public default team and never see their own until they reloaded.
+      if (window.supabaseService?.isConfigured()) {
+        this.syncFromSupabase().catch(e => console.warn('Post-auth re-sync notice:', e));
+      }
     });
 
     this.bindEvents();
