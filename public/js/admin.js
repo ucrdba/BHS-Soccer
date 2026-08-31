@@ -748,6 +748,10 @@ Object.assign(BHSSoccerApp.prototype, {
               <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;"
                       onclick="app.assignCoachToTeam('${t.id}')">Assign</button>
             </div>
+            <!-- Failures belong beside the control that caused them. A shared
+                 message box at the foot of the accordion is off-screen from
+                 here, so a refusal reads as nothing happening. -->
+            <div id="teamFeedback_${t.id}" style="color:var(--color-danger); font-size:0.78rem; margin-top:6px;"></div>
           </div>`;
         }).join('')}
       </div>`).join('');
@@ -801,10 +805,11 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   async assignCoachToTeam(teamId) {
-    const err = document.getElementById('teamAdminFeedback');
+    const err = document.getElementById('teamFeedback_' + teamId) || document.getElementById('teamAdminFeedback');
     const profileId = document.getElementById('assignCoach_' + teamId)?.value;
-    if (!profileId) { if (err) err.textContent = 'Pick a coach to assign.'; return; }
+    if (!profileId) { if (err) err.textContent = 'Pick a coach from the dropdown first.'; return; }
 
+    if (err) err.textContent = 'Assigning...';
     const res = await window.supabaseService.assignCoachToTeam(teamId, profileId);
     if (!res.ok) { if (err) err.textContent = res.error || 'Could not assign that coach.'; return; }
     // Re-open rather than patch the DOM: the assignment changes what the team
@@ -818,7 +823,7 @@ Object.assign(BHSSoccerApp.prototype, {
       'This is the only coach on that team. Removing them leaves nobody able to edit its roster, fixtures or Matrix results.\n\nRemove anyway?')) return;
 
     const res = await window.supabaseService.removeCoachFromTeam(teamId, profileId);
-    const err = document.getElementById('teamAdminFeedback');
+    const err = document.getElementById('teamFeedback_' + teamId) || document.getElementById('teamAdminFeedback');
     if (!res.ok) { if (err) err.textContent = res.error || 'Could not remove that coach.'; return; }
     await this.openAdminModal();
   },
