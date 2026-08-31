@@ -14,7 +14,7 @@
 
 - **The migration is `0009`.** `0008` is the highest applied. `0004` belongs to the parked `feat/google-signin-allowlist` branch and is not on `main` — do not renumber around it.
 - **No agent has DDL access.** Every `.sql` file is applied by hand by the user in the Supabase SQL editor. Never claim a migration has been run; never try to run one.
-- **Deploy the code BEFORE applying the migration.** This is the reverse of the usual order. See "Deploy sequence" at the end — it is part of the deliverable, not an afterthought.
+- **Apply the migration BEFORE deploying the code** (corrected during the pre-flight scan; the spec and an earlier draft of this plan said the reverse). Task 4 makes the code *write* `measure`, and Tasks 6-7 write to the two new tables — a write to a column or table that does not exist is a hard PostgREST 400 that breaks drill saving and session recording outright. The read gap the spec worried about does not exist: `fetchMatrixStandings` uses `select('*')` and the Task 3 mapping falls back across both view shapes, so a stale view degrades to zeros. A broken write beats a degraded read. See "Deploy sequence".
 - **Never mirror the scoring formula in JavaScript.** This repository's defining hazard is the same logic existing in parallel copies; `CLAUDE.md` warns about it three separate times. The migration's self-check is the test for the maths. Vitest covers only the JavaScript either side of it.
 - **Weights are looked up live, never snapshotted.** The view joins `drills_bank` at query time so retuning a weight re-ranks history.
 - **Participation floor is 25%**: `greatest(0.25, 1 - percent_rank)`, and it applies **only** to `count_high` and `time_low`. A `win_loss` or `head_to_head` loss earns zero.
@@ -65,10 +65,11 @@
 -- Weighted matrix scoring. See
 -- docs/superpowers/specs/2026-08-31-weighted-matrix-scoring-design.md
 --
--- APPLY THIS ONLY AFTER THE APPLICATION CODE IS DEPLOYED. matrix_standings
--- changes shape; the mapping in app.core.js reads both the old and new column
--- names so the gap degrades to zeros rather than an error, but the standings
--- are only correct once both halves are in place.
+-- APPLY THIS BEFORE DEPLOYING THE MATCHING CODE. The new code writes the
+-- `measure` column and the two tables below; against a database without them
+-- those writes are hard 400s that break drill saving and session recording.
+-- Applying first only costs a brief window where the standings read zeros,
+-- because the deployed mapping is still looking for the old column names.
 
 begin;
 
@@ -1728,18 +1729,31 @@ git commit -m "feat: recorded sessions list with delete"
 
 ## Deploy sequence
 
-**This order is the reverse of the usual and is part of the deliverable.**
+**Migration first, code second.** This is the ordinary order, but the spec
+argued for the reverse, so it is worth saying why it changed: the new code
+*writes* `measure` and writes to two new tables. Against a database without
+them, those writes are hard 400s that break drill saving and session recording.
+The read gap the spec worried about turned out not to exist.
 
-1. **Merge and push the code.** Vercel deploys from `main`.
-2. **Confirm the deploy landed** — fetch a marker from the live bundle rather than trusting the dashboard:
+1. **Hand the user `supabase/migrations/0009_weighted_matrix_scoring.sql`** to run in the Supabase SQL editor. Watch for the `matrix_standings self-check passed.` notice — if it raises instead, the view is wrong and the whole migration rolls back, leaving the database as it was.
+2. **Confirm it landed** by querying the view for the new columns:
+   ```bash
+   curl -s "$URL/rest/v1/matrix_standings?select=share,earned,available&limit=1"      -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+   ```
+   A `42703` means the migration has not been applied.
+3. **Then merge and push the code.** Vercel deploys from `main`. Confirm with:
    ```bash
    curl -s https://bhs-soccer.vercel.app/js/views/matrix-session.view.js | grep -c renderSessionRows
    ```
    Expect `1` or more. A `404` means the deploy has not finished.
-3. **Then** hand the user `supabase/migrations/0009_weighted_matrix_scoring.sql` to run in the Supabase SQL editor. Watch for the `matrix_standings self-check passed.` notice — if it raises instead, the view is wrong and the whole migration rolls back, leaving the database as it was.
 4. **Set the weights.** Every existing drill keeps `points = 3` and gets `measure = 'head_to_head'`, so **nothing changes until the coach opens Exercise weights and sets them.** The migration deliberately does not guess weights or measures from drill names. Say this to the user explicitly — otherwise the feature looks broken on arrival.
 
-Between steps 1 and 3 the standings read a view that still has the old shape. Because `fetchMatrixStandings` selects `*` and the Task 3 mapping falls back across both column sets, the table renders zeros rather than erroring. That window closes the moment the migration is applied.
+Between steps 1 and 3 the deployed (old) code reads a view that has already
+been rewritten. Because `fetchMatrixStandings` selects `*` and the old mapping
+reads `s.points` / `s.win_pct`, which the new view no longer has, the table
+renders zeros rather than erroring. That window closes the moment the code
+deploys. The Task 3 mapping's two-shape fallback means the window is harmless
+in either direction — it is the *writes* that force the order.
 
 ## Verification summary
 
