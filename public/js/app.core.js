@@ -685,6 +685,13 @@ class BHSSoccerApp {
           }
         }, 80);
       }
+    } else if (this.currentView === 'help') {
+      container.innerHTML = this.renderHelpView();
+      // The index, search and highlighting need the elements to exist, so they
+      // are wired after innerHTML lands -- the same reason the planner branch
+      // re-initialises the tactical canvas on a timeout.
+      setTimeout(() => this.initHelpView(), 0);
+
     } else if (this.currentView === 'coaches') {
       container.innerHTML = this.renderCoachesView();
     }

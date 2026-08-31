@@ -1018,3 +1018,170 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: grabbing;
 }
 
+
+/* ══ Coach's handbook (help view) ══════════════════════════════════════════
+   Reuses the app's own tokens rather than carrying its own palette, so the
+   handbook reads as part of the product and follows any future retheme. */
+
+.help-shell {
+  display: grid;
+  grid-template-columns: 244px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.help-rail {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--bhs-navy-card);
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-searchwrap { position: relative; }
+.help-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: 0; color: var(--text-muted);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.help-clear:hover { color: #FFF; }
+.help-hits {
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted); min-height: 1em;
+}
+
+.help-toc { list-style: none; margin: 0; padding: 0; }
+.help-toc-part {
+  font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text-muted); margin: 13px 0 4px; padding-left: 8px;
+}
+.help-toc a {
+  display: block; padding: 5px 9px; border-radius: 5px; text-decoration: none;
+  color: var(--text-muted); font-size: 0.85rem; line-height: 1.35;
+  border-left: 2px solid transparent;
+}
+.help-toc a:hover { background: rgba(0, 240, 255, 0.07); color: #FFF; }
+.help-toc a:focus-visible { outline: 2px solid var(--bhs-cyan-accent); outline-offset: -2px; }
+
+.help-body { min-width: 0; }
+.help-section {
+  background: var(--bhs-navy-card);
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 8px;
+  padding: 22px 26px;
+  margin-bottom: 16px;
+  scroll-margin-top: 16px;
+  max-width: 70ch;
+}
+.help-h2 {
+  color: var(--bhs-gold-accent);
+  font-size: 1.32rem;
+  margin: 0 0 8px;
+  letter-spacing: 0.01em;
+}
+.help-section h4 {
+  color: #FFF; font-size: 0.92rem; text-transform: uppercase;
+  letter-spacing: 0.06em; margin: 20px 0 6px;
+}
+.help-section p { margin: 0 0 12px; line-height: 1.65; }
+.help-section ul, .help-section ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.65; }
+.help-section li { margin-bottom: 6px; }
+
+.help-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+.help-chip {
+  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 3px; border: 1px solid currentColor;
+}
+.help-chip-coach { color: var(--bhs-cyan-accent); }
+.help-chip-admin { color: var(--bhs-gold-accent); }
+.help-chip-all   { color: var(--text-muted); }
+
+.help-path {
+  font-size: 0.82rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid var(--bhs-cyan-accent);
+  border-radius: 0 5px 5px 0;
+  padding: 8px 12px;
+  margin: 0 0 14px !important;
+  color: var(--text-muted);
+  overflow-x: auto; white-space: nowrap;
+}
+.help-path b { color: #FFF; font-weight: 600; }
+.help-path span { color: var(--bhs-cyan-accent); margin: 0 2px; }
+
+/* Numbered because these genuinely are sequences — do this, then this. */
+.help-steps { list-style: none; counter-reset: hstep; padding-left: 0 !important; }
+.help-steps > li {
+  counter-increment: hstep; position: relative; padding-left: 34px; margin-bottom: 10px;
+}
+.help-steps > li::before {
+  content: counter(hstep);
+  position: absolute; left: 0; top: 0;
+  width: 23px; height: 23px; display: grid; place-items: center;
+  border-radius: 50%; font-size: 0.76rem; font-weight: 700;
+  background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg);
+}
+
+.help-note, .help-warn {
+  border-radius: 6px; padding: 12px 14px; margin: 0 0 14px; font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid var(--bhs-navy-border);
+}
+.help-note { border-left: 3px solid var(--bhs-gold-accent); }
+.help-warn { border-left: 3px solid var(--color-danger); }
+.help-note p:last-child, .help-warn p:last-child { margin-bottom: 0 !important; }
+.help-note-label, .help-warn-label {
+  display: block; font-size: 0.66rem; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 5px;
+}
+.help-note-label { color: var(--bhs-gold-accent); }
+.help-warn-label { color: var(--color-danger); }
+
+.help-tablewrap {
+  overflow-x: auto; margin: 0 0 16px;
+  border: 1px solid var(--bhs-navy-border); border-radius: 6px;
+}
+.help-table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+.help-table th, .help-table td {
+  text-align: left; padding: 8px 12px;
+  border-bottom: 1px solid var(--bhs-navy-border); vertical-align: top;
+}
+.help-table th {
+  font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); background: rgba(0, 0, 0, 0.25); white-space: nowrap;
+}
+.help-table tr:last-child td { border-bottom: 0; }
+
+.help-calc {
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 0.78rem; line-height: 1.75;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--bhs-navy-border); border-radius: 6px;
+  padding: 13px 15px; margin: 0 0 14px;
+  overflow-x: auto; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.help-calc-hl { color: var(--bhs-cyan-accent); }
+
+.help-section mark {
+  background: rgba(255, 215, 0, 0.28);
+  color: #FFF; padding: 0 2px; border-radius: 2px;
+}
+
+.help-hidden { display: none !important; }
+
+.help-empty { display: none; padding: 40px 0; text-align: center; }
+.help-empty-show { display: block; }
+.help-empty h3 { color: #FFF; margin: 0 0 6px; }
+
+@media (max-width: 900px) {
+  .help-shell { grid-template-columns: 1fr; }
+  .help-rail { position: static; max-height: none; }
+  .help-toc { max-height: 220px; overflow-y: auto; }
+  .help-section { padding: 18px; }
+}
