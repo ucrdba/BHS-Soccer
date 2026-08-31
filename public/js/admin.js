@@ -719,7 +719,12 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const teamRows = Array.from(byOrg.entries()).map(([org, list]) => `
       <div style="margin-bottom:14px;">
-        <div style="color:var(--bhs-gold-accent); font-size:0.8rem; font-weight:700; margin-bottom:6px;">${org}</div>
+        <div style="color:var(--bhs-gold-accent); font-size:0.8rem; font-weight:700; margin-bottom:6px;">
+          ${org}
+          <span class="text-muted" style="font-weight:400; text-transform:uppercase; font-size:0.7rem;">
+            ${(list[0] && list[0].school_kind === 'club') ? 'club' : 'school'}
+          </span>
+        </div>
         ${list.map(t => {
           const staff = coaches.filter(c => c.team_id === t.id);
           return `
@@ -771,6 +776,25 @@ Object.assign(BHSSoccerApp.prototype, {
           ${teamRows || '<p class="text-muted" style="font-size:0.85rem;">No teams yet.</p>'}
 
           <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:6px;">
+            <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:8px;">Create an organization</div>
+            <p class="text-muted" style="font-size:0.78rem; margin:0 0 8px 0;">
+              A school or a club. Teams belong to one, and a player may be on one team per
+              organization &mdash; so a player can be on a school team and a club team at once.
+            </p>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <input type="text" id="newOrgName" class="form-control" style="max-width:200px; font-size:0.8rem;" placeholder="Riverside Surf SC" />
+              <input type="text" id="newOrgMascot" class="form-control" style="max-width:130px; font-size:0.8rem;" placeholder="Surf" />
+              <input type="text" id="newOrgCode" class="form-control" style="max-width:90px; font-size:0.8rem;" placeholder="rvsc" />
+              <select id="newOrgKind" class="form-control" style="max-width:120px; font-size:0.8rem;">
+                <option value="school">School</option>
+                <option value="club">Club</option>
+              </select>
+              <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;" onclick="app.createOrganization()">+ Create</button>
+            </div>
+            <div id="orgAdminFeedback" style="color:var(--color-danger); font-size:0.8rem; margin-top:8px;"></div>
+          </div>
+
+          <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:12px;">
             <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:8px;">Create a team</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
               <select id="newTeamOrg" class="form-control" style="max-width:220px; font-size:0.8rem;">
@@ -784,6 +808,29 @@ Object.assign(BHSSoccerApp.prototype, {
           </div>
         </div>
       </details>`;
+  },
+
+  async createOrganization() {
+    const err = document.getElementById('orgAdminFeedback');
+    const set = (m) => { if (err) err.textContent = m; };
+    const name = (document.getElementById('newOrgName')?.value || '').trim();
+    const mascot = (document.getElementById('newOrgMascot')?.value || '').trim();
+    const code = (document.getElementById('newOrgCode')?.value || '').trim().toLowerCase();
+    const kind = document.getElementById('newOrgKind')?.value || 'school';
+
+    if (!name) return set('Give the organization a name.');
+    // Headings render the mascot beside the name, and the column is NOT NULL.
+    if (!mascot) return set('Give it a mascot, e.g. Surf.');
+    if (!code) return set('Give it a short code, e.g. rvsc.');
+
+    set('Creating...');
+    const res = await window.supabaseService.createSchool(code, name, kind, mascot);
+    if (!res.ok) return set(res.error || 'Could not create that organization.');
+
+    // Re-sync rather than patch: the new organization has to reach
+    // this.data.schools before the create-team picker can offer it.
+    await this.syncFromSupabase();
+    await this.openAdminModal();
   },
 
   async createTeamFromAdmin() {

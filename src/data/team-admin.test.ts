@@ -136,12 +136,46 @@ describe('renderTeamAdminSection', () => {
     expect(html).toContain('app.createTeamFromAdmin()');
   });
 
+  it('offers a create-organization form', () => {
+    const html = app.renderTeamAdminSection();
+    expect(html).toContain('id="newOrgName"');
+    expect(html).toContain('id="newOrgMascot"');
+    expect(html).toContain('id="newOrgCode"');
+    expect(html).toContain('id="newOrgKind"');
+    expect(html).toContain('app.createOrganization()');
+  });
+
+  it('lets the organization be marked a club, not just a school', () => {
+    // Without this the kind column can only be set in SQL, which is what made
+    // REV Club a club in the first place.
+    const html = app.renderTeamAdminSection();
+    const kindSelect = html.slice(
+      html.indexOf('id="newOrgKind"'),
+      html.indexOf('</select>', html.indexOf('id="newOrgKind"'))
+    );
+    expect(kindSelect).toContain('value="school"');
+    expect(kindSelect).toContain('value="club"');
+  });
+
+  it('labels each organization as a school or a club', () => {
+    app._allTeams = [
+      { id: 't-a', school_id: 's-bhs', name: 'Varsity', school_name: 'Beaumont High School', school_kind: 'school' },
+      { id: 't-b', school_id: 's-rev', name: 'U16 Boys', school_name: 'REV Club', school_kind: 'club' }
+    ];
+    const html = app.renderTeamAdminSection();
+    const bhsBlock = html.slice(html.indexOf('Beaumont High School'), html.indexOf('REV Club'));
+    const revBlock = html.slice(html.indexOf('REV Club'));
+    expect(bhsBlock).toContain('school');
+    expect(revBlock).toContain('club');
+  });
+
   it('handles having no teams at all without breaking', () => {
     app._allTeams = [];
     app._teamCoaches = [];
     const html = app.renderTeamAdminSection();
     expect(html).toContain('No teams yet');
-    // The create form must still render, or there is no way out of that state.
+    // Both create forms must still render, or there is no way out of that state.
     expect(html).toContain('app.createTeamFromAdmin()');
+    expect(html).toContain('app.createOrganization()');
   });
 });

@@ -1194,6 +1194,10 @@ class SupabaseService {
       record: school.record || { wins: 0, losses: 0, draws: 0 }
     };
 
+    // Only written when supplied, so editing an existing organization through
+    // the profile form cannot silently reset a club back to the column default.
+    if (school.kind === 'school' || school.kind === 'club') payload.kind = school.kind;
+
     if (school.id && this.isUuid(school.id)) {
       payload.id = school.id;
     }
@@ -1216,6 +1220,46 @@ class SupabaseService {
     } catch (err: any) {
       console.error('❌ Supabase upsertSchool exception:', err.message);
       return { data: null, error: err.message };
+    }
+  }
+
+  /**
+   * Creates an organization -- a school or a club.
+   *
+   * Deliberately separate from upsertSchool, which upserts on : changing
+   * the code in the profile editor and saving would silently create a second
+   * organization rather than renaming the one being edited. Creating one should
+   * be something you asked for.
+   */
+  async createSchool(
+    code: string, name: string, kind: string, mascot: string
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    const c = String(code || '').trim().toLowerCase();
+    const n = String(name || '').trim();
+    // schools.mascot is NOT NULL with no default, and it is what page headings
+    // render beside the name ("BEAUMONT COUGARS ROSTER"). Omitting it fails the
+    // insert outright; defaulting it silently ships an organization branded
+    // with a placeholder nobody remembers to correct.
+    const m = String(mascot || '').trim();
+    if (!c || !n) return { ok: false, error: 'Give the organization a name and a short code.' };
+    if (!m) return { ok: false, error: 'Give the organization a mascot.' };
+    if (kind !== 'school' && kind !== 'club') return { ok: false, error: 'Pick school or club.' };
+    try {
+      const { data, error } = await this.client!
+        .from('schools').insert([{ code: c, name: n, kind, mascot: m }]).select();
+      if (error) {
+        console.warn('Supabase createSchool notice:', error.message);
+        if (error.code === '23505') return { ok: false, error: `The code "${c}" is already in use.` };
+        return { ok: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that write. Coach or admin access is required.' };
+      }
+      return { ok: true, id: data[0].id };
+    } catch (e: any) {
+      console.warn('Supabase createSchool exception:', e);
+      return { ok: false, error: e?.message || String(e) };
     }
   }
 
