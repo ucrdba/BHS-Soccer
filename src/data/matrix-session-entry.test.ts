@@ -83,6 +83,25 @@ describe('session grid', () => {
     expect(opts).not.toContain('d3');
   });
 
+  it('explains an empty picker instead of showing a bare prompt', () => {
+    // Every drill starts as head_to_head, so on a fresh install the picker is
+    // legitimately empty. "Pick an exercise" with nothing to pick reads as a
+    // broken feature, and a coach has no way to learn that the fix is to set a
+    // measurement type on the weights screen.
+    app._sessionDrillId = '';
+    app.data.drillsBank = [{ id: 'd3', name: '1v1', measure: 'head_to_head', points: 3 }];
+    const html = app.renderSessionRows();
+    expect(html).toContain('No exercises are set up');
+    expect(html).toContain('Exercise weights');
+  });
+
+  it('shows the ordinary prompt when exercises do exist', () => {
+    app._sessionDrillId = '';
+    const html = app.renderSessionRows();
+    expect(html).toContain('Pick an exercise');
+    expect(html).not.toContain('No exercises are set up');
+  });
+
   it('asks for a number when the drill is measured', () => {
     app._sessionDrillId = 'd1';
     const html = app.renderSessionRows();

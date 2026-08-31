@@ -116,6 +116,27 @@ Object.assign(BHSSoccerApp.prototype, {
   renderSessionRows() {
     const drill = this.sessionDrill();
     if (!drill) {
+      // Distinguish "you have not picked one yet" from "there is nothing to
+      // pick". The picker excludes head_to_head drills because those are
+      // recorded as pairings elsewhere, and every drill starts as
+      // head_to_head — so on a fresh install the list is legitimately empty
+      // and an unexplained blank reads as a broken feature.
+      const available = (this.data.drillsBank || [])
+        .filter(d => !d.is_deleted && !d.isDeleted && (d.measure || 'head_to_head') !== 'head_to_head');
+      if (available.length === 0) {
+        return `
+          <p class="text-muted" style="font-size:0.85rem;">
+            No exercises are set up for session recording yet.
+          </p>
+          <p class="text-muted" style="font-size:0.85rem;">
+            Sessions are for whole-squad exercises &mdash; a timed run, a beep test,
+            shots made out of ten, a small-sided game. Open
+            <strong style="color:#FFF;">&#9878; Exercise weights</strong> and give a drill
+            any measurement type other than <em>1v1</em>, and it will appear here.
+            1v1 drills stay in <strong style="color:#FFF;">Record Practice Drill Scores</strong>,
+            because those are entered as pairings.
+          </p>`;
+      }
       return '<p class="text-muted" style="font-size:0.85rem;">Pick an exercise to load the squad.</p>';
     }
     const players = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
