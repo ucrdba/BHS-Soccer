@@ -1689,11 +1689,17 @@ class SupabaseService {
 
   async fetchDailyThoughts(schoolId: string = 'bhs'): Promise<Partial<DailyThoughtRow>[] | null> {
     if (!this.isConfigured()) return null;
+    // daily_thoughts.school_id is a UUID column, and every caller passes the
+    // school CODE ('bhs'). Passing it straight through fails the cast with
+    // 22P02 and returns null, so this feature was silently dead. getSchoolUuid
+    // returns a uuid unchanged, so resolving is safe whatever the caller sends.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return null;
     const { data, error } = await this.client!
       .from('daily_thoughts')
       .select('*')
       .or('is_deleted.is.null,is_deleted.eq.false')
-      .eq('school_id', schoolId)
+      .eq('school_id', schoolUuid)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetchDailyThoughts error:', error); return null; }
     return data;
@@ -1701,11 +1707,13 @@ class SupabaseService {
 
   async fetchLatestDailyThoughts(schoolId: string = 'bhs'): Promise<Partial<DailyThoughtRow> | null> {
     if (!this.isConfigured()) return null;
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return null;
     const { data, error } = await this.client!
       .from('daily_thoughts')
       .select('*')
       .or('is_deleted.is.null,is_deleted.eq.false')
-      .eq('school_id', schoolId)
+      .eq('school_id', schoolUuid)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -1716,8 +1724,11 @@ class SupabaseService {
   async upsertDailyThought(schoolId: string = 'bhs', thought: any = {}): Promise<any> {
     if (!this.isConfigured()) return { error: 'Supabase client is not configured' };
 
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return { error: 'Could not resolve the organization for this thought.' };
+
     const payload: Record<string, any> = {
-      school_id: schoolId,
+      school_id: schoolUuid,
       coach_id: thought.coachId || 'c1',
       coach_name: thought.coachName || '',
       thoughts_text: thought.text || '',
@@ -1770,10 +1781,14 @@ class SupabaseService {
 
   async setActiveDailyThought(schoolId: string = 'bhs', activeId?: string): Promise<any> {
     if (!this.isConfigured() || !activeId) return null;
+    // Without resolving this, the "clear the old active one" update matched
+    // nothing and errored, so two thoughts could end up active at once.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return null;
     const { error: err1 } = await this.client!
       .from('daily_thoughts')
       .update({ is_active: false })
-      .eq('school_id', schoolId);
+      .eq('school_id', schoolUuid);
     if (err1) console.error('Supabase setActiveDailyThought reset error:', err1);
 
     const { error: err2 } = await this.client!
