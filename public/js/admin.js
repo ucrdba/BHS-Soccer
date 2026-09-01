@@ -512,15 +512,21 @@ Object.assign(BHSSoccerApp.prototype, {
         // 7. Daily Thoughts
         try {
           const thoughts = this.data.dailyThoughts || [];
-          let thoughtSuccess = 0;
-          for (const t of thoughts) {
-            const res = await window.supabaseService.upsertDailyThought(schoolCode, t);
-            if (res && res.data) {
-              if (res.data.id) t.id = res.data.id;
-              thoughtSuccess++;
+          if (!this.activeTeamId) {
+            // upsertDailyThought now refuses a non-uuid/absent team_id, so
+            // pushing with none selected would silently reject every row.
+            report.push('⚠️ 💡 Coach Daily Thoughts skipped — no team is selected. Choose a team in the header first.');
+          } else {
+            let thoughtSuccess = 0;
+            for (const t of thoughts) {
+              const res = await window.supabaseService.upsertDailyThought(this.activeTeamId, t);
+              if (res && res.data) {
+                if (res.data.id) t.id = res.data.id;
+                thoughtSuccess++;
+              }
             }
+            report.push(`✅ 💡 Coach Daily Thoughts: ${thoughtSuccess} / ${thoughts.length} thoughts synced to DB`);
           }
-          report.push(`✅ 💡 Coach Daily Thoughts: ${thoughtSuccess} / ${thoughts.length} thoughts synced to DB`);
         } catch (e) {
           report.push(`❌ 💡 Coach Daily Thoughts Exception: ${e.message}`);
         }
@@ -1847,6 +1853,13 @@ Object.assign(BHSSoccerApp.prototype, {
               totalRejected += await persistAll(resC.toPersist, c => window.supabaseService.upsertCoach('bhs', c));
             }
           } else if (activeTarget === 'thoughts') {
+            if (!this.activeTeamId) {
+              // upsertDailyThought now refuses a non-uuid/absent team_id, so
+              // importing with none selected would silently reject every row
+              // while the import still reports its own success counts.
+              warnings.push('Daily thoughts skipped — no team is selected. Choose a team in the header first.');
+              continue;
+            }
             const imported = rows.filter(r => r.ThoughtsText || r.text).map(r => ({
               id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               coachId: 'c1',
@@ -1867,7 +1880,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
             if (window.supabaseService?.isConfigured()) {
               for (const t of imported) {
-                await window.supabaseService.upsertDailyThought('bhs', {
+                await window.supabaseService.upsertDailyThought(this.activeTeamId, {
                   id: t.id,
                   coachId: t.coachId,
                   coachName: t.coachName,
