@@ -293,10 +293,41 @@ describe('editing a recorded session', () => {
   });
 
   it('does not carry an edit into a fresh Record a session', async () => {
+    // The bug this replaces: after editing, "Record a session" reopened the
+    // SAME session for editing, so a coach could not record a new one at all.
+    // It was inferred from whether a prefill existed, which is exactly what is
+    // set after an edit -- so it never cleared.
     await app.editSession('s1');
-    app._sessionPrefill = null;
-    await app.openSessionModal();
+    expect(app._editingSessionId).toBe('s1');
+
+    await app.newSession();
     expect(app._editingSessionId).toBeNull();
+    expect(app._sessionPrefill).toBeNull();
+  });
+
+  it('clears the previous exercise when starting a new session', async () => {
+    // Otherwise the new session silently inherits the edited session's drill.
+    await app.editSession('s1');
+    await app.newSession();
+    expect(app._sessionDrillId).toBe('');
+  });
+
+  it('resets the date to today for a new session', async () => {
+    // An edited session restores its own date; a new one must not keep it.
+    await app.editSession('s1');
+    expect((document.getElementById('sessionDate') as HTMLInputElement).value).toBe('2026-08-20');
+    await app.newSession();
+    const today = new Date().toISOString().slice(0, 10);
+    expect((document.getElementById('sessionDate') as HTMLInputElement).value).toBe(today);
+  });
+
+  it('renders blank inputs after an edit, not the edited values', async () => {
+    await app.editSession('s1');
+    await app.newSession();
+    app._sessionDrillId = 'd1';
+    document.getElementById('sessionRows')!.innerHTML = app.renderSessionRows();
+    expect((document.getElementById('sessionValue_p1') as HTMLInputElement).value).toBe('');
+    expect((document.getElementById('sessionAttend_p1') as HTMLSelectElement).value).toBe('present');
   });
 });
 

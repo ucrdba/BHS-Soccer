@@ -122,16 +122,28 @@ Object.assign(BHSSoccerApp.prototype, {
     if (when) when.value = s.occurred_on || '';
   },
 
+  /**
+   * Start a NEW session.
+   *
+   * Separate from openSessionModal because that is also the drill picker's
+   * onchange handler, so it cannot tell a fresh start from a change of
+   * exercise by its arguments. Inferring it from whether a prefill existed
+   * was the bug this replaces: after editing a session, "Record a session"
+   * reopened that same session for editing.
+   */
+  async newSession() {
+    this._editingSessionId = null;
+    this._sessionPrefill = null;
+    this._sessionDrillId = '';
+    const when = document.getElementById('sessionDate');
+    if (when) when.value = '';          // openSessionModal fills today's date
+    await this.openSessionModal();
+  },
+
   async openSessionModal(drillId) {
     this._sessionDrillId = drillId || this._sessionDrillId || '';
     const err = document.getElementById('sessionError');
     if (err) err.textContent = '';
-
-    // Called with no drill from the "Record a session" button: that is a NEW
-    // session, so any prior edit state has to go. Without this, recording
-    // after an edit would silently overwrite the session just edited -- the
-    // same trap the 1v1 modal has with its hidden log id.
-    if (!drillId && !this._sessionPrefill) this._editingSessionId = null;
 
     const picker = document.getElementById('sessionDrill');
     if (picker) {
