@@ -157,6 +157,12 @@ export class BHSSoccerApp {
         }));
       }
 
+      // PHASE 2: must pass activeTeamId, not a school code. practice_plans
+      // and daily_thoughts are team-scoped (migration 0014); passing a school
+      // CODE here is the exact bug the team-scoped-planner branch removed from
+      // public/js/app.core.js -- it reaches a uuid column as 22P02, the service
+      // logs and returns null, and the feature is silently dead. Typecheck
+      // cannot catch it: the parameter is typed `string`.
       const dbPlans = await supabaseService.fetchPracticePlans('bhs');
       if (dbPlans && dbPlans.length > 0) {
         const planMap: Record<string, AppData['savedPlans'][number]> = {};
@@ -219,6 +225,12 @@ export class BHSSoccerApp {
         }));
       }
 
+      // PHASE 2: must pass activeTeamId, not a school code. practice_plans
+      // and daily_thoughts are team-scoped (migration 0014); passing a school
+      // CODE here is the exact bug the team-scoped-planner branch removed from
+      // public/js/app.core.js -- it reaches a uuid column as 22P02, the service
+      // logs and returns null, and the feature is silently dead. Typecheck
+      // cannot catch it: the parameter is typed `string`.
       const dbThoughts = await supabaseService.fetchDailyThoughts('bhs');
       if (dbThoughts && dbThoughts.length > 0) {
         this.data.dailyThoughts = dbThoughts.map((t: any) => ({
