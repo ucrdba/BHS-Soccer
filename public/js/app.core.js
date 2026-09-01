@@ -279,9 +279,11 @@ class BHSSoccerApp {
 
       // A viewer with no team is legitimate -- and this branch is also reached
       // when fetchTeamsForViewer transiently fails, which is why it must not
-      // gate the fetches below. school, schools, drillsBank, practicePlans,
-      // coaches, dailyThoughts and soccerCategories are not team-scoped; a
-      // network blip on one table should not blank all of them.
+      // gate the fetches below. school, schools, drillsBank, coaches and
+      // soccerCategories are not team-scoped; a network blip on one table
+      // should not blank all of them. practicePlans and dailyThoughts ARE
+      // team-scoped, so they run inside the `if (hasTeam)` block below,
+      // alongside roster/schedule/matrix, not out here.
       const hasTeam = !!this.activeTeamId;
       if (!hasTeam) {
         this.data.players = [];
@@ -425,55 +427,70 @@ class BHSSoccerApp {
           score: s.score,
           result: s.result
         }));
-      }
 
-      const dbPlans = await window.supabaseService.fetchPracticePlans('bhs');
-      if (dbPlans && dbPlans.length > 0) {
-        const planMap = {};
+        // Moved inside the team branch: practicePlans and dailyThoughts are
+        // now team-scoped (see the comment above `hasTeam`), so they must
+        // run only once activeTeamId is known, same as roster/schedule/matrix.
+        const dbPlans = await window.supabaseService.fetchPracticePlans(this.activeTeamId);
+        if (dbPlans && dbPlans.length > 0) {
+          const planMap = {};
 
-        dbPlans.forEach(plan => {
-          const notes = plan.coach_notes || '';
-          let planName = plan.name || 'Practice Plan';
-          let drillName = plan.drill || plan.name || 'Soccer Drill';
-          let cleanNotes = notes;
+          dbPlans.forEach(plan => {
+            const notes = plan.coach_notes || '';
+            let planName = plan.name || 'Practice Plan';
+            let drillName = plan.drill || plan.name || 'Soccer Drill';
+            let cleanNotes = notes;
 
-          const match = notes.match(/^\[Plan:\s*([^\]]+)\]\s*(.*)/i);
-          if (match) {
-            planName = match[1].trim();
-            cleanNotes = match[2].trim();
-          }
-
-          if (planName) {
-            if (!planMap[planName]) {
-              planMap[planName] = {
-                id: 'plan_db_' + planName.replace(/\s+/g, '_').toLowerCase(),
-                name: planName,
-                date: new Date(plan.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
-                drills: []
-              };
+            const match = notes.match(/^\[Plan:\s*([^\]]+)\]\s*(.*)/i);
+            if (match) {
+              planName = match[1].trim();
+              cleanNotes = match[2].trim();
             }
-            planMap[planName].drills.push({
-              id: plan.id,
-              time: plan.time_slot,
-              name: drillName,
-              duration: plan.duration,
-              coachNotes: cleanNotes,
-              diagramImage: plan.diagram_image || null,
-              diagramData: plan.diagram_data || null
-            });
-          }
-        });
 
-        // Merge DB saved plans into local savedPlans
-        Object.values(planMap).forEach(dbPlan => {
-          if (!this.data.savedPlans) this.data.savedPlans = [];
-          const idx = this.data.savedPlans.findIndex(sp => sp.name.toLowerCase() === dbPlan.name.toLowerCase());
-          if (idx !== -1) {
-            this.data.savedPlans[idx] = dbPlan;
-          } else {
-            this.data.savedPlans.push(dbPlan);
-          }
-        });
+            if (planName) {
+              if (!planMap[planName]) {
+                planMap[planName] = {
+                  id: 'plan_db_' + planName.replace(/\s+/g, '_').toLowerCase(),
+                  name: planName,
+                  date: new Date(plan.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
+                  drills: []
+                };
+              }
+              planMap[planName].drills.push({
+                id: plan.id,
+                time: plan.time_slot,
+                name: drillName,
+                duration: plan.duration,
+                coachNotes: cleanNotes,
+                diagramImage: plan.diagram_image || null,
+                diagramData: plan.diagram_data || null
+              });
+            }
+          });
+
+          // Merge DB saved plans into local savedPlans
+          Object.values(planMap).forEach(dbPlan => {
+            if (!this.data.savedPlans) this.data.savedPlans = [];
+            const idx = this.data.savedPlans.findIndex(sp => sp.name.toLowerCase() === dbPlan.name.toLowerCase());
+            if (idx !== -1) {
+              this.data.savedPlans[idx] = dbPlan;
+            } else {
+              this.data.savedPlans.push(dbPlan);
+            }
+          });
+        }
+
+        const dbThoughts = await window.supabaseService.fetchDailyThoughts(this.activeTeamId);
+        if (dbThoughts && dbThoughts.length > 0) {
+          this.data.dailyThoughts = dbThoughts.map(t => ({
+            id: t.id,
+            coachId: t.coach_id,
+            coachName: t.coach_name || '',
+            text: t.thoughts_text,
+            isActive: !!t.is_active,
+            createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+          }));
+        }
       }
 
       const dbCoaches = await window.supabaseService.fetchCoaches('bhs');
@@ -487,18 +504,6 @@ class BHSSoccerApp {
           email: c.email,
           photo: c.photo_url,
           bio: c.bio
-        }));
-      }
-
-      const dbThoughts = await window.supabaseService.fetchDailyThoughts('bhs');
-      if (dbThoughts && dbThoughts.length > 0) {
-        this.data.dailyThoughts = dbThoughts.map(t => ({
-          id: t.id,
-          coachId: t.coach_id,
-          coachName: t.coach_name || '',
-          text: t.thoughts_text,
-          isActive: !!t.is_active,
-          createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
         }));
       }
 

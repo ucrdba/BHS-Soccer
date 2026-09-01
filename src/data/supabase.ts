@@ -868,12 +868,18 @@ class SupabaseService {
     return data;
   }
 
-  async fetchPracticePlans(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
-    if (!this.isConfigured()) return null;
-    let query = this.client!.from('practice_plans').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true }) as any;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (schoolUuid) query = query.eq('school_id', schoolUuid);
-    const { data, error } = await query;
+  async fetchPracticePlans(teamId: string): Promise<Record<string, any>[] | null> {
+    // team_id is a uuid column (0014_team_scoped_planner.sql); a caller
+    // passing something else (e.g. a leftover school code) must be refused
+    // here rather than reaching Postgres and failing the cast with 22P02 —
+    // the exact bug class daily_thoughts.school_id hit for months.
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('practice_plans')
+      .select('*')
+      .or('is_deleted.is.null,is_deleted.eq.false')
+      .eq('team_id', teamId)
+      .order('created_at', { ascending: true });
     if (error) { console.error('Supabase fetchPracticePlans error:', error); return null; }
     return data;
   }
@@ -1687,33 +1693,28 @@ class SupabaseService {
     if (error) console.error('Supabase soft deleteCoach error:', error);
   }
 
-  async fetchDailyThoughts(schoolId: string = 'bhs'): Promise<Partial<DailyThoughtRow>[] | null> {
-    if (!this.isConfigured()) return null;
-    // daily_thoughts.school_id is a UUID column, and every caller passes the
-    // school CODE ('bhs'). Passing it straight through fails the cast with
-    // 22P02 and returns null, so this feature was silently dead. getSchoolUuid
-    // returns a uuid unchanged, so resolving is safe whatever the caller sends.
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (!schoolUuid) return null;
+  async fetchDailyThoughts(teamId: string): Promise<Partial<DailyThoughtRow>[] | null> {
+    // team_id is a uuid column; refuse a non-uuid value (e.g. a leftover
+    // school code) here rather than letting it reach Postgres and fail the
+    // cast with 22P02 — the exact bug class this table hit for months.
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
     const { data, error } = await this.client!
       .from('daily_thoughts')
       .select('*')
       .or('is_deleted.is.null,is_deleted.eq.false')
-      .eq('school_id', schoolUuid)
+      .eq('team_id', teamId)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetchDailyThoughts error:', error); return null; }
     return data;
   }
 
-  async fetchLatestDailyThoughts(schoolId: string = 'bhs'): Promise<Partial<DailyThoughtRow> | null> {
-    if (!this.isConfigured()) return null;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (!schoolUuid) return null;
+  async fetchLatestDailyThoughts(teamId: string): Promise<Partial<DailyThoughtRow> | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
     const { data, error } = await this.client!
       .from('daily_thoughts')
       .select('*')
       .or('is_deleted.is.null,is_deleted.eq.false')
-      .eq('school_id', schoolUuid)
+      .eq('team_id', teamId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -1721,14 +1722,16 @@ class SupabaseService {
     return data && data.length > 0 ? data[0] : null;
   }
 
-  async upsertDailyThought(schoolId: string = 'bhs', thought: any = {}): Promise<any> {
-    if (!this.isConfigured()) return { error: 'Supabase client is not configured' };
-
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (!schoolUuid) return { error: 'Could not resolve the organization for this thought.' };
+  async upsertDailyThought(teamId: string, thought: any = {}): Promise<any> {
+    if (!this.isConfigured()) return { error: 'Cloud database is not configured.' };
+    // Without a team the row is invisible to every read that follows, and the
+    // caller would report success over a permanent silent loss. A non-uuid
+    // value (e.g. a leftover school code) is refused the same way, since
+    // team_id is a uuid column and would otherwise fail the write with 22P02.
+    if (!teamId || !this.isUuid(teamId)) return { error: 'No team selected; refusing to write an unscoped thought.' };
 
     const payload: Record<string, any> = {
-      school_id: schoolUuid,
+      team_id: teamId,
       coach_id: thought.coachId || 'c1',
       coach_name: thought.coachName || '',
       thoughts_text: thought.text || '',
@@ -1779,16 +1782,14 @@ class SupabaseService {
     if (error) console.error('Supabase soft deleteDailyThought error:', error);
   }
 
-  async setActiveDailyThought(schoolId: string = 'bhs', activeId?: string): Promise<any> {
-    if (!this.isConfigured() || !activeId) return null;
-    // Without resolving this, the "clear the old active one" update matched
-    // nothing and errored, so two thoughts could end up active at once.
-    const schoolUuid = await this.getSchoolUuid(schoolId);
-    if (!schoolUuid) return null;
+  async setActiveDailyThought(teamId: string, activeId?: string): Promise<any> {
+    if (!this.isConfigured() || !activeId || !teamId || !this.isUuid(teamId)) return null;
+    // Scoped to the team: clearing by school would clear another squad's
+    // active message.
     const { error: err1 } = await this.client!
       .from('daily_thoughts')
       .update({ is_active: false })
-      .eq('school_id', schoolUuid);
+      .eq('team_id', teamId);
     if (err1) console.error('Supabase setActiveDailyThought reset error:', err1);
 
     const { error: err2 } = await this.client!

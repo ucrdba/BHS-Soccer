@@ -29,7 +29,7 @@ declare global {
     fetchDrillsBank(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchPlayers(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
-    fetchPracticePlans(schoolCode: string): Promise<Record<string, any>[] | null>;
+    fetchPracticePlans(teamId: string): Promise<Record<string, any>[] | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
     updateDrillWeights(rows: { id: string; points: number; measure: string }[]):
@@ -45,7 +45,10 @@ declare global {
     deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
     createSchool(code: string, name: string, kind: string, mascot: string): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchCoaches(schoolCode: string): Promise<Partial<Coach>[] | null>;
-    fetchDailyThoughts(schoolCode: string): Promise<Partial<DailyThought>[] | null>;
+    fetchDailyThoughts(teamId: string): Promise<Partial<DailyThought>[] | null>;
+    fetchLatestDailyThoughts(teamId: string): Promise<Partial<DailyThought> | null>;
+    upsertDailyThought(teamId: string, thought: any): Promise<any>;
+    setActiveDailyThought(teamId: string, activeId?: string): Promise<any>;
     fetchSoccerCategories(schoolCode: string): Promise<Partial<SoccerCategory>[] | null>;
     upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string }): Promise<Record<string, any> | null>;
     upsertPlayer(schoolCode: string, player: unknown): Promise<{ id?: string } | null>;
