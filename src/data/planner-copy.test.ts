@@ -104,12 +104,39 @@ describe('copying a practice plan', () => {
     expect(copies.every(r => !('school_id' in r))).toBe(true);
   });
 
-  it('REFUSES a copy to another organization, naming the drills', async () => {
+  it('REFUSES a copy to another organization, saying so explicitly', async () => {
     // The drill library is per-organization, so the copies would point at
     // drills that team cannot see. Half-copying would be silent corruption.
     const res = await supabaseService.copyPracticePlan('Standard 90', FROM, TO_OTHER_ORG);
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('Dynamic Warmup');
+    expect(res.error).toContain('different organizations');
+    expect(inserted.filter(r => r.table === 'practice_plans')).toHaveLength(0);
+  });
+
+  it('refuses a cross-organization copy even when every drill name coincides', async () => {
+    // The refusal used to be incidental: it fired only because a drill NAME
+    // was missing from the destination library. teamsCoachedBy() offers every
+    // team the coach coaches, another organization's included, so a coach of
+    // both Beaumont and Legends could slip a plan across whenever the names
+    // happened to match. Give Legends drills by the same names and the old
+    // check waves the copy through.
+    tables.drills_bank.push(
+      { id: 'd3', school_id: 's-legends', name: 'Dynamic Warmup' },
+      { id: 'd4', school_id: 's-legends', name: '1v1 Gauntlet' }
+    );
+    const res = await supabaseService.copyPracticePlan('Standard 90', FROM, TO_OTHER_ORG);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('different organizations');
+    expect(inserted.filter(r => r.table === 'practice_plans')).toHaveLength(0);
+  });
+
+  it('still names the missing drills when both teams are in ONE organization', async () => {
+    // Same-org is where that message earns its keep: naming what is missing is
+    // its whole value, so the explicit org check must not swallow it.
+    tables.drills_bank = [{ id: 'd1', school_id: 's-bhs', name: 'Dynamic Warmup' }];
+    const res = await supabaseService.copyPracticePlan('Standard 90', FROM, TO_SAME_ORG);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('1v1 Gauntlet');
     expect(inserted.filter(r => r.table === 'practice_plans')).toHaveLength(0);
   });
 

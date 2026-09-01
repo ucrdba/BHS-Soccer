@@ -934,10 +934,23 @@ class SupabaseService {
    * duplicates all of them. Copies carry no id: reusing one would make the
    * next save overwrite the original.
    *
-   * Refused across organizations. practice_plans.drill is a drill NAME, and
-   * the drill library is scoped per organization, so the copies would name
-   * drills the destination team cannot see. Half-copying and leaving broken
-   * slots would be a silent corruption.
+   * Refused across organizations, explicitly. The design puts cross-org plan
+   * sharing out of scope, but the only thing enforcing that used to be the
+   * drill check below -- which refuses when a drill NAME is missing from the
+   * destination library, and therefore lets a copy through whenever the names
+   * happen to coincide. teamsCoachedBy() offers every team the coach coaches,
+   * including in another organization, so a coach of both Beaumont and Legends
+   * could slip a plan across on a name collision. The school_id comparison
+   * makes the refusal the rule rather than an accident of naming.
+   *
+   * The drill check stays for the same-organization case: practice_plans.drill
+   * is a drill NAME and the library is scoped per organization, so naming the
+   * drills that are missing is the whole value of that message. (In practice a
+   * same-org destination shares the library, so it should rarely fire -- but a
+   * soft-deleted or renamed drill still would.)
+   *
+   * copyDailyThought is deliberately NOT gated this way: a thought references
+   * no drills and copies across organizations fine.
    *
    * Copies deliberately omit `school_id`: migration 0015 drops that column
    * from practice_plans (Task 6), and `team_id` alone already determines the
@@ -960,9 +973,25 @@ class SupabaseService {
       .eq('name', planName);
     if (!slots || slots.length === 0) return { ok: false, error: `No plan named "${planName}" on that team.` };
 
-    const { data: destTeam } = await this.client!
-      .from('teams').select('id, school_id').eq('id', toTeamId).maybeSingle();
+    // Both teams in one read, because the source's organization is now part of
+    // the decision and not just the destination's.
+    const { data: teamRows } = await this.client!
+      .from('teams').select('id, school_id').in('id', [fromTeamId, toTeamId]);
+    const destTeam = (teamRows || []).find((t: any) => t.id === toTeamId);
+    const srcTeam = (teamRows || []).find((t: any) => t.id === fromTeamId);
     if (!destTeam) return { ok: false, error: 'That team no longer exists.' };
+    if (!srcTeam) return { ok: false, error: 'The team this plan came from no longer exists.' };
+
+    // Out of scope by design, and now refused outright rather than incidentally
+    // by the drill check below -- see the doc comment.
+    if (srcTeam.school_id !== destTeam.school_id) {
+      return {
+        ok: false,
+        error: 'Those teams belong to different organizations, and a practice plan cannot be copied ' +
+               'between organizations. Drills belong to one organization\'s library, so the copied ' +
+               'slots would name drills that team cannot see.'
+      };
+    }
 
     const { data: destDrills } = await this.client!
       .from('drills_bank').select('name').eq('school_id', destTeam.school_id);
