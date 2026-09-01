@@ -10,6 +10,26 @@ Object.assign(BHSSoccerApp.prototype, {
     const savedCount = (this.data.savedPlans || []).length;
     const activeName = this.data.activePlanName || 'Standard Practice Session';
 
+    // copyPracticePlan matches on practice_plans.name, so "Copy to team…" can
+    // only work when the heading above it names a plan that actually exists.
+    // activePlanName is set solely by Save Practice Plan and Load Plan, and is
+    // never restored by syncFromSupabase -- so after any reload the heading
+    // falls back to "Standard Practice Session", which no write path ever
+    // stores, and the copy returned `No plan named "Standard Practice Session"
+    // on that team.` even on Varsity with all 27 rows. Gate the control on the
+    // active plan being real instead: Load, then Copy.
+    const copyablePlan = (this.data.savedPlans || []).find(
+      p => this.data.activePlanName && p.name === this.data.activePlanName
+    );
+    // The name lands inside a single-quoted onclick attribute, so an
+    // apostrophe in a coach-chosen plan name would otherwise break the handler.
+    const copyArg = copyablePlan
+      ? copyablePlan.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;')
+      : '';
+    const copyButton = copyablePlan
+      ? `<button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;" onclick="app.openCopyToTeam('plan','${copyArg}')">📋 Copy to team…</button>`
+      : `<button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem; opacity:0.5; cursor:not-allowed;" disabled title="Load a saved plan first — copying sends a named plan to another team.">📋 Copy to team…</button>`;
+
     // Compute total session duration in minutes
     let totalMinutes = 0;
     (this.data.currentPracticePlan || []).forEach(p => {
@@ -54,7 +74,7 @@ Object.assign(BHSSoccerApp.prototype, {
                 <div style="color: var(--bhs-gold-accent); font-size: 0.95rem; font-weight: 700;">
                   "${activeName}"
                 </div>
-                <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;" onclick="app.openCopyToTeam('plan','${activeName}')">📋 Copy to team…</button>
+                ${copyButton}
               </div>
             </div>
             <div style="display: flex; gap: 16px; align-items: center; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--bhs-navy-border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
