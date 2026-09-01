@@ -422,7 +422,7 @@ class SupabaseService {
     }
   }
 
-  async runFullDatabaseDiagnostic(): Promise<any> {
+  async runFullDatabaseDiagnostic(teamId?: string): Promise<any> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -432,10 +432,14 @@ class SupabaseService {
     }
 
     const schoolUuid = await this.getSchoolUuid('bhs');
+    // practice_plans and daily_thoughts dropped school_id in migration 0015
+    // and are now written under team-scoped RLS (is_team_coach(team_id)), so
+    // their diagnostic rows need a real team, not the legacy school lookup.
+    const hasValidTeam = !!teamId && this.isUuid(teamId);
     const tableResults: any[] = [];
 
     // Helper runner for individual table testing
-    const testTable = async (tableName: string, icon: string, operation: string, testPayload: Record<string, any> | null, selectCols: string = '*') => {
+    const testTable = async (tableName: string, icon: string, operation: string, testPayload: Record<string, any> | null, selectCols: string = '*', skippedReason?: string) => {
       const res: Record<string, any> = {
         table: tableName,
         icon: icon,
@@ -504,7 +508,7 @@ class SupabaseService {
         }
       } else {
         res.insertStatus = 'N/A';
-        res.responseDetails = 'Read-only log table query test';
+        res.responseDetails = skippedReason || 'Read-only log table query test';
       }
 
       return res;
@@ -542,20 +546,31 @@ class SupabaseService {
     if (schoolUuid) drillPayload.school_id = schoolUuid;
     tableResults.push(await testTable('drills_bank', '📚', 'INSERT', drillPayload));
 
-    // 6. practice_plans
-    const planPayload: Record<string, any> = { time_slot: '0:00 - 0:15', name: 'Diagnostic Plan Item', duration: '15 min', coach_notes: 'Automated test item' };
-    if (schoolUuid) planPayload.school_id = schoolUuid;
-    tableResults.push(await testTable('practice_plans', '📋', 'INSERT', planPayload));
+    // 6. practice_plans -- team-scoped since 0014/0015; skip the write (not a
+    // FAILED) when no valid team is selected, since is_team_coach(null) only
+    // passes for an admin and would falsely report a plain coach's DB as broken.
+    const planPayload: Record<string, any> | null = hasValidTeam
+      ? { time_slot: '0:00 - 0:15', name: 'Diagnostic Plan Item', duration: '15 min', coach_notes: 'Automated test item', team_id: teamId }
+      : null;
+    tableResults.push(await testTable(
+      'practice_plans', '📋', 'INSERT', planPayload, '*',
+      hasValidTeam ? undefined : 'Skipped: practice_plans is team-scoped. Select an active team in Admin Center to test this table.'
+    ));
 
     // 7. coaches
     const coachPayload: Record<string, any> = { name: 'Diagnostic Coach', level: 'Staff Coach', email: `coach_diag_${Date.now().toString().slice(-4)}@bhs.org` };
     if (schoolUuid) coachPayload.school_id = schoolUuid;
     tableResults.push(await testTable('coaches', '👔', 'INSERT', coachPayload));
 
-    // 8. daily_thoughts
-    const thoughtPayload: Record<string, any> = { coach_name: 'Diagnostic Coach', thoughts_text: 'Diagnostic automated test thought', is_active: false };
-    if (schoolUuid) thoughtPayload.school_id = schoolUuid;
-    tableResults.push(await testTable('daily_thoughts', '💡', 'INSERT', thoughtPayload));
+    // 8. daily_thoughts -- team-scoped since 0014/0015, same reasoning as
+    // practice_plans above.
+    const thoughtPayload: Record<string, any> | null = hasValidTeam
+      ? { coach_name: 'Diagnostic Coach', thoughts_text: 'Diagnostic automated test thought', is_active: false, team_id: teamId }
+      : null;
+    tableResults.push(await testTable(
+      'daily_thoughts', '💡', 'INSERT', thoughtPayload, '*',
+      hasValidTeam ? undefined : 'Skipped: daily_thoughts is team-scoped. Select an active team in Admin Center to test this table.'
+    ));
 
     // 9. matrix_logs
     tableResults.push(await testTable('matrix_logs', '📊', 'SELECT', null));

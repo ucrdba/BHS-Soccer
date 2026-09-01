@@ -570,7 +570,7 @@ Object.assign(BHSSoccerApp.prototype, {
     }
     if (listEl) listEl.innerHTML = '';
 
-    const res = await window.supabaseService.runFullDatabaseDiagnostic();
+    const res = await window.supabaseService.runFullDatabaseDiagnostic(this.activeTeamId);
 
     if (!res.credentials) {
       if (headerEl) headerEl.innerHTML = `<div style="color:var(--color-danger);">${res.summaryText}</div>`;
