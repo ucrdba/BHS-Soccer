@@ -1016,6 +1016,7 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     this.data.activePlanName = cleanName;
+    this.tagWorkingPlanTeam();
     this.saveData();
 
     let dbSaved = true;
@@ -1099,6 +1100,7 @@ Object.assign(BHSSoccerApp.prototype, {
       onConfirm: () => {
         this.data.currentPracticePlan = JSON.parse(JSON.stringify(plan.drills));
         this.data.activePlanName = plan.name;
+        this.tagWorkingPlanTeam();
         this.saveData();
         this.renderCurrentView();
         this.closeModals();
@@ -1966,6 +1968,7 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     this.data.currentPracticePlan.push(newPlanDrill);
+    this.tagWorkingPlanTeam();
     this.saveData();
     this.closeModal('drillsBankModal');
     this.renderCurrentView();
@@ -2108,6 +2111,7 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     this.data.currentPracticePlan.push(newDrill);
+    this.tagWorkingPlanTeam();
     this.saveData();
     this.renderCurrentView();
     this.closeModals();

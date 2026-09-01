@@ -218,6 +218,31 @@ class BHSSoccerApp {
     };
   }
 
+  /**
+   * Bind the working practice plan to the team it came from.
+   *
+   * `currentPracticePlan` is not free-floating scratch: once a drill has been
+   * written, it carries that team's practice_plans row id, and every later
+   * edit upserts on that id with whatever activeTeamId happens to be current.
+   * Tagging it is what lets syncFromSupabase tell "the same plan, re-synced"
+   * from "another team's plan, still on screen".
+   *
+   * Called from loadPracticePlan, savePracticePlan and the two add-drill
+   * paths -- everywhere the plan gains a database identity. A null activeTeamId
+   * leaves it untagged, which is correct: nothing was written, so there are no
+   * row ids to move.
+   */
+  tagWorkingPlanTeam() {
+    this._workingPlanTeamId = this.activeTeamId || null;
+  }
+
+  clearWorkingPlan() {
+    this.data.currentPracticePlan = [];
+    this.data.activePlanName = '';
+    this.selectedDrillIndex = undefined;
+    this._workingPlanTeamId = null;
+  }
+
   async setActiveTeam(teamId) {
     if (!teamId || teamId === this.activeTeamId) return;
     this.activeTeamId = teamId;
@@ -225,14 +250,18 @@ class BHSSoccerApp {
 
     // The working plan belongs to the team it was loaded from: its drills carry
     // that team's practice_plans row ids, and a later drill edit upserts on
-    // those ids with the NEW team_id, moving rows between squads. Cleared here
-    // rather than in syncFromSupabase() because sync also runs on boot and on
-    // token refresh, where wiping an in-progress plan would be wrong -- only a
-    // genuine team change invalidates it. savedPlans and dailyThoughts are
-    // rebuilt by the sync below and need no clearing here.
-    this.data.currentPracticePlan = [];
-    this.data.activePlanName = '';
-    this.selectedDrillIndex = undefined;
+    // those ids with the NEW team_id, moving rows between squads.
+    //
+    // The tag comparison in syncFromSupabase() would catch this too -- it is
+    // the same condition -- but this stays explicit because the sync can throw
+    // before it ever reaches that comparison (fetchTeamsForViewer is its first
+    // await, and the whole body is inside one try/catch). activeTeamId has
+    // already changed by then. A team switch the coach asked for must not
+    // depend on a network call succeeding.
+    //
+    // savedPlans and dailyThoughts are rebuilt by the sync below and need no
+    // clearing here.
+    this.clearWorkingPlan();
 
     await this.syncFromSupabase();
     this.renderCurrentView();
@@ -297,20 +326,40 @@ class BHSSoccerApp {
       // team-scoped, so they run inside the `if (hasTeam)` block below,
       // alongside roster/schedule/matrix, not out here.
       const hasTeam = !!this.activeTeamId;
+
+      // The working plan belongs to one team (see tagWorkingPlanTeam). Its
+      // drills carry that team's practice_plans row ids, and the next edit
+      // upserts on those ids under whatever team is active now -- silently
+      // moving the previous team's rows. So when the resolved team no longer
+      // matches the tag, the plan on screen has to go.
+      //
+      // setActiveTeam already clears on an explicit switch. This catches the
+      // route it cannot see: one user signs out and another signs in on the
+      // same device, the auth subscriber re-syncs, and resolveActiveTeam lands
+      // on a DIFFERENT team without setActiveTeam ever running.
+      //
+      // Deliberately NOT triggered when nothing resolved. That branch is also
+      // reached when fetchTeamsForViewer transiently fails, and discarding a
+      // coach's unsaved plan over a dropped packet is a bad trade for a guard
+      // setActiveTeam already provides. With no resolved team there is nothing
+      // to compare against, and every write path already refuses without a
+      // team, so nothing can be corrupted while in that state.
+      if (hasTeam && this._workingPlanTeamId && this._workingPlanTeamId !== this.activeTeamId) {
+        this.clearWorkingPlan();
+      }
+
       if (!hasTeam) {
         this.data.players = [];
         this.data.schedule = [];
         this.data.matrixLogs = [];
         this._sessions = [];
-        // Planner state is team-scoped too, so it clears with the rest. Leaving
-        // it behind is not merely a stale display: `currentPracticePlan` holds
-        // the practice_plans row ids of whichever team it was loaded from, and
-        // the next drill edit upserts on those ids under the NEW team_id --
-        // silently moving the previous team's rows. See the unconditional
-        // assignments further down and the schedule comment beside them.
+        // savedPlans and dailyThoughts are database-derived and must not bleed
+        // across teams, so they clear with the rest. currentPracticePlan and
+        // activePlanName deliberately do NOT: this branch is also reached on a
+        // transient fetchTeamsForViewer failure, and a coach's unsaved work
+        // should survive a dropped packet. The tag comparison above is what
+        // discards it, and only once a DIFFERENT team has actually resolved.
         this.data.savedPlans = [];
-        this.data.currentPracticePlan = [];
-        this.data.activePlanName = '';
         this.data.dailyThoughts = [];
       }
 

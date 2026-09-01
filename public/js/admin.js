@@ -1837,6 +1837,7 @@ Object.assign(BHSSoccerApp.prototype, {
               is_deleted: toStr(r.IsDeleted).toLowerCase() === 'true'
             }));
             this.data.currentPracticePlan.push(...imported);
+            this.tagWorkingPlanTeam();
             totalCount += imported.length;
           } else if (activeTarget === 'coaches') {
             const coachDefaults = { level: 'Staff', isDeleted: false, is_deleted: false };
