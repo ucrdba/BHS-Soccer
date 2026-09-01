@@ -1107,6 +1107,23 @@ class SupabaseService {
     return { ok: true, id: sessionId };
   }
 
+  /**
+   * Read back one session's results, for editing it.
+   *
+   * Returns every stored row including absences, because the editor has to be
+   * able to show a player who was marked excused or a no-show -- not only the
+   * ones who posted a number.
+   */
+  async fetchMatrixSessionResults(sessionId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !sessionId) return null;
+    const { data, error } = await this.client!
+      .from('matrix_session_results')
+      .select('player_id, attendance, raw_value, outcome')
+      .eq('session_id', sessionId);
+    if (error) { console.warn('Supabase fetchMatrixSessionResults notice:', error.message); return null; }
+    return data;
+  }
+
   async deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     const { data, error } = await this.client!

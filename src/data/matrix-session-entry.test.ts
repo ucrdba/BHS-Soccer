@@ -234,6 +234,72 @@ describe('session grid', () => {
   });
 });
 
+describe('editing a recorded session', () => {
+  beforeEach(() => {
+    app._sessions = [{ id: 's1', drill_id: 'd1', occurred_on: '2026-08-20', drills_bank: { name: "Coopers" } }];
+    (globalThis as any).supabaseService.fetchMatrixSessionResults = async () => ([
+      { player_id: 'p1', attendance: 'present', raw_value: 2800, outcome: null },
+      { player_id: 'p2', attendance: 'unexcused', raw_value: null, outcome: null }
+    ]);
+  });
+
+  it('prefills each player with what was stored', async () => {
+    await app.editSession('s1');
+    expect((document.getElementById('sessionValue_p1') as HTMLInputElement).value).toBe('2800');
+    expect((document.getElementById('sessionAttend_p2') as HTMLSelectElement).value).toBe('unexcused');
+  });
+
+  it('restores the date the session actually happened', async () => {
+    await app.editSession('s1');
+    expect((document.getElementById('sessionDate') as HTMLInputElement).value).toBe('2026-08-20');
+  });
+
+  it('locks the exercise, because the drill decides how values are scored', async () => {
+    // Switching a count_high session to win_loss would leave stored numbers
+    // that mean nothing. Wrong exercise is a delete-and-re-enter.
+    await app.editSession('s1');
+    expect((document.getElementById('sessionDrill') as HTMLSelectElement).disabled).toBe(true);
+  });
+
+  it('updates in place rather than creating a second session', async () => {
+    await app.editSession('s1');
+    await app.saveSession();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].s.id).toBe('s1');
+  });
+
+  it('defaults a player who joined since to excused, not present', async () => {
+    // p3 has no stored row: they were not there. Defaulting to present would
+    // block the save on a blank value, and marking them present would be a lie.
+    app.data.players.push({ id: 'p3', name: 'New Kid', number: 5 });
+    await app.editSession('s1');
+    expect((document.getElementById('sessionAttend_p3') as HTMLSelectElement).value).toBe('excused');
+  });
+
+  it('still shows a player who has left the squad', async () => {
+    // Their result is still scoring. Hiding them would let a coach save the
+    // session while silently keeping a result they cannot see.
+    app.data.players = [{ id: 'p1', name: 'Cesar Alva', number: 9 }];
+    await app.editSession('s1');
+    expect(document.getElementById('sessionAttend_p2')).not.toBeNull();
+    expect(document.getElementById('sessionRows')!.innerHTML).toContain('no longer on this team');
+  });
+
+  it('clears edit state after saving, so the next record is a new session', async () => {
+    await app.editSession('s1');
+    await app.saveSession();
+    expect(app._editingSessionId).toBeNull();
+    expect(app._sessionPrefill).toBeNull();
+  });
+
+  it('does not carry an edit into a fresh Record a session', async () => {
+    await app.editSession('s1');
+    app._sessionPrefill = null;
+    await app.openSessionModal();
+    expect(app._editingSessionId).toBeNull();
+  });
+});
+
 describe('session history placement', () => {
   // A coach could not find this panel on the live site: it rendered correctly
   // but sat below a 14-row leaderboard AND the logged-results panel, so it was

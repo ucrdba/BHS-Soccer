@@ -93,15 +93,59 @@ Object.assign(BHSSoccerApp.prototype, {
     return (this.data.drillsBank || []).find(d => d.id === this._sessionDrillId) || null;
   },
 
+  /**
+   * Open the grid to edit a session already recorded.
+   *
+   * The exercise is locked: the drill decides how every stored value is
+   * scored, so switching a count_high session to win_loss would leave numbers
+   * that mean nothing. Delete and re-enter is the route for a wrong exercise.
+   */
+  async editSession(sessionId) {
+    const s = (this._sessions || []).find(x => x.id === sessionId);
+    if (!s) return;
+
+    this._editingSessionId = sessionId;
+    this._sessionDrillId = s.drill_id;
+    this._sessionPrefill = {};
+
+    const rows = (await window.supabaseService.fetchMatrixSessionResults(sessionId)) || [];
+    rows.forEach(r => {
+      this._sessionPrefill[r.player_id] = {
+        attendance: r.attendance,
+        rawValue: r.raw_value,
+        outcome: r.outcome
+      };
+    });
+
+    await this.openSessionModal(s.drill_id);
+    const when = document.getElementById('sessionDate');
+    if (when) when.value = s.occurred_on || '';
+  },
+
   async openSessionModal(drillId) {
     this._sessionDrillId = drillId || this._sessionDrillId || '';
     const err = document.getElementById('sessionError');
     if (err) err.textContent = '';
 
+    // Called with no drill from the "Record a session" button: that is a NEW
+    // session, so any prior edit state has to go. Without this, recording
+    // after an edit would silently overwrite the session just edited -- the
+    // same trap the 1v1 modal has with its hidden log id.
+    if (!drillId && !this._sessionPrefill) this._editingSessionId = null;
+
     const picker = document.getElementById('sessionDrill');
     if (picker) {
       picker.innerHTML = '<option value="">— pick an exercise —</option>' + this.sessionDrillOptions();
       picker.value = this._sessionDrillId;
+      picker.disabled = !!this._editingSessionId;
+    }
+    const title = document.querySelector('#matrixSessionModal .modal-header h3');
+    if (title) {
+      title.textContent = this._editingSessionId ? '✏️ EDIT SESSION' : '📋 RECORD A SESSION';
+    }
+    const saveBtn = document.getElementById('sessionSaveBtn');
+    if (saveBtn) {
+      saveBtn.textContent = this._editingSessionId ? '💾 Save changes' : '💾 Save session';
     }
     const when = document.getElementById('sessionDate');
     if (when && !when.value) when.value = new Date().toISOString().slice(0, 10);
@@ -139,7 +183,20 @@ Object.assign(BHSSoccerApp.prototype, {
       }
       return '<p class="text-muted" style="font-size:0.85rem;">Pick an exercise to load the squad.</p>';
     }
-    const players = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
+    const roster = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
+    const pre = this._sessionPrefill || null;
+
+    // Someone recorded in this session who is no longer on the roster still
+    // has a result that is still scoring. Hiding them would let a coach save
+    // the session while silently keeping a result they cannot see, so they are
+    // shown and flagged instead.
+    const gone = pre
+      ? Object.keys(pre)
+          .filter(id => !roster.some(p => p.id === id))
+          .map(id => ({ id, name: 'Former squad member', number: null, _gone: true }))
+      : [];
+    const players = roster.concat(gone);
+
     if (players.length === 0) {
       return '<p class="text-muted" style="font-size:0.85rem;">This team has no players yet.</p>';
     }
@@ -153,26 +210,35 @@ Object.assign(BHSSoccerApp.prototype, {
       <p class="text-muted" style="font-size:0.78rem; margin:0 0 8px 0;">
         ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
       </p>
-      ${players.map(p => `
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+      ${players.map(p => {
+        // A player who joined after this session was recorded has no stored
+        // row. Default them to excused rather than present: they were not
+        // there, and a blank present row would block the save.
+        const had = pre ? pre[p.id] : null;
+        const att = pre ? (had ? had.attendance : 'excused') : 'present';
+        const val = had && had.rawValue !== null && had.rawValue !== undefined ? had.rawValue : '';
+        const out = had && had.outcome ? had.outcome : '';
+        return `
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
           <span style="flex:1; color:#FFF; font-size:0.85rem;">
             ${p.name} <span class="text-muted">#${p.number || '—'}</span>
+            ${p._gone ? '<span class="badge badge-coach" style="font-size:0.65rem;">no longer on this team</span>' : ''}
           </span>
           ${measure === 'win_loss'
             ? `<select id="sessionOutcome_${p.id}" class="form-control" style="max-width:110px; font-size:0.8rem;">
-                 <option value="" selected>— result —</option>
-                 <option value="win">Won</option>
-                 <option value="draw">Drew</option>
-                 <option value="loss">Lost</option>
+                 <option value=""${out === '' ? ' selected' : ''}>— result —</option>
+                 <option value="win"${out === 'win' ? ' selected' : ''}>Won</option>
+                 <option value="draw"${out === 'draw' ? ' selected' : ''}>Drew</option>
+                 <option value="loss"${out === 'loss' ? ' selected' : ''}>Lost</option>
                </select>`
             : `<input type="number" id="sessionValue_${p.id}" class="form-control" step="any"
-                      style="max-width:110px; font-size:0.8rem;" />`}
+                      style="max-width:110px; font-size:0.8rem;" value="${val}" />`}
           <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
-            <option value="present">Here</option>
-            <option value="excused">Excused</option>
-            <option value="unexcused">No-show</option>
+            <option value="present"${att === 'present' ? ' selected' : ''}>Here</option>
+            <option value="excused"${att === 'excused' ? ' selected' : ''}>Excused</option>
+            <option value="unexcused"${att === 'unexcused' ? ' selected' : ''}>No-show</option>
           </select>
-        </div>`).join('')}`;
+        </div>`; }).join('')}`;
   },
 
   /**
@@ -225,12 +291,20 @@ Object.assign(BHSSoccerApp.prototype, {
     if (btn) btn.disabled = true;
     try {
       set('Saving…');
+      // Passing the id makes saveMatrixSession upsert the existing row rather
+      // than insert a second session for the same exercise and day.
+      const session = { drillId: this._sessionDrillId, occurredOn };
+      if (this._editingSessionId) session.id = this._editingSessionId;
+
       const res = await window.supabaseService.saveMatrixSession(
-        this.activeTeamId,
-        { drillId: this._sessionDrillId, occurredOn },
-        this.collectSessionResults()
+        this.activeTeamId, session, this.collectSessionResults()
       );
       if (!res.ok) return set(res.error || 'Could not save that session.');
+
+      // Leaving edit state set would make the next "Record a session"
+      // overwrite the session just edited instead of creating a new one.
+      this._editingSessionId = null;
+      this._sessionPrefill = null;
 
       // Standings are derived in Postgres, so nothing moves until a re-read.
       await this.syncFromSupabase();
@@ -244,9 +318,8 @@ Object.assign(BHSSoccerApp.prototype, {
   /**
    * The recorded sessions behind the leaderboard, newest first.
    *
-   * Editing a past session is out of scope — delete and re-enter is the only
-   * correction path — so this list exists specifically to make delete
-   * reachable. A session's drill can itself have been deleted since, so
+   * Each row offers Edit and Delete. A session's drill can itself have been
+   * deleted since, so
    * `drills_bank` may come back null; fall back to a label rather than
    * rendering "undefined".
    */
@@ -260,6 +333,8 @@ Object.assign(BHSSoccerApp.prototype, {
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px; font-size:0.8rem;">
         <span style="flex:1; color:#FFF;">${s.drills_bank?.name || 'Exercise'}</span>
         <span class="text-muted">${s.occurred_on}</span>
+        <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;"
+                onclick="app.editSession('${s.id}')">Edit</button>
         <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;"
                 onclick="app.removeSession('${s.id}')">Delete</button>
       </div>`).join('');
