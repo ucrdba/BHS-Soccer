@@ -164,12 +164,15 @@ Object.assign(BHSSoccerApp.prototype, {
               </tbody>
             </table>
 
-            ${isCoach ? this.renderMatrixResultsPanel() : ''}
-
             ${isCoach ? `<div class="planner-card" style="margin-top:12px;">
-              <h3 style="color: var(--bhs-gold-accent); margin-bottom: 12px;">📋 RECORDED SESSIONS</h3>
+              <h3 style="color: var(--bhs-gold-accent); margin-bottom: 12px;">
+                📋 RECORDED SESSIONS
+                <span class="badge badge-coach">${(this._sessions || []).length}</span>
+              </h3>
               ${this.renderSessionHistory()}
             </div>` : ''}
+
+            ${isCoach ? this.renderMatrixResultsPanel() : ''}
           </div>
 
           <div>

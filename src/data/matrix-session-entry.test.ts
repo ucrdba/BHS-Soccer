@@ -234,6 +234,47 @@ describe('session grid', () => {
   });
 });
 
+describe('session history placement', () => {
+  // A coach could not find this panel on the live site: it rendered correctly
+  // but sat below a 14-row leaderboard AND the logged-results panel, so it was
+  // off-screen and reaching it took a console command.
+  let matrixApp: any;
+
+  beforeEach(async () => {
+    const matrixSrc = (await import('../../public/js/views/matrix.view.js?raw')).default;
+    const appCore = (await import('../../public/js/app.core.js?raw')).default;
+    const sessionView = (await import('../../public/js/views/matrix-session.view.js?raw')).default;
+    const clean = (x: string) => (x.charCodeAt(0) === 0xfeff ? x.slice(1) : x);
+    const ctor = new Function(
+      [clean(appCore), clean(matrixSrc), clean(sessionView)].join('\n;\n') + '\nreturn BHSSoccerApp;'
+    )() as any;
+    matrixApp = Object.create(ctor.prototype);
+    matrixApp.data = { players: [], matrixLogs: [], drillsBank: [], currentPracticePlan: [] };
+    matrixApp._sessions = [{ id: 's1', occurred_on: '2026-08-31', drills_bank: { name: "Coopers" } }];
+    matrixApp.renderMatrixResultsPanel = () => '<div>LOGGED RESULTS</div>';
+    matrixApp.activeTeamLabel = () => 'Varsity';
+  });
+
+  it('puts recorded sessions ABOVE logged results', () => {
+    const html = matrixApp.renderMatrixView();
+    expect(html.indexOf('RECORDED SESSIONS')).toBeLessThan(html.indexOf('LOGGED RESULTS'));
+  });
+
+  it('shows the session count so it can be read without scrolling', () => {
+    const html = matrixApp.renderMatrixView();
+    const head = html.slice(html.indexOf('RECORDED SESSIONS'), html.indexOf('RECORDED SESSIONS') + 200);
+    expect(head).toContain('>1<');
+  });
+
+  it('shows zero rather than hiding the panel when nothing is recorded', () => {
+    // An absent panel reads as a missing feature; a zero reads as "nothing yet".
+    matrixApp._sessions = [];
+    const html = matrixApp.renderMatrixView();
+    expect(html).toContain('RECORDED SESSIONS');
+    expect(html).toContain('>0<');
+  });
+});
+
 describe('session history', () => {
   it('lists recorded sessions newest first', () => {
     app._sessions = [
