@@ -181,3 +181,42 @@ describe('importing daily thoughts is team-scoped', () => {
     expect(importStatus()).toContain('no team is selected');
   });
 });
+
+describe('the daily-thoughts move', () => {
+  it('defines the eight methods in the new file', async () => {
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    for (const m of ['getActiveThought', 'openManageThoughtsModal', 'renderThoughtsList',
+                     'openAddThoughtModal', 'openEditThoughtFormModal', 'submitThoughtForm',
+                     'setActiveThought', 'deleteThought']) {
+      expect(src, m).toContain(m);
+    }
+  });
+
+  it('leaves none of them behind in planner.view.js', async () => {
+    // Two copies on one prototype means the load order silently decides which
+    // wins, and edits to the wrong copy do nothing.
+    const src = (await import('../../public/js/views/planner.view.js?raw')).default;
+    expect(src).not.toContain('renderThoughtsList()');
+    expect(src).not.toContain('submitThoughtForm()');
+  });
+
+  it('keeps the quiz in planner.view.js', async () => {
+    // The quiz is explicitly out of scope; it must not have been swept along.
+    const src = (await import('../../public/js/views/planner.view.js?raw')).default;
+    expect(src).toContain('openTakeQuizModal');
+  });
+
+  it('loads after app.core.js', async () => {
+    const html = (await import('../../index.html?raw')).default;
+    const core = html.indexOf('js/app.core.js');
+    const thoughts = html.indexOf('js/views/thoughts.view.js');
+    expect(core).toBeGreaterThan(-1);
+    expect(thoughts).toBeGreaterThan(core);
+  });
+
+  it('passes a team, never the school code', async () => {
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    expect(src).not.toContain("'bhs'");
+    expect(src).toContain('this.activeTeamId');
+  });
+});
