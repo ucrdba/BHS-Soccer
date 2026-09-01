@@ -62,6 +62,30 @@ describe('handbook content', () => {
     }
   });
 
+  it('describes the 6-digit code, not a link', () => {
+    // The confirmation email carried a LINK while the app asked for a code —
+    // a mismatch that made sign-up look broken for a whole afternoon. The
+    // template now sends {{ .Token }}; the handbook has to say so, or it
+    // teaches players to look for the wrong thing.
+    const html = app.renderHelpView();
+    expect(html).toContain('6-digit code');
+    expect(html).not.toContain('The link expires');
+  });
+
+  it('tells a player to check spam', () => {
+    // Mail from a new sending domain lands there routinely, and a player who
+    // cannot find the email concludes sign-up is broken rather than looking.
+    const html = app.renderHelpView().toLowerCase();
+    expect(html).toContain('spam');
+  });
+
+  it('warns that registering twice sends nothing', () => {
+    // Supabase silently sends no second email for an existing account, which
+    // reads exactly like a delivery failure.
+    const html = app.renderHelpView().toLowerCase();
+    expect(html).toContain('twice');
+  });
+
   it('covers the traps that generate support questions', () => {
     const html = app.renderHelpView().toLowerCase();
     // Each of these cost real confusion during development; the handbook

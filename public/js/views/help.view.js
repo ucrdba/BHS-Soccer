@@ -106,9 +106,16 @@ Object.assign(BHSSoccerApp.prototype, {
           <h4>Signing up</h4>
           <ol class="help-steps">
             <li>Click <b>Sign In</b>, then <b>Create an account</b>, using an email you actually read.</li>
-            <li>Confirm the email. The link expires, so if it sits overnight you will need a fresh one.</li>
+            <li>Check your inbox for a <b>6-digit code</b> and type it into the box on screen. The
+                code expires after about an hour, so if it has sat overnight, register again for a
+                fresh one.</li>
             <li>Wait for a coach or admin to approve you. Until then you can sign in, but you see the public site.</li>
           </ol>
+          ${N('If the email does not arrive', `<p>Check your spam folder first &mdash; mail from a
+            new domain often lands there until the address is recognised. Marking it
+            <em>Not spam</em> helps every player who signs up after you. If it is genuinely not
+            there, ask a coach to check whether that address already has an account: registering
+            an address twice sends nothing the second time.</p>`)}
           ${N('If you are stuck at pending', `<p>Approval is not automatic and no reminder is sent.
             Message whoever runs the program &mdash; it takes them about four seconds.</p>`)}
           <h4>What each role can do</h4>
