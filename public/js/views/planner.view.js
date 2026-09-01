@@ -225,13 +225,23 @@ Object.assign(BHSSoccerApp.prototype, {
     this.saveData();
 
     // Persist to Supabase Database for both practice plan and drills_bank repository
+    let dbSaved = true;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.upsertPracticePlanItem('bhs', drill);
+      if (this.activeTeamId) {
+        await window.supabaseService.upsertPracticePlanItem(this.activeTeamId, drill);
+      } else {
+        // upsertPracticePlanItem now refuses a non-uuid/absent team_id, so
+        // sending nothing would silently drop this on the floor.
+        dbSaved = false;
+        console.warn('Practice plan diagram not saved to the database — no team is selected.');
+      }
       await window.supabaseService.upsertDrillBankItem('bhs', masterDrill);
     }
 
     this.renderCurrentView();
-    alert(`🎉 Tactical drill diagram stored in Master Drills Repository (drills_bank) for "${drill.name}"!`);
+    alert(dbSaved
+      ? `🎉 Tactical drill diagram stored in Master Drills Repository (drills_bank) for "${drill.name}"!`
+      : `⚠️ Diagram stored for "${drill.name}", but NOT saved to the database — no team is selected. Choose a team in the header first; it will disappear on reload.`);
   },
 
   async removeDrillDiagram(idx) {
@@ -242,7 +252,11 @@ Object.assign(BHSSoccerApp.prototype, {
       this.saveData();
 
       if (window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.upsertPracticePlanItem('bhs', drill);
+        if (this.activeTeamId) {
+          await window.supabaseService.upsertPracticePlanItem(this.activeTeamId, drill);
+        } else {
+          console.warn('Drill diagram removal not saved to the database — no team is selected.');
+        }
       }
 
       this.renderCurrentView();
@@ -1153,8 +1167,17 @@ Object.assign(BHSSoccerApp.prototype, {
     this.data.activePlanName = cleanName;
     this.saveData();
 
+    let dbSaved = true;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.saveFullPracticePlan('bhs', cleanName, planObj.drills);
+      if (this.activeTeamId) {
+        const res = await window.supabaseService.saveFullPracticePlan(this.activeTeamId, cleanName, planObj.drills);
+        if (!(res && res.success)) dbSaved = false;
+      } else {
+        // saveFullPracticePlan now refuses a non-uuid/absent team_id, so
+        // sending nothing would silently drop this plan on the floor.
+        dbSaved = false;
+        console.warn('Practice plan not saved to the database — no team is selected.');
+      }
     }
 
     this.renderCurrentView();
@@ -1164,7 +1187,9 @@ Object.assign(BHSSoccerApp.prototype, {
       // Trigger native browser File Save dialog with Filename Box prefilled with cleanName
       this.downloadPracticePlan('html');
     } else {
-      alert(`✅ Practice Plan "${cleanName}" saved to database successfully!`);
+      alert(dbSaved
+        ? `✅ Practice Plan "${cleanName}" saved to database successfully!`
+        : `⚠️ Practice Plan "${cleanName}" saved to this screen, but NOT to the database — no team is selected. Choose a team in the header first; it will disappear on reload.`);
     }
   },
 
@@ -2002,7 +2027,11 @@ Object.assign(BHSSoccerApp.prototype, {
           p.diagramImage = drillObj.diagramImage;
           p.diagramData = drillObj.diagramData;
           if (window.supabaseService && window.supabaseService.isConfigured()) {
-            window.supabaseService.upsertPracticePlanItem('bhs', p);
+            if (this.activeTeamId) {
+              window.supabaseService.upsertPracticePlanItem(this.activeTeamId, p);
+            } else {
+              console.warn('Practice plan item not synced to the database — no team is selected.');
+            }
           }
         }
       });
@@ -2070,16 +2099,26 @@ Object.assign(BHSSoccerApp.prototype, {
       diagramData: drill.diagramData || null
     };
 
+    let dbSaved = true;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      const saved = await window.supabaseService.savePracticePlanItem('bhs', newPlanDrill);
-      if (saved && saved.id) newPlanDrill.id = saved.id;
+      if (this.activeTeamId) {
+        const saved = await window.supabaseService.savePracticePlanItem(this.activeTeamId, newPlanDrill);
+        if (saved && saved.id) newPlanDrill.id = saved.id;
+      } else {
+        // savePracticePlanItem now refuses a non-uuid/absent team_id, so
+        // sending nothing would silently drop this drill on the floor.
+        dbSaved = false;
+        console.warn('Drill not saved to the database — no team is selected.');
+      }
     }
 
     this.data.currentPracticePlan.push(newPlanDrill);
     this.saveData();
     this.closeModal('drillsBankModal');
     this.renderCurrentView();
-    alert(`➕ "${drill.name}" added to today's active practice timeline!`);
+    alert(dbSaved
+      ? `➕ "${drill.name}" added to today's active practice timeline!`
+      : `⚠️ "${drill.name}" added to today's timeline, but NOT saved to the database — no team is selected. Choose a team in the header first; it will disappear on reload.`);
   },
 
   calculateDrillTimeSlotAndDuration(prefix = 'new') {
@@ -2202,8 +2241,12 @@ Object.assign(BHSSoccerApp.prototype, {
 
     // Save to Supabase first to get the DB-assigned id
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      const saved = await window.supabaseService.savePracticePlanItem('bhs', newDrill);
-      if (saved && saved.id) newDrill.id = saved.id;
+      if (this.activeTeamId) {
+        const saved = await window.supabaseService.savePracticePlanItem(this.activeTeamId, newDrill);
+        if (saved && saved.id) newDrill.id = saved.id;
+      } else {
+        console.warn('Drill not saved to the database — no team is selected.');
+      }
     }
 
     this.data.currentPracticePlan.push(newDrill);
@@ -2264,7 +2307,11 @@ Object.assign(BHSSoccerApp.prototype, {
 
       // Upsert to Supabase (uses existing id if present)
       if (window.supabaseService && window.supabaseService.isConfigured()) {
-        await window.supabaseService.upsertPracticePlanItem('bhs', updated);
+        if (this.activeTeamId) {
+          await window.supabaseService.upsertPracticePlanItem(this.activeTeamId, updated);
+        } else {
+          console.warn('Drill edit not saved to the database — no team is selected.');
+        }
       }
 
       this.renderCurrentView();
@@ -2357,10 +2404,14 @@ Object.assign(BHSSoccerApp.prototype, {
     this.saveData();
 
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      window.supabaseService.saveFullPracticePlan(this.data.school?.code || 'bhs', {
-        name: this.data.activePlanName || 'Current Practice Session',
-        items: this.data.currentPracticePlan
-      });
+      if (this.activeTeamId) {
+        window.supabaseService.saveFullPracticePlan(this.activeTeamId, {
+          name: this.data.activePlanName || 'Current Practice Session',
+          items: this.data.currentPracticePlan
+        });
+      } else {
+        console.warn('Practice plan reorder not synced to the database — no team is selected.');
+      }
     }
 
     this.renderCurrentView();

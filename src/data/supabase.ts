@@ -884,8 +884,152 @@ class SupabaseService {
     return data;
   }
 
-  async saveFullPracticePlan(schoolId: string = 'bhs', planNameOrObj?: any, drillsArr?: any[]): Promise<any> {
+  /**
+   * Teams the signed-in coach may write to.
+   *
+   * Used to build the "Copy to team…" list. is_team_coach() refuses the write
+   * regardless, so offering a team the coach cannot write to would produce a
+   * control that always fails -- the same trap that made unassigned coaches
+   * look like a broken app.
+   */
+  async teamsCoachedBy(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data: session } = await this.client!.auth.getSession();
+    const uid = session?.session?.user?.id;
+    if (!uid) return [];
+
+    const { data: rows, error } = await this.client!
+      .from('team_coaches')
+      .select('team_id, teams(id, name, school_id, schools(name))')
+      .eq('profile_id', uid);
+    if (error) { console.warn('Supabase teamsCoachedBy notice:', error.message); return null; }
+
+    return (rows || []).map((r: any) => ({
+      id: r.teams?.id || r.team_id,
+      name: r.teams?.name || 'Team',
+      school_id: r.teams?.school_id || null,
+      school_name: r.teams?.schools?.name || ''
+    }));
+  }
+
+  /**
+   * Copy every slot of a plan to another team, as an independent snapshot.
+   *
+   * A plan is the set of practice_plans rows sharing a `name`, so a copy
+   * duplicates all of them. Copies carry no id: reusing one would make the
+   * next save overwrite the original.
+   *
+   * Refused across organizations. practice_plans.drill is a drill NAME, and
+   * the drill library is scoped per organization, so the copies would name
+   * drills the destination team cannot see. Half-copying and leaving broken
+   * slots would be a silent corruption.
+   *
+   * Copies deliberately omit `school_id`: migration 0015 drops that column
+   * from practice_plans (Task 6), and `team_id` alone already determines the
+   * organization. `destTeam.school_id` is still needed here -- just for the
+   * cross-organization drill check, not for the insert payload.
+   */
+  async copyPracticePlan(
+    planName: string, fromTeamId: string, toTeamId: string
+  ): Promise<{ ok: boolean; error?: string; slots?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!planName || !fromTeamId || !toTeamId) return { ok: false, error: 'Pick a plan and a destination team.' };
+    if (fromTeamId === toTeamId) {
+      return { ok: false, error: 'That plan is already on this team.' };
+    }
+
+    const { data: slots } = await this.client!
+      .from('practice_plans')
+      .select('*')
+      .eq('team_id', fromTeamId)
+      .eq('name', planName);
+    if (!slots || slots.length === 0) return { ok: false, error: `No plan named "${planName}" on that team.` };
+
+    const { data: destTeam } = await this.client!
+      .from('teams').select('id, school_id').eq('id', toTeamId).maybeSingle();
+    if (!destTeam) return { ok: false, error: 'That team no longer exists.' };
+
+    const { data: destDrills } = await this.client!
+      .from('drills_bank').select('name').eq('school_id', destTeam.school_id);
+    const available = new Set((destDrills || []).map((d: any) => d.name));
+    const missing = Array.from(new Set(
+      slots.map((s: any) => s.drill).filter((n: any) => n && !available.has(n))
+    ));
+    if (missing.length) {
+      return {
+        ok: false,
+        error: `That team's drill library does not have: ${missing.join(', ')}. ` +
+               `Drills belong to one organization, so this plan cannot be copied there.`
+      };
+    }
+
+    const copies = slots.map((s: any) => ({
+      team_id: toTeamId,
+      name: s.name,
+      time_slot: s.time_slot,
+      duration: s.duration,
+      drill: s.drill,
+      coach_notes: s.coach_notes,
+      diagram_image: s.diagram_image,
+      diagram_data: s.diagram_data,
+      is_deleted: false
+    }));
+
+    const { data, error } = await this.client!.from('practice_plans').insert(copies).select();
+    if (error) { console.warn('Supabase copyPracticePlan notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that. Only a coach of the destination team can copy to it.' };
+    }
+    return { ok: true, slots: data.length };
+  }
+
+  /**
+   * Copy one daily thought to another team.
+   *
+   * Never active on arrival: the source is active for ITS team, and making the
+   * copy active would silently replace whatever message the destination team
+   * is currently showing.
+   */
+  async copyDailyThought(thoughtId: string, toTeamId: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!thoughtId || !toTeamId) return { ok: false, error: 'Pick a message and a destination team.' };
+
+    const { data: src } = await this.client!
+      .from('daily_thoughts').select('*').eq('id', thoughtId).maybeSingle();
+    if (!src) return { ok: false, error: 'That message no longer exists.' };
+    if (src.team_id === toTeamId) return { ok: false, error: 'That message is already on this team.' };
+
+    const { data, error } = await this.client!.from('daily_thoughts').insert([{
+      team_id: toTeamId,
+      coach_id: src.coach_id,
+      coach_name: src.coach_name,
+      thoughts_text: src.thoughts_text,
+      is_active: false,
+      is_deleted: false
+    }]).select();
+    if (error) { console.warn('Supabase copyDailyThought notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that. Only a coach of the destination team can copy to it.' };
+    }
+    return { ok: true, id: data[0].id };
+  }
+
+  /**
+   * Save a full practice plan (a set of drills sharing one `name`).
+   *
+   * Accepts either calling convention: `(teamId, planName, drillsArray)` or
+   * `(teamId, { name, items })`. team_id is a uuid column
+   * (0014_team_scoped_planner.sql); a caller passing something else (e.g. a
+   * leftover school code) must be refused here rather than reaching Postgres
+   * and failing the cast with 22P02 -- the exact bug class daily_thoughts hit
+   * for months. school_id is not written: it is dropped from practice_plans
+   * by migration 0015, and team_id alone already determines the organization.
+   */
+  async saveFullPracticePlan(teamId: string, planNameOrObj?: any, drillsArr?: any[]): Promise<any> {
     if (!this.isConfigured()) return { success: false, error: 'Supabase Cloud DB is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) {
+      return { success: false, error: 'No team selected; refusing to save an unscoped practice plan.' };
+    }
 
     let planName = 'Practice Plan';
     let drills: any[] = [];
@@ -902,9 +1046,9 @@ class SupabaseService {
       return { success: false, error: 'No drills provided in practice plan' };
     }
 
-    const schoolUuid = await this.getSchoolUuid(schoolId);
     const rows = drills.map(d => {
       const item: Record<string, any> = {
+        team_id: teamId,
         name: planName || 'Standard Practice Plan',
         drill: d.name || d.drill || 'Soccer Drill',
         time_slot: d.time || '',
@@ -913,7 +1057,6 @@ class SupabaseService {
         diagram_image: d.diagramImage || null,
         diagram_data: d.diagramData || null
       };
-      if (schoolUuid) item.school_id = schoolUuid;
       if (d.id && this.isUuid(d.id)) item.id = d.id;
       return item;
     });
@@ -939,10 +1082,16 @@ class SupabaseService {
     }
   }
 
-  async savePracticePlanItem(schoolId: string, planItem: any): Promise<any> {
+  async savePracticePlanItem(teamId: string, planItem: any): Promise<any> {
     if (!this.isConfigured()) return null;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
+    // Same team_id guard as saveFullPracticePlan -- refuse a leftover school
+    // code here rather than letting it reach Postgres and fail the uuid cast.
+    if (!teamId || !this.isUuid(teamId)) {
+      console.warn('Supabase savePracticePlanItem notice: no team selected; refusing to save an unscoped practice plan item.');
+      return null;
+    }
     const payload: Record<string, any> = {
+      team_id: teamId,
       name: planItem.planName || (window as any).app?.data?.activePlanName || 'Standard Practice Plan',
       drill: planItem.name || planItem.drill || 'Soccer Drill',
       time_slot: planItem.time || '',
@@ -951,7 +1100,6 @@ class SupabaseService {
       diagram_image: planItem.diagramImage || null,
       diagram_data: planItem.diagramData || null
     };
-    if (schoolUuid) payload.school_id = schoolUuid;
     if (planItem.id && this.isUuid(planItem.id)) payload.id = planItem.id;
 
     console.log('⚡ Supabase inserting practice plan item into `practice_plans` table:', payload);
@@ -972,8 +1120,8 @@ class SupabaseService {
     }
   }
 
-  async upsertPracticePlanItem(schoolId: string, planItem: any): Promise<any> {
-    return this.savePracticePlanItem(schoolId, planItem);
+  async upsertPracticePlanItem(teamId: string, planItem: any): Promise<any> {
+    return this.savePracticePlanItem(teamId, planItem);
   }
 
   async deletePracticePlanItem(planId: string): Promise<any> {

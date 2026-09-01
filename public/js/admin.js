@@ -475,20 +475,26 @@ Object.assign(BHSSoccerApp.prototype, {
         // 5. Practice Plans (Saved Plans & Current Plan)
         try {
           const plans = this.data.savedPlans || [];
-          let planSuccess = 0;
-          for (const plan of plans) {
-            const res = await window.supabaseService.saveFullPracticePlan(schoolCode, plan);
-            if (res && res.success) {
-              planSuccess++;
+          if (!this.activeTeamId) {
+            // saveFullPracticePlan now refuses a non-uuid/absent team_id, so
+            // pushing with none selected would silently reject every plan.
+            report.push('⚠️ 📋 Practice Plans skipped — no team is selected. Choose a team in the header first.');
+          } else {
+            let planSuccess = 0;
+            for (const plan of plans) {
+              const res = await window.supabaseService.saveFullPracticePlan(this.activeTeamId, plan);
+              if (res && res.success) {
+                planSuccess++;
+              }
             }
+            if (this.data.currentPracticePlan && this.data.currentPracticePlan.length > 0) {
+              await window.supabaseService.saveFullPracticePlan(this.activeTeamId, {
+                name: this.data.activePlanName || 'Current Practice Session',
+                items: this.data.currentPracticePlan
+              });
+            }
+            report.push(`✅ 📋 Practice Plans: ${planSuccess} saved plans synced to DB`);
           }
-          if (this.data.currentPracticePlan && this.data.currentPracticePlan.length > 0) {
-            await window.supabaseService.saveFullPracticePlan(schoolCode, {
-              name: this.data.activePlanName || 'Current Practice Session',
-              items: this.data.currentPracticePlan
-            });
-          }
-          report.push(`✅ 📋 Practice Plans: ${planSuccess} saved plans synced to DB`);
         } catch (e) {
           report.push(`❌ 📋 Practice Plans Exception: ${e.message}`);
         }

@@ -30,6 +30,11 @@ declare global {
     fetchPlayers(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
     fetchPracticePlans(teamId: string): Promise<Record<string, any>[] | null>;
+    teamsCoachedBy(): Promise<Record<string, any>[] | null>;
+    copyPracticePlan(planName: string, fromTeamId: string, toTeamId: string):
+      Promise<{ ok: boolean; error?: string; slots?: number }>;
+    copyDailyThought(thoughtId: string, toTeamId: string):
+      Promise<{ ok: boolean; error?: string; id?: string }>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
     updateDrillWeights(rows: { id: string; points: number; measure: string }[]):
