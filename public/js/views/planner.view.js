@@ -251,15 +251,22 @@ Object.assign(BHSSoccerApp.prototype, {
       delete drill.diagramData;
       this.saveData();
 
+      let dbSaved = true;
       if (window.supabaseService && window.supabaseService.isConfigured()) {
         if (this.activeTeamId) {
           await window.supabaseService.upsertPracticePlanItem(this.activeTeamId, drill);
         } else {
+          // upsertPracticePlanItem now refuses a non-uuid/absent team_id, so
+          // the removal would silently revert on the next reload otherwise.
+          dbSaved = false;
           console.warn('Drill diagram removal not saved to the database — no team is selected.');
         }
       }
 
       this.renderCurrentView();
+      if (!dbSaved) {
+        alert('⚠️ Diagram removed from this screen, but NOT saved to the database — no team is selected. Choose a team in the header first; the diagram will reappear on reload.');
+      }
     }
   },
 
@@ -2240,11 +2247,16 @@ Object.assign(BHSSoccerApp.prototype, {
     const newDrill = { time, name, duration: formattedDuration, coachNotes };
 
     // Save to Supabase first to get the DB-assigned id
+    let dbSaved = true;
     if (window.supabaseService && window.supabaseService.isConfigured()) {
       if (this.activeTeamId) {
         const saved = await window.supabaseService.savePracticePlanItem(this.activeTeamId, newDrill);
         if (saved && saved.id) newDrill.id = saved.id;
       } else {
+        // savePracticePlanItem now refuses a non-uuid/absent team_id. This is
+        // an explicit modal Save action, so the coach must be told -- the
+        // drill would otherwise appear to save and vanish on reload.
+        dbSaved = false;
         console.warn('Drill not saved to the database — no team is selected.');
       }
     }
@@ -2253,6 +2265,9 @@ Object.assign(BHSSoccerApp.prototype, {
     this.saveData();
     this.renderCurrentView();
     this.closeModals();
+    if (!dbSaved) {
+      alert(`⚠️ "${name}" added to today's timeline, but NOT saved to the database — no team is selected. Choose a team in the header first; it will disappear on reload.`);
+    }
   },
 
   openEditPlanDrillModal(index) {
@@ -2306,16 +2321,24 @@ Object.assign(BHSSoccerApp.prototype, {
       this.saveData();
 
       // Upsert to Supabase (uses existing id if present)
+      let dbSaved = true;
       if (window.supabaseService && window.supabaseService.isConfigured()) {
         if (this.activeTeamId) {
           await window.supabaseService.upsertPracticePlanItem(this.activeTeamId, updated);
         } else {
+          // upsertPracticePlanItem now refuses a non-uuid/absent team_id. This
+          // is an explicit modal Save action, so the coach must be told -- the
+          // edit would otherwise appear to save and revert on reload.
+          dbSaved = false;
           console.warn('Drill edit not saved to the database — no team is selected.');
         }
       }
 
       this.renderCurrentView();
       this.closeModals();
+      if (!dbSaved) {
+        alert(`⚠️ "${name}" updated on this screen, but NOT saved to the database — no team is selected. Choose a team in the header first; the edit will revert on reload.`);
+      }
     }
   },
 
