@@ -371,6 +371,104 @@ Object.assign(BHSSoccerApp.prototype, {
 
     await this.syncFromSupabase();
     this.renderCurrentView();
+  },
+
+  /**
+   * Why a player sits where they sit: one line per exercise.
+   *
+   * The lines come from matrix_exercise_points, which matrix_standings is an
+   * aggregate of -- so they sum to the leaderboard row this was opened from
+   * by construction rather than by two calculations agreeing.
+   */
+  async openBreakdown(playerId) {
+    const player = (this.data.players || []).find(p => p.id === playerId);
+    if (!player) return;
+
+    this._breakdownPlayer = player;
+    this._breakdown = null;
+
+    const body = document.getElementById('breakdownBody');
+    const title = document.getElementById('breakdownTitle');
+    if (title) title.textContent = player.name;
+    if (body) body.innerHTML = '<p class="text-muted" style="font-size:0.85rem;">Loading…</p>';
+
+    const modal = document.getElementById('breakdownModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+
+    if (window.supabaseService?.isConfigured()) {
+      this._breakdown = await window.supabaseService.fetchPlayerBreakdown(this.activeTeamId, playerId);
+    }
+    if (body) body.innerHTML = this.renderBreakdown();
+  },
+
+  /** What the player actually did, phrased for the exercise they did it in. */
+  breakdownDetail(row) {
+    const names = new Map((this.data.players || []).map(p => [p.id, p.name]));
+    if (row.kind === 'head_to_head') {
+      const who = names.get(row.opponent_id) || 'an opponent';
+      return row.detail === 'win' ? `beat ${who}`
+           : row.detail === 'draw' ? `drew with ${who}`
+           : `lost to ${who}`;
+    }
+    if (row.kind === 'win_loss') {
+      return row.detail === 'win' ? 'won' : row.detail === 'draw' ? 'drew' : 'lost';
+    }
+    if (row.kind === 'absent') return 'no-show';
+    return row.raw_value === null || row.raw_value === undefined
+      ? 'took part' : String(Number(row.raw_value));
+  },
+
+  renderBreakdown() {
+    const rows = this._breakdown;
+    if (rows === null || rows === undefined) {
+      return '<p class="text-muted" style="font-size:0.85rem;">Could not load the breakdown.</p>';
+    }
+    if (rows.length === 0) {
+      // Distinct from a failure: this player genuinely has nothing scored.
+      // An excused absence contributes no row, which is the point of it.
+      return `<p class="text-muted" style="font-size:0.85rem;">
+        Nothing scored yet for ${this._breakdownPlayer ? this._breakdownPlayer.name : 'this player'}
+        on this team. Excused absences do not appear here &mdash; they count for
+        nothing either way.</p>`;
+    }
+
+    const earned = rows.reduce((t, r) => t + Number(r.earned || 0), 0);
+    const avail = rows.reduce((t, r) => t + Number(r.available || 0), 0);
+    const share = avail > 0 ? (100 * earned / avail) : null;
+
+    return `
+      <div style="display:flex; gap:18px; align-items:baseline; flex-wrap:wrap; margin-bottom:12px;">
+        <span style="color:var(--bhs-cyan-accent); font-size:1.5rem; font-weight:700;">
+          ${share === null ? '—' : share.toFixed(1) + '%'}
+        </span>
+        <span class="text-muted" style="font-size:0.85rem;">
+          ${earned.toFixed(2)} of ${avail.toFixed(2)} points across
+          ${rows.length} exercise${rows.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div class="help-tablewrap"><table class="help-table">
+        <thead><tr><th>Exercise</th><th>Date</th><th>Result</th><th>Earned</th><th>Of</th></tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const zero = Number(r.earned || 0) === 0;
+            return `
+            <tr>
+              <td>${r.exercise || 'Exercise'}</td>
+              <td class="text-muted">${r.occurred_on || ''}</td>
+              <td${r.kind === 'absent' ? ' style="color:var(--color-danger);"' : ''}>${this.breakdownDetail(r)}</td>
+              <td${zero ? ' class="text-muted"' : ' style="color:var(--bhs-cyan-accent); font-weight:600;"'}>
+                ${Number(r.earned || 0).toFixed(2)}
+              </td>
+              <td class="text-muted">${Number(r.available || 0).toFixed(2)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
+      <p class="text-muted" style="font-size:0.78rem; margin-top:10px;">
+        Every exercise offers its full weight; the best result earns all of it.
+        These lines add up to the leaderboard row exactly &mdash; the table there
+        is their sum.
+      </p>`;
   }
 
 });

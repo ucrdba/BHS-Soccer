@@ -147,7 +147,14 @@ Object.assign(BHSSoccerApp.prototype, {
                         ? '<div class="rank-pill rank-other">&mdash;</div>'
                         : `<div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">${m.rank}</div>`}
                     </td>
-                    <td><strong>${p.name}</strong> <span class="text-muted">#${p.number || '—'}</span></td>
+                    <td>
+                      <button type="button" onclick="app.openBreakdown('${p.id}')"
+                              title="See how these points were earned"
+                              style="background:none; border:0; padding:0; cursor:pointer; text-align:left; font:inherit; color:inherit;">
+                        <strong style="border-bottom:1px dotted var(--bhs-cyan-accent);">${p.name}</strong>
+                      </button>
+                      <span class="text-muted">#${p.number || '—'}</span>
+                    </td>
                     <td>${m.exercises}</td>
                     <td>${m.wins} - ${m.draws} - ${m.losses}</td>
                     <td><strong>${m.earned.toFixed(2)}</strong></td>

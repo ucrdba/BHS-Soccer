@@ -1114,6 +1114,26 @@ class SupabaseService {
    * able to show a player who was marked excused or a no-show -- not only the
    * ones who posted a number.
    */
+  /**
+   * One player's per-exercise breakdown, straight from the view.
+   *
+   * Deliberately a read rather than a client calculation: matrix_standings is
+   * an aggregate of this same view, so the lines shown here are guaranteed to
+   * sum to the leaderboard row the panel was opened from. Re-deriving them in
+   * JavaScript would put the scoring rules in two places.
+   */
+  async fetchPlayerBreakdown(teamId: string, playerId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId || !playerId) return null;
+    const { data, error } = await this.client!
+      .from('matrix_exercise_points')
+      .select('exercise, occurred_on, kind, detail, raw_value, attendance, weight, earned, available, opponent_id')
+      .eq('team_id', teamId)
+      .eq('player_id', playerId)
+      .order('occurred_on', { ascending: false });
+    if (error) { console.warn('Supabase fetchPlayerBreakdown notice:', error.message); return null; }
+    return data;
+  }
+
   async fetchMatrixSessionResults(sessionId: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured() || !sessionId) return null;
     const { data, error } = await this.client!

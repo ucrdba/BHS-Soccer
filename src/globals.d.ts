@@ -40,6 +40,7 @@ declare global {
       session: { id?: string; drillId: string; occurredOn: string; notes?: string },
       results: { playerId: string; attendance: string; rawValue?: number | null; outcome?: string | null }[]
     ): Promise<{ ok: boolean; error?: string; id?: string }>;
+    fetchPlayerBreakdown(teamId: string, playerId: string): Promise<Record<string, any>[] | null>;
     fetchMatrixSessionResults(sessionId: string): Promise<Record<string, any>[] | null>;
     deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
     createSchool(code: string, name: string, kind: string, mascot: string): Promise<{ ok: boolean; error?: string; id?: string }>;
