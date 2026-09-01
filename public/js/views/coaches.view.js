@@ -82,14 +82,26 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  async handleRegister() {
+  /**
+   * @param acceptTypedEmail true when the person has already been shown a
+   *        suggested correction and chosen to keep what they typed.
+   */
+  async handleRegister(acceptTypedEmail = false) {
     const name = document.getElementById('regName').value;
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPassword').value;
     const role = document.getElementById('regRole').value;
     const feedback = document.getElementById('authFormFeedback');
 
-    const res = await window.auth.registerUser({ name, email, password, role });
+    const res = await window.auth.registerUser({ name, email, password, role, acceptTypedEmail });
+
+    // A near-miss for a common provider. Offered, never enforced: an
+    // unfamiliar domain is ordinary for a club coach, and someone may
+    // genuinely own an address one character from Gmail.
+    if (!res.success && res.emailSuggestion) {
+      this.showEmailSuggestion(res.emailSuggestion);
+      return;
+    }
     if (res.success) {
       if (res.requiresVerification) {
         this.openVerifyTab(email);
@@ -104,6 +116,39 @@ Object.assign(BHSSoccerApp.prototype, {
         feedback.innerHTML = `<span style="color: var(--color-danger);">${res.message}</span>`;
       }
     }
+  },
+
+  /**
+   * Offer a corrected address with both answers equally available.
+   *
+   * Making "use what I typed" a plain link rather than a buried option matters:
+   * the check cannot know every legitimate domain, so the person overruling it
+   * must be an easy path, not a fight.
+   */
+  showEmailSuggestion(suggestion) {
+    const feedback = document.getElementById('authFormFeedback');
+    if (!feedback) return;
+    feedback.innerHTML = `
+      <div style="background:rgba(255,215,0,0.08); border:1px solid var(--bhs-gold-accent);
+                  border-radius:6px; padding:10px 12px; text-align:left;">
+        <div style="color:var(--bhs-gold-accent); font-size:0.85rem; margin-bottom:8px;">
+          Did you mean <strong>${suggestion}</strong>?
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-gold" style="padding:4px 12px; font-size:0.8rem;"
+                  onclick="app.useSuggestedEmail('${suggestion}')">Yes, use that</button>
+          <button type="button" class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;"
+                  onclick="app.handleRegister(true)">No, use what I typed</button>
+        </div>
+      </div>`;
+  },
+
+  useSuggestedEmail(suggestion) {
+    const field = document.getElementById('regEmail');
+    if (field) field.value = suggestion;
+    // Already corrected, so do not offer again — the corrected address could
+    // itself be one character from another provider and loop.
+    this.handleRegister(true);
   },
 
   openVerifyTab(email) {

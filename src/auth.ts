@@ -9,6 +9,8 @@ import type {
   LoginResult, RegisterResult, OtpVerifyResult
 } from './types';
 
+import { checkEmail } from './auth/email-typo';
+
 const ROLES = {
   GUEST: 'guest' as UserRole,
   PLAYER: 'player' as UserRole,

@@ -216,6 +216,13 @@ export interface RegisterResult {
   requiresVerification?: boolean;
   requiresApproval?: boolean;
   isExisting?: boolean;
+  /**
+   * A corrected address to offer before signing anyone up. Present only when
+   * the typed address looks like a near-miss for a common provider; the caller
+   * must let the person keep what they typed, because an unfamiliar domain is
+   * ordinary for a club coach.
+   */
+  emailSuggestion?: string;
 }
 
 export interface OtpVerifyResult {
