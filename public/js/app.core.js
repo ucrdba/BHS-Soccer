@@ -222,6 +222,18 @@ class BHSSoccerApp {
     if (!teamId || teamId === this.activeTeamId) return;
     this.activeTeamId = teamId;
     try { localStorage.setItem(ACTIVE_TEAM_KEY, teamId); } catch (e) { /* private mode */ }
+
+    // The working plan belongs to the team it was loaded from: its drills carry
+    // that team's practice_plans row ids, and a later drill edit upserts on
+    // those ids with the NEW team_id, moving rows between squads. Cleared here
+    // rather than in syncFromSupabase() because sync also runs on boot and on
+    // token refresh, where wiping an in-progress plan would be wrong -- only a
+    // genuine team change invalidates it. savedPlans and dailyThoughts are
+    // rebuilt by the sync below and need no clearing here.
+    this.data.currentPracticePlan = [];
+    this.data.activePlanName = '';
+    this.selectedDrillIndex = undefined;
+
     await this.syncFromSupabase();
     this.renderCurrentView();
   }
@@ -290,6 +302,16 @@ class BHSSoccerApp {
         this.data.schedule = [];
         this.data.matrixLogs = [];
         this._sessions = [];
+        // Planner state is team-scoped too, so it clears with the rest. Leaving
+        // it behind is not merely a stale display: `currentPracticePlan` holds
+        // the practice_plans row ids of whichever team it was loaded from, and
+        // the next drill edit upserts on those ids under the NEW team_id --
+        // silently moving the previous team's rows. See the unconditional
+        // assignments further down and the schedule comment beside them.
+        this.data.savedPlans = [];
+        this.data.currentPracticePlan = [];
+        this.data.activePlanName = '';
+        this.data.dailyThoughts = [];
       }
 
       // Sync School Profile & Multi-tenant Schools list from Supabase DB
@@ -431,11 +453,23 @@ class BHSSoccerApp {
         // Moved inside the team branch: practicePlans and dailyThoughts are
         // now team-scoped (see the comment above `hasTeam`), so they must
         // run only once activeTeamId is known, same as roster/schedule/matrix.
+        //
+        // Rebuilt, not merged, and assigned unconditionally -- exactly like the
+        // schedule above, and for the same reason. Guarding on
+        // `dbPlans.length > 0` and merging into `this.data.savedPlans` let a
+        // team switch leave the previous team's plans in the picker: after
+        // 0014, JV and the club teams have zero plan rows, so the first switch
+        // out of Varsity showed Varsity's plans under JV's name. Worse than a
+        // display bug -- loading one of those leaked plans copies Varsity's
+        // practice_plans row ids into `currentPracticePlan`, and the next drill
+        // edit upserts on those ids with JV's team_id, MOVING Varsity's rows.
+        // An empty team must produce an empty plan list. Do not reintroduce
+        // the guard.
         const dbPlans = await window.supabaseService.fetchPracticePlans(this.activeTeamId);
-        if (dbPlans && dbPlans.length > 0) {
+        {
           const planMap = {};
 
-          dbPlans.forEach(plan => {
+          (dbPlans || []).forEach(plan => {
             const notes = plan.coach_notes || '';
             let planName = plan.name || 'Practice Plan';
             let drillName = plan.drill || plan.name || 'Soccer Drill';
@@ -468,29 +502,24 @@ class BHSSoccerApp {
             }
           });
 
-          // Merge DB saved plans into local savedPlans
-          Object.values(planMap).forEach(dbPlan => {
-            if (!this.data.savedPlans) this.data.savedPlans = [];
-            const idx = this.data.savedPlans.findIndex(sp => sp.name.toLowerCase() === dbPlan.name.toLowerCase());
-            if (idx !== -1) {
-              this.data.savedPlans[idx] = dbPlan;
-            } else {
-              this.data.savedPlans.push(dbPlan);
-            }
-          });
+          // The active team's plans ARE the saved plans -- no merge with
+          // whatever the previously active team left behind.
+          this.data.savedPlans = Object.values(planMap);
         }
 
+        // Assigned unconditionally for the same reason as the plans above: a
+        // team with no daily_thoughts rows must show no coaching message, not
+        // the previous team's. `daily_thoughts` is empty by construction after
+        // 0014, so every team starts here.
         const dbThoughts = await window.supabaseService.fetchDailyThoughts(this.activeTeamId);
-        if (dbThoughts && dbThoughts.length > 0) {
-          this.data.dailyThoughts = dbThoughts.map(t => ({
-            id: t.id,
-            coachId: t.coach_id,
-            coachName: t.coach_name || '',
-            text: t.thoughts_text,
-            isActive: !!t.is_active,
-            createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
-          }));
-        }
+        this.data.dailyThoughts = (dbThoughts || []).map(t => ({
+          id: t.id,
+          coachId: t.coach_id,
+          coachName: t.coach_name || '',
+          text: t.thoughts_text,
+          isActive: !!t.is_active,
+          createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+        }));
       }
 
       const dbCoaches = await window.supabaseService.fetchCoaches('bhs');
