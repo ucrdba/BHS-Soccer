@@ -36,7 +36,9 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const thoughts = this.data.dailyThoughts || [];
     if (thoughts.length === 0) {
-      container.innerHTML = `<p class="text-muted" style="text-align: center; padding: 20px;">No daily thoughts recorded yet. Click <strong>+ Add New Thought</strong> above to create one!</p>`;
+      container.innerHTML = `<p class="text-muted" style="font-size:0.85rem; text-align: center; padding: 20px;">
+        No messages for this team yet. Messages are per team now, so each squad
+        gets its own &mdash; write one below, or copy one across from another team.</p>`;
       return;
     }
 
@@ -50,6 +52,7 @@ Object.assign(BHSSoccerApp.prototype, {
           <div style="display:flex; gap:6px;">
             ${!t.isActive ? `<button class="btn btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setActiveThought('${t.id}')">⭐ Set Active</button>` : ''}
             <button class="btn btn-primary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.openEditThoughtFormModal('${t.id}')">✏️ Edit</button>
+            <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;" onclick="app.openCopyToTeam('thought','${t.id}')">Copy to team…</button>
             <button class="btn btn-secondary" style="padding:3px 8px; font-size:0.75rem; background:rgba(239,68,68,0.2); color:var(--color-danger); border-color:var(--color-danger);" onclick="app.deleteThought('${t.id}')">🗑️ Delete</button>
           </div>
         </div>
@@ -213,6 +216,86 @@ Object.assign(BHSSoccerApp.prototype, {
         this.renderCurrentView();
       }
     });
+  },
+
+  /**
+   * Open the copy dialog for a plan or a daily message.
+   *
+   * Shared by thoughts.view.js and planner.view.js -- both extend the same
+   * BHSSoccerApp.prototype, and defining this once here (rather than in both
+   * files) avoids one silently overwriting the other at script-load time.
+   *
+   * @param kind 'plan' or 'thought'
+   * @param ref  the plan NAME, or the thought id
+   */
+  async openCopyToTeam(kind, ref) {
+    this._copyKind = kind;
+    this._copyRef = ref;
+    this._copySourceTeamId = this.activeTeamId;
+    this._copyTargets = [];
+
+    const err = document.getElementById('copyToTeamError');
+    if (err) err.textContent = '';
+    const what = document.getElementById('copyToTeamWhat');
+    if (what) {
+      what.textContent = kind === 'plan'
+        ? `Copying the plan "${ref}" — every drill slot in it.`
+        : 'Copying this message to another team.';
+    }
+
+    if (window.supabaseService?.isConfigured()) {
+      const teams = (await window.supabaseService.teamsCoachedBy()) || [];
+      // Never offer the team it is already on: the copy would be refused, and
+      // two identically named plans on one team cannot be told apart.
+      this._copyTargets = teams.filter(t => t.id !== this._copySourceTeamId);
+    }
+
+    const box = document.getElementById('copyToTeamTargets');
+    if (box) box.innerHTML = this.renderCopyTargets();
+
+    const modal = document.getElementById('copyToTeamModal');
+    if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  renderCopyTargets() {
+    const targets = this._copyTargets || [];
+    if (targets.length === 0) {
+      return `<p class="text-muted" style="font-size:0.85rem;">
+        You do not coach another team to copy this to. An admin assigns coaches to
+        teams under Admin &rsaquo; Teams &amp; Coach Assignments.</p>`;
+    }
+    return `
+      <label for="copyToTeamSelect" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Destination team</label>
+      <select id="copyToTeamSelect" class="form-control" style="font-size:0.85rem;">
+        ${targets.map(t => `<option value="${t.id}">${t.name}${t.school_name ? ' — ' + t.school_name : ''}</option>`).join('')}
+      </select>`;
+  },
+
+  async confirmCopyToTeam() {
+    const err = document.getElementById('copyToTeamError');
+    const set = (m) => { if (err) err.textContent = m; };
+    const to = document.getElementById('copyToTeamSelect')?.value;
+    if (!to) return set('Pick a destination team.');
+
+    const btn = document.getElementById('copyToTeamBtn');
+    if (btn) btn.disabled = true;
+    try {
+      set('Copying…');
+      const res = this._copyKind === 'plan'
+        ? await window.supabaseService.copyPracticePlan(this._copyRef, this._copySourceTeamId, to)
+        : await window.supabaseService.copyDailyThought(this._copyRef, to);
+
+      // The service names the drills a cross-organization copy is missing;
+      // pass that through verbatim rather than replacing it with something
+      // generic the coach cannot act on.
+      if (!res.ok) return set(res.error || 'Could not copy that.');
+
+      await this.syncFromSupabase();
+      this.renderCurrentView();
+      this.closeModals();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   },
 
 });

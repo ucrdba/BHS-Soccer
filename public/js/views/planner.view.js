@@ -50,8 +50,11 @@ Object.assign(BHSSoccerApp.prototype, {
                 <h3 style="color: #FFF; margin: 0;">TODAY'S PRACTICE TIMELINE</h3>
                 <span class="badge badge-coach">ACTIVE PLAN</span>
               </div>
-              <div style="color: var(--bhs-gold-accent); font-size: 0.95rem; font-weight: 700;">
-                "${activeName}"
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="color: var(--bhs-gold-accent); font-size: 0.95rem; font-weight: 700;">
+                  "${activeName}"
+                </div>
+                <button class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem;" onclick="app.openCopyToTeam('plan','${activeName}')">📋 Copy to team…</button>
               </div>
             </div>
             <div style="display: flex; gap: 16px; align-items: center; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--bhs-navy-border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
@@ -1029,8 +1032,10 @@ Object.assign(BHSSoccerApp.prototype, {
       if (saved.length === 0) {
         container.innerHTML = `
           <div style="text-align:center; padding:30px; color:var(--text-muted);">
-            <p style="font-size:1.1rem; margin-bottom:8px;">No saved practice plans found.</p>
-            <p style="font-size:0.85rem;">Add drills to today's timeline and click <strong>💾 Save Practice Plan</strong> to record custom plans here.</p>
+            <p style="font-size:1.1rem; margin-bottom:8px;">No practice plans for this team yet.</p>
+            <p style="font-size:0.85rem;">Build one below, or open a plan on another team and use
+              <strong style="color:#FFF;">Copy to team…</strong> &mdash; plans belong to a single team
+              now, so ${this.activeTeamLabel ? (this.activeTeamLabel().team || 'this team') : 'this team'} starts fresh.</p>
           </div>
         `;
       } else {

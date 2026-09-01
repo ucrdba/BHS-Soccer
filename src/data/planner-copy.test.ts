@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { supabaseService } from './supabase';
 
 const svc = supabaseService as any;
@@ -236,5 +236,224 @@ describe('team-scoping the practice-plan write paths', () => {
       expect(saved).toBeNull();
       expect(inserted.filter(r => r.table === 'practice_plans')).toHaveLength(0);
     });
+  });
+});
+
+// ─── Task 5: the "Copy to team…" control ────────────────────────────────────
+
+describe('the copy control', () => {
+  it('offers only teams the coach is assigned to', async () => {
+    // is_team_coach() refuses the write anyway, so offering an unavailable
+    // team would produce a button that always fails.
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    expect(src).toContain('teamsCoachedBy');
+  });
+
+  it('excludes the team the item is already on', async () => {
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    expect(src).toContain('_copySourceTeamId');
+  });
+
+  it('says what is being copied', async () => {
+    const html = (await import('../../index.html?raw')).default;
+    expect(html).toContain('copyToTeamWhat');
+  });
+
+  it('surfaces a refusal rather than closing silently', async () => {
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    expect(src).toContain('copyToTeamError');
+  });
+});
+
+describe('a team with nothing yet', () => {
+  it('explains an empty plan list rather than showing a blank panel', async () => {
+    const src = (await import('../../public/js/views/planner.view.js?raw')).default;
+    expect(src).toContain('No practice plans for this team yet');
+  });
+
+  it('points at copying, since another team probably has one', async () => {
+    // The whole reason JV is empty is that the plans went to Varsity.
+    const src = (await import('../../public/js/views/planner.view.js?raw')).default;
+    expect(src).toContain('Copy to team');
+  });
+
+  it('explains an empty message list too', async () => {
+    const src = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    expect(src).toContain('No messages for this team yet');
+  });
+});
+
+// The four tests above only prove the right tokens exist in the source text --
+// a `toContain` check would still pass with an inverted guard or a filter that
+// keeps the wrong team. The suite below loads the actual classic scripts and
+// executes openCopyToTeam / renderCopyTargets / confirmCopyToTeam, the same
+// technique as thoughts-save.test.ts and planner-drill-save.test.ts, so a
+// broken filter or a swapped argument order actually fails a test.
+describe('the copy control (behavioural)', () => {
+  let ctor: any;
+
+  beforeAll(async () => {
+    const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+    const appCoreSrc = (await import('../../public/js/app.core.js?raw')).default;
+    const thoughtsSrc = (await import('../../public/js/views/thoughts.view.js?raw')).default;
+    ctor = new Function([appCoreSrc, thoughtsSrc].map(strip).join('\n;\n') + '\nreturn BHSSoccerApp;')();
+  });
+
+  const SOURCE_TEAM = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+  const OTHER_TEAM = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+  const THIRD_TEAM = 'cccccccc-dddd-eeee-ffff-000000000000';
+
+  function setupDom() {
+    document.body.innerHTML = `
+      <div id="copyToTeamModal" class="modal-overlay">
+        <p id="copyToTeamWhat"></p>
+        <div id="copyToTeamTargets"></div>
+        <div id="copyToTeamError"></div>
+        <button id="copyToTeamBtn"></button>
+      </div>
+    `;
+  }
+
+  function makeApp() {
+    const app = Object.create(ctor.prototype) as any;
+    app.activeTeamId = SOURCE_TEAM;
+    app.syncFromSupabase = vi.fn(async () => {});
+    app.renderCurrentView = vi.fn();
+    app.closeModals = vi.fn();
+    return app;
+  }
+
+  beforeEach(() => {
+    setupDom();
+    (window as any).supabaseService = undefined;
+  });
+
+  it('fetches teamsCoachedBy and excludes the source team from the offered destinations', async () => {
+    const teamsCoachedBy = vi.fn(async () => ([
+      { id: SOURCE_TEAM, name: 'Varsity', school_id: 's-bhs', school_name: 'Beaumont' },
+      { id: OTHER_TEAM, name: 'JV', school_id: 's-bhs', school_name: 'Beaumont' }
+    ]));
+    (window as any).supabaseService = { isConfigured: () => true, teamsCoachedBy };
+    const app = makeApp();
+
+    await app.openCopyToTeam('plan', 'Standard 90');
+
+    expect(teamsCoachedBy).toHaveBeenCalled();
+    expect(app._copyTargets).toEqual([
+      { id: OTHER_TEAM, name: 'JV', school_id: 's-bhs', school_name: 'Beaumont' }
+    ]);
+    const select = document.getElementById('copyToTeamSelect') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    const optionValues = Array.from(select.options).map(o => o.value);
+    expect(optionValues).toEqual([OTHER_TEAM]);
+    expect(optionValues).not.toContain(SOURCE_TEAM);
+  });
+
+  it('describes what is being copied, naming the plan', async () => {
+    (window as any).supabaseService = { isConfigured: () => true, teamsCoachedBy: vi.fn(async () => []) };
+    const app = makeApp();
+    await app.openCopyToTeam('plan', 'Standard 90');
+    expect(document.getElementById('copyToTeamWhat')!.textContent).toContain('Standard 90');
+  });
+
+  it('tells the coach when they coach no other team, rather than an empty enabled control', async () => {
+    (window as any).supabaseService = { isConfigured: () => true, teamsCoachedBy: vi.fn(async () => []) };
+    const app = makeApp();
+    await app.openCopyToTeam('thought', 't1');
+    expect(document.getElementById('copyToTeamSelect')).toBeNull();
+    expect(document.getElementById('copyToTeamTargets')!.textContent).toContain('do not coach another team');
+  });
+
+  it('confirmCopyToTeam refuses with no destination selected, and calls no service method', async () => {
+    const copyPracticePlan = vi.fn();
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    // No <select> in the DOM (renderCopyTargets was never called), matching a
+    // coach who opened the modal with no other team to pick.
+
+    await app.confirmCopyToTeam();
+
+    expect(copyPracticePlan).not.toHaveBeenCalled();
+    expect(document.getElementById('copyToTeamError')!.textContent).toBe('Pick a destination team.');
+    expect(app.syncFromSupabase).not.toHaveBeenCalled();
+    expect(app.closeModals).not.toHaveBeenCalled();
+  });
+
+  it('confirmCopyToTeam calls copyPracticePlan with (name, sourceTeam, chosenTeam) and closes on success', async () => {
+    const copyPracticePlan = vi.fn(async () => ({ ok: true, slots: 2 }));
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }, { id: THIRD_TEAM, name: 'U16' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = THIRD_TEAM;
+
+    await app.confirmCopyToTeam();
+
+    expect(copyPracticePlan).toHaveBeenCalledWith('Standard 90', SOURCE_TEAM, THIRD_TEAM);
+    expect(app.syncFromSupabase).toHaveBeenCalled();
+    expect(app.renderCurrentView).toHaveBeenCalled();
+    expect(app.closeModals).toHaveBeenCalled();
+  });
+
+  it('confirmCopyToTeam surfaces the drill-refusal text verbatim and does NOT close the modal', async () => {
+    const refusal = 'That team\'s drill library does not have: Dynamic Warmup. Drills belong to one organization, so this plan cannot be copied there.';
+    const copyPracticePlan = vi.fn(async () => ({ ok: false, error: refusal }));
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = OTHER_TEAM;
+
+    await app.confirmCopyToTeam();
+
+    expect(document.getElementById('copyToTeamError')!.textContent).toBe(refusal);
+    expect(app.syncFromSupabase).not.toHaveBeenCalled();
+    expect(app.closeModals).not.toHaveBeenCalled();
+  });
+
+  it('confirmCopyToTeam calls copyDailyThought with (thoughtId, chosenTeam) for kind "thought"', async () => {
+    const copyDailyThought = vi.fn(async () => ({ ok: true, id: 'dt_new' }));
+    (window as any).supabaseService = { isConfigured: () => true, copyDailyThought };
+    const app = makeApp();
+    app._copyKind = 'thought';
+    app._copyRef = 't1';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = OTHER_TEAM;
+
+    await app.confirmCopyToTeam();
+
+    expect(copyDailyThought).toHaveBeenCalledWith('t1', OTHER_TEAM);
+    expect(app.closeModals).toHaveBeenCalled();
+  });
+
+  it('re-enables the Copy button after a failed copy, so the coach can retry', async () => {
+    const copyPracticePlan = vi.fn(async () => ({ ok: false, error: 'nope' }));
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = OTHER_TEAM;
+
+    await app.confirmCopyToTeam();
+
+    expect((document.getElementById('copyToTeamBtn') as HTMLButtonElement).disabled).toBe(false);
   });
 });
