@@ -400,6 +400,9 @@ describe('the copy control (behavioural)', () => {
     expect(app.syncFromSupabase).toHaveBeenCalled();
     expect(app.renderCurrentView).toHaveBeenCalled();
     expect(app.closeModals).toHaveBeenCalled();
+    // Minor fix-round finding: "Copying…" must not survive a success --
+    // it is only invisible because the modal happens to close right after.
+    expect(document.getElementById('copyToTeamError')!.textContent).toBe('');
   });
 
   it('confirmCopyToTeam surfaces the drill-refusal text verbatim and does NOT close the modal', async () => {
@@ -454,6 +457,53 @@ describe('the copy control (behavioural)', () => {
 
     await app.confirmCopyToTeam();
 
+    expect((document.getElementById('copyToTeamBtn') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // Fix-round finding: confirmCopyToTeam had a `finally` but no `catch`, and
+  // read `res.ok` without checking `res` was truthy first. Neither failure
+  // mode is reachable through today's SupabaseService, but both are explicit
+  // addendum criteria ("errors must land where the coach is actually
+  // looking") and neither was covered. These two tests close that gap.
+  it('treats a null/undefined service result as a refusal, without throwing, and shows an error', async () => {
+    const copyPracticePlan = vi.fn(async () => null);
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = OTHER_TEAM;
+
+    await expect(app.confirmCopyToTeam()).resolves.toBeUndefined();
+
+    expect(document.getElementById('copyToTeamError')!.textContent).not.toBe('');
+    expect(document.getElementById('copyToTeamError')!.textContent).not.toBe('Copying…');
+    expect(app.syncFromSupabase).not.toHaveBeenCalled();
+    expect(app.closeModals).not.toHaveBeenCalled();
+    expect((document.getElementById('copyToTeamBtn') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('catches a rejected service call and shows an error instead of an unhandled rejection', async () => {
+    const copyPracticePlan = vi.fn(async () => { throw new Error('network drop'); });
+    (window as any).supabaseService = { isConfigured: () => true, copyPracticePlan };
+    const app = makeApp();
+    app._copyKind = 'plan';
+    app._copyRef = 'Standard 90';
+    app._copySourceTeamId = SOURCE_TEAM;
+    document.getElementById('copyToTeamTargets')!.innerHTML = app.renderCopyTargets.call(
+      { _copyTargets: [{ id: OTHER_TEAM, name: 'JV' }] }
+    );
+    (document.getElementById('copyToTeamSelect') as HTMLSelectElement).value = OTHER_TEAM;
+
+    await expect(app.confirmCopyToTeam()).resolves.toBeUndefined();
+
+    expect(document.getElementById('copyToTeamError')!.textContent).not.toBe('');
+    expect(document.getElementById('copyToTeamError')!.textContent).not.toBe('Copying…');
+    expect(app.syncFromSupabase).not.toHaveBeenCalled();
+    expect(app.closeModals).not.toHaveBeenCalled();
     expect((document.getElementById('copyToTeamBtn') as HTMLButtonElement).disabled).toBe(false);
   });
 });

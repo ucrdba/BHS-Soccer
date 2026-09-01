@@ -285,14 +285,24 @@ Object.assign(BHSSoccerApp.prototype, {
         ? await window.supabaseService.copyPracticePlan(this._copyRef, this._copySourceTeamId, to)
         : await window.supabaseService.copyDailyThought(this._copyRef, to);
 
+      // A missing/null result is treated the same as an explicit refusal --
+      // res.ok would throw on null and leave the div stuck on "Copying…"
+      // with the coach shown nothing, the exact silent-failure shape this
+      // control exists to avoid.
+      if (!res || !res.ok) return set((res && res.error) || 'Could not copy that.');
+
       // The service names the drills a cross-organization copy is missing;
       // pass that through verbatim rather than replacing it with something
       // generic the coach cannot act on.
-      if (!res.ok) return set(res.error || 'Could not copy that.');
-
+      set('');
       await this.syncFromSupabase();
       this.renderCurrentView();
       this.closeModals();
+    } catch (e) {
+      // A thrown error (network drop, bad response, ...) must not escape
+      // uncaught and leave the div reading "Copying…" forever -- show
+      // something the coach can act on instead.
+      set('Could not reach the database. Check your connection and try again.');
     } finally {
       if (btn) btn.disabled = false;
     }
