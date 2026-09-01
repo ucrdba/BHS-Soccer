@@ -109,14 +109,16 @@ Object.assign(BHSSoccerApp.prototype, {
                   <th>EX</th>
                   <th>W-D-L</th>
                   <th>PTS</th>
-                  <th>AVAIL</th>
+                  <th>OF</th>
                   <th>SHARE</th>
                 </tr>
               </thead>
               <tbody>
                 ${(() => {
-                  // Ranking is on share, which is already a percentage, so the
-                  // bar needs no leader to scale against.
+                  // Hoisted: computing this inside the map would rescan every
+                  // player for every row.
+                  const leaderPts = Math.max(0, ...(this.data.players || [])
+                    .map(x => Number(x.matrixStats?.earned || 0)));
                   return (this.data.players || [])
                   .filter(p => !p.is_deleted && !p.isDeleted)
                   .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
@@ -137,9 +139,10 @@ Object.assign(BHSSoccerApp.prototype, {
                       share: (ms.share === undefined ? null : ms.share),
                       rank: ms.rank || 999
                     };
-                    // The bar is share, not points: ranking is on share, so a
-                    // bar drawn from totals would disagree with the ordering.
-                    const barPct = m.share === null ? 0 : Math.round(m.share);
+                    // The bar tracks POINTS against the leader, because points
+                    // are what the table is ordered by. A bar drawn from share
+                    // would disagree with the ordering sitting beside it.
+                    const barPct = leaderPts > 0 ? Math.round((m.earned / leaderPts) * 100) : 0;
                     return `
                   <tr>
                     <td>

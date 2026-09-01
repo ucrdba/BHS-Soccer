@@ -116,6 +116,13 @@ describe('how each line reads', () => {
     expect(detail({ kind: 'absent' })).toBe('no-show');
   });
 
+  it('distinguishes never being entered from a deliberate no-show', () => {
+    // Both score zero, but they are different facts about the coach's data:
+    // one is a player who did not turn up, the other a session only half
+    // filled in. Reading them the same would hide the second.
+    expect(detail({ kind: 'not_entered' })).toBe('not entered');
+  });
+
   it('reads a small-sided result plainly', () => {
     expect(detail({ kind: 'win_loss', detail: 'win' })).toBe('won');
     expect(detail({ kind: 'win_loss', detail: 'loss' })).toBe('lost');

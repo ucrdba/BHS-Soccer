@@ -414,6 +414,9 @@ Object.assign(BHSSoccerApp.prototype, {
       return row.detail === 'win' ? 'won' : row.detail === 'draw' ? 'drew' : 'lost';
     }
     if (row.kind === 'absent') return 'no-show';
+    // Distinct from a no-show: nobody marked them absent, they were simply
+    // never given a row. Naming it tells the coach to go back and fill it in.
+    if (row.kind === 'not_entered') return 'not entered';
     return row.raw_value === null || row.raw_value === undefined
       ? 'took part' : String(Number(row.raw_value));
   },
@@ -455,7 +458,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <tr>
               <td>${r.exercise || 'Exercise'}</td>
               <td class="text-muted">${r.occurred_on || ''}</td>
-              <td${r.kind === 'absent' ? ' style="color:var(--color-danger);"' : ''}>${this.breakdownDetail(r)}</td>
+              <td${(r.kind === 'absent' || r.kind === 'not_entered') ? ' style="color:var(--color-danger);"' : ''}>${this.breakdownDetail(r)}</td>
               <td${zero ? ' class="text-muted"' : ' style="color:var(--bhs-cyan-accent); font-weight:600;"'}>
                 ${Number(r.earned || 0).toFixed(2)}
               </td>
@@ -466,8 +469,8 @@ Object.assign(BHSSoccerApp.prototype, {
       </table></div>
       <p class="text-muted" style="font-size:0.78rem; margin-top:10px;">
         Every exercise offers its full weight; the best result earns all of it.
-        These lines add up to the leaderboard row exactly &mdash; the table there
-        is their sum.
+        Ranking is on points earned, so competing in what matters most is what
+        rises. These lines add up to the leaderboard row exactly.
       </p>`;
   }
 

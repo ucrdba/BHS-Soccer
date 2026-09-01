@@ -41,7 +41,9 @@ describe('standings table', () => {
     }];
     const html = app.renderMatrixView();
     expect(html).toContain('SHARE');
-    expect(html).toContain('AVAIL');
+    // Renamed from AVAIL when ranking moved to points: the column reads
+    // "3.00 of 4.00", so "OF" is what the header should say.
+    expect(html).toContain('>OF<');
     expect(html).toContain('100.0%');
     expect(html).toContain('7');
   });
@@ -56,6 +58,19 @@ describe('standings table', () => {
     const html = app.renderMatrixView();
     expect(html).not.toContain('NaN');
     expect(html).toContain('&mdash;');
+  });
+
+  it('scales the bar against the points leader, not the share', () => {
+    // The table is ordered by points now, so a bar drawn from share would
+    // disagree with the ordering it sits beside.
+    app.data.players = [
+      { id: 'p1', name: 'Leader', matrixStats: { earned: 8, available: 8, share: 100, rank: 1, games: 1, exercises: 1, wins: 1, draws: 0, losses: 0 } },
+      { id: 'p2', name: 'Half',   matrixStats: { earned: 4, available: 4, share: 100, rank: 2, games: 1, exercises: 1, wins: 1, draws: 0, losses: 0 } }
+    ];
+    const html = app.renderMatrixView();
+    // Equal shares, half the points: the bars must differ.
+    expect(html).toContain('width: 100%');
+    expect(html).toContain('width: 50%');
   });
 
   it('orders by rank', () => {
