@@ -147,6 +147,8 @@ Object.assign(BHSSoccerApp.prototype, {
 
       ${this.renderTeamAdminSection()}
 
+      ${this.renderCategoryAdminSection()}
+
       <!-- Section 2: School & Club Profile Settings -->
       <details class="admin-accordion">
         <summary class="admin-accordion-summary">
@@ -708,6 +710,321 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * Escape a value that lands inside a single-quoted onclick attribute.
+   * Category names carry apostrophes, ampersands and slashes ("Technical /
+   * Ball Mastery", "Passing & Possession"), any of which would otherwise break
+   * the handler or the markup around it.
+   */
+  _attrArg(value) {
+    return String(value == null ? '' : value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  },
+
+  /** Escape a value rendered as visible text. */
+  _text(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  },
+
+  /**
+   * Drill categories.
+   *
+   * Coach-visible, unlike the team section: soccer_categories_write in
+   * supabase_migration_auth.sql allows coach or admin, so offering these to a
+   * coach does not produce a control the database refuses.
+   *
+   * The second half of this section exists because drills_bank.category is free
+   * TEXT rather than a foreign key. A drill can carry a name no category row
+   * has, and on the live data half of them do. Those are shown as "used by
+   * drills, not defined" so the drift is visible instead of silent.
+   */
+  renderCategoryAdminSection() {
+    if (!(window.auth.isCoach() || window.auth.isAdmin())) return '';
+
+    // Read-and-clear: a notice belongs to the render that follows the action,
+    // not to every later re-render of the panel.
+    const notice = this._categoryNotice || '';
+    this._categoryNotice = '';
+    const error = this._categoryError || '';
+    this._categoryError = '';
+
+    const cats = (this.data.soccerCategories || []).slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const usage = this._categoryUsage || {};
+    const defined = new Set(cats.map(c => c.name));
+    const strays = Object.keys(usage).filter(n => !defined.has(n)).sort();
+
+    const destOptions = cats
+      .map(c => `<option value="${this._attrArg(c.name)}">${this._text(c.name)}</option>`)
+      .join('');
+
+    const rows = cats.map(c => {
+      const count = usage[c.name] || 0;
+      const editing = this._editingCategoryId === c.id;
+      const nameArg = this._attrArg(c.name);
+
+      if (editing) {
+        return `
+          <div style="background:rgba(0,0,0,0.25); border:1px solid var(--bhs-gold-accent); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+              <div>
+                <label style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Name</label>
+                <input type="text" id="editCategoryName" class="form-control" style="max-width:220px; font-size:0.8rem;" value="${this._attrArg(c.name)}" />
+              </div>
+              <div style="flex:1; min-width:200px;">
+                <label style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Description</label>
+                <input type="text" id="editCategoryDesc" class="form-control" style="width:100%; font-size:0.8rem;" value="${this._attrArg(c.description || '')}" />
+              </div>
+              <button class="btn btn-gold" style="padding:5px 12px; font-size:0.8rem;" onclick="app.saveCategoryEdit('${c.id}','${nameArg}')">Save</button>
+              <button class="btn btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="app.cancelCategoryEdit()">Cancel</button>
+            </div>
+            ${count > 0 ? `<p class="text-muted" style="font-size:0.75rem; margin:8px 0 0 0;">Renaming this also re-tags the ${count} drill${count === 1 ? '' : 's'} using it.</p>` : ''}
+          </div>`;
+      }
+
+      return `
+        <div style="background:rgba(0,0,0,0.25); border:1px solid var(--bhs-navy-border); border-radius:8px; padding:9px 12px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:200px;">
+            <strong style="color:#FFF; font-size:0.87rem;">${this._text(c.name)}</strong>
+            <span class="text-muted" style="font-size:0.75rem; margin-left:8px;">${count} drill${count === 1 ? '' : 's'}</span>
+            <div class="text-muted" style="font-size:0.76rem; margin-top:2px;">${this._text(c.description || 'No description.')}</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;" onclick="app.startCategoryEdit('${c.id}')">Edit</button>
+            <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; color:var(--color-danger); border-color:var(--color-danger);" onclick="app.retireCategory('${c.id}','${nameArg}',${count})">Retire</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const strayRows = strays.map(name => {
+      const count = usage[name] || 0;
+      const arg = this._attrArg(name);
+      const selId = 'mergeInto_' + name.replace(/[^a-zA-Z0-9]/g, '_');
+      return `
+        <div style="background:rgba(255,193,7,0.07); border:1px solid rgba(255,193,7,0.35); border-radius:8px; padding:9px 12px; margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div>
+              <strong style="color:#FFF; font-size:0.87rem;">${this._text(name)}</strong>
+              <span class="text-muted" style="font-size:0.75rem; margin-left:8px;">${count} drill${count === 1 ? '' : 's'} &bull; not in the list</span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;" onclick="app.adoptStrayCategory('${arg}')">+ Add as category</button>
+              <select id="${selId}" class="form-control" style="max-width:190px; font-size:0.78rem; padding:3px 6px;">
+                <option value="">&mdash; merge into &mdash;</option>
+                ${destOptions}
+              </select>
+              <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;" onclick="app.mergeStrayCategory('${arg}','${selId}')">Merge</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Every action re-renders the whole modal, which resets <details> to
+    // closed. Without this the panel snaps shut and the result is hidden.
+    return `
+      <details class="admin-accordion" ${this._categoryAdminOpen ? 'open' : ''}>
+        <summary class="admin-accordion-summary">
+          <span>&#127942; DRILL CATEGORIES</span>
+          <span class="badge badge-coach">${cats.length} CATEGOR${cats.length === 1 ? 'Y' : 'IES'}</span>
+        </summary>
+        <div class="admin-accordion-content">
+          ${notice ? `<div style="background:rgba(46,160,67,0.12); border:1px solid rgba(46,160,67,0.5); color:#7ee2a8; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">&#10003; ${this._text(notice)}</div>` : ''}
+          ${error ? `<div style="background:rgba(239,68,68,0.12); border:1px solid var(--color-danger); color:#ffb4b4; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">${this._text(error)}</div>` : ''}
+          <p class="text-muted" style="font-size:0.8rem; margin:0 0 12px 0;">
+            These are the categories offered when you create a master drill. They are shared
+            by every team and organization.
+          </p>
+
+          ${rows || '<p class="text-muted" style="font-size:0.85rem;">No categories yet.</p>'}
+
+          <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:10px;">
+            <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:8px;">Add a category</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+              <div>
+                <label for="newCategoryName" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Name</label>
+                <input type="text" id="newCategoryName" class="form-control" style="max-width:220px; font-size:0.8rem;" placeholder="e.g. Transition Play" />
+              </div>
+              <div style="flex:1; min-width:200px;">
+                <label for="newCategoryDesc" style="display:block; font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Description</label>
+                <input type="text" id="newCategoryDesc" class="form-control" style="width:100%; font-size:0.8rem;" placeholder="What this category covers" />
+              </div>
+              <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="app.addSoccerCategory()">+ Add</button>
+            </div>
+          </div>
+
+          ${strays.length ? `
+          <div style="border-top:1px solid var(--bhs-navy-border); padding-top:12px; margin-top:14px;">
+            <div style="color:#FFF; font-size:0.85rem; font-weight:700; margin-bottom:4px;">Used by drills, not in the list</div>
+            <p class="text-muted" style="font-size:0.78rem; margin:0 0 10px 0;">
+              A drill's category is plain text, so these were typed or imported without ever being
+              defined. Add each one as a real category, or merge it into an existing one &mdash;
+              merging re-tags those drills.
+            </p>
+            ${strayRows}
+          </div>` : ''}
+        </div>
+      </details>`;
+  },
+
+  /** Re-read categories and their drill counts. */
+  async loadCategoryAdminData() {
+    if (!window.supabaseService?.isConfigured()) return;
+    const [cats, usage] = await Promise.all([
+      window.supabaseService.fetchSoccerCategories(),
+      window.supabaseService.fetchCategoryUsage()
+    ]);
+    if (cats) {
+      this.data.soccerCategories = cats.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description || ''
+      }));
+    }
+    this._categoryUsage = usage || {};
+  },
+
+  /**
+   * Apply a category change, then refresh and re-render.
+   *
+   * Every action funnels through here so a refusal always reaches the panel:
+   * the service returns {ok, error} precisely so an RLS denial is reported in
+   * words rather than looking like nothing happened.
+   */
+  async _applyCategoryChange(fn, successMessage) {
+    this._categoryAdminOpen = true;
+    if (!window.supabaseService?.isConfigured()) {
+      this._categoryError = 'Cloud database is not configured, so nothing was saved.';
+      this.renderAdminModalContent();
+      return false;
+    }
+    let res;
+    try {
+      res = await fn();
+    } catch (e) {
+      res = { ok: false, error: e?.message || 'Could not reach the database.' };
+    }
+    if (!res || !res.ok) {
+      this._categoryError = (res && res.error) || 'That did not work.';
+    } else {
+      this._categoryNotice = typeof successMessage === 'function' ? successMessage(res) : successMessage;
+      this._editingCategoryId = null;
+    }
+    await this.loadCategoryAdminData();
+    this.populateCategoryDropdowns();
+    this.renderAdminModalContent();
+    return !!(res && res.ok);
+  },
+
+  startCategoryEdit(id) {
+    this._editingCategoryId = id;
+    this._categoryAdminOpen = true;
+    this.renderAdminModalContent();
+  },
+
+  cancelCategoryEdit() {
+    this._editingCategoryId = null;
+    this._categoryAdminOpen = true;
+    this.renderAdminModalContent();
+  },
+
+  async addSoccerCategory() {
+    const name = (document.getElementById('newCategoryName')?.value || '').trim();
+    const description = (document.getElementById('newCategoryDesc')?.value || '').trim();
+    if (!name) {
+      this._categoryAdminOpen = true;
+      this._categoryError = 'Give the category a name first.';
+      this.renderAdminModalContent();
+      return;
+    }
+    await this._applyCategoryChange(
+      () => window.supabaseService.upsertSoccerCategory({ name, description }),
+      `Added "${name}".`
+    );
+  },
+
+  /**
+   * Save an edited category. A changed name is a rename, which carries every
+   * drill using it across; an unchanged name is just a description edit.
+   */
+  async saveCategoryEdit(id, oldName) {
+    const name = (document.getElementById('editCategoryName')?.value || '').trim();
+    const description = (document.getElementById('editCategoryDesc')?.value || '').trim();
+    if (!name) {
+      this._categoryAdminOpen = true;
+      this._categoryError = 'A category needs a name.';
+      this.renderAdminModalContent();
+      return;
+    }
+
+    if (name !== oldName) {
+      const count = (this._categoryUsage || {})[oldName] || 0;
+      if (count > 0 && !confirm(
+        `Rename "${oldName}" to "${name}"?\n\nThis also re-tags the ${count} drill${count === 1 ? '' : 's'} using it, so the two stay in step.`
+      )) return;
+      const ok = await this._applyCategoryChange(
+        () => window.supabaseService.renameSoccerCategory(id, oldName, name),
+        (res) => `Renamed to "${name}"${res.drillsUpdated ? ` and re-tagged ${res.drillsUpdated} drill${res.drillsUpdated === 1 ? '' : 's'}` : ''}.`
+      );
+      // The description may have changed in the same edit.
+      if (ok) await this._applyCategoryChange(
+        () => window.supabaseService.upsertSoccerCategory({ id, name, description }),
+        `Renamed to "${name}".`
+      );
+      return;
+    }
+
+    await this._applyCategoryChange(
+      () => window.supabaseService.upsertSoccerCategory({ id, name, description }),
+      `Updated "${name}".`
+    );
+  },
+
+  async retireCategory(id, name, count) {
+    if (count > 0 && !confirm(
+      `Retire "${name}"?\n\n${count} drill${count === 1 ? '' : 's'} still use it and will keep the label, but it will no longer be offered for new drills. To move those drills instead, cancel and use Merge.`
+    )) return;
+    if (count === 0 && !confirm(`Retire "${name}"?`)) return;
+
+    await this._applyCategoryChange(
+      () => window.supabaseService.retireSoccerCategory(id),
+      `Retired "${name}".`
+    );
+  },
+
+  /** Promote a name that drills already use into a real category. */
+  async adoptStrayCategory(name) {
+    await this._applyCategoryChange(
+      () => window.supabaseService.upsertSoccerCategory({ name, description: '' }),
+      `Added "${name}" to the list.`
+    );
+  },
+
+  async mergeStrayCategory(fromName, selectId) {
+    const to = document.getElementById(selectId)?.value || '';
+    this._categoryAdminOpen = true;
+    if (!to) {
+      this._categoryError = `Pick a category to merge "${fromName}" into.`;
+      this.renderAdminModalContent();
+      return;
+    }
+    const count = (this._categoryUsage || {})[fromName] || 0;
+    if (!confirm(
+      `Merge "${fromName}" into "${to}"?\n\nThis re-tags ${count} drill${count === 1 ? '' : 's'}. It cannot be undone from here.`
+    )) return;
+
+    await this._applyCategoryChange(
+      () => window.supabaseService.mergeSoccerCategory(fromName, to),
+      (res) => `Merged into "${to}", re-tagging ${res.drillsUpdated || 0} drill${res.drillsUpdated === 1 ? '' : 's'}.`
+    );
+  },
+
+  /**
    * Team management. Admin-only, because teams_write and team_coaches_write are
    * admin-only by RLS -- rendering these controls for a coach would offer an
    * action the database will refuse.
@@ -939,6 +1256,11 @@ Object.assign(BHSSoccerApp.prototype, {
       this._allTeams = allTeams || [];
       this._teamCoaches = teamCoaches || [];
       this._assignableCoaches = assignable || [];
+    }
+    // Drill counts per category, for the categories section. Coach-visible, so
+    // this load is not inside the isAdmin() branch above.
+    if (window.auth.isCoach() || window.auth.isAdmin()) {
+      await this.loadCategoryAdminData();
     }
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
@@ -1916,7 +2238,12 @@ Object.assign(BHSSoccerApp.prototype, {
             });
             totalCount += imported.length;
             if (window.supabaseService?.isConfigured()) {
-              for (const cat of imported) await window.supabaseService.upsertSoccerCategory('bhs', cat);
+              // No school code: soccer_categories has no school_id column, and
+              // passing one is what made every category import fail silently.
+              for (const cat of imported) {
+                const res = await window.supabaseService.upsertSoccerCategory(cat);
+                if (res && !res.ok) warnings.push(`Category "${cat.name}": ${res.error}`);
+              }
             }
             this.populateCategoryDropdowns();
           } else if (activeTarget === 'quiz') {

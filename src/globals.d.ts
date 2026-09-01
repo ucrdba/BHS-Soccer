@@ -54,7 +54,17 @@ declare global {
     fetchLatestDailyThoughts(teamId: string): Promise<Partial<DailyThought> | null>;
     upsertDailyThought(teamId: string, thought: any): Promise<any>;
     setActiveDailyThought(teamId: string, activeId?: string): Promise<any>;
-    fetchSoccerCategories(schoolCode: string): Promise<Partial<SoccerCategory>[] | null>;
+    fetchSoccerCategories(schoolCode?: string): Promise<Partial<SoccerCategory>[] | null>;
+    // soccer_categories has no school_id column -- the list is shared across
+    // every organization -- so none of these take one.
+    upsertSoccerCategory(category: any): Promise<{ ok: boolean; error?: string; data?: any }>;
+    fetchCategoryUsage(): Promise<Record<string, number> | null>;
+    retagDrills(fromName: string, toName: string): Promise<{ ok: boolean; error?: string; count?: number }>;
+    renameSoccerCategory(id: string, oldName: string, newName: string):
+      Promise<{ ok: boolean; error?: string; drillsUpdated?: number }>;
+    mergeSoccerCategory(fromName: string, toName: string):
+      Promise<{ ok: boolean; error?: string; drillsUpdated?: number }>;
+    retireSoccerCategory(id: string): Promise<{ ok: boolean; error?: string }>;
     upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string }): Promise<Record<string, any> | null>;
     upsertPlayer(schoolCode: string, player: unknown): Promise<{ id?: string } | null>;
     deletePlayer(playerId: string): Promise<unknown>;

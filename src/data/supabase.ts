@@ -1445,15 +1445,32 @@ class SupabaseService {
     return { ok: true };
   }
 
-  async upsertSoccerCategory(schoolId: string = 'bhs', categoryObj: any = {}): Promise<any> {
-    if (!this.isConfigured()) return null;
-    const schoolUuid = await this.getSchoolUuid(schoolId);
+  /**
+   * Insert or update one drill category.
+   *
+   * `soccer_categories` has NO `school_id` column -- the category list is
+   * shared across every organization. The previous version of this method set
+   * one anyway, so every call failed with 42703, this method logged and
+   * returned null, and the XLSX category import reported success while
+   * importing nothing. Verified against the live database, not against
+   * supabase_schema.sql, which has drifted.
+   *
+   * Returns {ok, error} rather than null so an RLS refusal is reported in
+   * words instead of silently doing nothing.
+   */
+  async upsertSoccerCategory(
+    categoryObj: any = {}
+  ): Promise<{ ok: boolean; error?: string; data?: any }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+
+    const name = (categoryObj.name || '').trim();
+    if (!name) return { ok: false, error: 'A category needs a name.' };
+
     const payload: Record<string, any> = {
-      name: categoryObj.name,
-      description: categoryObj.description || '',
+      name,
+      description: (categoryObj.description || '').trim(),
       is_deleted: categoryObj.is_deleted || false
     };
-    if (schoolUuid) payload.school_id = schoolUuid;
     if (categoryObj.id && this.isUuid(categoryObj.id)) payload.id = categoryObj.id;
 
     try {
@@ -1461,11 +1478,161 @@ class SupabaseService {
         .from('soccer_categories')
         .upsert([payload], { onConflict: 'name' })
         .select();
-      if (error) { console.error('Supabase upsertSoccerCategory error:', error.message); return null; }
-      return data ? data[0] : null;
-    } catch (e) {
-      return null;
+      if (error) { console.warn('Supabase upsertSoccerCategory notice:', error.message); return { ok: false, error: error.message }; }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that. Only a coach or admin can edit categories.' };
+      }
+      return { ok: true, data: data[0] };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Could not reach the database.' };
     }
+  }
+
+  /**
+   * How many drills use each category NAME.
+   *
+   * Keyed by name rather than by id on purpose: `drills_bank.category` is free
+   * text, not a foreign key, so a drill can carry a name no category row has.
+   * Those are exactly the entries the editor has to surface -- on the live data
+   * five of ten drills are in that state.
+   */
+  async fetchCategoryUsage(): Promise<Record<string, number> | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('drills_bank')
+      .select('category')
+      .or('is_deleted.is.null,is_deleted.eq.false');
+    if (error) { console.warn('Supabase fetchCategoryUsage notice:', error.message); return null; }
+
+    const counts: Record<string, number> = {};
+    (data || []).forEach((d: any) => {
+      const name = (d.category || '').trim();
+      if (!name) return;
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /**
+   * Rewrite `drills_bank.category` from one name to another.
+   *
+   * The engine behind both rename and merge. Returns the number of drills
+   * changed so the caller can tell the coach what it did rather than leaving
+   * them to guess.
+   */
+  async retagDrills(
+    fromName: string, toName: string
+  ): Promise<{ ok: boolean; error?: string; count?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!fromName || !toName) return { ok: false, error: 'Both the old and the new name are needed.' };
+
+    const { data, error } = await this.client!
+      .from('drills_bank')
+      .update({ category: toName })
+      .eq('category', fromName)
+      .select();
+    if (error) { console.warn('Supabase retagDrills notice:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, count: (data || []).length };
+  }
+
+  /**
+   * Rename a category, carrying every drill that uses it along.
+   *
+   * The drills are re-tagged FIRST. If that half fails the category row is left
+   * untouched, so the two stay consistent; if the row rename fails afterwards
+   * the drills show up under an undefined category, which the editor displays
+   * and offers to fix. Either failure is visible and recoverable.
+   *
+   * Renaming onto a name another category already holds is refused -- two rows
+   * with one name cannot be told apart in the drill dropdown, and the upsert
+   * above conflicts on name. That operation is a merge.
+   */
+  async renameSoccerCategory(
+    id: string, oldName: string, newName: string
+  ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+
+    const to = (newName || '').trim();
+    if (!id || !oldName || !to) return { ok: false, error: 'A category and a new name are needed.' };
+    if (to === oldName) return { ok: false, error: 'That is already the name.' };
+
+    const { data: clash } = await this.client!
+      .from('soccer_categories')
+      .select('id')
+      .eq('name', to)
+      .or('is_deleted.is.null,is_deleted.eq.false');
+    if (clash && clash.length > 0) {
+      return { ok: false, error: `"${to}" already exists. Use Merge to combine the two instead.` };
+    }
+
+    const retag = await this.retagDrills(oldName, to);
+    if (!retag.ok) return { ok: false, error: retag.error };
+
+    const { error } = await this.client!
+      .from('soccer_categories')
+      .update({ name: to })
+      .eq('id', id)
+      .select();
+    if (error) {
+      console.warn('Supabase renameSoccerCategory notice:', error.message);
+      return {
+        ok: false,
+        error: `${retag.count} drill(s) were re-tagged, but the category itself could not be renamed: ${error.message}`
+      };
+    }
+    return { ok: true, drillsUpdated: retag.count };
+  }
+
+  /**
+   * Fold one category into another: re-tag its drills, then retire its row.
+   *
+   * `fromName` need not have a category row at all. That is the common case --
+   * a drill labelled with a name nobody ever defined -- and there is simply
+   * nothing to retire.
+   */
+  async mergeSoccerCategory(
+    fromName: string, toName: string
+  ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!fromName || !toName) return { ok: false, error: 'Pick a category and a destination.' };
+    if (fromName === toName) return { ok: false, error: 'That is the same category.' };
+
+    const retag = await this.retagDrills(fromName, toName);
+    if (!retag.ok) return { ok: false, error: retag.error };
+
+    const { error } = await this.client!
+      .from('soccer_categories')
+      .update({ is_deleted: true })
+      .eq('name', fromName)
+      .select();
+    if (error) {
+      console.warn('Supabase mergeSoccerCategory notice:', error.message);
+      return {
+        ok: false,
+        error: `${retag.count} drill(s) moved, but "${fromName}" could not be retired: ${error.message}`
+      };
+    }
+    return { ok: true, drillsUpdated: retag.count };
+  }
+
+  /**
+   * Retire a category. Soft delete, matching the repo-wide convention.
+   *
+   * Drills are deliberately left alone: `category` is text on the drill, so a
+   * retired category keeps working there and simply stops being offered for new
+   * ones. Merge is the operation for moving them.
+   */
+  async retireSoccerCategory(id: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!id) return { ok: false, error: 'No category given.' };
+
+    const { error } = await this.client!
+      .from('soccer_categories')
+      .update({ is_deleted: true })
+      .eq('id', id)
+      .select();
+    if (error) { console.warn('Supabase retireSoccerCategory notice:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true };
   }
 
   async fetchDrillsBank(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
