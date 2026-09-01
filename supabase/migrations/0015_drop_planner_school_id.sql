@@ -28,6 +28,21 @@ begin
   end if;
 end $$;
 
+-- Same reasoning, same guard, for daily_thoughts -- a separate check with its
+-- own count and its own message, so a failure here does not send the human
+-- looking at practice_plans instead.
+do $$
+declare
+  stranded integer;
+begin
+  select count(*) into stranded from public.daily_thoughts
+   where team_id is null and not coalesce(is_deleted, false);
+  if stranded > 0 then
+    raise exception
+      '% daily_thoughts rows still have no team. Assign them before dropping school_id, or their origin is lost.', stranded;
+  end if;
+end $$;
+
 alter table public.practice_plans drop column if exists school_id;
 alter table public.daily_thoughts drop column if exists school_id;
 
