@@ -3,11 +3,22 @@
 -- Team-scoped practice planner. See
 -- docs/superpowers/specs/2026-09-01-team-scoped-planner-design.md
 --
--- SAFE TO APPLY BEFORE THE CODE DEPLOYS. school_id is left in place, so
--- currently-deployed code keeps working unchanged. 0015 drops it afterwards.
--- This is deliberately the opposite of what 0005 did: dropping in the same
--- migration that adds leaves a window where deployed code queries a column
--- that no longer exists.
+-- SAFE TO APPLY BEFORE THE CODE DEPLOYS, for reads AND for writes. school_id
+-- is left in place, so currently-deployed code keeps working unchanged. 0015
+-- drops it afterwards. This is deliberately the opposite of what 0005 did:
+-- dropping in the same migration that adds leaves a window where deployed code
+-- queries a column that no longer exists.
+--
+-- PER-TEAM WRITE CONTROL ARRIVES WITH 0015, NOT HERE. The team-scoped RLS
+-- policies used to live in this file, and that reintroduced exactly the window
+-- this split exists to remove -- in the other direction. Deployed code at this
+-- moment writes team_id NULL; is_team_coach(null) is false for a plain coach
+-- (their save is silently refused) but TRUE for an admin (whose save lands with
+-- a null team, vanishes once the new code deploys, and then trips 0015's
+-- stranded-row guard). So the policy swap moved to 0015, which runs after the
+-- deploy. During the window the planner keeps the permissive policies it has
+-- today -- any coach may write any team's planner rows. That is the current
+-- production behaviour, not a new exposure, and it ends when 0015 runs.
 --
 -- The quiz is not touched. Its questions are hardcoded in planner.view.js,
 -- nothing reads quiz_questions, the table is empty and it has no school_id --
@@ -61,34 +72,20 @@ create index if not exists daily_thoughts_team on public.daily_thoughts (team_id
   where not coalesce(is_deleted, false);
 
 -- ─── RLS ───────────────────────────────────────────────────────────────────
--- These tables are in the uniform policy loop in supabase_migration_auth.sql
--- section 6, which grants any coach write access to any row. Replaced here
--- with team-scoped policies: this is the first time the planner has had
--- per-team write control.
---
--- NOTE: re-running supabase_migration_auth.sql section 6 after this would
--- silently restore the permissive policies.
+-- Deliberately NOT here. The team-scoped policy swap lives in 0015 -- see the
+-- header for why applying it before the deploy loses an admin's writes.
 
-alter table public.practice_plans enable row level security;
-alter table public.daily_thoughts enable row level security;
+-- ─── school_id must tolerate being omitted ─────────────────────────────────
+-- From the deploy until 0015 runs, the new code writes planner rows with
+-- team_id and no school_id at all. If either column is NOT NULL, every one of
+-- those writes fails. supabase_schema.sql cannot answer whether they are (it
+-- lists columns, not nullability, and has known drift from the live database),
+-- and this migration is written without database access -- so rather than
+-- assume, make the question moot. A no-op when the column is already nullable,
+-- a fix when it is not. 0015 drops both columns anyway.
 
-drop policy if exists "practice_plans_select" on public.practice_plans;
-create policy "practice_plans_select" on public.practice_plans
-  for select using (coalesce(is_deleted, false) = false);
-
-drop policy if exists "practice_plans_write" on public.practice_plans;
-create policy "practice_plans_write" on public.practice_plans
-  for all using (public.is_team_coach(team_id))
-  with check (public.is_team_coach(team_id));
-
-drop policy if exists "daily_thoughts_select" on public.daily_thoughts;
-create policy "daily_thoughts_select" on public.daily_thoughts
-  for select using (coalesce(is_deleted, false) = false);
-
-drop policy if exists "daily_thoughts_write" on public.daily_thoughts;
-create policy "daily_thoughts_write" on public.daily_thoughts
-  for all using (public.is_team_coach(team_id))
-  with check (public.is_team_coach(team_id));
+alter table public.practice_plans alter column school_id drop not null;
+alter table public.daily_thoughts  alter column school_id drop not null;
 
 -- ─── Self-check ────────────────────────────────────────────────────────────
 -- Proves the backfill reached every row and that the columns exist, at the
@@ -135,11 +132,9 @@ commit;
 --   group by t.name, p.name order by t.name, p.name;
 
 -- Rollback:
---   drop policy if exists "practice_plans_write" on public.practice_plans;
---   drop policy if exists "practice_plans_select" on public.practice_plans;
---   drop policy if exists "daily_thoughts_write" on public.daily_thoughts;
---   drop policy if exists "daily_thoughts_select" on public.daily_thoughts;
 --   alter table public.practice_plans drop column if exists team_id;
 --   alter table public.daily_thoughts drop column if exists team_id;
---   -- then re-run supabase_migration_auth.sql section 6 to restore the
---   -- uniform coach/admin policies on both tables.
+--   -- No policy rollback needed: this migration no longer touches RLS. The
+--   -- `drop not null` on school_id is not reversed -- re-imposing NOT NULL
+--   -- would fail on any row written without one, and the column is dropped
+--   -- by 0015 regardless.

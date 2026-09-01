@@ -120,6 +120,9 @@ Reads stay public, matching every other table. Writes are gated on
 first time the planner has had per-team write control: today any coach can edit
 any plan in the organization.
 
+The policies ship in `0015`, after the code deploys, not in `0014` — see the
+deploy sequence for why applying them earlier loses an admin's writes.
+
 ## Copying between teams
 
 One mechanism, two surfaces: **Copy to team…** on a plan and on a daily
@@ -212,13 +215,30 @@ otherwise be silent:
 Load-bearing, and the reverse of the usual order for step 3:
 
 1. **Apply `0014`** — adds `team_id` to `practice_plans` and `daily_thoughts`,
-   backfills the 27 plan rows to Varsity, leaves `school_id` in place. Nothing breaks; deployed code
-   continues to work unchanged.
-2. **Deploy the code** that reads `team_id`.
-3. **Apply `0015`** — drops `school_id` from both tables.
+   backfills the 27 plan rows to Varsity, leaves `school_id` in place and makes
+   it nullable. Deployed code continues to work unchanged, for reads *and* for
+   writes: it still writes `school_id` and no `team_id`, and the permissive
+   planner policies from `supabase_migration_auth.sql` section 6 are still in
+   force. The only visible effect is that new rows written during the window
+   have a null `team_id` and must be assigned before step 3 (see the note
+   below).
+2. **Deploy the code** that reads and writes `team_id`.
+3. **Apply `0015`** — swaps the planner RLS policies to `is_team_coach(team_id)`
+   and drops `school_id` from both tables.
 
-Step 3 is optional in timing and could wait a week. Nothing depends on it except
-tidiness, and delaying it costs only a redundant column.
+The RLS swap sits in step 3, not step 1. Applied before the deploy it would
+break writes rather than reads: deployed code writes `team_id` NULL, and
+`is_team_coach(null)` is false for a plain coach — whose save is silently
+refused — but **true** for an admin, whose save then lands with a null team,
+disappears once the new code deploys, and trips `0015`'s stranded-row guard.
+That is the same silent-failure-plus-data-loss shape the whole task exists to
+close, so the window keeps today's permissive policies instead. Any coach can
+write any team's planner rows until step 3 — which is exactly current
+production behaviour, not a new exposure.
+
+The **column drop** in step 3 is optional in timing and could wait a week;
+nothing depends on it except tidiness. The **policy swap** in the same step is
+not: per-team write control does not exist until it runs.
 
 ## Out of scope
 

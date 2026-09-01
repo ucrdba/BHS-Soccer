@@ -1,11 +1,11 @@
 /**
  * Task 6 / addendum Ruling B: migration 0015 drops school_id from
  * practice_plans and daily_thoughts, and both tables are team-scoped by RLS
- * (is_team_coach(team_id)) since migration 0014. runFullDatabaseDiagnostic's
+ * (is_team_coach(team_id)) as of migration 0015. runFullDatabaseDiagnostic's
  * two payloads for those tables used to send school_id and no team_id at
  * all -- after 0015 that insert fails outright ("column does not exist"),
- * and even before 0015 it reads as a false FAILED for a plain coach, since
- * is_team_coach(null) only returns true for an admin.
+ * and once 0015 swaps the policies in it reads as a false FAILED for a plain
+ * coach, since is_team_coach(null) only returns true for an admin.
  *
  * These tests execute the real SupabaseService method against a recording
  * fake client and assert the payload that would reach the database, not
