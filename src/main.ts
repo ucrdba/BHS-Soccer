@@ -15,6 +15,7 @@ declare global {
   interface Window {
     auth: typeof auth;
     authReady: Promise<void>;
+    emailLinkResult?: { outcome: string; message?: string };
     can: typeof can;
     resolveActiveTeam: typeof resolveActiveTeam;
   }
@@ -47,7 +48,21 @@ if (backedUp) {
 // a roles-load failure is caught too. Appending `.then()` after `.catch()`
 // would let a rejected fetchRoles() reject window.authReady itself and
 // reproduce the exact bug the `.catch()` exists to prevent.
-window.authReady = auth.init()
+// An emailed confirmation link returns here with its tokens in the URL. This
+// has to run BEFORE auth.init() reads the session, or init sees a signed-out
+// browser and the player lands on the guest home page having just confirmed
+// their account — which is exactly the bug this fixes.
+//
+// The result is stashed on window rather than acted on here: this module owns
+// wiring, and the classic scripts own what the page says. utils.js reads it
+// once the app has rendered.
+window.authReady = supabaseService.completeEmailLink()
+  .then((res) => { window.emailLinkResult = res; })
+  .catch((err) => {
+    console.warn('Email link completion notice:', err);
+    window.emailLinkResult = { outcome: 'none' };
+  })
+  .then(() => auth.init())
   .then(async () => {
     const rows = await supabaseService.fetchRoles();
     setRoles((rows as RoleRow[]) ?? []);

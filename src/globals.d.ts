@@ -70,6 +70,8 @@ declare global {
     deleteTeamMembership(teamId: string, playerId: string): Promise<{ ok: boolean; error?: string }>;
 
     // Real Supabase Auth
+    authRedirectUrl(): string;
+    completeEmailLink(): Promise<{ outcome: string; message?: string }>;
     signUpUser(email: string, password: string, metadata?: Record<string, any>): Promise<SupabaseAuthResult | null>;
     signInUser(email: string, password: string): Promise<SupabaseAuthResult | null>;
     signOutUser(): Promise<{ error: { message: string } | null } | null>;

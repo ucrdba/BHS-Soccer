@@ -57,7 +57,23 @@ function initSupabaseClient(): void {
 
   if (url && url.includes('.supabase.co') && key && key.startsWith('eyJ')) {
     try {
-      supabaseClient = createClient(url, key);
+      supabaseClient = createClient(url, key, {
+        auth: {
+          // The signup email carries a LINK, not a code — the template that
+          // would send a 6-digit token cannot be changed on this project's
+          // plan. So the client has to pick the session up out of the URL it
+          // is returned to, which is what detectSessionInUrl does.
+          detectSessionInUrl: true,
+          // Implicit rather than PKCE, deliberately. PKCE stores a verifier in
+          // the browser that started the signup, so a player who registers on
+          // a laptop and opens the email on their phone can never complete it
+          // — the phone has no verifier. Implicit returns tokens in the URL
+          // fragment and works on whichever device opens the link.
+          flowType: 'implicit',
+          persistSession: true,
+          autoRefreshToken: true
+        }
+      });
       console.log('⚡ Connected to Supabase Cloud Database:', url);
     } catch (err: any) {
       console.warn('Supabase init notice:', err.message);
@@ -93,10 +109,86 @@ class SupabaseService {
     return this.isConfigured();
   }
 
+  /**
+   * Where an emailed auth link should return the player.
+   *
+   * The current origin, so a link opened from a signup on localhost returns to
+   * localhost and one from production returns to production. Every origin used
+   * must also be in Supabase's redirect allow-list, or GoTrue silently
+   * substitutes the Site URL and the player lands on the wrong site.
+   */
+  authRedirectUrl(): string {
+    try {
+      return `${window.location.origin}/`;
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Finish an emailed confirmation link.
+   *
+   * Returns what actually happened so the caller can say it out loud:
+   *   'confirmed'  — session established, they are signed in and pending
+   *   'verified'   — the link was valid but no session could be made here,
+   *                  which is the cross-device case: signed up on a laptop,
+   *                  opened the email on a phone. The account IS confirmed.
+   *   'error'      — the link was expired or already used
+   *   'none'       — an ordinary page load, no auth parameters present
+   */
+  async completeEmailLink(): Promise<{ outcome: string; message?: string }> {
+    if (!this.isConfigured()) return { outcome: 'none' };
+
+    let hash = '', search = '';
+    try {
+      hash = window.location.hash || '';
+      search = window.location.search || '';
+    } catch { return { outcome: 'none' }; }
+
+    const hasTokens = hash.includes('access_token=');
+    const hasError = hash.includes('error=') || search.includes('error=');
+    const hasCode = /[?&]code=/.test(search);
+    if (!hasTokens && !hasError && !hasCode) return { outcome: 'none' };
+
+    // Strip the parameters either way: leaving tokens in the address bar means
+    // they survive a copied link, a screenshot, or the browser history.
+    const clean = () => {
+      try {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch { /* history blocked; the tokens are cosmetic at this point */ }
+    };
+
+    if (hasError) {
+      const params = new URLSearchParams((hash || search).replace(/^[#?]/, ''));
+      const desc = params.get('error_description') || 'That link is no longer valid.';
+      clean();
+      return { outcome: 'error', message: desc.replace(/\+/g, ' ') };
+    }
+
+    // detectSessionInUrl has already run by now; ask what it produced rather
+    // than parsing the fragment ourselves.
+    try {
+      const { data } = await this.client!.auth.getSession();
+      clean();
+      if (data?.session) return { outcome: 'confirmed' };
+      return { outcome: 'verified' };
+    } catch {
+      clean();
+      return { outcome: 'verified' };
+    }
+  }
+
   async signUpUser(email: string, password: string, metadata: Record<string, any> = {}): Promise<any> {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client!.auth.signUp({ email, password, options: { data: metadata } });
+      // Without emailRedirectTo the link falls back to whatever Site URL is
+      // configured, which is invisible from here and easy to leave pointing at
+      // localhost. Sending the current origin makes the round trip land back
+      // where the player actually signed up.
+      const { data, error } = await this.client!.auth.signUp({
+        email, password,
+        options: { data: metadata, emailRedirectTo: this.authRedirectUrl() }
+      });
       if (error) console.warn('Supabase Auth signUp notice:', error.message);
       return { data, error };
     } catch (e) {

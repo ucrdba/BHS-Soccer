@@ -316,6 +316,71 @@ function initApp() {
   if (!window.app) {
     window.app = new BHSSoccerApp();
   }
+  showEmailLinkOutcome();
+}
+
+/**
+ * Say what an emailed confirmation link actually did.
+ *
+ * Without this a player clicks the link in their email, the account is
+ * confirmed at Supabase, and the app renders its ordinary guest home page —
+ * so the only visible outcome of confirming your account is nothing at all.
+ * That was the reported bug; establishing the session was only half of it.
+ *
+ * src/main.ts sets window.emailLinkResult before the app boots.
+ */
+function showEmailLinkOutcome() {
+  const res = window.emailLinkResult;
+  if (!res || res.outcome === 'none') return;
+
+  const copy = {
+    // Signed in here: the same browser that registered.
+    confirmed: {
+      tone: 'ok',
+      title: 'Email confirmed',
+      body: 'Your account is now waiting for a coach to approve it. You will be able to see your team once they do.'
+    },
+    // The cross-device case — registered on a laptop, opened the mail on a
+    // phone. No session can be created here, but the account IS confirmed, and
+    // saying so is the difference between "done" and "nothing happened".
+    verified: {
+      tone: 'ok',
+      title: 'Email confirmed',
+      body: 'Sign in with your email and password to finish. A coach still needs to approve your account before you can see your team.'
+    },
+    error: {
+      tone: 'bad',
+      title: 'That link did not work',
+      body: res.message || 'It may have expired or already been used. Try signing in — if that fails, register again.'
+    }
+  }[res.outcome];
+  if (!copy) return;
+
+  const ok = copy.tone === 'ok';
+  const box = document.createElement('div');
+  box.setAttribute('role', 'status');
+  box.style.cssText = [
+    'position:fixed', 'left:50%', 'top:18px', 'transform:translateX(-50%)',
+    'z-index:9999', 'max-width:min(92vw,460px)', 'padding:14px 18px',
+    'border-radius:8px', 'background:var(--bhs-navy-card,#112240)',
+    'border:1px solid ' + (ok ? 'var(--bhs-cyan-accent,#00F0FF)' : 'var(--color-danger,#EF4444)'),
+    'border-left-width:4px', 'box-shadow:0 8px 30px rgba(0,0,0,.45)',
+    'font-size:0.9rem', 'line-height:1.5'
+  ].join(';');
+  box.innerHTML =
+    '<div style="color:' + (ok ? 'var(--bhs-cyan-accent,#00F0FF)' : 'var(--color-danger,#EF4444)') +
+      ';font-weight:700;margin-bottom:4px;">' + copy.title + '</div>' +
+    '<div style="color:var(--text-muted,#94A3B8);">' + copy.body + '</div>' +
+    '<button type="button" style="position:absolute;top:8px;right:10px;background:none;border:0;' +
+      'color:var(--text-muted,#94A3B8);font-size:18px;line-height:1;cursor:pointer;" ' +
+      'aria-label="Dismiss">&times;</button>';
+
+  box.querySelector('button').addEventListener('click', () => box.remove());
+  document.body.appendChild(box);
+
+  // Long enough to read twice; a coach-approval message the player misses is
+  // worse than one that lingers.
+  setTimeout(() => box.remove(), 15000);
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
