@@ -37,7 +37,8 @@ update public.practice_plans p
   join public.schools s on s.id = t.school_id
  where p.team_id is null
    and p.school_id = s.id
-   and t.is_public_default;
+   and t.is_public_default
+   and not coalesce(t.is_deleted, false);
 
 -- Anything still unassigned had a school_id matching no default team. Report
 -- it rather than leaving rows that will silently vanish from every view.
@@ -111,6 +112,12 @@ begin
    where table_schema = 'public' and table_name = 'practice_plans' and column_name = 'school_id';
   if has_col <> 1 then
     raise exception 'school_id was dropped by 0014; deployed code still needs it. That belongs in 0015.';
+  end if;
+
+  select count(*) into has_col from information_schema.columns
+   where table_schema = 'public' and table_name = 'daily_thoughts' and column_name = 'school_id';
+  if has_col <> 1 then
+    raise exception 'school_id was dropped from daily_thoughts by 0014; deployed code still needs it. That belongs in 0015.';
   end if;
 
   select count(*) into unassigned from public.practice_plans
