@@ -31,6 +31,11 @@ declare global {
     fetchSchedule(teamId: string): Promise<Record<string, any>[] | null>;
     fetchPracticePlans(teamId: string): Promise<Record<string, any>[] | null>;
     teamsCoachedBy(): Promise<Record<string, any>[] | null>;
+    // A plan is the set of practice_plans rows sharing a name, so this renames
+    // every slot -- and refuses a name the team already uses, which would fuse
+    // the two plans into one session.
+    renamePracticePlan(teamId: string, oldName: string, newName: string):
+      Promise<{ ok: boolean; error?: string; slots?: number }>;
     copyPracticePlan(planName: string, fromTeamId: string, toTeamId: string):
       Promise<{ ok: boolean; error?: string; slots?: number }>;
     copyDailyThought(thoughtId: string, toTeamId: string):

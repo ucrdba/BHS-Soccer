@@ -1075,6 +1075,7 @@ Object.assign(BHSSoccerApp.prototype, {
                 </div>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-gold" style="padding:6px 12px; font-size:0.82rem;" onclick="app.loadPracticePlan('${p.id}')">⚡ Load Plan</button>
+                  <button class="btn btn-secondary" style="padding:6px 10px; font-size:0.82rem;" onclick="app.renameSavedPlan('${p.id}')" title="Rename this plan">✏️ Rename</button>
                   <button class="btn btn-secondary" style="padding:6px 10px; font-size:0.82rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger); border-color:var(--color-danger);" onclick="app.deleteSavedPlan('${p.id}')">🗑️</button>
                 </div>
               </div>
@@ -1104,6 +1105,60 @@ Object.assign(BHSSoccerApp.prototype, {
         this.saveData();
         this.renderCurrentView();
         this.closeModals();
+      }
+    });
+  },
+
+  /**
+   * Rename a saved plan.
+   *
+   * A plan is the set of practice_plans rows sharing a name, so this renames
+   * every slot in one write. The service refuses a rename onto a name this
+   * team already uses: Postgres would accept it and quietly fuse the two into
+   * a single session with overlapping times.
+   *
+   * The local copies are updated alongside the database rather than by a full
+   * re-sync, so the modal stays open on the list the coach is working through.
+   */
+  renameSavedPlan(planId) {
+    const plan = (this.data.savedPlans || []).find(p => p.id === planId);
+    if (!plan) return;
+
+    this.showPromptModal({
+      title: '✏️ RENAME PRACTICE PLAN',
+      message: `Rename "${plan.name}". Every drill slot in this plan moves with it.`,
+      defaultValue: plan.name,
+      placeholder: 'e.g. Short Varsity 60-Min High Intensity',
+      confirmText: '✏️ Rename',
+      onConfirm: async (value) => {
+        const newName = (value || '').trim();
+        if (!newName || newName === plan.name) { this.openLoadPlanModal(); return; }
+
+        if (!window.supabaseService || !window.supabaseService.isConfigured()) {
+          window.alert('Cloud database is not configured; the plan was not renamed.');
+          return;
+        }
+        if (!this.activeTeamId) {
+          window.alert('No team is selected, so the plan was not renamed. Choose a team in the header first.');
+          return;
+        }
+
+        const oldName = plan.name;
+        const res = await window.supabaseService.renamePracticePlan(this.activeTeamId, oldName, newName);
+        if (!res || !res.ok) {
+          window.alert((res && res.error) || 'Could not rename that plan.');
+          this.openLoadPlanModal();
+          return;
+        }
+
+        // Keep local state in step: the saved list, and the active plan name if
+        // this is the plan currently loaded into the timeline. oldName is read
+        // before the mutation below -- comparing after it would always match.
+        plan.name = newName;
+        if (this.data.activePlanName === oldName) this.data.activePlanName = newName;
+        this.saveData();
+        this.renderCurrentView();
+        this.openLoadPlanModal();
       }
     });
   },

@@ -1069,6 +1069,57 @@ class SupabaseService {
    * for months. school_id is not written: it is dropped from practice_plans
    * by migration 0015, and team_id alone already determines the organization.
    */
+  /**
+   * Rename a saved practice plan.
+   *
+   * A plan is NOT a row: practice_plans holds one row per drill slot, and a
+   * plan is the set of rows sharing a name. So this updates every slot, and a
+   * rename onto a name this team already uses is REFUSED -- Postgres would
+   * accept it happily, and the coach would be left with one session holding
+   * both plans' slots at overlapping times, with nothing having errored. That
+   * exact fusion had to be avoided by hand when repairing a mangled plan name
+   * in the live database.
+   *
+   * Team-scoped, so Varsity and JV may each keep their own "Monday Session".
+   */
+  async renamePracticePlan(
+    teamId: string, oldName: string, newName: string
+  ): Promise<{ ok: boolean; error?: string; slots?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    // team_id is a uuid column; a leftover school code must be refused here
+    // rather than reaching Postgres and failing the cast with 22P02.
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+
+    const to = (newName || '').trim();
+    if (!oldName || !to) return { ok: false, error: 'A plan and a new name are needed.' };
+    if (to === oldName) return { ok: false, error: 'That is already the name.' };
+
+    const { data: clash } = await this.client!
+      .from('practice_plans')
+      .select('id')
+      .eq('team_id', teamId)
+      .eq('name', to)
+      .or('is_deleted.is.null,is_deleted.eq.false');
+    if (clash && clash.length > 0) {
+      return {
+        ok: false,
+        error: `This team already has a plan called "${to}". Two plans sharing a name become one session, so pick a different name.`
+      };
+    }
+
+    const { data, error } = await this.client!
+      .from('practice_plans')
+      .update({ name: to })
+      .eq('team_id', teamId)
+      .eq('name', oldName)
+      .select();
+    if (error) { console.warn('Supabase renamePracticePlan notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) {
+      return { ok: false, error: `No plan called "${oldName}" on this team, or the database refused the change.` };
+    }
+    return { ok: true, slots: data.length };
+  }
+
   async saveFullPracticePlan(teamId: string, planNameOrObj?: any, drillsArr?: any[]): Promise<any> {
     if (!this.isConfigured()) return { success: false, error: 'Supabase Cloud DB is not configured.' };
     if (!teamId || !this.isUuid(teamId)) {
