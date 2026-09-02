@@ -777,18 +777,22 @@ Object.assign(BHSSoccerApp.prototype, {
             <span class="text-muted" style="font-size:0.75rem; margin-left:8px;">${this._text(p.class_year || '')}</span>
             ${dup ? '<span class="badge badge-gold" style="margin-left:8px;">SAME NAME AS ANOTHER</span>' : ''}
             <div class="text-muted" style="font-size:0.76rem; margin-top:2px;">
-              ${p.resultCount > 0
-                ? `${p.resultCount} Matrix result${p.resultCount === 1 ? '' : 's'} on record`
-                : 'No results on record'}
+              ${p.historyUnknown
+                ? 'Result history unavailable'
+                : p.resultCount > 0
+                  ? `${p.resultCount} Matrix result${p.resultCount === 1 ? '' : 's'} on record`
+                  : 'No results on record'}
             </div>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             ${team ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;"
                     onclick="app.addUnassignedPlayerToTeam('${p.id}','${nameArg}')">+ Add to ${this._text(team.name)}</button>` : ''}
-            ${p.resultCount === 0
-              ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; color:var(--color-danger); border-color:var(--color-danger);"
-                       onclick="app.retireUnassignedPlayer('${p.id}','${nameArg}')">Retire</button>`
-              : `<span class="text-muted" style="font-size:0.73rem; align-self:center;">Keeps their results &mdash; add to a team instead</span>`}
+            ${p.historyUnknown
+              ? `<span class="text-muted" style="font-size:0.73rem; align-self:center;">Result history could not be read &mdash; retiring is disabled</span>`
+              : p.resultCount === 0
+                ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; color:var(--color-danger); border-color:var(--color-danger);"
+                         onclick="app.retireUnassignedPlayer('${p.id}','${nameArg}')">Retire</button>`
+                : `<span class="text-muted" style="font-size:0.73rem; align-self:center;">Keeps their results &mdash; add to a team instead</span>`}
           </div>
         </div>`;
     }).join('');
@@ -847,6 +851,11 @@ Object.assign(BHSSoccerApp.prototype, {
     const person = (this._unassignedPlayers || []).find(p => p.id === playerId);
     // Re-checked here rather than trusting the rendered button: the panel may
     // have been open while a result was recorded elsewhere.
+    if (person && person.historyUnknown) {
+      this._unassignedError = `Could not read ${name}'s result history, so retiring them is not safe. Try again once the database is reachable.`;
+      this.renderAdminModalContent();
+      return;
+    }
     if (person && person.resultCount > 0) {
       this._unassignedError = `${name} has ${person.resultCount} Matrix result(s) on record and cannot be retired — add them to a team instead.`;
       this.renderAdminModalContent();

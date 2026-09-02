@@ -1938,11 +1938,24 @@ class SupabaseService {
         .select('player_id, is_deleted'),
       this.client!.from('matrix_logs')
         .select('player_a_id, player_b_id, is_deleted'),
+      // No is_deleted here: matrix_session_results does NOT have that column,
+      // unlike matrix_logs and team_players. Verified against the live
+      // database -- asking for it returns 42703 and the whole query fails,
+      // which would have made every session result count as zero and offered a
+      // player with real history for retirement.
       this.client!.from('matrix_session_results')
-        .select('player_id, is_deleted')
+        .select('player_id')
     ]);
 
     if (people.error) { console.warn('Supabase fetchUnassignedPlayers notice:', people.error.message); return null; }
+
+    // If a history query failed we cannot say what anyone owns. Say so rather
+    // than reporting zero, which reads identically to "safe to retire".
+    const historyUnknown = !!(logs.error || sessionResults.error || memberships.error);
+    if (historyUnknown) {
+      console.warn('Supabase fetchUnassignedPlayers: could not read result history —',
+        (logs.error || sessionResults.error || memberships.error)?.message);
+    }
 
     const onATeam = new Set(
       (memberships.data || [])
@@ -1964,7 +1977,12 @@ class SupabaseService {
 
     return (people.data || [])
       .filter((p: any) => !onATeam.has(p.id))
-      .map((p: any) => ({ ...p, resultCount: results[p.id] || 0 }))
+      .map((p: any) => ({
+        ...p,
+        resultCount: results[p.id] || 0,
+        // A caller must not offer to retire anyone while this is true.
+        historyUnknown
+      }))
       .sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
   }
 

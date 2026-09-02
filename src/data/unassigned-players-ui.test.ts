@@ -132,6 +132,32 @@ describe('someone with no results', () => {
   });
 });
 
+describe('when the result history could not be read', () => {
+  // This nearly shipped: fetchUnassignedPlayers asked matrix_session_results
+  // for an is_deleted column that table does not have, so the query 400'd and
+  // every session result silently counted as zero -- which reads exactly like
+  // "safe to retire". Unknown history must never look like no history.
+  const UNKNOWN = { ...CLEAN, resultCount: 0, historyUnknown: true };
+
+  it('offers no Retire button', () => {
+    const html = makeApp([UNKNOWN]).renderUnassignedPlayersSection();
+    expect(html).not.toContain(`retireUnassignedPlayer('p-clean'`);
+    expect(html).toContain('Result history unavailable');
+  });
+
+  it('refuses the retire even if the call is made anyway', async () => {
+    const app = makeApp([UNKNOWN]);
+    await app.retireUnassignedPlayer('p-clean', 'Caleb Carver');
+    expect(deleted).toHaveLength(0);
+    expect(app._unassignedError).toMatch(/not safe|could not read/i);
+  });
+
+  it('still lets them be added to a team, which is always safe', () => {
+    const html = makeApp([UNKNOWN]).renderUnassignedPlayersSection();
+    expect(html).toContain('addUnassignedPlayerToTeam');
+  });
+});
+
 describe('adding one back to a team', () => {
   it('writes the membership for the active team', async () => {
     const app = makeApp([CLEAN]);
