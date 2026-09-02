@@ -143,6 +143,102 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * The overall board's rows, already ordered.
+   *
+   * Lifted out of the template so the ordering can be tested and so the header
+   * can sort it. Rank stays the default, because that is the board's own
+   * answer to "who is ahead"; the other columns answer different questions.
+   *
+   * Per-key defaults rather than an object-level fallback: matrixStats is
+   * populated by left-joining standings onto the roster, so a player with no
+   * results has no matrixStats at all, and one with partial standings can be
+   * missing a single key while holding the rest.
+   */
+  matrixBoardRows() {
+    const players = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
+    // Hoisted: computing this per row would rescan every player for every row.
+    const leaderPts = Math.max(0, ...players.map(x => Number(x.matrixStats?.earned || 0)));
+
+    const rows = players.map(p => {
+      const ms = p.matrixStats || {};
+      const earned = Number(ms.earned || 0);
+      return {
+        playerId: p.id,
+        name: p.name,
+        recordingNumber: p.recordingNumber,
+        wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
+        games: ms.games || 0, exercises: ms.exercises || 0,
+        earned,
+        available: Number(ms.available || 0),
+        share: (ms.share === undefined ? null : ms.share),
+        rank: ms.rank || 999,
+        // The bar tracks POINTS against the leader, because points are what
+        // the table is ordered by by default. A bar drawn from share would
+        // disagree with the ordering sitting beside it.
+        barPct: leaderPts > 0 ? Math.round((earned / leaderPts) * 100) : 0
+      };
+    });
+
+    const by = this._boardSort || 'rank';
+    const reversed = !!this._boardSortReversed;
+    return rows.sort((x, y) => this.compareBoardRows(x, y, by, reversed));
+  },
+
+  /**
+   * Order two rows of the overall board.
+   *
+   * A player who has taken part in nothing is not last on merit and not first
+   * when reversed -- there is nothing to compare. They sink either way, so a
+   * block of empty rows never leads the board.
+   */
+  compareBoardRows(x, y, by, reversed) {
+    const flip = reversed ? -1 : 1;
+    const unranked = (r) => r.exercises === 0;
+
+    if (by !== 'name') {
+      if (unranked(x) !== unranked(y)) return unranked(x) ? 1 : -1;
+    }
+
+    if (by === 'name') {
+      return flip * String(x.name || '').localeCompare(String(y.name || ''));
+    }
+
+    if (by === 'earned') {
+      if (x.earned !== y.earned) return flip * (y.earned - x.earned);
+      return String(x.name || '').localeCompare(String(y.name || ''));
+    }
+
+    if (by === 'share') {
+      // Share is null until a player has taken part in something.
+      if (x.share === null || y.share === null) {
+        if (x.share === y.share) return 0;
+        return x.share === null ? 1 : -1;
+      }
+      if (x.share !== y.share) return flip * (y.share - x.share);
+      return String(x.name || '').localeCompare(String(y.name || ''));
+    }
+
+    // Default: the board's own rank, best first.
+    if (x.rank !== y.rank) return flip * (x.rank - y.rank);
+    return String(x.name || '').localeCompare(String(y.name || ''));
+  },
+
+  /** Which way a board column reads on its first click. */
+  boardSortDescends(by) {
+    return by === 'earned' || by === 'share';
+  },
+
+  setBoardSort(by) {
+    if (this._boardSort === by) {
+      this._boardSortReversed = !this._boardSortReversed;
+    } else {
+      this._boardSort = by;
+      this._boardSortReversed = false;
+    }
+    this.renderCurrentView();
+  },
+
+  /**
    * Click a column to sort by it; click the same one again to reverse.
    *
    * There was no direction at all before: every click re-applied the same
@@ -316,6 +412,16 @@ Object.assign(BHSSoccerApp.prototype, {
   renderMatrixView() {
     const isCoach = window.auth.isCoach();
 
+    // The arrow shows the order in force, not merely that a column is sorted.
+    const boardTh = (key, label) => {
+      const on = (this._boardSort || 'rank') === key;
+      const desc = this.boardSortDescends(key) !== !!this._boardSortReversed;
+      const arrow = on ? (desc ? ' \u25BC' : ' \u25B2') : '';
+      const cls = key === 'name' ? 'col-text' : '';
+      return `<th class="${cls}" style="cursor:pointer;" title="Sort by ${label}"
+                  onclick="app.setBoardSort('${key}')">${label}${arrow}</th>`;
+    };
+
     return `
       <div class="container">
         <div class="portal-header">
@@ -362,59 +468,30 @@ Object.assign(BHSSoccerApp.prototype, {
             <table class="matrix-table">
               <thead>
                 <tr>
-                  <th>RANK</th>
-                  <th>PLAYER</th>
+                  ${boardTh('rank', 'RANK')}
+                  ${boardTh('name', 'PLAYER')}
                   <th>EX</th>
                   <th>W-D-L</th>
-                  <th>PTS</th>
+                  ${boardTh('earned', 'PTS')}
                   <th>OF</th>
-                  <th>SHARE</th>
+                  ${boardTh('share', 'SHARE')}
                 </tr>
               </thead>
               <tbody>
-                ${(() => {
-                  // Hoisted: computing this inside the map would rescan every
-                  // player for every row.
-                  const leaderPts = Math.max(0, ...(this.data.players || [])
-                    .map(x => Number(x.matrixStats?.earned || 0)));
-                  return (this.data.players || [])
-                  .filter(p => !p.is_deleted && !p.isDeleted)
-                  .sort((a, b) => (a.matrixStats?.rank || 999) - (b.matrixStats?.rank || 999))
-                  .map(p => {
-                    // Per-key defaults, not `p.matrixStats || {...}`. matrixStats is
-                    // populated in syncFromSupabase() by left-joining standings onto
-                    // the roster, so a player with no logged results at all gets no
-                    // matrixStats property rather than a zeroed one — an
-                    // object-level fallback covers that, but per-key defaults are
-                    // also what protects a partially-shaped object (e.g. missing
-                    // `exercises` while `wins`/`losses` are present) from rendering
-                    // `undefined` in any one cell.
-                    const ms = p.matrixStats || {};
-                    const m = {
-                      wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
-                      games: ms.games || 0, exercises: ms.exercises || 0,
-                      earned: Number(ms.earned || 0), available: Number(ms.available || 0),
-                      share: (ms.share === undefined ? null : ms.share),
-                      rank: ms.rank || 999
-                    };
-                    // The bar tracks POINTS against the leader, because points
-                    // are what the table is ordered by. A bar drawn from share
-                    // would disagree with the ordering sitting beside it.
-                    const barPct = leaderPts > 0 ? Math.round((m.earned / leaderPts) * 100) : 0;
-                    return `
+                ${this.matrixBoardRows().map(m => `
                   <tr>
                     <td>
                       ${m.exercises === 0
                         ? '<div class="rank-pill rank-other">&mdash;</div>'
                         : `<div class="rank-pill ${m.rank <= 3 ? 'rank-' + m.rank : 'rank-other'}">${m.rank}</div>`}
                     </td>
-                    <td>
-                      <button type="button" onclick="app.openBreakdown('${p.id}')"
+                    <td class="col-text">
+                      <button type="button" onclick="app.openBreakdown('${m.playerId}')"
                               title="See how these points were earned"
                               style="background:none; border:0; padding:0; cursor:pointer; text-align:left; font:inherit; color:inherit;">
-                        <strong style="border-bottom:1px dotted var(--bhs-cyan-accent);">${p.name}</strong>
+                        <strong style="border-bottom:1px dotted var(--bhs-cyan-accent);">${m.name}</strong>
                       </button>
-                      <span class="text-muted">${p.recordingNumber != null ? '(' + p.recordingNumber + ')' : '—'}</span>
+                      <span class="text-muted">${m.recordingNumber != null ? '(' + m.recordingNumber + ')' : '—'}</span>
                     </td>
                     <td>${m.exercises}</td>
                     <td>${m.wins} - ${m.draws} - ${m.losses}</td>
@@ -423,12 +500,10 @@ Object.assign(BHSSoccerApp.prototype, {
                     <td>
                       ${m.share === null ? '<span class="text-muted">&mdash;</span>' : m.share.toFixed(1) + '%'}
                       <div class="score-progress">
-                        <div class="score-bar" style="width: ${barPct}%;"></div>
+                        <div class="score-bar" style="width: ${m.barPct}%;"></div>
                       </div>
                     </td>
-                  </tr>`;
-                  }).join('');
-                })()}
+                  </tr>`).join('')}
               </tbody>
             </table>`}
 
