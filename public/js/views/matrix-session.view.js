@@ -338,6 +338,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (err) err.textContent = '';
 
     await this.loadSessionBands();
+    this.restoreSessionWidth();
 
     const picker = document.getElementById('sessionDrill');
     if (picker) {
@@ -464,7 +465,7 @@ Object.assign(BHSSoccerApp.prototype, {
         const out = had && had.outcome ? had.outcome : '';
         return `
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
-          <span style="flex:1; color:#FFF; font-size:0.85rem;">
+          <span style="flex:1; min-width:0; color:#FFF; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             <span style="display:inline-block; min-width:28px; color:var(--bhs-gold-accent); font-weight:700;">${p.recordingNumber != null ? p.recordingNumber : '—'}</span>
             ${p.name}
             ${p._gone ? '<span class="badge badge-coach" style="font-size:0.65rem;">no longer on this team</span>' : ''}
@@ -549,6 +550,35 @@ Object.assign(BHSSoccerApp.prototype, {
     this._sessionSort = by === 'name' ? 'name' : 'number';
     const rows = document.getElementById('sessionRows');
     if (rows) rows.innerHTML = this.renderSessionRows();
+  },
+
+  /**
+   * Widen the session modal to the full window, or back.
+   *
+   * A per-device preference, kept in localStorage: a coach entering a whole
+   * squad from paper wants the width every time, and re-clicking it at every
+   * session is the sort of small friction that makes a screen feel unfinished.
+   */
+  toggleSessionWidth() {
+    const win = document.getElementById('matrixSessionWindow');
+    if (!win) return;
+    const wide = win.style.maxWidth !== '98vw';
+    this.applySessionWidth(wide);
+    try { localStorage.setItem('bhs_session_modal_wide', wide ? '1' : '0'); } catch (e) { /* private mode */ }
+  },
+
+  applySessionWidth(wide) {
+    const win = document.getElementById('matrixSessionWindow');
+    const btn = document.getElementById('sessionWidthBtn');
+    if (win) win.style.maxWidth = wide ? '98vw' : '820px';
+    if (btn) btn.textContent = wide ? '↔ Narrow' : '↔ Wide';
+  },
+
+  /** Restore the remembered width when the modal opens. */
+  restoreSessionWidth() {
+    let wide = false;
+    try { wide = localStorage.getItem('bhs_session_modal_wide') === '1'; } catch (e) { /* private mode */ }
+    this.applySessionWidth(wide);
   },
 
   collectSessionResults() {

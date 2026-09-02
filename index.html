@@ -398,10 +398,18 @@
   </div>
 
   <div id="matrixSessionModal" class="modal-overlay">
-    <div class="modal-window">
+    <!-- Wider than the 520px default: a row carries a name, a time, what it
+         earns and an attendance, and at that width the names wrapped. -->
+    <div class="modal-window" id="matrixSessionWindow" style="max-width: 820px;">
       <div class="modal-header">
         <h3>📋 RECORD A SESSION</h3>
-        <button class="close-btn">&times;</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" id="sessionWidthBtn" class="btn btn-secondary"
+                  style="padding:3px 10px; font-size:0.76rem;"
+                  title="Use the full window width"
+                  onclick="app.toggleSessionWidth()">&#8596; Wide</button>
+          <button class="close-btn">&times;</button>
+        </div>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px;">
         <div>
