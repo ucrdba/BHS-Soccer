@@ -194,7 +194,43 @@ Object.assign(BHSSoccerApp.prototype, {
       mental: parseInt(playerData.ment || 80)
     };
 
+    // ─── Is this person already in the program? ─────────────────────────────
+    // The "Already in the system?" search above does this properly, but it is
+    // opt-in, and a coach who just types a name and submits would otherwise
+    // mint a SECOND identity for the same human. That is the everyday route to
+    // a duplicate, because removing a player from a team deletes only their
+    // team_players row -- the person stays, by design, since they may play for
+    // a club side too. Their Matrix history would then split across two records
+    // that look identical on screen.
+    //
+    // Asked, not decided: two people in one program really can share a name, so
+    // silently merging them would be worse than the duplicate it prevents.
+    const typedName = `${(playerData.firstName || '').trim()} ${(playerData.lastName || '').trim()}`
+      .replace(/\s+/g, ' ').trim();
+    const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    let existingId = null;
+    if (typedName) {
+      const hits = (await window.supabaseService.searchPlayersByName(typedName)) || [];
+      // searchPlayersByName matches partially, so "Caleb Carver" also returns
+      // "Caleb Carverton". Only the whole name is a duplicate.
+      const match = hits.find(h => norm(h.name) === norm(typedName));
+      if (match) {
+        if ((this.data.players || []).some(p => p.id === match.id)) {
+          window.alert(`${typedName} is already on this team.`);
+          return;
+        }
+        existingId = window.confirm(
+          `${typedName} is already in your program.\n\n` +
+          `OK — add THAT player to ${team.name}, keeping their photo and past results.\n\n` +
+          `Cancel — create a separate new player who happens to have the same name.`
+        ) ? match.id : null;
+      }
+    }
+
     const identity = await window.supabaseService.upsertPlayerIdentity({
+      // With an id this updates the existing person; without one it creates.
+      ...(existingId ? { id: existingId } : {}),
       firstName: playerData.firstName,
       lastName: playerData.lastName,
       classYear: playerData.classYear,
