@@ -2248,6 +2248,46 @@ class SupabaseService {
     return { ok: false, error: `No player called "${typed}" on this team.` };
   }
 
+  /**
+   * Set one player's recording number, and touch nothing else.
+   *
+   * Deliberately not upsertTeamMembership: that method always sends position
+   * and number, so calling it to change a recording number would blank a
+   * player's position as a side effect.
+   *
+   * null clears the number. `0021` made it unique per team, so a value already
+   * in use comes back as a named conflict rather than a Postgres code.
+   */
+  async setRecordingNumber(
+    teamId: string,
+    playerId: string,
+    recordingNumber: number | null
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!playerId) return { ok: false, error: 'No player given.' };
+
+    const { data, error } = await this.client!
+      .from('team_players')
+      .update({ recording_number: recordingNumber })
+      .eq('team_id', teamId)
+      .eq('player_id', playerId)
+      .select();
+
+    if (error) {
+      console.warn('Supabase setRecordingNumber notice:', error.message);
+      if (error.code === '23505') {
+        return { ok: false, error: `Recording number ${recordingNumber} is already used by someone on this team.` };
+      }
+      return { ok: false, error: error.message };
+    }
+    // An RLS refusal returns no error and no rows.
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that change. You must coach this team.' };
+    }
+    return { ok: true };
+  }
+
   async upsertTeamMembership(
     teamId: string,
     schoolId: string,

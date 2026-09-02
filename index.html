@@ -404,6 +404,35 @@
     </div>
   </div>
 
+  <!-- Recording numbers. The number a player writes on a paper score sheet,
+       which is not their shirt number. Until this existed the only way to set
+       one was an import column, so a squad imported without it had none and no
+       way to get them. -->
+  <div id="recordingNumbersModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>&#128290; RECORDING NUMBERS</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin:0 0 10px 0;">
+        What each player writes on a paper score sheet &mdash; not their shirt number.
+        Numbers must be different from each other and stay put all season.
+      </p>
+      <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" style="flex:1; min-width:150px;" onclick="app.autoNumberRoster()">
+          Number 1&ndash;N by surname
+        </button>
+        <button class="btn btn-secondary" style="flex:1; min-width:110px;" onclick="app.clearRecordingNumberDrafts()">
+          Clear all
+        </button>
+      </div>
+      <div id="recordingNumbersBody" style="max-height:46vh; overflow-y:auto; padding-right:4px;"></div>
+      <p id="recordingNumbersError" class="text-danger" style="font-size:0.8rem; min-height:1em; margin:8px 0 0 0;"></p>
+      <button id="recordingNumbersSave" class="btn btn-gold" style="width:100%; margin-top:10px;"
+              onclick="app.saveRecordingNumbers()">Save numbers</button>
+    </div>
+  </div>
+
   <!-- Import team routing. Raised BEFORE any row is written, because a sheet
        naming a squad that does not exist is nearly always a spelling that
        missed, and the moment to find out is before 26 players land on a team
@@ -1403,6 +1432,7 @@
   <script src="./js/views/thoughts.view.js"></script>
   <script src="./js/views/roundrobin.view.js"></script>
   <script src="./js/views/report.view.js"></script>
+  <script src="./js/views/recording-numbers.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>
   <script src="./js/views/help.view.js"></script>
   <script src="./js/views/teamswitcher.view.js"></script>

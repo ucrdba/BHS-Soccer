@@ -19,7 +19,9 @@ Object.assign(BHSSoccerApp.prototype, {
             <p class="text-muted">${[label.season, label.team].filter(Boolean).join(' ')} Squad</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-            ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddPlayerModal()">+ Add New Player</button>` : ''}
+            ${isCoach ? `<button class="btn btn-gold" onclick="app.openAddPlayerModal()">+ Add New Player</button>
+            <button class="btn btn-secondary" onclick="app.openRecordingNumbersModal()"
+                    title="The numbers players write on paper score sheets">&#128290; Recording numbers</button>` : ''}
             <div class="filters-bar">
               <span class="filter-chip ${this.rosterSort !== 'name' ? 'active' : ''}" data-sort="number" onclick="app.sortRoster('number')" title="Sort by jersey number">#&nbsp;Number</span>
               <span class="filter-chip ${this.rosterSort === 'name' ? 'active' : ''}" data-sort="name" onclick="app.sortRoster('name')" title="Sort alphabetically">A&ndash;Z&nbsp;Name</span>

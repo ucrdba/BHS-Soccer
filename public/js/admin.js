@@ -2382,6 +2382,28 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * Read a column whatever the sheet calls it.
+   *
+   * Header matching used to be exact, and a header that misses is SILENT: the
+   * value arrives undefined, the importer treats that as "not supplied", and
+   * the column is simply never written. A JV roster came through with no
+   * recording numbers that way, and nothing in the import report said so.
+   *
+   * Compares on letters and digits only, so "Recording Number", "recording_number",
+   * "Rec #" and "RECORDINGNUMBER" all reach the same field.
+   */
+  pickColumn(row, aliases) {
+    const norm = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const key of Object.keys(row || {})) {
+      if (aliases.indexOf(norm(key)) !== -1) {
+        const v = row[key];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+    }
+    return undefined;
+  },
+
+  /**
    * The teams an import may route to: this organization's only.
    *
    * Never another club's. Offering one would let a Beaumont sheet file players
@@ -2686,7 +2708,8 @@ Object.assign(BHSSoccerApp.prototype, {
                 id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
                 number: optI(r.Number),
                 // The paper-sheet number, distinct from the shirt number (0021).
-                recordingNumber: optI(r.RecordingNumber || r.RecNumber || r.RecordNo || r.recording_number),
+                recordingNumber: optI(this.pickColumn(r,
+                  ['recordingnumber', 'recnumber', 'recordno', 'recno', 'rec'])),
                 name: parts.name,
                 firstName: parts.firstName, lastName: parts.lastName,
                 position: opt(r.Position),
