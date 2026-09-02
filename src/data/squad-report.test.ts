@@ -185,3 +185,119 @@ describe('the whole report', () => {
     expect(makeApp([]).buildSquadReport()).toEqual([]);
   });
 });
+
+describe('sorting a block', () => {
+  const points = [
+    point({ player_id: 'p1', raw_value: 288, earned: 0.25 }),   // #1  Cesar Alva   4:48
+    point({ player_id: 'p2', raw_value: 274, earned: 0.5 }),    // #7  Ashton Earls 4:34
+    point({ player_id: 'p3', raw_value: 255, earned: 1 })       // #14 Juan Marcias 4:15
+  ];
+
+  const sorted = (by: string, times = 1) => {
+    const app = makeApp(points);
+    (app as any).renderSquadReport = () => '';   // no DOM in this test
+    for (let i = 0; i < times; i++) app.setReportSort(LAPS, by, true);
+    return app.reportBlock(LAPS).rows;
+  };
+
+  it('opens as a checklist, before anything is clicked', () => {
+    // The default still matters: a fitness standard asks "is this player match
+    // fit", so it starts in recording-number order rather than as a ranking.
+    expect(makeApp(points).reportBlock(LAPS).rows.map((r: any) => r.recordingNumber))
+      .toEqual([1, 7, 14]);
+  });
+
+  it('sorts by time when the coach asks for it', () => {
+    expect(sorted('figure').map((r: any) => r.recordingNumber)).toEqual([14, 7, 1]);
+  });
+
+  it('puts the fastest first on a timed column, in one click', () => {
+    // Not blind ascending: a first click gives the order the column is read in.
+    expect(sorted('figure')[0].figure).toBe('4:15');
+  });
+
+  it('reverses when the same column is clicked again', () => {
+    expect(sorted('figure', 2).map((r: any) => r.recordingNumber)).toEqual([1, 7, 14]);
+  });
+
+  it('compares times as numbers, not as the text shown', () => {
+    // "10:00" sorts before "9:00" as text. This is why the raw value is kept.
+    const app = makeApp([
+      point({ player_id: 'p1', raw_value: 540, earned: 0 }),    // 9:00
+      point({ player_id: 'p2', raw_value: 600, earned: 0 })     // 10:00
+    ]);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(LAPS, 'figure', true);
+    expect(app.reportBlock(LAPS).rows.map((r: any) => r.figure)).toEqual(['9:00', '10:00']);
+  });
+
+  it('sorts by name', () => {
+    expect(sorted('name').map((r: any) => r.name))
+      .toEqual(['Ashton Earls', 'Cesar Alva', 'Juan Marcias']);
+  });
+
+  it('sorts by recording number', () => {
+    expect(sorted('number').map((r: any) => r.recordingNumber)).toEqual([1, 7, 14]);
+  });
+
+  it('sorts a standard by whether the player met it', () => {
+    const rows = sorted('points');
+    expect(rows[0].met).toBe(true);
+  });
+
+  it('sinks a player with no result to the bottom, ascending', () => {
+    // They are not the fastest and not the slowest -- they did not run it.
+    const app = makeApp([
+      point({ player_id: 'p1', raw_value: 288, earned: 0.25 }),
+      point({ player_id: 'p2', kind: 'not_entered', raw_value: null, earned: 0 })
+    ]);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(LAPS, 'figure', true);
+    expect(app.reportBlock(LAPS).rows[1].playerId).toBe('p2');
+  });
+
+  it('keeps them at the bottom when reversed too', () => {
+    const app = makeApp([
+      point({ player_id: 'p1', raw_value: 288, earned: 0.25 }),
+      point({ player_id: 'p2', kind: 'not_entered', raw_value: null, earned: 0 })
+    ]);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(LAPS, 'figure', true);
+    app.setReportSort(LAPS, 'figure', true);
+    expect(app.reportBlock(LAPS).rows[1].playerId).toBe('p2');
+  });
+
+  it('sorts a competitive drill by wins, most first', () => {
+    const app = makeApp([
+      point({ drill_id: GAUNTLET, kind: 'head_to_head', player_id: 'p1', w: 3, weight: 3, earned: 9 }),
+      point({ drill_id: GAUNTLET, kind: 'head_to_head', player_id: 'p2', w: 5, weight: 3, earned: 15 })
+    ]);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(GAUNTLET, 'figure', false);
+    expect(app.reportBlock(GAUNTLET).rows[0].playerId).toBe('p2');
+  });
+
+  it('sorts each block on its own', () => {
+    // Two exercises are two questions; sorting one must not disturb the other.
+    const app = makeApp([
+      point({ player_id: 'p1', raw_value: 288, earned: 0.25 }),
+      point({ player_id: 'p3', raw_value: 255, earned: 1 }),
+      point({ drill_id: COOPERS, kind: 'measured', player_id: 'p1', raw_value: 2600, earned: 0.6 }),
+      point({ drill_id: COOPERS, kind: 'measured', player_id: 'p3', raw_value: 2900, earned: 1 })
+    ]);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(LAPS, 'name', true);
+
+    expect(app.reportBlock(LAPS).sort.by).toBe('name');
+    expect(app.reportBlock(COOPERS).sort).toBeNull();
+  });
+
+  it('remembers the sort, so printing gives what is on screen', () => {
+    const app = makeApp(points);
+    (app as any).renderSquadReport = () => '';
+    app.setReportSort(LAPS, 'figure', true);
+    // buildSquadReport is what the print path uses.
+    const block = app.buildSquadReport().find((b: any) => b.drillId === LAPS);
+    expect(block.rows.map((r: any) => r.recordingNumber)).toEqual([14, 7, 1]);
+  });
+});

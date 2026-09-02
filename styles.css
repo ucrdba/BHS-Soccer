@@ -1231,6 +1231,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--text-main);
 }
 
+#squadReportBody th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+#squadReportBody th.sortable:hover { color: var(--bhs-cyan-accent); }
+#squadReportBody th.sorted { color: var(--bhs-cyan-accent); }
+
 #squadReportBody .num { width: 40px; color: var(--text-muted); }
 
 /* The players who have not met the standard are the reason the sheet exists,

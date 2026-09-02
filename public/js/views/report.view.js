@@ -39,8 +39,10 @@ Object.assign(BHSSoccerApp.prototype, {
     const isWinLoss = measure === 'win_loss' || measure === 'head_to_head';
     const timed = measure === 'time_low' || measure === 'time_bands';
 
-    // A standard is read by number so it does not look like a league table;
-    // everything else is read as the ranking it is.
+    // A standard OPENS by number so it does not look like a league table --
+    // it answers "is this player match fit", not "who is fastest". The coach
+    // can still sort it any way they like; what this decides is only where it
+    // starts.
     const sortBy = isStandard ? 'number' : (isWinLoss ? 'wins' : 'best');
     const rows = this.exerciseLeaderboard(drillId, sortBy);
     const standard = isStandard ? this.reportStandardSeconds(drillId) : null;
@@ -53,6 +55,10 @@ Object.assign(BHSSoccerApp.prototype, {
       available: r.available,
       // Met the standard means inside the tightest band, not merely scoring.
       met: isStandard && r.best !== null && standard !== null ? r.best <= standard : false,
+      // The raw figure, kept beside the formatted one. Sorting "4:15" as text
+      // puts 10:00 before 9:00, so the number is what gets compared.
+      value: r.best === null || r.best === undefined ? null : r.best,
+      wins: r.wins,
       figure: isWinLoss
         ? `${r.wins} - ${r.draws} - ${r.losses}`
         : r.best === null || r.best === undefined
@@ -60,6 +66,7 @@ Object.assign(BHSSoccerApp.prototype, {
           : (timed ? window.supabaseService.formatSecondsAsTime(r.best) : String(r.best))
     }));
 
+    const sort = (this._reportSort || {})[drillId];
     return {
       drillId,
       name: drill.name,
@@ -67,10 +74,74 @@ Object.assign(BHSSoccerApp.prototype, {
       measure,
       isStandard,
       isWinLoss,
+      timed,
       standard,
+      sort: sort || null,
       metCount: out.filter(r => r.met).length,
-      rows: out
+      rows: sort ? this.sortReportRows(out, sort, { isWinLoss, timed }) : out
     };
+  },
+
+  /**
+   * Sort one block's rows by the column the coach clicked.
+   *
+   * Every comparison is on a number or a string, never on the displayed text:
+   * "4:15" and "10:00" sort backwards as text, and "—" would sort among the
+   * real values.
+   *
+   * A player with no result always sinks to the bottom, whichever direction is
+   * chosen. They are not the best and they are not the worst -- they simply
+   * have not run it, and burying them at one end keeps the recorded results
+   * together where they can be read.
+   */
+  sortReportRows(rows, sort, kind) {
+    const dir = sort.dir === 'desc' ? -1 : 1;
+
+    const key = (r) => {
+      switch (sort.by) {
+        case 'number': return r.recordingNumber == null ? null : Number(r.recordingNumber);
+        case 'name':   return String(r.name || '').toLowerCase();
+        case 'figure': return kind.isWinLoss ? Number(r.wins || 0) : r.value;
+        case 'points': return r.met !== undefined && sort.metColumn ? (r.met ? 1 : 0) : Number(r.earned || 0);
+        default:       return null;
+      }
+    };
+
+    return rows.slice().sort((a, b) => {
+      const x = key(a), y = key(b);
+      // Missing values sink, regardless of direction.
+      if (x === null && y === null) return 0;
+      if (x === null) return 1;
+      if (y === null) return -1;
+      if (typeof x === 'string') return dir * x.localeCompare(y);
+      return dir * (x - y);
+    });
+  },
+
+  /**
+   * Click a column to sort by it; click the same one again to reverse.
+   *
+   * A first click sorts the way that column is usually read -- fastest time
+   * first, most points first, lowest number first -- rather than always
+   * ascending, so the useful order arrives in one click instead of two.
+   */
+  setReportSort(drillId, by, metColumn) {
+    if (!this._reportSort) this._reportSort = {};
+    const cur = this._reportSort[drillId];
+
+    if (cur && cur.by === by) {
+      cur.dir = cur.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      const block = (this.data.drillsBank || []).find(d => d.id === drillId);
+      const timed = block && (block.measure === 'time_low' || block.measure === 'time_bands');
+      // Times read fastest-first; counts and points read highest-first.
+      const firstDir = by === 'points' ? 'desc'
+        : by === 'figure' ? (timed ? 'asc' : 'desc')
+        : 'asc';
+      this._reportSort[drillId] = { by, dir: firstDir, metColumn: !!metColumn };
+    }
+    const body = document.getElementById('squadReportBody');
+    if (body) body.innerHTML = this.renderSquadReport();
   },
 
   /** A block for every exercise that has results. */
@@ -126,13 +197,22 @@ Object.assign(BHSSoccerApp.prototype, {
       : `${esc(b.name)} <span class="report-sub">weight ${b.weight}</span>`;
 
     const col = b.isWinLoss ? 'W - D - L' : b.isStandard ? 'Time' : 'Best';
+    const lastCol = b.isStandard ? 'Match fit' : 'Points';
+
+    // An arrow only on the column in play, so the header row stays quiet.
+    const th = (label, by) => {
+      const on = b.sort && b.sort.by === by;
+      const arrow = on ? (b.sort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+      return `<th class="sortable${on ? ' sorted' : ''}"
+                  onclick="app.setReportSort('${b.drillId}','${by}',${b.isStandard})"
+                  title="Sort by ${label}">${label}${arrow}</th>`;
+    };
 
     return `
       <div class="report-block">
         <h3>${heading}</h3>
         <table>
-          <thead><tr><th>#</th><th>Player</th><th>${col}</th>
-            ${b.isStandard ? '<th>Match fit</th>' : '<th>Points</th>'}</tr></thead>
+          <thead><tr>${th('#', 'number')}${th('Player', 'name')}${th(col, 'figure')}${th(lastCol, 'points')}</tr></thead>
           <tbody>
             ${b.rows.map(r => `
               <tr>
