@@ -1373,10 +1373,145 @@ class SupabaseService {
     }
   }
 
-  private static readonly MEASURES = ['head_to_head', 'win_loss', 'count_high', 'time_low'];
+  /**
+   * Read a time a coach typed into seconds, or null if it is not a time.
+   *
+   * Stored as seconds because raw_value is numeric and because comparing
+   * "10:00" against "4:30" as text puts the slower one first.
+   *
+   * Null rather than a guess: a silently wrong time is scored against the
+   * wrong band, and the standings move with nothing on screen to show for it.
+   */
+  parseTimeToSeconds(value: any): number | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
 
-  async fetchDrillsForWeighting(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+    if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+
+    const m = /^(\d+):([0-5]\d)$/.exec(raw);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  /** Seconds back to mm:ss, zero-padded, for display and for editing. */
+  formatSecondsAsTime(seconds: any): string {
+    const n = Number(seconds);
+    if (!Number.isFinite(n) || n < 0) return '';
+    return `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')}`;
+  }
+
+  /**
+   * What a time earns against a set of bands: the TIGHTEST band it fits under.
+   *
+   * 4:28 satisfies a 4:30, a 4:40 and a 4:50 band; it earns the 4:30 one. A
+   * time exactly on a threshold meets it -- the standard is "<= 4:30", and an
+   * off-by-one here is a player losing a point they ran for.
+   *
+   * Mirrors the `banded` CTE in 0022. The database is the authority; this
+   * exists so the session grid can show the factor as the time is typed,
+   * rather than after a save and a reload.
+   */
+  factorForTime(seconds: any, bands: Record<string, any>[]): number {
+    const n = Number(seconds);
+    if (!Number.isFinite(n)) return 0;
+
+    const fitting = (bands || [])
+      .filter(b => n <= Number(b.max_seconds))
+      .sort((a, b) => Number(a.max_seconds) - Number(b.max_seconds));
+
+    return fitting.length ? Number(fitting[0].factor) : 0;
+  }
+
+  /**
+   * The standards one squad is held to on one drill, tightest first.
+   *
+   * Team-scoped: a 4:30 that stretches a varsity side is out of reach for an
+   * under-14, so the same drill carries different thresholds per squad.
+   */
+  async fetchTimeBands(drillId: string, teamId: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured()) return null;
+    if (!drillId || !this.isUuid(drillId)) return null;
+    if (!teamId || !this.isUuid(teamId)) return null;
+
+    const { data, error } = await this.client!
+      .from('drill_time_bands')
+      .select('id, drill_id, team_id, max_seconds, factor')
+      .eq('drill_id', drillId)
+      .eq('team_id', teamId);
+    if (error) { console.warn('Supabase fetchTimeBands notice:', error.message); return null; }
+
+    return (data || [])
+      .slice()
+      .sort((a: any, b: any) => Number(a.max_seconds) - Number(b.max_seconds));
+  }
+
+  /**
+   * Replace one squad's standards for a drill.
+   *
+   * Replace rather than merge: editing 4:30 to 4:25 must change the standard,
+   * not leave both in place, which would silently make the easier one the one
+   * that pays out.
+   *
+   * Every band is validated before anything is deleted, so a typo in the third
+   * row cannot leave the squad with no standards at all.
+   */
+  async saveTimeBands(
+    drillId: string, teamId: string, rows: { time: any; factor: any }[]
+  ): Promise<{ ok: boolean; error?: string; saved?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!drillId || !this.isUuid(drillId)) return { ok: false, error: 'No drill given.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+
+    const parsed: { max_seconds: number; factor: number }[] = [];
+    for (const row of rows || []) {
+      const rawTime = String(row?.time ?? '').trim();
+      const rawFactor = String(row?.factor ?? '').trim();
+      if (!rawTime && !rawFactor) continue;   // an untouched blank row
+
+      const seconds = this.parseTimeToSeconds(rawTime);
+      if (seconds === null) {
+        return { ok: false, error: `"${rawTime}" is not a time. Use mm:ss, for example 4:30.` };
+      }
+
+      const factor = Number(rawFactor);
+      if (!Number.isFinite(factor) || factor < 0 || factor > 1) {
+        return {
+          ok: false,
+          error: `A band's points must be between 0 and 1 (found "${row?.factor ?? ''}"). It multiplies the drill's weight, so 1 earns the whole exercise.`
+        };
+      }
+
+      if (parsed.some(p => p.max_seconds === seconds)) {
+        return { ok: false, error: `${this.formatSecondsAsTime(seconds)} is listed twice. Two bands at one time cannot both apply.` };
+      }
+      parsed.push({ max_seconds: seconds, factor });
+    }
+
+    const { error: clearErr } = await this.client!
+      .from('drill_time_bands')
+      .delete()
+      .eq('drill_id', drillId)
+      .eq('team_id', teamId);
+    if (clearErr) { console.warn('Supabase saveTimeBands clear notice:', clearErr.message); return { ok: false, error: clearErr.message }; }
+
+    if (!parsed.length) return { ok: true, saved: 0 };
+
+    const { error } = await this.client!
+      .from('drill_time_bands')
+      .insert(parsed.map(p => ({ drill_id: drillId, team_id: teamId, ...p })));
+    if (error) { console.warn('Supabase saveTimeBands notice:', error.message); return { ok: false, error: error.message }; }
+
+    return { ok: true, saved: parsed.length };
+  }
+
+  private static readonly MEASURES = ['head_to_head', 'win_loss', 'count_high', 'time_low', 'time_bands'];
+
+  async fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    // No default of 'bhs': the drill library belongs to an organization, and
+    // falling back to Beaumont's would show a club coach somebody else's
+    // exercises and let them re-weight them.
+    if (!schoolId) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     if (!schoolUuid) return null;
     const { data, error } = await this.client!

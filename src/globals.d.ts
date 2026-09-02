@@ -58,6 +58,15 @@ declare global {
     fetchActiveThoughtId(teamId: string): Promise<string | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
+    // Timed exercises scored against an absolute standard rather than by
+    // finishing position (0022). Bands are per team: a 4:30 that stretches a
+    // varsity side is out of reach for an under-14.
+    parseTimeToSeconds(value: unknown): number | null;
+    formatSecondsAsTime(seconds: unknown): string;
+    factorForTime(seconds: unknown, bands: Record<string, any>[]): number;
+    fetchTimeBands(drillId: string, teamId: string): Promise<Record<string, any>[] | null>;
+    saveTimeBands(drillId: string, teamId: string, rows: { time: unknown; factor: unknown }[]):
+      Promise<{ ok: boolean; error?: string; saved?: number }>;
     updateDrillWeights(rows: { id: string; points: number; measure: string }[]):
       Promise<{ ok: boolean; error?: string; updated: number }>;
     fetchMatrixSessions(teamId: string): Promise<Record<string, any>[] | null>;

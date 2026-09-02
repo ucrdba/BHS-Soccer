@@ -13,7 +13,22 @@ Object.assign(BHSSoccerApp.prototype, {
     const err = document.getElementById('matrixWeightsError');
     if (err) err.textContent = '';
     if (window.supabaseService?.isConfigured()) {
-      this._weightDrills = (await window.supabaseService.fetchDrillsForWeighting('bhs')) || [];
+      // Resolved from the active team rather than a hardcoded school code: the
+      // drill library belongs to an organization, and a club coach has their
+      // own.
+      const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+      this._weightDrills = (await window.supabaseService.fetchDrillsForWeighting(team?.school_id)) || [];
+
+      // Standards are per squad, so they are loaded for the active team only.
+      this._weightBands = {};
+      if (this.activeTeamId) {
+        for (const d of this._weightDrills) {
+          if (d.measure === 'time_bands') {
+            this._weightBands[d.id] =
+              (await window.supabaseService.fetchTimeBands(d.id, this.activeTeamId)) || [];
+          }
+        }
+      }
     } else {
       this._weightDrills = this._weightDrills || [];
     }
@@ -21,6 +36,42 @@ Object.assign(BHSSoccerApp.prototype, {
     if (rows) rows.innerHTML = this.renderWeightsRows();
     const modal = document.getElementById('matrixWeightsModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  /**
+   * The standards rows for one drill, for the active squad.
+   *
+   * Always one spare row below the ones already set, so a fourth band needs no
+   * button. A row left entirely blank is ignored on save; one half-filled is
+   * refused, because points typed with no time is a band the coach meant.
+   */
+  renderBandRows(drillId) {
+    const bands = (this._weightBands || {})[drillId] || [];
+    const label = this.activeTeamLabel ? (this.activeTeamLabel().team || 'this team') : 'this team';
+    const rows = bands.concat([{ max_seconds: '', factor: '' }]);
+
+    return `
+      <div style="margin:4px 0 10px 12px; padding:8px 10px; background:rgba(0,0,0,0.25); border-left:2px solid var(--bhs-gold-accent); border-radius:0 6px 6px 0;">
+        <div class="text-muted" style="font-size:0.73rem; text-transform:uppercase; margin-bottom:5px;">
+          Standards for ${this._text ? this._text(label) : label}
+        </div>
+        ${rows.map((b, i) => `
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+            <span class="text-muted" style="font-size:0.75rem;">at or under</span>
+            <input type="text" id="bandTime_${drillId}_${i}" class="form-control"
+                   style="max-width:80px; font-size:0.78rem;" placeholder="4:30"
+                   value="${b.max_seconds === '' ? '' : window.supabaseService.formatSecondsAsTime(b.max_seconds)}" />
+            <span class="text-muted" style="font-size:0.75rem;">earns</span>
+            <input type="number" id="bandFactor_${drillId}_${i}" class="form-control"
+                   step="0.25" min="0" max="1" style="max-width:80px; font-size:0.78rem;" placeholder="1"
+                   value="${b.factor === '' ? '' : Number(b.factor)}" />
+            <span class="text-muted" style="font-size:0.72rem;">of the exercise</span>
+          </div>`).join('')}
+        <div class="text-muted" style="font-size:0.72rem; margin-top:4px;">
+          A time meeting no standard scores nothing. Set none and this exercise is not counted for
+          ${this._text ? this._text(label) : label} at all.
+        </div>
+      </div>`;
   },
 
   renderWeightsRows() {
@@ -32,22 +83,45 @@ Object.assign(BHSSoccerApp.prototype, {
       ['head_to_head', '1v1 (pairings)'],
       ['win_loss', 'Small-sided (W/D/L)'],
       ['count_high', 'Counted, high wins'],
-      ['time_low', 'Timed, low wins']
+      ['time_low', 'Timed, fastest wins'],
+      ['time_bands', 'Timed against a standard']
     ];
     return drills.map(d => `
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-        <span style="flex:1; color:#FFF; font-size:0.85rem;">${d.name}
-          <span class="text-muted" style="font-size:0.75rem;">${d.category || ''}</span>
-        </span>
-        <input type="number" id="weightPoints_${d.id}" class="form-control"
-               step="0.5" min="0" max="10" style="max-width:80px; font-size:0.8rem;"
-               value="${Number(d.points ?? 3)}" />
-        <select id="weightMeasure_${d.id}" class="form-control" style="max-width:190px; font-size:0.8rem;">
-          ${measures.map(([v, label]) =>
-            `<option value="${v}"${(d.measure || 'head_to_head') === v ? ' selected' : ''}>${label}</option>`
-          ).join('')}
-        </select>
+      <div style="margin-bottom:6px;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span style="flex:1; color:#FFF; font-size:0.85rem;">${d.name}
+            <span class="text-muted" style="font-size:0.75rem;">${d.category || ''}</span>
+          </span>
+          <input type="number" id="weightPoints_${d.id}" class="form-control"
+                 step="0.5" min="0" max="10" style="max-width:80px; font-size:0.8rem;"
+                 value="${Number(d.points ?? 3)}" />
+          <select id="weightMeasure_${d.id}" class="form-control" style="max-width:190px; font-size:0.8rem;"
+                  onchange="app.onMeasureChanged('${d.id}', this.value)">
+            ${measures.map(([v, label]) =>
+              `<option value="${v}"${(d.measure || 'head_to_head') === v ? ' selected' : ''}>${label}</option>`
+            ).join('')}
+          </select>
+        </div>
+        ${d.measure === 'time_bands' ? this.renderBandRows(d.id) : ''}
       </div>`).join('');
+  },
+
+  /**
+   * Reveal or hide the standards rows when the measure changes.
+   *
+   * Held in local state and re-rendered rather than toggled with CSS, so the
+   * rows a coach has typed survive switching away and back before saving.
+   */
+  onMeasureChanged(drillId, measure) {
+    const d = (this._weightDrills || []).find(x => x.id === drillId);
+    if (!d) return;
+    d.measure = measure;
+    if (measure === 'time_bands' && !(this._weightBands || {})[drillId]) {
+      this._weightBands = this._weightBands || {};
+      this._weightBands[drillId] = [];
+    }
+    const rows = document.getElementById('matrixWeightsRows');
+    if (rows) rows.innerHTML = this.renderWeightsRows();
   },
 
   async saveWeights() {
@@ -67,6 +141,29 @@ Object.assign(BHSSoccerApp.prototype, {
     set('Saving…');
     const res = await window.supabaseService.updateDrillWeights(rows);
     if (!res.ok) return set(res.error || 'Could not save those weights.');
+
+    // Standards for any drill now measured against one. Saved after the
+    // weights, because a band is meaningless until the measure is stored --
+    // and reported by name on failure rather than lost behind a success
+    // message about the weights.
+    for (const r of rows.filter(r => r.measure === 'time_bands')) {
+      if (!this.activeTeamId) {
+        return set('Weights saved, but standards need a team. Choose one in the header.');
+      }
+      const typed = [];
+      for (let i = 0; ; i++) {
+        const t = document.getElementById(`bandTime_${r.id}_${i}`);
+        const f = document.getElementById(`bandFactor_${r.id}_${i}`);
+        if (!t || !f) break;
+        typed.push({ time: t.value, factor: f.value });
+      }
+      const bandRes = await window.supabaseService.saveTimeBands(r.id, this.activeTeamId, typed);
+      if (!bandRes.ok) {
+        const name = (this._weightDrills.find(d => d.id === r.id) || {}).name || 'that exercise';
+        return set(`Weights saved. Standards for ${name}: ${bandRes.error}`);
+      }
+      this._weightBands[r.id] = (await window.supabaseService.fetchTimeBands(r.id, this.activeTeamId)) || [];
+    }
 
     // Weights are looked up live, so every past result is re-scored. Re-sync
     // rather than patch, or the leaderboard on screen contradicts the database.
@@ -140,10 +237,28 @@ Object.assign(BHSSoccerApp.prototype, {
     await this.openSessionModal();
   },
 
+  /**
+   * The active squad's standards for the exercise being recorded.
+   *
+   * Loaded per session rather than held globally: the bands belong to a
+   * (drill, team) pair, and both change as the coach moves around.
+   */
+  async loadSessionBands() {
+    this._sessionBands = [];
+    const drill = this.sessionDrill();
+    if (!drill || (drill.measure || '') !== 'time_bands') return;
+    if (!window.supabaseService?.isConfigured() || !this.activeTeamId) return;
+
+    this._sessionBands =
+      (await window.supabaseService.fetchTimeBands(drill.id, this.activeTeamId)) || [];
+  },
+
   async openSessionModal(drillId) {
     this._sessionDrillId = drillId || this._sessionDrillId || '';
     const err = document.getElementById('sessionError');
     if (err) err.textContent = '';
+
+    await this.loadSessionBands();
 
     const picker = document.getElementById('sessionDrill');
     if (picker) {
@@ -214,14 +329,31 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     const measure = drill.measure || 'count_high';
-    const hint = measure === 'time_low' ? 'seconds — lower wins'
+    const bands = (this._sessionBands || []);
+    const hint = measure === 'time_low' ? 'seconds — fastest wins'
+               : measure === 'time_bands' ? 'mm:ss — scored against the standard'
                : measure === 'win_loss' ? 'result'
                : 'number — higher wins';
+
+    // A timed standard is only meaningful once the squad has one. Said here
+    // rather than after saving, when the exercise would simply not be counted
+    // and nothing would explain why.
+    const bandNote = measure === 'time_bands'
+      ? (bands.length
+          ? `<p class="text-muted" style="font-size:0.76rem; margin:0 0 8px 0;">Standards: ${
+              bands.map(b => `${window.supabaseService.formatSecondsAsTime(b.max_seconds)} → ${Number(b.factor)}`).join(' · ')
+            }</p>`
+          : `<p style="color:var(--color-danger); font-size:0.76rem; margin:0 0 8px 0;">
+               No standards set for this team, so this exercise will not be scored for them.
+               Set them under Exercise Weights first.
+             </p>`)
+      : '';
 
     return `
       <p class="text-muted" style="font-size:0.78rem; margin:0 0 8px 0;">
         ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
       </p>
+      ${bandNote}
       ${players.map(p => {
         // A player who joined after this session was recorded has no stored
         // row. Default them to excused rather than present: they were not
@@ -243,6 +375,12 @@ Object.assign(BHSSoccerApp.prototype, {
                  <option value="draw"${out === 'draw' ? ' selected' : ''}>Drew</option>
                  <option value="loss"${out === 'loss' ? ' selected' : ''}>Lost</option>
                </select>`
+            : measure === 'time_bands'
+            ? `<input type="text" id="sessionValue_${p.id}" class="form-control" placeholder="4:30"
+                      style="max-width:110px; font-size:0.8rem;"
+                      value="${val === '' ? '' : window.supabaseService.formatSecondsAsTime(val)}"
+                      oninput="app.showBandEarned('${p.id}')" />
+               <span id="sessionEarned_${p.id}" class="text-muted" style="font-size:0.75rem; min-width:64px;"></span>`
             : `<input type="number" id="sessionValue_${p.id}" class="form-control" step="any"
                       style="max-width:110px; font-size:0.8rem;" value="${val}" />`}
           <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
@@ -262,6 +400,33 @@ Object.assign(BHSSoccerApp.prototype, {
    * excused) — that stale entry is never read for a non-present player, so a
    * result is only ever sent for someone who was actually present.
    */
+  /**
+   * Show what a typed time earns, as it is typed.
+   *
+   * The database is the authority on scoring; this is the same rule computed
+   * locally so a coach sees the band land rather than discovering it after a
+   * save and a reload.
+   */
+  showBandEarned(playerId) {
+    const out = document.getElementById(`sessionEarned_${playerId}`);
+    const input = document.getElementById(`sessionValue_${playerId}`);
+    if (!out || !input) return;
+
+    const raw = input.value.trim();
+    if (!raw) { out.textContent = ''; return; }
+
+    const seconds = window.supabaseService.parseTimeToSeconds(raw);
+    if (seconds === null) {
+      out.textContent = 'mm:ss?';
+      out.style.color = 'var(--color-danger)';
+      return;
+    }
+
+    const factor = window.supabaseService.factorForTime(seconds, this._sessionBands || []);
+    out.textContent = factor > 0 ? `earns ${factor}` : 'no band';
+    out.style.color = factor > 0 ? 'var(--bhs-cyan-accent)' : 'var(--text-muted)';
+  },
+
   collectSessionResults() {
     const drill = this.sessionDrill();
     const measure = drill ? (drill.measure || 'count_high') : 'count_high';
@@ -277,7 +442,12 @@ Object.assign(BHSSoccerApp.prototype, {
                    outcome: document.getElementById(`sessionOutcome_${p.id}`)?.value || null };
         }
         const raw = document.getElementById(`sessionValue_${p.id}`)?.value;
-        const n = parseFloat(raw);
+        // A banded drill is typed as mm:ss and stored as seconds. parseFloat
+        // would read "4:30" as 4, which lands under every standard and hands
+        // the player full marks for a time they did not run.
+        const n = measure === 'time_bands'
+          ? window.supabaseService.parseTimeToSeconds(raw)
+          : parseFloat(raw);
         return { playerId: p.id, attendance,
                  rawValue: Number.isFinite(n) ? n : null, outcome: null };
       });
