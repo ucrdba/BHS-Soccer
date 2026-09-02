@@ -148,6 +148,14 @@ Object.assign(BHSSoccerApp.prototype, {
         body: `
           <p>The squad for whichever team is selected. Click any player for their detail card.
           Coaches see technical, tactical, physical and mental ratings; visitors do not.</p>
+          ${N('A player has two numbers', `<p>The <b>jersey number</b> is their shirt, and it appears
+            on the roster card. The <b>recording number</b> is a short number they write on paper
+            sheets, and it appears everywhere results are recorded &mdash; the Matrix, sessions, 1v1s
+            and the round robin. They are not the same, and the recording number is the one that
+            matters for scoring.</p>`)}
+          ${N('First and last name are separate', `<p>Entered as two fields, so the roster can be
+            sorted and searched by surname. Imports accept either two columns or one, including
+            <code>Herrera, Mateo</code>.</p>`)}
           ${P('Roster', 'Add Player')}
           <p>Search by name first. If the player already exists &mdash; because they are on another
           team in your program &mdash; reuse that record rather than making a second one. One person,
@@ -236,8 +244,18 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             ['Small-sided game', '2.5', 'Small-sided'],
             ['Finishing under pressure', '2.0', 'Counted, high wins'],
             ['12-minute Cooper test', '1.5', 'Counted, high wins'],
+            ['Three laps', '1.5', 'Timed against a standard'],
             ['Beep test', '1.0', 'Counted, high wins']
           ])}
+          <h4>Ranked against the squad, or against a standard?</h4>
+          <p>Two of these measure a time, and they answer different questions.
+          <b>Timed, fastest wins</b> ranks the squad against each other that session, so somebody is
+          always top and somebody always last. <b>Timed against a standard</b> pays out on absolute
+          times &mdash; hit 4:30 and you earn it whether six team-mates beat you or nobody did.</p>
+          ${N('Standards are per squad', `<p>Choose <b>Timed against a standard</b> and rows appear
+            beneath the drill for the team currently selected. A 4:30 that stretches a varsity side
+            is out of reach for an under-14, so each squad carries its own times. Set none and that
+            exercise is simply not counted for them.</p>`)}
           ${N('Changing a weight re-scores history', `<p>Raise the Cooper&rsquo;s from 1.0 to 1.5 and
             every Cooper&rsquo;s you have ever recorded is re-scored immediately, and the table
             re-ranks. Set it back and it reverts. Nothing is frozen &mdash; which is the point, but it
@@ -267,8 +285,10 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           <ol class="help-steps">
             <li>Pick the exercise. Only drills with a non-1v1 measurement type appear here.</li>
             <li>Check the date.</li>
-            <li>Type each player&rsquo;s number down the column &mdash; metres, level, seconds or
-                shots made. For a small-sided game, pick won, drew or lost instead.</li>
+            <li>Type each player&rsquo;s number down the column &mdash; metres, level or shots
+                made. For a small-sided game, pick won, drew or lost instead. For a
+                <b>timed</b> exercise type <code>mm:ss</code>, so <code>4:28</code> rather than
+                268.</li>
             <li>Mark anyone absent as <b>Excused</b> or <b>No-show</b>. Their number box is ignored either way.</li>
             <li>Save. The placings and the points are worked out for you.</li>
           </ol>
@@ -278,11 +298,28 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           <h4>Fixing a mistake</h4>
           ${P('Player Ratings', 'Recorded sessions', 'Delete')}
           <p>Sessions cannot be edited &mdash; delete the session and enter it again. Deleting removes
-          every result in it and re-ranks the table, so it asks first and names the exercise and date.</p>`
+          every result in it and re-ranks the table, so it asks first and names the exercise and date.</p>
+          <h4>Built for reading off a paper sheet</h4>
+          <p>Players are listed by <b>recording number</b> and ordered by it, matching the order the
+          sheet is written in. The <b>Order by</b> chips switch to name, and re-sorting keeps
+          whatever you have already typed. The <b>Wide</b> button widens the window and remembers
+          the choice for next time.</p>
+          ${N('A timed standard shows what it earned', `<p>Type a time and the figure it earns
+            appears beside the box, so you can see the band land before saving. If the squad has no
+            standards set for that exercise, the screen says so in red rather than saving something
+            that will not be scored.</p>`)}`
       },
       {
         id: 'reading', part: 'The Competitive Matrix', title: 'Reading the table', roles: [ALL],
         body: `
+          <h4>One exercise at a time</h4>
+          <p>The <b>Exercise</b> picker above the table switches between the overall board and a
+          single exercise &mdash; who has the most small-sided wins, who is best at the Cooper's.
+          For a 1v1 or small-sided drill the column is wins-draws-losses; for a counted or timed one
+          it is each player's best figure. Any column heading re-sorts.</p>
+          ${N('Best means their peak', `<p>The highest count for a counted exercise, and the FASTEST
+            time for a timed one. Points are still totalled across every attempt, so that column
+            agrees with the overall board.</p>`)}
           ${T(['Column', 'Means'], [
             ['<b>EX</b>', 'Exercises they have been scored on. Excused sessions are not counted.'],
             ['<b>W-D-L</b>', 'Wins, draws and losses from 1v1s and small-sided games. Measured tests have no W/L.'],
@@ -292,6 +329,23 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           ])}
           <p>A dash in SHARE means nothing has been scored for that player yet &mdash; not zero
           percent. Two players on the same share are separated by who has competed more.</p>`
+      },
+      {
+        id: 'roundrobin', part: 'Practice', title: '1v1 round robin', roles: [COACH],
+        body: `
+          ${P('Practice planner', '1v1 Round Robin')}
+          <p>Builds a schedule where every player meets every other exactly once, labelled the way
+          the paper sheets read &mdash; <code>(1) Cesar A. vs (4) Tom B.</code> A squad of 24 is 23
+          rounds of 12 matches.</p>
+          <p>Two outputs: <b>Print / Save as PDF</b> gives a sheet laid out round by round with a
+          blank column to write results into, and <b>Download CSV</b> gives the same schedule as a
+          file.</p>
+          ${N('It marks itself off', `<p>Nothing is stored. The schedule is built from the roster
+            each time you open it, and pairings already recorded in the Matrix are ticked with their
+            result &mdash; so a sheet reprinted mid-tournament shows what is left. Add a player and
+            re-open to get a new schedule.</p>`)}
+          ${N('An odd squad gets a bye', `<p>One player sits out each round, and the bye rotates so
+            nobody sits out twice.</p>`)}`
       },
       {
         id: 'planner', part: 'Practice', title: 'Practice planner', roles: [COACH],
@@ -323,15 +377,31 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
       {
         id: 'thoughts', part: 'Practice', title: 'Daily thoughts &amp; the quiz', roles: [COACH, ALL],
         body: `
-          <p>A short coaching message on the home page &mdash; one is active at a time. Quiz questions
-          can be attached so players have to show they read it, and the leaderboard shows who
-          answered what.</p>`
+          <p>A short coaching message on the home page &mdash; one is active at a time, and each
+          squad has its own. Write one from
+          <span class="help-path">Home &rsaquo; Coach's Daily Thoughts &rsaquo; Manage</span>.</p>
+          <p>Give it a short <b>title</b> and a quiz question can name it, in which case that
+          question is asked only while that message is the active one. Questions naming no message
+          &mdash; the formation, the participation rule &mdash; are always asked.</p>
+          <h4>The quiz</h4>
+          ${P('Admin panel', 'Quiz Questions')}
+          <p>Questions are shared across the organization, and each squad is asked the ones ticked
+          against it. Each carries its options, which is correct, and an explanation shown to a
+          player who gets it wrong.</p>
+          ${W('A question no team has ticked is asked by nobody', `<p>It sits in the bank, invisible
+            in every quiz. The list says <em>no team asks this</em> against those rows, which is the
+            only place they can be found.</p>`)}
+          ${N('A question can have three options, or six', `<p>Four is not required. The editor shows
+            a spare box below the ones in use; fill it for another option, blank one to remove
+            it.</p>`)}`
       },
       {
         id: 'admin', part: 'Running the program', title: 'The admin panel', roles: [ADMIN, COACH],
         body: `
           ${P('Header', '⚙️ Admin &amp; Role Control Center')}
-          <p>Four collapsible sections. They start closed &mdash; click a heading to open it.</p>
+          <p>Several collapsible sections. They start closed &mdash; click a heading to open it.
+          Which you see depends on your role: team and organization management is admin-only, while
+          categories, quiz questions and the unassigned-players list are open to coaches.</p>
           ${T(['Section', 'For'], [
             ['Pending user approval queue', 'Approving or rejecting new signups'],
             ['Teams &amp; coach assignments', 'Creating organizations and teams, assigning coaches'],
@@ -381,6 +451,216 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           ${N('Import builds rosters, not logins', `<p>Importing players creates roster entries. It
             cannot create accounts people sign in with &mdash; that is a separate job, run from a
             computer by whoever administers the site.</p>`)}`
+      },
+      {
+        id: 'ex-team', part: 'Worked examples', title: 'Add an organization and a team', roles: [ADMIN],
+        body: `
+          <p>Everything else hangs off a team, so this is the first thing to do in a new program.
+          An <b>organization</b> is a school or a club; <b>teams</b> belong to one. A player can be
+          on one team per organization, which is what lets somebody play for their school and a club
+          at the same time.</p>
+          ${P('Admin panel', 'Teams & Coach Assignments')}
+          <h4>Worked example &mdash; a club with two age groups</h4>
+          <ol class="help-steps">
+            <li>Under <b>Create an organization</b>, enter the name (<code>Riverside Surf SC</code>),
+                a mascot (<code>Surf</code>), a short code (<code>rvsc</code>) and type <b>Club</b>.
+                Click <b>+ Create</b>.</li>
+            <li>Under <b>Create a team</b>, pick that organization, name the team
+                <code>U16 Boys</code>, set the season, and create it. Repeat for <code>U14 Boys</code>.</li>
+            <li>Mark one team <b>public default</b> if visitors should see it when they arrive with
+                no team chosen.</li>
+          </ol>
+          ${N('Mascot is required', `<p>It is not decoration &mdash; the mascot appears in page
+            headings and on the home page, so the form will not save without one.</p>`)}
+          ${W('Only an admin can do this', `<p>Creating teams and organizations is admin-only in the
+            database itself, not just in the interface. A coach clicking these controls would be
+            refused by the database, so they are not shown to them at all.</p>`)}`
+      },
+      {
+        id: 'ex-coach', part: 'Worked examples', title: 'Add a coach and give them a team', roles: [ADMIN],
+        body: `
+          <p>Two separate things: the person needs an <b>account</b>, and that account needs
+          <b>assigning</b> to each team they coach. Having the coach role on its own grants nothing.</p>
+          <h4>Worked example &mdash; a new assistant for JV</h4>
+          <ol class="help-steps">
+            <li>Ask them to sign up themselves at <b>Sign In &rarr; Create an account</b>, choosing
+                <b>Coach</b> as the role they are asking for.</li>
+            <li>Open <span class="help-path">Admin panel</span> and find them under
+                <b>pending approvals</b>. Approve them &mdash; they are now a coach with no teams.</li>
+            <li>Under <b>Teams &amp; Coach Assignments</b>, find <b>JV</b>, pick their name from the
+                <em>assign a coach</em> list, and click <b>Assign</b>.</li>
+          </ol>
+          ${W('Approving is not assigning', `<p>This is the single most common confusion. An approved
+            coach with no team assignment can sign in and see the public site and nothing else. If a
+            new coach says the app looks empty, check their assignments first.</p>`)}
+          ${N('Removing access', `<p>The &times; beside their name on a team removes that
+            assignment immediately. Their account stays; only that team's write access goes.</p>`)}`
+      },
+      {
+        id: 'ex-players', part: 'Worked examples', title: 'Add players, and give them recording numbers', roles: [COACH, ADMIN],
+        body: `
+          <p>A player has two different numbers, and mixing them up causes most of the confusion
+          here.</p>
+          ${T(['Number', 'What it is', 'Where it shows'], [
+            ['<b>Jersey #</b>', 'Their shirt number', 'The roster card only'],
+            ['<b>Recording #</b>', 'A short number, usually 1..N, that they write on paper sheets',
+             'Everywhere results are recorded: the Matrix, sessions, 1v1s, the round robin']
+          ])}
+          <p>The recording number exists because handwriting on a paper sheet is not always
+          readable. A player writes <code>7</code> rather than their name, and the sheet stays
+          legible.</p>
+          <h4>Worked example &mdash; one player by hand</h4>
+          ${P('Roster', '+ Add New Player')}
+          <ol class="help-steps">
+            <li>Enter <b>First Name</b> and <b>Last Name</b> separately &mdash; not one full name.</li>
+            <li>Set the <b>Recording #</b>. Most programs number the squad 1..N alphabetically at the
+                start of the season and leave it alone.</li>
+            <li>Jersey # can be left blank until shirts are handed out.</li>
+          </ol>
+          <h4>Worked example &mdash; a whole squad from a spreadsheet</h4>
+          ${P('Admin panel', 'Import & Export', 'Players')}
+          <p>Download the template first, so the headings are right. The columns that matter:</p>
+          ${T(['Column', 'Example', 'Notes'], [
+            ['<code>FirstName</code>', 'Mateo', 'Or use a single <code>Name</code> column &mdash; see below'],
+            ['<code>LastName</code>', 'Herrera', ''],
+            ['<code>RecordingNumber</code>', '12', 'The paper-sheet number'],
+            ['<code>Number</code>', '9', 'Jersey number, optional'],
+            ['<code>Position</code>', 'MF', 'Free text; be consistent'],
+            ['<code>Team</code>', 'JV', 'Blank means the team selected in the header']
+          ])}
+          ${N('A single Name column still works', `<p>Both <code>Mateo Herrera</code> and
+            <code>Herrera, Mateo</code> are read correctly &mdash; a comma means the surname comes
+            first. A two-word surname survives the comma form (<code>Bustillos Correa, Luis</code>)
+            where it cannot be guessed from spaces alone.</p>`)}
+          ${W('Re-importing updates, it does not duplicate', `<p>Players are matched by full name, so
+            importing a corrected sheet updates the people already there. But a blank cell CLEARS the
+            stored value &mdash; export the roster first and edit that file, rather than starting a
+            fresh sheet with only the columns you care about.</p>`)}`
+      },
+      {
+        id: 'ex-drills', part: 'Worked examples', title: 'Add a drill and decide how it scores', roles: [COACH],
+        body: `
+          <p>A drill in the library can be used in a practice plan, scored in the Matrix, or both.
+          What decides how it scores is its <b>measure</b>.</p>
+          ${P('Practice planner', 'Add New Drill')}
+          ${T(['Measure', 'Use it for', 'How points are earned'], [
+            ['<b>1v1 (pairings)</b>', 'Head-to-head duels', 'Win 1.0, draw 0.5, loss 0'],
+            ['<b>Small-sided (W/D/L)</b>', 'Team games in a session', 'Win 1.0, draw 0.5, loss 0'],
+            ['<b>Counted, higher wins</b>', 'Coopers, beep test, shots made', 'Ranked against the squad that session'],
+            ['<b>Timed, fastest wins</b>', 'A sprint where placing matters', 'Ranked against the squad that session'],
+            ['<b>Timed against a standard</b>', 'Three laps under 4:30', 'Absolute: hit the time, earn the band']
+          ])}
+          <h4>Worked example &mdash; a timed standard</h4>
+          <ol class="help-steps">
+            <li>Create the drill <code>3 Laps</code> with measure <b>Timed against a standard</b>.</li>
+            <li>Go to <span class="help-path">Matrix &rsaquo; Exercise Weights</span> and set its
+                weight &mdash; how much this exercise is worth next to the others.</li>
+            <li>Standards rows appear beneath it for the team currently selected. Enter
+                <code>4:30 &rarr; 1</code>, click <b>+ Add a standard</b>, then
+                <code>4:40 &rarr; 0.5</code>, and again for <code>4:50 &rarr; 0.25</code>. Save.</li>
+            <li><b>Switch to your other squad and set their standards too.</b> They start empty.</li>
+          </ol>
+          ${N('The number earned multiplies the weight', `<p>On a drill weighted 1.5, hitting 4:30
+            earns the full 1.5 and 4:50 earns 0.375. The weight says how much the exercise matters;
+            the band says how much of it was earned.</p>`)}
+          ${W('A squad with no standards is not scored', `<p>Deliberately, rather than scored zero
+            &mdash; a zero would quietly drag their percentage down because nobody had set their
+            times yet. The session screen warns you before you save.</p>`)}`
+      },
+      {
+        id: 'ex-session', part: 'Worked examples', title: 'Run a practice and record the results', roles: [COACH],
+        body: `
+          <h4>Worked example &mdash; a Tuesday session</h4>
+          <ol class="help-steps">
+            <li><b>Before</b>: build the plan in <span class="help-path">Practice planner</span>,
+                adding drills and times, then <b>Save Practice Plan</b> under a name you will
+                recognise. <b>Print Practice Plan</b> gives you the sheet to take out.</li>
+            <li>For 1v1s, <span class="help-path">Practice planner &rsaquo; 1v1 Round Robin</span>
+                prints a sheet of every pairing &mdash; <code>(1) Cesar A. vs (4) Tom B.</code> &mdash;
+                with a blank column to write results into.</li>
+            <li><b>On the pitch</b>: write results on paper, using recording numbers rather than
+                names.</li>
+            <li><b>After</b>: for a whole-squad exercise use
+                <span class="help-path">Matrix &rsaquo; Record a session</span>; for individual duels
+                use <b>Record Practice Drill Scores</b>.</li>
+          </ol>
+          <h4>Entering from the paper sheet</h4>
+          <p>Both screens are built for reading down a sheet. The player lists lead with the
+          recording number and are ordered by it, and the 1v1 screen has a box beside each player
+          where you can type <code>6</code> or a surname instead of scrolling.</p>
+          ${N('A time is typed as mm:ss', `<p><code>4:28</code>, not 268. The screen shows what the
+            time earns as you type it, so you can see the band land before saving.</p>`)}
+          ${W('An unknown number is refused, not guessed', `<p>Type a recording number nobody has and
+            the screen says so and clears the selection. That is deliberate: a misread digit
+            attributed to the wrong player would move the standings with nothing to show for
+            it.</p>`)}`
+      },
+      {
+        id: 'ex-ratings', part: 'Worked examples', title: 'Set player ratings', roles: [COACH],
+        body: `
+          <p>Ratings are a coach's own judgement &mdash; technical, tactical, physical and mental,
+          each out of 100. They are separate from the Competitive Matrix, which is earned from
+          recorded results rather than assigned.</p>
+          ${P('Roster', 'a player', 'Edit')}
+          <ol class="help-steps">
+            <li>Open the player and click <b>Edit</b>.</li>
+            <li>Set the four ratings. They default to 80, so a squad left untouched all looks
+                identical.</li>
+            <li>Save. Visitors never see these; only coaches and admins do.</li>
+          </ol>
+          ${N('Ratings and the Matrix are different things', `<p>A rating is what you think of a
+            player. A Matrix score is what they earned in recorded exercises. A player can be highly
+            rated and low on the Matrix if they have not been turning up &mdash; which is exactly the
+            comparison worth looking at.</p>`)}
+          <p>Ratings can also be set in bulk through the players import, using the
+          <code>Tech</code>, <code>Tactical</code>, <code>Physical</code> and <code>Mental</code>
+          columns.</p>`
+      },
+      {
+        id: 'ex-plans', part: 'Worked examples', title: 'Reuse a plan across squads', roles: [COACH],
+        body: `
+          <p>Practice plans belong to one team. The drill library is shared across the whole
+          organization, so the drills themselves do not need duplicating &mdash; only the plan.</p>
+          <h4>Worked example &mdash; the same session for Varsity and JV</h4>
+          <ol class="help-steps">
+            <li>Build and save the plan with <b>Varsity</b> selected.</li>
+            <li>With that plan loaded, click <b>Copy to team&hellip;</b> beside its name and choose
+                <b>JV</b>.</li>
+            <li>Switch to JV and open it. Edit it freely &mdash; the copy is independent, so changing
+                JV's version leaves Varsity's alone.</li>
+          </ol>
+          ${N('Renaming a plan', `<p><span class="help-path">Select Practice Plan &rsaquo;
+            Rename</span> renames every drill slot in it at once. A name another plan on that team
+            already uses is refused, because two plans sharing a name become one session.</p>`)}
+          ${W('Copying across organizations is refused', `<p>The drill library belongs to one
+            organization, so a plan copied to a club team would point at drills that team cannot
+            see. The copy is blocked and names the drills that are missing, rather than half-copying
+            and leaving broken slots.</p>`)}`
+      },
+      {
+        id: 'ex-quiz', part: 'Worked examples', title: 'Write a daily message and its quiz', roles: [COACH],
+        body: `
+          <p>The daily message is what players see on the home page. Quiz questions can be tied to
+          it, so a question is only asked while that message is the current one.</p>
+          <h4>Worked example</h4>
+          <ol class="help-steps">
+            <li><span class="help-path">Home &rsaquo; Coach's Daily Thoughts &rsaquo; Manage &rsaquo;
+                Add New Thought</span>. Write the message, give it a short <b>title</b> such as
+                <code>Week 3 &ndash; High Press</code>, and set it active.</li>
+            <li><span class="help-path">Admin panel &rsaquo; Quiz Questions &rsaquo; Add a
+                question</span>. Write the question and its options, mark the correct one, and add an
+                explanation &mdash; players see it when they get the question wrong.</li>
+            <li>Set <b>Tests which message?</b> to that title. Leave it on <em>always asked</em> for
+                evergreen questions like the formation or the participation rule.</li>
+            <li>Tick which squads are asked it. A question no team has ticked is asked by
+                nobody.</li>
+          </ol>
+          ${N('Questions can be imported too', `<p>A two-sheet workbook: a Thoughts sheet with
+            <code>id</code>, <code>Title</code>, <code>ThoughtsText</code>, and a Quiz sheet whose
+            <code>id</code> column repeats the number of the message each question belongs to.
+            Import the thoughts first, so the numbers exist for the questions to point at.</p>`)}
+          ${W('The message is per squad', `<p>Varsity's message and JV's are separate. Write one with
+            the wrong team selected and the wrong squad reads it.</p>`)}`
       },
       {
         id: 'fix', part: 'When something looks wrong', title: 'Common confusions', roles: [ALL],
