@@ -1237,3 +1237,148 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    so they are the ones that read at a glance. */
 #squadReportBody .met { color: var(--text-muted); }
 #squadReportBody .notyet { color: var(--bhs-gold-accent); font-weight: 700; }
+
+/* ===========================================================================
+   PHONE LAYOUT
+   ===========================================================================
+
+   Written for a coach holding a phone on the touchline, one-handed, often in
+   sunlight, entering results between drills. That use case drives every rule
+   below, so the priorities are: never lose the field you are typing into,
+   never make a target too small to hit while walking, and never make the page
+   scroll sideways.
+
+   The app is otherwise built for a desktop and that stays true -- everything
+   here lives behind a max-width query and changes nothing above it.
+   =========================================================================== */
+
+@media (max-width: 640px) {
+
+  /* ── Typing ──────────────────────────────────────────────────────────────
+     Safari force-zooms the page whenever a focused input renders below 16px,
+     and then leaves you panned away from the form. The session grid sets
+     font-size:0.8rem INLINE on its inputs, and an inline style beats any
+     stylesheet rule, so this is one of the few places !important is the right
+     tool rather than a shortcut. 16px exactly: large enough that Safari leaves
+     the viewport alone, small enough that a time still fits its box. */
+  input.form-control,
+  select.form-control,
+  textarea.form-control,
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Stop Safari inflating body text in landscape. */
+  body { -webkit-text-size-adjust: 100%; }
+
+  /* ── Targets ─────────────────────────────────────────────────────────────
+     44px is the smallest reliably hittable target for a thumb in motion. The
+     filter chips and tool buttons were laid out for a mouse and are well under
+     it. */
+  .btn,
+  .tool-btn,
+  .filter-chip,
+  .nav-item,
+  select.form-control,
+  input.form-control {
+    min-height: 44px;
+  }
+
+  .btn { padding: 10px 16px; }
+  .filter-chip { padding: 10px 14px; font-size: 0.85rem; }
+
+  /* ── Chrome around the page ──────────────────────────────────────────────
+     40px of vertical padding is a fifth of a phone screen spent on nothing. */
+  .container { padding: 16px 12px; }
+  .navbar { padding: 10px 12px; }
+
+  /* The nav is a horizontal strip that would otherwise wrap into a wall. Let
+     it scroll sideways on its own rather than pushing the page around. */
+  .nav-links {
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-item { font-size: 0.85rem; padding: 8px 10px; white-space: nowrap; }
+  .nav-brand img { height: 34px; }
+
+  /* ── Layouts that assume width ───────────────────────────────────────────
+     Each of these is a fixed or multi-column grid with no fallback. */
+  .matrix-grid { grid-template-columns: 1fr; gap: 16px; }
+  .player-stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+  /* 120px + 180px + 140px of fixed columns is 440px before the opponent name
+     gets a pixel, so this one scrolled sideways on every phone made. */
+  .schedule-card {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    text-align: left;
+  }
+
+  .portal-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+  }
+  .section-header,
+  .player-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  /* ── Modals ──────────────────────────────────────────────────────────────
+     Full-bleed, because 30px of padding either side of a 390px screen is a
+     third of the room gone. dvh rather than vh: Safari's toolbar shrinks the
+     viewport as you scroll, and vh does not notice, so the bottom of a long
+     modal ends up under the browser chrome -- which is where the Save button
+     lives. */
+  .modal-overlay { align-items: flex-start; }
+  .modal-window {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 0;
+    padding: 16px 14px;
+    max-height: 100dvh;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+  .modal-header h3 { font-size: 1rem; }
+
+  /* ── Tables ──────────────────────────────────────────────────────────────
+     A table with real columns cannot be made narrow without becoming
+     unreadable, so let it scroll inside its own box. The page body still must
+     not scroll sideways -- that is the rule this protects. */
+  .matrix-table-container,
+  .help-tablewrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+  }
+  .matrix-table,
+  .data-table { min-width: 460px; }
+
+  /* ── Diagrammer ──────────────────────────────────────────────────────────
+     The board itself already scales to its wrapper. The toolbar was laid out
+     for a mouse. */
+  .diagrammer-toolbar { padding: 8px; gap: 6px; justify-content: flex-start; }
+  .tool-btn { font-size: 0.8rem; padding: 8px 10px; }
+  .canvas-wrapper { padding: 4px; }
+}
+
+/* ── Touch, at any width ───────────────────────────────────────────────────
+   Not phone-specific: a touchscreen laptop has the same problem. Without
+   touch-action the browser claims the gesture for scrolling and the first
+   part of every stroke is lost, which reads as a laggy canvas rather than as
+   a scroll. */
+canvas { touch-action: none; max-width: 100%; }

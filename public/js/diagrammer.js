@@ -33,17 +33,80 @@ class SoccerTacticalBoard {
     this.animReqId = null;
   }
 
+  /**
+   * Size the board to the space it has, keeping the pitch's 5:3 proportions.
+   *
+   * Capped at 840 so it does not sprawl on a desktop, and floored at 280 so a
+   * narrow phone still gets a board rather than a sliver. Redrawing is the
+   * caller's job everywhere except the resize handler, which has to.
+   */
+  fitToWrapper() {
+    if (!this.canvas) return false;
+    const wrapper = this.canvas.parentElement;
+    const avail = (wrapper ? wrapper.clientWidth : 800) - 20;
+    const w = Math.max(280, Math.min(840, avail || 800));
+    const h = Math.round(w * 0.6);
+    if (this.canvas.width === w && this.canvas.height === h) return false;
+    this.canvas.width = w;
+    this.canvas.height = h;
+    return true;
+  }
+
+  /**
+   * Re-fit when the viewport changes -- rotating a phone, mostly.
+   *
+   * Element coordinates are stored in canvas pixels, so a resize would move
+   * every player relative to the pitch. They are rescaled by the same factor
+   * the canvas changed by, which keeps a diagram looking like itself.
+   *
+   * Debounced because iOS fires resize repeatedly through an orientation
+   * change, and each one is a full re-render.
+   */
+  attachResize() {
+    if (this.hasResizeAttached) return;
+    this.hasResizeAttached = true;
+
+    let pending = null;
+    this.onViewportResize = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        if (!this.canvas || !this.canvas.isConnected) return;
+        const before = { w: this.canvas.width, h: this.canvas.height };
+        if (!this.fitToWrapper()) return;
+        this.rescaleContents(before, { w: this.canvas.width, h: this.canvas.height });
+        this.render();
+      }, 150);
+    };
+    window.addEventListener('resize', this.onViewportResize);
+    window.addEventListener('orientationchange', this.onViewportResize);
+  }
+
+  /** Move everything by the same factor the board changed by. */
+  rescaleContents(before, after) {
+    if (!before.w || !before.h) return;
+    const fx = after.w / before.w;
+    const fy = after.h / before.h;
+    if (fx === 1 && fy === 1) return;
+
+    (this.elements || []).forEach(el => { el.x *= fx; el.y *= fy; });
+    (this.drawings || []).forEach(d => {
+      (d.points || []).forEach(pt => { pt.x *= fx; pt.y *= fy; });
+    });
+    (this.keyframes || []).forEach(kf => {
+      (kf.elements || []).forEach(el => { el.x *= fx; el.y *= fy; });
+      (kf.drawings || []).forEach(d => {
+        (d.points || []).forEach(pt => { pt.x *= fx; pt.y *= fy; });
+      });
+    });
+  }
+
   init(canvasId) {
     this.canvas = document.getElementById(canvasId);
     if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
 
-    const wrapper = this.canvas.parentElement;
-    const w = Math.min(840, (wrapper ? wrapper.clientWidth : 800) - 20 || 800);
-    const h = Math.round(w * 0.6);
-    this.canvas.width = w;
-    this.canvas.height = h;
-
+    this.fitToWrapper();
     this.attachEvents();
     this.render();
     this.updateToolbarUI();
@@ -480,7 +543,21 @@ class SoccerTacticalBoard {
     return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
   }
 
+  /**
+   * How close counts as "on" a drawn line.
+   *
+   * 18px was measured against a mouse pointer. A fingertip covers roughly a
+   * 40px circle and you cannot see under it, so a coarse pointer needs a
+   * wider catchment or selecting a line becomes guesswork.
+   */
+  touchHitRadius(base) {
+    const coarse = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(pointer: coarse)').matches;
+    return coarse ? base * 2 : base;
+  }
+
   isPointNearDrawing(pos, drawing, maxDist = 18) {
+    maxDist = this.touchHitRadius(maxDist);
     const pts = drawing.points;
     if (!pts || pts.length === 0) return false;
     if (pts.length === 1) return Math.hypot(pos.x - pts[0].x, pos.y - pts[0].y) <= maxDist;
@@ -643,9 +720,12 @@ class SoccerTacticalBoard {
     this.canvas.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
 
-    this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); });
-    this.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); });
+    this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, { passive: false });
+    this.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); }, { passive: false });
     window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+
+    this.attachResize();
 
     if (!this.hasKeydownAttached) {
       this.hasKeydownAttached = true;
