@@ -725,6 +725,18 @@ Object.assign(BHSSoccerApp.prototype, {
     if (body) body.innerHTML = this.renderBreakdown();
   },
 
+  /**
+   * Whether a 'measured' row came from a timed drill rather than a counted one.
+   *
+   * Both arrive as kind 'measured' with a bare number; only the drill knows
+   * whether that number is seconds or a count, and 2800 metres and 2800
+   * seconds want very different formatting.
+   */
+  isTimedExercise(row) {
+    const drill = (this.data.drillsBank || []).find(d => d.id === row.drill_id);
+    return !!drill && (drill.measure === 'time_low' || drill.measure === 'time_bands');
+  },
+
   /** What the player actually did, phrased for the exercise they did it in. */
   breakdownDetail(row) {
     const names = new Map((this.data.players || []).map(p => [p.id, p.name]));
@@ -741,8 +753,23 @@ Object.assign(BHSSoccerApp.prototype, {
     // Distinct from a no-show: nobody marked them absent, they were simply
     // never given a row. Naming it tells the coach to go back and fill it in.
     if (row.kind === 'not_entered') return 'not entered';
-    return row.raw_value === null || row.raw_value === undefined
-      ? 'took part' : String(Number(row.raw_value));
+
+    if (row.raw_value === null || row.raw_value === undefined) return 'took part';
+
+    // A timed exercise stores seconds, and 250 read as a score rather than as
+    // a time -- it looks like points earned, which is the column next to it.
+    // Shown as the coach entered it, with what the time earned, because the
+    // whole question a breakdown answers is "why that number?".
+    if (row.kind === 'time_band') {
+      const time = window.supabaseService.formatSecondsAsTime(row.raw_value);
+      const share = Number(row.available) ? Number(row.earned) / Number(row.available) : 0;
+      return share > 0 ? `${time} — earned ${+share.toFixed(2)} of the exercise`
+                       : `${time} — met no standard`;
+    }
+    if (row.kind === 'measured' && this.isTimedExercise(row)) {
+      return window.supabaseService.formatSecondsAsTime(row.raw_value);
+    }
+    return String(Number(row.raw_value));
   },
 
   renderBreakdown() {
