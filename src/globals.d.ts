@@ -43,6 +43,14 @@ declare global {
     // The questions one team's quiz asks: the organization's bank filtered by
     // that team's selection (team_quiz_questions, added by 0017).
     fetchTeamQuiz(teamId: string): Promise<Record<string, any>[] | null>;
+    // The whole bank for an organization, each question carrying the ids of
+    // the teams that ask it. The editor needs questions no team has switched
+    // on; fetchTeamQuiz by definition cannot return those.
+    fetchQuizBank(schoolId: string): Promise<Record<string, any>[] | null>;
+    setTeamQuizQuestion(teamId: string, questionId: string, on: boolean): Promise<{ ok: boolean; error?: string }>;
+    retireQuizQuestion(questionId: string): Promise<{ ok: boolean; error?: string }>;
+    findThoughtIdByTitle(teamId: string, title: string): Promise<string | null>;
+    fetchActiveThoughtId(teamId: string): Promise<string | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
     updateDrillWeights(rows: { id: string; points: number; measure: string }[]):

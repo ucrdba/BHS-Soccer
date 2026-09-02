@@ -2431,6 +2431,61 @@ class SupabaseService {
   }
 
   /**
+   * The whole question bank for an organization, with which teams ask each one.
+   *
+   * Distinct from fetchTeamQuiz, which returns only what one squad is asked
+   * right now. The editor needs everything, including questions no team has
+   * switched on -- those are invisible in every quiz and the coach has no other
+   * way to find them.
+   */
+  async fetchQuizBank(schoolId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !schoolId || !this.isUuid(schoolId)) return null;
+
+    const [questions, selections] = await Promise.all([
+      this.client!.from('quiz_questions')
+        .select('question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, thought_id, import_key')
+        .eq('school_id', schoolId)
+        .or('is_deleted.is.null,is_deleted.eq.false'),
+      this.client!.from('team_quiz_questions').select('team_id, question_id')
+    ]);
+
+    if (questions.error) { console.warn('Supabase fetchQuizBank notice:', questions.error.message); return null; }
+
+    const teamsByQuestion: Record<string, string[]> = {};
+    (selections.data || []).forEach((r: any) => {
+      (teamsByQuestion[r.question_id] = teamsByQuestion[r.question_id] || []).push(r.team_id);
+    });
+
+    return (questions.data || []).map((q: any) => ({
+      ...q,
+      teamIds: teamsByQuestion[q.question_id] || []
+    }));
+  }
+
+  /**
+   * Retire a question. Soft delete, matching the repo-wide convention.
+   *
+   * Its team_quiz_questions rows are left alone: fetchTeamQuiz filters on
+   * is_deleted, so a retired question stops being asked anyway, and keeping the
+   * rows means un-retiring restores which squads used it.
+   */
+  async retireQuizQuestion(questionId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!questionId || !this.isUuid(questionId)) return { ok: false, error: 'No question given.' };
+
+    const { data, error } = await this.client!
+      .from('quiz_questions')
+      .update({ is_deleted: true })
+      .eq('question_id', questionId)
+      .select();
+    if (error) { console.warn('Supabase retireQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that. Coach or admin access is required.' };
+    }
+    return { ok: true };
+  }
+
+  /**
    * Switch a question on or off for one team.
    *
    * The bank belongs to the organization; this is what decides whether a given

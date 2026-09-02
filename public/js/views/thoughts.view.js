@@ -67,6 +67,7 @@ Object.assign(BHSSoccerApp.prototype, {
     document.getElementById('thoughtEditId').value = '';
     document.getElementById('thoughtFormModalTitle').textContent = '➕ ADD NEW DAILY THOUGHT';
     document.getElementById('thoughtCoachNameInput').value = (currentUser && currentUser.name) ? currentUser.name : 'Coach Bob Miller';
+    document.getElementById('thoughtTitleInput').value = '';
     document.getElementById('thoughtTextInput').value = '';
     document.getElementById('thoughtIsActiveInput').checked = true;
 
@@ -81,6 +82,7 @@ Object.assign(BHSSoccerApp.prototype, {
     document.getElementById('thoughtEditId').value = thought.id;
     document.getElementById('thoughtFormModalTitle').textContent = '✏️ EDIT DAILY THOUGHT';
     document.getElementById('thoughtCoachNameInput').value = thought.coachName || 'Coach Bob Miller';
+    document.getElementById('thoughtTitleInput').value = thought.title || '';
     document.getElementById('thoughtTextInput').value = thought.text || '';
     document.getElementById('thoughtIsActiveInput').checked = !!thought.isActive;
 
@@ -91,6 +93,7 @@ Object.assign(BHSSoccerApp.prototype, {
   async submitThoughtForm() {
     const id = document.getElementById('thoughtEditId').value;
     const coachName = document.getElementById('thoughtCoachNameInput').value.trim() || 'Coach Bob Miller';
+    const title = document.getElementById('thoughtTitleInput').value.trim();
     const text = document.getElementById('thoughtTextInput').value.trim();
     const isActive = document.getElementById('thoughtIsActiveInput').checked;
 
@@ -108,6 +111,7 @@ Object.assign(BHSSoccerApp.prototype, {
       targetThought = (this.data.dailyThoughts || []).find(t => t.id === id);
       if (targetThought) {
         targetThought.coachName = coachName;
+        targetThought.title = title;
         targetThought.text = text;
         targetThought.isActive = isActive;
       }
@@ -116,6 +120,7 @@ Object.assign(BHSSoccerApp.prototype, {
         id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
         coachId: coachId,
         coachName: coachName,
+        title: title,
         text: text,
         isActive: isActive,
         createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
@@ -134,6 +139,7 @@ Object.assign(BHSSoccerApp.prototype, {
           id: targetThought.id,
           coachId: coachId,
           coachName: coachName,
+          title: title,
           text: text,
           isActive: isActive
         });

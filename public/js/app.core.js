@@ -578,6 +578,9 @@ class BHSSoccerApp {
           id: t.id,
           coachId: t.coach_id,
           coachName: t.coach_name || '',
+          // Short name a quiz question can point at (0018), and what the
+          // edit form pre-fills.
+          title: t.title || '',
           text: t.thoughts_text,
           isActive: !!t.is_active,
           createdAt: new Date(t.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()

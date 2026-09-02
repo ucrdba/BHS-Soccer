@@ -45,6 +45,7 @@ function setupThoughtFormDom() {
   document.body.innerHTML = `
     <input id="thoughtEditId" value="" />
     <input id="thoughtCoachNameInput" value="Coach B" />
+    <input id="thoughtTitleInput" value="" />
     <textarea id="thoughtTextInput">Press high today.</textarea>
     <input id="thoughtIsActiveInput" type="checkbox" checked />
     <div id="editThoughtFormModal" class="active"></div>

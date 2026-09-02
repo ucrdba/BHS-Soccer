@@ -149,6 +149,8 @@ Object.assign(BHSSoccerApp.prototype, {
 
       ${this.renderCategoryAdminSection()}
 
+      ${this.renderQuizAdminSection()}
+
       ${this.renderUnassignedPlayersSection()}
 
       <!-- Section 2: School & Club Profile Settings -->
@@ -732,6 +734,240 @@ Object.assign(BHSSoccerApp.prototype, {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  },
+
+  /**
+   * The quiz question bank.
+   *
+   * The bank belongs to the organization; team_quiz_questions decides which
+   * squad is asked what. Both are edited here, because a question nobody has
+   * switched on is invisible in every quiz and this is the only place it can be
+   * found.
+   *
+   * A question may also name the daily message it tests. Those are asked only
+   * while that message is active, so the list says which message rather than
+   * leaving a coach to guess why a question is not appearing.
+   */
+  renderQuizAdminSection() {
+    if (!(window.auth.isCoach() || window.auth.isAdmin())) return '';
+
+    const notice = this._quizNotice || '';
+    this._quizNotice = '';
+    const error = this._quizError || '';
+    this._quizError = '';
+
+    const bank = this._quizBank || [];
+    const teams = (this.data.teams || []).filter(t => !t.is_deleted);
+    const thoughts = (this.data.dailyThoughts || []).filter(t => t.title);
+    const editing = this._editingQuestionId;
+
+    const thoughtName = (id) => {
+      const t = (this.data.dailyThoughts || []).find(x => x.id === id);
+      return t ? (t.title || 'Untitled message') : null;
+    };
+
+    const optionRow = (letter, value) => `
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+        <span style="color:var(--bhs-gold-accent); font-weight:700; font-size:0.8rem; width:16px;">${letter}</span>
+        <input type="text" id="qOption${letter}" class="form-control" style="flex:1; font-size:0.8rem;" value="${this._attrArg(value || '')}" />
+        <label style="display:flex; align-items:center; gap:4px; font-size:0.76rem; color:var(--text-muted); cursor:pointer;">
+          <input type="radio" name="qCorrect" value="${letter}" ${(this._editingCorrect || 'A') === letter ? 'checked' : ''} /> correct
+        </label>
+      </div>`;
+
+    const form = (q) => `
+      <div style="background:rgba(0,0,0,0.3); border:1px solid var(--bhs-gold-accent); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted);">Question</label>
+          <textarea id="qText" class="form-control" rows="2" style="font-size:0.82rem;">${this._text(q.question || '')}</textarea>
+        </div>
+        ${optionRow('A', q.option_a)}
+        ${optionRow('B', q.option_b)}
+        ${optionRow('C', q.option_c)}
+        ${optionRow('D', q.option_d)}
+        <div class="form-group" style="margin:8px 0;">
+          <label style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted);">Explanation (shown when a player gets it wrong)</label>
+          <input type="text" id="qExplanation" class="form-control" style="font-size:0.8rem;" value="${this._attrArg(q.explanation || '')}" />
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <div style="flex:1; min-width:130px;">
+            <label style="display:block; font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Category</label>
+            <input type="text" id="qCategory" class="form-control" style="font-size:0.8rem;" value="${this._attrArg(q.category || 'Tactical')}" />
+          </div>
+          <div style="flex:1; min-width:110px;">
+            <label style="display:block; font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Key (for re-import)</label>
+            <input type="text" id="qKey" class="form-control" style="font-size:0.8rem;" value="${this._attrArg(q.import_key || '')}" placeholder="e.g. 100" />
+          </div>
+          <div style="flex:2; min-width:170px;">
+            <label style="display:block; font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Tests which message?</label>
+            <select id="qThought" class="form-control" style="font-size:0.8rem;">
+              <option value="">&mdash; always asked &mdash;</option>
+              ${thoughts.map(t => `<option value="${this._attrArg(t.id)}" ${q.thought_id === t.id ? 'selected' : ''}>${this._text(t.title)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-gold" style="padding:5px 12px; font-size:0.8rem;" onclick="app.saveQuizQuestion('${this._attrArg(q.question_id || 'new')}')">Save</button>
+          <button class="btn btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="app.cancelQuizEdit()">Cancel</button>
+        </div>
+      </div>`;
+
+    const rows = bank.map(q => {
+      if (editing === q.question_id) return form(q);
+      const linked = thoughtName(q.thought_id);
+      return `
+        <div style="background:rgba(0,0,0,0.25); border:1px solid var(--bhs-navy-border); border-radius:8px; padding:9px 12px; margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:220px;">
+              <strong style="color:#FFF; font-size:0.85rem;">${this._text(q.question)}</strong>
+              <div class="text-muted" style="font-size:0.75rem; margin-top:3px;">
+                answer ${this._text(q.correct_option)} &bull; ${this._text(q.category || 'Tactical')}
+                ${q.import_key ? ' &bull; key ' + this._text(q.import_key) : ''}
+                ${linked
+                  ? ' &bull; <span style="color:var(--bhs-gold-accent);">only while &quot;' + this._text(linked) + '&quot; is active</span>'
+                  : ' &bull; always asked'}
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;" onclick="app.startQuizEdit('${this._attrArg(q.question_id)}')">Edit</button>
+              <button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; color:var(--color-danger); border-color:var(--color-danger);" onclick="app.retireQuizQuestion('${this._attrArg(q.question_id)}')">Retire</button>
+            </div>
+          </div>
+          <div style="margin-top:7px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <span class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Asked by</span>
+            ${teams.map(t => `
+              <label style="display:flex; align-items:center; gap:5px; font-size:0.78rem; color:${(q.teamIds || []).includes(t.id) ? '#FFF' : 'var(--text-muted)'}; cursor:pointer;">
+                <input type="checkbox" ${(q.teamIds || []).includes(t.id) ? 'checked' : ''}
+                       onchange="app.toggleQuizQuestionForTeam('${this._attrArg(q.question_id)}','${this._attrArg(t.id)}', this.checked)" />
+                ${this._text(t.name)}
+              </label>`).join('')}
+            ${(q.teamIds || []).length === 0 ? '<span style="color:var(--color-danger); font-size:0.74rem;">no team asks this</span>' : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <details class="admin-accordion" ${this._quizAdminOpen ? 'open' : ''}>
+        <summary class="admin-accordion-summary">
+          <span>&#128221; QUIZ QUESTIONS</span>
+          <span class="badge badge-coach">${bank.length}</span>
+        </summary>
+        <div class="admin-accordion-content">
+          ${notice ? '<div style="background:rgba(46,160,67,0.12); border:1px solid rgba(46,160,67,0.5); color:#7ee2a8; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">&#10003; ' + this._text(notice) + '</div>' : ''}
+          ${error ? '<div style="background:rgba(239,68,68,0.12); border:1px solid var(--color-danger); color:#ffb4b4; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">' + this._text(error) + '</div>' : ''}
+          <p class="text-muted" style="font-size:0.8rem; margin:0 0 12px 0;">
+            Questions are shared across your organization; each team is asked the ones ticked below.
+            A question can also name a daily message &mdash; it is then asked only while that message is active.
+          </p>
+
+          ${editing === 'new'
+            ? form({ category: 'Tactical' })
+            : '<button class="btn btn-secondary" style="padding:5px 12px; font-size:0.8rem; margin-bottom:10px;" onclick="app.startQuizEdit(\'new\')">+ Add a question</button>'}
+
+          ${rows || '<p class="text-muted" style="font-size:0.85rem;">No questions yet.</p>'}
+        </div>
+      </details>`;
+  },
+
+  async loadQuizBank() {
+    if (!window.supabaseService?.isConfigured()) return;
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) { this._quizBank = []; return; }
+    this._quizBank = (await window.supabaseService.fetchQuizBank(team.school_id)) || [];
+  },
+
+  startQuizEdit(questionId) {
+    this._editingQuestionId = questionId;
+    const q = (this._quizBank || []).find(x => x.question_id === questionId);
+    this._editingCorrect = q ? q.correct_option : 'A';
+    this._quizAdminOpen = true;
+    this.renderAdminModalContent();
+  },
+
+  cancelQuizEdit() {
+    this._editingQuestionId = null;
+    this._quizAdminOpen = true;
+    this.renderAdminModalContent();
+  },
+
+  /** Apply a bank change, refresh and re-render, surfacing any refusal. */
+  async _applyQuizChange(fn, successMessage) {
+    this._quizAdminOpen = true;
+    let res;
+    try {
+      res = await fn();
+    } catch (e) {
+      res = { ok: false, error: (e && e.message) || 'Could not reach the database.' };
+    }
+    if (!res || !res.ok) {
+      this._quizError = (res && res.error) || 'That did not work.';
+    } else {
+      this._quizNotice = successMessage;
+      this._editingQuestionId = null;
+    }
+    await this.loadQuizBank();
+    this.renderAdminModalContent();
+    return !!(res && res.ok);
+  },
+
+  async saveQuizQuestion(questionId) {
+    this._quizAdminOpen = true;
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) {
+      this._quizError = 'Choose a team in the header first, so the question bank knows which organization it belongs to.';
+      this.renderAdminModalContent();
+      return;
+    }
+
+    const val = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+    const checked = document.querySelector('input[name="qCorrect"]:checked');
+
+    const payload = {
+      schoolId: team.school_id,
+      question: val('qText'),
+      option_a: val('qOptionA'), option_b: val('qOptionB'),
+      option_c: val('qOptionC'), option_d: val('qOptionD'),
+      correct_option: checked ? checked.value : 'A',
+      explanation: val('qExplanation'),
+      category: val('qCategory'),
+      importKey: val('qKey'),
+      thoughtId: val('qThought') || null
+    };
+    const isNew = !questionId || questionId === 'new';
+    if (!isNew) payload.question_id = questionId;
+
+    const ok = await this._applyQuizChange(
+      () => window.supabaseService.upsertQuizQuestion(payload),
+      isNew ? 'Question added.' : 'Question saved.'
+    );
+
+    // A question nobody asks is invisible in every quiz, so a new one is
+    // switched on for the team being worked on rather than left stranded.
+    if (ok && isNew) {
+      const added = (this._quizBank || []).find(q => q.question === payload.question);
+      if (added) {
+        await window.supabaseService.setTeamQuizQuestion(this.activeTeamId, added.question_id, true);
+        await this.loadQuizBank();
+        this.renderAdminModalContent();
+      }
+    }
+  },
+
+  async retireQuizQuestion(questionId) {
+    const q = (this._quizBank || []).find(x => x.question_id === questionId);
+    const text = (q && q.question) || '';
+    if (!confirm('Retire this question?\n\n"' + text + '"\n\nIt stops being asked by every team. Attempts already recorded keep their answers.')) return;
+    await this._applyQuizChange(
+      () => window.supabaseService.retireQuizQuestion(questionId),
+      'Question retired.'
+    );
+  },
+
+  async toggleQuizQuestionForTeam(questionId, teamId, on) {
+    await this._applyQuizChange(
+      () => window.supabaseService.setTeamQuizQuestion(teamId, questionId, on),
+      on ? 'Question switched on for that team.' : 'Question switched off for that team.'
+    );
   },
 
   /**
@@ -1403,6 +1639,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (window.auth.isCoach() || window.auth.isAdmin()) {
       await this.loadCategoryAdminData();
       await this.loadUnassignedPlayers();
+      await this.loadQuizBank();
     }
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
