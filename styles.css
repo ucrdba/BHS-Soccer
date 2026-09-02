@@ -612,6 +612,11 @@
 .data-table th, .data-table td { text-align: center; }
 .data-table th.col-text, .data-table td.col-text { text-align: left; }
 
+/* The row jumped to in Record a Session. Fades out on its own, because the
+   highlight answers "where did it go" and then stops being useful. */
+.session-row { border-radius: 6px; transition: background-color 0.4s ease; }
+.session-row-found { background: rgba(0, 240, 255, 0.16); }
+
 .rank-pill {
   width: 32px;
   height: 32px;

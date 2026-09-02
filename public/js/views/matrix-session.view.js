@@ -448,6 +448,18 @@ Object.assign(BHSSoccerApp.prototype, {
         ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
       </p>
       ${bandNote}
+      <!-- Results are read off paper, where a player is written as a recording
+           number or a scribbled surname. One box takes either, so the coach
+           does not have to say which kind of thing they are typing. -->
+      <div style="display:flex; gap:8px; align-items:center; margin:0 0 8px 0; flex-wrap:wrap;">
+        <input type="text" id="sessionQuick" class="form-control"
+               style="max-width:220px;" placeholder="Recording number or name"
+               aria-label="Jump to a player by recording number or name"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); app.jumpToSessionPlayer(); }" />
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;"
+                onclick="app.jumpToSessionPlayer()">Find</button>
+        <span id="sessionQuickError" style="font-size:0.76rem; color:var(--color-danger);"></span>
+      </div>
       <div style="display:flex; gap:8px; align-items:center; margin:0 0 8px 0;">
         <span class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Order by</span>
         <span class="filter-chip ${by === 'number' ? 'active' : ''}" style="font-size:0.72rem; cursor:pointer;"
@@ -464,7 +476,8 @@ Object.assign(BHSSoccerApp.prototype, {
         const val = had && had.rawValue !== null && had.rawValue !== undefined ? had.rawValue : '';
         const out = had && had.outcome ? had.outcome : '';
         return `
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
+        <div id="sessionRow_${p.id}" class="session-row"
+             style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
           <span style="flex:1; min-width:0; color:#FFF; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             <span style="display:inline-block; min-width:28px; color:var(--bhs-gold-accent); font-weight:700;">${p.recordingNumber != null ? p.recordingNumber : '—'}</span>
             ${p.name}
@@ -536,6 +549,58 @@ Object.assign(BHSSoccerApp.prototype, {
    * the order mid-entry does not discard times already entered -- the rows are
    * re-rendered from scratch, and anything only in the DOM would be lost.
    */
+  /**
+   * Jump to a player by recording number or name.
+   *
+   * The squad is 25 rows on a phone held at the touchline, and a coach reading
+   * from paper wants the row for "34" or "Frias" without scrolling for it.
+   * Uses the same findPlayerOnTeam as RECORD DRILL RESULT, so a bare surname
+   * works when exactly one player has it and an ambiguous one is refused
+   * rather than guessed.
+   *
+   * This SCROLLS AND FOCUSES rather than filtering the list: a session is
+   * entered for the whole squad, and hiding the rest would make it easy to
+   * save with players silently left out.
+   */
+  async jumpToSessionPlayer() {
+    const box = document.getElementById('sessionQuick');
+    const err = document.getElementById('sessionQuickError');
+    const say = (m) => { if (err) err.textContent = m; };
+    if (!box) return;
+
+    const typed = box.value.trim();
+    if (!typed) { say(''); return; }
+
+    if (!window.supabaseService?.isConfigured() || !this.activeTeamId) {
+      say('Choose a team in the header first.');
+      return;
+    }
+
+    const res = await window.supabaseService.findPlayerOnTeam(this.activeTeamId, typed);
+    if (!res || !res.ok) { say((res && res.error) || 'Could not find that player.'); return; }
+
+    const row = document.getElementById('sessionRow_' + res.player.id);
+    if (!row) {
+      // Found on the team but not on screen: they joined after this session
+      // was recorded, or the grid is showing a different squad.
+      say(`${res.player.name} is not in this session's list.`);
+      return;
+    }
+
+    say('');
+    box.value = '';
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+    // Focus whichever control this exercise actually uses, so the coach can
+    // type the result straight away.
+    const field = document.getElementById('sessionValue_' + res.player.id)
+      || document.getElementById('sessionOutcome_' + res.player.id);
+    if (field) { field.focus(); if (field.select) field.select(); }
+
+    row.classList.add('session-row-found');
+    setTimeout(() => row.classList.remove('session-row-found'), 1600);
+  },
+
   setSessionSort(by) {
     const typed = this.collectSessionResults();
     this._sessionPrefill = this._sessionPrefill || {};
