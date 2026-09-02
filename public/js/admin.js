@@ -2259,6 +2259,37 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
+  /** The teams an import could route to: this organization's, by name. */
+  importableTeamNames(active) {
+    return (this.data.teams || [])
+      .filter(t => t.school_id === active.school_id && !t.is_deleted)
+      .map(t => t.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  },
+
+  /**
+   * Confirm a team the sheet names but the organization does not have.
+   *
+   * Split out from resolveImportTeam so a test can decide the answer without
+   * a browser, and so the wording lives in one place.
+   */
+  confirmNewImportTeam(wanted, active) {
+    const existing = this.importableTeamNames(active);
+    return window.confirm(
+      `This sheet routes rows to a team called "${wanted}", which does not exist in `
+      + `${active.school_name || 'this organization'}.
+
+`
+      + `Teams that do exist: ${existing.length ? existing.join(', ') : '(none yet)'}
+
+`
+      + `OK — create "${wanted}" as a new squad.
+`
+      + `Cancel — skip those rows and change the Team column to match an existing team.`
+    );
+  },
+
   /**
    * Resolves an import row's Team column to a real team.
    *
@@ -2268,11 +2299,21 @@ Object.assign(BHSSoccerApp.prototype, {
    * CREATED, which is what makes loading a season's worth of squads a single
    * import rather than a round of SQL first.
    *
-   * Two consequences worth knowing. Creating a team needs admin, because
-   * teams_write is admin-only — a coach importing a sheet that names a new team
-   * gets those rows skipped with a warning rather than the whole sheet failing.
-   * And a typo makes a team: "Varisty" becomes a fourth squad. That is the
-   * deliberate trade for not refusing the import.
+   * Creating one is CONFIRMED first, never silent. A JV sheet whose Team
+   * column said "Jr Varsity" while the squad in the app was called "JV" quietly
+   * produced a second, parallel squad: 25 players on a team nobody had asked
+   * for, and the real JV still empty. The import reported success, because by
+   * its own rules it had succeeded. A name that matches nothing is far more
+   * often a spelling that missed than a squad the coach meant to create, so the
+   * coach is shown what exists and decides.
+   *
+   * Declining skips those rows rather than rerouting them to the active team:
+   * a sheet that names a team means it, and silently landing 26 strangers on
+   * the selected squad is the worse of the two mistakes.
+   *
+   * Creating a team also needs admin, because teams_write is admin-only — a
+   * coach importing a sheet that names a new team gets those rows skipped with
+   * a warning rather than the whole sheet failing.
    *
    * `cache` is a Map shared across one import so a 30-row sheet resolves each
    * distinct team once, not thirty times.
@@ -2291,6 +2332,15 @@ Object.assign(BHSSoccerApp.prototype, {
     if (existing) { cache.set(key, existing); return existing; }
 
     if (!active) { cache.set(key, null); return null; }
+
+    // Asked once per distinct name, because the cache short-circuits every
+    // later row naming the same team.
+    if (!this.confirmNewImportTeam(wanted, active)) {
+      warnings.push(`Team "${wanted}" does not exist — rows naming it were skipped. `
+        + `Change that Team column to one of: ${this.importableTeamNames(active).join(', ')}.`);
+      cache.set(key, null);
+      return null;
+    }
 
     const created = await window.supabaseService.createTeam(active.school_id, wanted);
     if (!created || !created.id) {

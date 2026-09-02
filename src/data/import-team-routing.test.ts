@@ -28,6 +28,9 @@ const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 let app: ImportApp;
 let created: { schoolId: string; name: string }[];
 let createTeamReturns: { id?: string } | null;
+/** What the coach answers when asked to create a team the sheet names. */
+let confirmAnswer: boolean;
+let confirmPrompts: string[];
 
 beforeEach(() => {
   const w = globalThis as any;
@@ -41,6 +44,10 @@ beforeEach(() => {
 
   created = [];
   createTeamReturns = { id: 'team-new' };
+  confirmAnswer = true;
+  confirmPrompts = [];
+  w.window = w;
+  w.confirm = (msg: string) => { confirmPrompts.push(msg); return confirmAnswer; };
   w.supabaseService = {
     isConfigured: () => false,
     createTeam: async (schoolId: string, name: string) => {
@@ -137,6 +144,65 @@ describe('resolveImportTeam', () => {
     await app.resolveImportTeam('Freshman', cache, warnings);
     expect(created).toHaveLength(1);
     expect(warnings).toHaveLength(1);
+  });
+
+  it('asks before creating a squad the sheet names', async () => {
+    // The JV import that produced this test: the sheet said "Jr Varsity", the
+    // squad in the app was "JV", and 25 players landed on a parallel team
+    // nobody had asked for while the real JV stayed empty. The import called
+    // that success.
+    await app.resolveImportTeam('Jr Varsity', new Map(), []);
+    expect(confirmPrompts).toHaveLength(1);
+    expect(confirmPrompts[0]).toContain('Jr Varsity');
+  });
+
+  it('names the teams that do exist, which is what reveals the near-miss', async () => {
+    await app.resolveImportTeam('Jr Varsity', new Map(), []);
+    expect(confirmPrompts[0]).toContain('JV');
+    expect(confirmPrompts[0]).toContain('Varsity');
+  });
+
+  it("offers only this organization's teams, never another club's", async () => {
+    await app.resolveImportTeam('Jr Varsity', new Map(), []);
+    expect(confirmPrompts[0]).not.toContain('U16');
+  });
+
+  it('creates nothing when the coach declines', async () => {
+    confirmAnswer = false;
+    const team = await app.resolveImportTeam('Jr Varsity', new Map(), []);
+    expect(team).toBeNull();
+    expect(created).toHaveLength(0);
+  });
+
+  it('skips declined rows rather than landing them on the active team', async () => {
+    // Rerouting to the selected squad is the worse mistake: a sheet that names
+    // a team means it, and 26 strangers would join Varsity silently.
+    confirmAnswer = false;
+    const team = await app.resolveImportTeam('Jr Varsity', new Map(), []);
+    expect(team).toBeNull();
+  });
+
+  it('says which names would have worked when the coach declines', async () => {
+    confirmAnswer = false;
+    const warnings: string[] = [];
+    await app.resolveImportTeam('Jr Varsity', new Map(), warnings);
+    expect(warnings[0]).toContain('Jr Varsity');
+    expect(warnings[0]).toContain('JV');
+  });
+
+  it('asks once per distinct name, not once per row', async () => {
+    confirmAnswer = false;
+    const cache = new Map();
+    await app.resolveImportTeam('Jr Varsity', cache, []);
+    await app.resolveImportTeam('Jr Varsity', cache, []);
+    await app.resolveImportTeam('jr varsity', cache, []);
+    expect(confirmPrompts).toHaveLength(1);
+  });
+
+  it('never asks about a team that already exists', async () => {
+    await app.resolveImportTeam('JV', new Map(), []);
+    await app.resolveImportTeam('', new Map(), []);
+    expect(confirmPrompts).toHaveLength(0);
   });
 
   it('returns null when there is no active team to borrow an organization from', async () => {
