@@ -1185,3 +1185,55 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .help-toc { max-height: 220px; overflow-y: auto; }
   .help-section { padding: 18px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Squad report (on screen). The print window carries its own light stylesheet,
+   so everything here is scoped to the modal and never reaches the printed page.
+   --------------------------------------------------------------------------- */
+
+#squadReportBody .report-block { margin-bottom: 20px; }
+
+#squadReportBody .report-block h3 {
+  font-size: 0.95rem;
+  color: var(--bhs-cyan-accent);
+  margin: 0 0 6px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--bhs-navy-border);
+}
+
+#squadReportBody .report-sub {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+#squadReportBody table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#squadReportBody th {
+  text-align: left;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 3px 6px;
+}
+
+#squadReportBody td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--bhs-navy-border);
+  color: var(--text-main);
+}
+
+#squadReportBody .num { width: 40px; color: var(--text-muted); }
+
+/* The players who have not met the standard are the reason the sheet exists,
+   so they are the ones that read at a glance. */
+#squadReportBody .met { color: var(--text-muted); }
+#squadReportBody .notyet { color: var(--bhs-gold-accent); font-weight: 700; }

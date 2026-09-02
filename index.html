@@ -404,6 +404,24 @@
     </div>
   </div>
 
+  <!-- Squad performance report -->
+  <div id="squadReportModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 860px;">
+      <div class="modal-header">
+        <h3>&#128203; SQUAD REPORT</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin:0 0 10px 0;">
+        Every exercise with results, for the team selected. Competitive drills are ranked;
+        fitness standards list the whole squad with met or not yet.
+      </p>
+      <div id="squadReportBody" style="max-height:460px; overflow-y:auto; padding-right:4px;"></div>
+      <button class="btn btn-gold" style="width:100%; margin-top:12px;" onclick="app.printSquadReport()">
+        &#128424; Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
   <!-- 1v1 Round Robin -->
   <div id="roundRobinModal" class="modal-overlay">
     <div class="modal-window" style="max-width: 720px;">
@@ -1362,6 +1380,7 @@
   <script src="./js/views/planner.view.js"></script>
   <script src="./js/views/thoughts.view.js"></script>
   <script src="./js/views/roundrobin.view.js"></script>
+  <script src="./js/views/report.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>
   <script src="./js/views/help.view.js"></script>
   <script src="./js/views/teamswitcher.view.js"></script>

@@ -297,6 +297,8 @@ Object.assign(BHSSoccerApp.prototype, {
             <div class="table-title">
               <h3 style="color:#FFF">CURRENT PRACTICE MATRIX LEADERBOARD</h3>
               <span class="badge badge-coach">UPDATED DAILY</span>
+              ${isCoach ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;"
+                      onclick="app.openSquadReport()" title="Every exercise, printable for the locker room">📋 Squad report</button>` : ''}
             </div>
 
             <!-- Filtering to one exercise answers a different question from the
