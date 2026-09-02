@@ -432,6 +432,8 @@ class BHSSoccerApp {
           height: m.players?.height,
           photo: m.players?.photo_url,
           number: m.number,
+          // The paper-sheet number, distinct from the shirt number (0021).
+          recordingNumber: m.recording_number,
           position: m.position,
           seasonStats: m.season_stats || {},
           ratings: m.ratings || {}

@@ -1911,7 +1911,7 @@ Object.assign(BHSSoccerApp.prototype, {
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'players') {
             fileName = '3_Roster_Players.xlsx'; sheetName = 'Players';
-            const rows = (this.data.players || []).map(p => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Number: p.number, FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.players || []).map(p => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Number: p.number, RecordingNumber: p.recordingNumber ?? '', FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'schedule') {
             fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
@@ -2007,7 +2007,7 @@ Object.assign(BHSSoccerApp.prototype, {
     // 3. PLAYERS SHEET
     if (type === 'players' || type === 'all') {
       const rows = (this.data.players || []).map(p => ({
-        Number: p.number, FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position,
+        Number: p.number, RecordingNumber: p.recordingNumber ?? '', FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position,
         Class: p.classYear || p.class_year || 'Senior', Height: p.height || '',
         Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '',
         Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '',
@@ -2136,7 +2136,7 @@ Object.assign(BHSSoccerApp.prototype, {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Profiles');
       XLSX.writeFile(wb, 'BHS_Profiles_Template.xlsx');
     } else if (type === 'players') {
-      const headers = [{ Team:'blank = current team', Number:'', FirstName:'', LastName:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
+      const headers = [{ Team:'blank = current team', Number:'', RecordingNumber:'', FirstName:'', LastName:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
       XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
     } else if (type === 'schedule') {
@@ -2431,6 +2431,8 @@ Object.assign(BHSSoccerApp.prototype, {
               return {
                 id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
                 number: optI(r.Number),
+                // The paper-sheet number, distinct from the shirt number (0021).
+                recordingNumber: optI(r.RecordingNumber || r.RecNumber || r.RecordNo || r.recording_number),
                 name: parts.name,
                 firstName: parts.firstName, lastName: parts.lastName,
                 position: opt(r.Position),
@@ -2473,6 +2475,7 @@ Object.assign(BHSSoccerApp.prototype, {
                 const memRes = await window.supabaseService.upsertTeamMembership(team.id, team.school_id, {
                   player_id: identity.id,
                   number: p.number,
+                  recording_number: p.recordingNumber,
                   position: p.position,
                   season_stats: p.seasonStats,
                   ratings: p.ratings

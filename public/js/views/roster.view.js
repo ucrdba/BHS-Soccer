@@ -245,6 +245,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const res = await window.supabaseService.upsertTeamMembership(teamId, team.school_id, {
       player_id: identity.id,
       number: parseInt(playerData.number) || null,
+      recording_number: parseInt(playerData.recordingNumber) || null,
       position: playerData.position,
       season_stats: seasonStats,
       ratings: ratings
@@ -311,6 +312,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const fields = {
       editPlayerId: player.id,
       editPlayerNumber: player.number,
+      editPlayerRecordingNumber: player.recordingNumber ?? '',
       editPlayerFirstName: player.firstName || window.supabaseService.splitPlayerName(player.name).firstName,
       editPlayerLastName: player.lastName || window.supabaseService.splitPlayerName(player.name).lastName,
       editPlayerPosition: player.position,
@@ -389,6 +391,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const res = await window.supabaseService.upsertTeamMembership(this.activeTeamId, team.school_id, {
       player_id: identity.id,
       number: parseInt(playerData.number) || null,
+      recording_number: parseInt(playerData.recordingNumber) || null,
       position: playerData.position,
       season_stats: seasonStats,
       ratings: ratings

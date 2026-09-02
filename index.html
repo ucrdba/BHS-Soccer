@@ -990,6 +990,7 @@
       </div>
       <form onsubmit="event.preventDefault(); app.addPlayer({
         number: document.getElementById('newPlayerNumber').value,
+        recordingNumber: document.getElementById('newPlayerRecordingNumber').value,
         firstName: document.getElementById('newPlayerFirstName').value,
         lastName: document.getElementById('newPlayerLastName').value,
         position: document.getElementById('newPlayerPosition').value,
@@ -1014,10 +1015,14 @@
             not retyped — that keeps one person with one photo across both teams.
           </p>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 0.8fr 0.8fr 1.4fr 1.4fr; gap: 12px;">
           <div class="form-group">
             <label>Jersey #</label>
-            <input type="number" id="newPlayerNumber" class="form-control" placeholder="10" required />
+            <input type="number" id="newPlayerNumber" class="form-control" placeholder="10" />
+          </div>
+          <div class="form-group">
+            <label>Recording #</label>
+            <input type="number" id="newPlayerRecordingNumber" class="form-control" placeholder="1" title="The number this player writes on paper Matrix sheets. Not their shirt number." />
           </div>
           <div class="form-group">
             <label>First Name</label>
@@ -1099,6 +1104,7 @@
       </div>
       <form onsubmit="event.preventDefault(); app.saveEditPlayer(document.getElementById('editPlayerId').value, {
         number: document.getElementById('editPlayerNumber').value,
+        recordingNumber: document.getElementById('editPlayerRecordingNumber').value,
         firstName: document.getElementById('editPlayerFirstName').value,
         lastName: document.getElementById('editPlayerLastName').value,
         position: document.getElementById('editPlayerPosition').value,
@@ -1114,10 +1120,14 @@
       });">
         <input type="hidden" id="editPlayerId" />
 
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 0.8fr 0.8fr 1.4fr 1.4fr; gap: 12px;">
           <div class="form-group">
             <label>Jersey #</label>
-            <input type="number" id="editPlayerNumber" class="form-control" required />
+            <input type="number" id="editPlayerNumber" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Recording #</label>
+            <input type="number" id="editPlayerRecordingNumber" class="form-control" placeholder="1" title="The number this player writes on paper Matrix sheets. Not their shirt number." />
           </div>
           <div class="form-group">
             <label>First Name</label>

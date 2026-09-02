@@ -680,7 +680,7 @@ class SupabaseService {
     if (!this.isConfigured() || !teamId) return null;
     const { data, error } = await this.client!
       .from('team_players')
-      .select('id, team_id, school_id, number, position, season_stats, ratings, is_deleted, players(id, name, first_name, last_name, class_year, height, photo_url)')
+      .select('id, team_id, school_id, number, recording_number, position, season_stats, ratings, is_deleted, players(id, name, first_name, last_name, class_year, height, photo_url)')
       .eq('team_id', teamId)
       .eq('is_deleted', false);
     if (error) { console.warn('Supabase fetchTeamRoster notice:', error.message); return null; }
@@ -1970,6 +1970,102 @@ class SupabaseService {
    * specification"), not a clean upsert. So this looks up the live row by
    * hand and updates it, falling back to insert.
    */
+  /**
+   * The squad, as a paper sheet reads it: recording number and name.
+   *
+   * Kept separate from fetchTeamRoster because that one carries season stats,
+   * ratings and photos for the roster screen, and a lookup during result entry
+   * wants none of it.
+   */
+  async fetchTeamLookup(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('team_players')
+      .select('player_id, recording_number, number, is_deleted, players(id, name, first_name, last_name)')
+      .eq('team_id', teamId);
+    if (error) { console.warn('Supabase fetchTeamLookup notice:', error.message); return null; }
+
+    return (data || [])
+      .filter((m: any) => !m.is_deleted && m.players)
+      .map((m: any) => ({
+        id: m.players.id,
+        name: m.players.name,
+        firstName: m.players.first_name || '',
+        lastName: m.players.last_name || '',
+        recordingNumber: m.recording_number,
+        number: m.number
+      }));
+  }
+
+  /**
+   * The player holding a recording number on this team.
+   *
+   * Results are written on paper during a session and handwriting is not always
+   * readable, so players write a short number instead of a name. An unknown
+   * number is REFUSED and named: a misread digit must surface as an error, not
+   * as a result quietly attributed to whoever happens to hold that number --
+   * that would move the Matrix standings with nobody knowing to look.
+   */
+  async findPlayerByRecordingNumber(
+    teamId: string, value: any
+  ): Promise<{ ok: boolean; error?: string; player?: Record<string, any> }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+
+    const n = parseInt(String(value ?? '').trim(), 10);
+    if (!Number.isFinite(n)) return { ok: false, error: `"${value ?? ''}" is not a recording number.` };
+
+    const squad = await this.fetchTeamLookup(teamId);
+    if (!squad) return { ok: false, error: 'Could not read the squad.' };
+
+    const hit = squad.find(p => Number(p.recordingNumber) === n);
+    if (!hit) return { ok: false, error: `No player with recording number ${n} on this team.` };
+    return { ok: true, player: hit };
+  }
+
+  /**
+   * A player on this team, by recording number OR name.
+   *
+   * One box takes either, so a coach entering from paper does not have to say
+   * which kind of thing they are typing. A bare surname is accepted because
+   * sheets are rarely written in full -- but only when exactly one player has
+   * it, since guessing between two would attribute a result to the wrong one.
+   */
+  async findPlayerOnTeam(
+    teamId: string, value: any
+  ): Promise<{ ok: boolean; error?: string; player?: Record<string, any> }> {
+    const typed = String(value ?? '').replace(/\s+/g, ' ').trim();
+    if (!typed) return { ok: false, error: 'Enter a recording number or a name.' };
+
+    if (/^\d+$/.test(typed)) return this.findPlayerByRecordingNumber(teamId, typed);
+
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+
+    const squad = await this.fetchTeamLookup(teamId);
+    if (!squad) return { ok: false, error: 'Could not read the squad.' };
+
+    const wanted = typed.toLowerCase();
+    const norm = (v: any) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    const exact = squad.filter(p => norm(p.name) === wanted);
+    if (exact.length === 1) return { ok: true, player: exact[0] };
+
+    const bySurname = squad.filter(p => norm(p.lastName) === wanted);
+    if (bySurname.length === 1) return { ok: true, player: bySurname[0] };
+    if (bySurname.length > 1) {
+      return {
+        ok: false,
+        error: `More than one player is called ${typed}: ${bySurname.map(p => p.name).join(', ')}. Use their recording number.`
+      };
+    }
+
+    if (exact.length > 1) {
+      return { ok: false, error: `More than one player is called ${typed}. Use their recording number.` };
+    }
+    return { ok: false, error: `No player called "${typed}" on this team.` };
+  }
+
   async upsertTeamMembership(
     teamId: string,
     schoolId: string,
@@ -1983,6 +2079,11 @@ class SupabaseService {
         school_id: schoolId,
         player_id: membership.player_id,
         number: membership.number ?? null,
+        // The paper-sheet number (0021). Undefined means "not supplied" and
+        // must not clear one already set; null is an explicit clear.
+        ...(membership.recording_number !== undefined
+              ? { recording_number: membership.recording_number }
+              : {}),
         position: membership.position ?? null,
         is_deleted: false
       };

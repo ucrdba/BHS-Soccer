@@ -104,6 +104,14 @@ declare global {
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
+    // Paper Matrix sheets carry a recording number rather than a name,
+    // because handwriting is not always readable (0021). An unknown number
+    // is refused and named rather than guessed at.
+    fetchTeamLookup(teamId: string): Promise<Record<string, any>[] | null>;
+    findPlayerByRecordingNumber(teamId: string, value: unknown):
+      Promise<{ ok: boolean; error?: string; player?: Record<string, any> }>;
+    findPlayerOnTeam(teamId: string, value: unknown):
+      Promise<{ ok: boolean; error?: string; player?: Record<string, any> }>;
     // People on no team, each with a resultCount so a caller knows whether
     // retiring them would strand Matrix history.
     fetchUnassignedPlayers(): Promise<Record<string, any>[] | null>;
