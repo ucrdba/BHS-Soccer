@@ -40,6 +40,9 @@ declare global {
       Promise<{ ok: boolean; error?: string; slots?: number }>;
     copyDailyThought(thoughtId: string, toTeamId: string):
       Promise<{ ok: boolean; error?: string; id?: string }>;
+    // The questions one team's quiz asks: the organization's bank filtered by
+    // that team's selection (team_quiz_questions, added by 0017).
+    fetchTeamQuiz(teamId: string): Promise<Record<string, any>[] | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;
     updateDrillWeights(rows: { id: string; points: number; measure: string }[]):

@@ -67,6 +67,7 @@ function makeService(over: Record<string, any> = {}) {
     fetchSchedule: empty,
     fetchPracticePlans: empty,
     fetchDailyThoughts: empty,
+    fetchTeamQuiz: empty,
     fetchCoaches: empty,
     fetchSoccerCategories: empty,
     ...over
