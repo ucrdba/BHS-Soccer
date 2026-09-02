@@ -60,6 +60,7 @@ Object.assign(BHSSoccerApp.prototype, {
             <button class="btn btn-primary" onclick="app.openLoadPlanModal()">📂 Select Practice Plan (${savedCount})</button>
             <button class="btn btn-primary" onclick="app.printPracticePlan()">🖨️ Print Practice Plan</button>
             <button class="btn btn-secondary" onclick="app.downloadPracticePlan('html')">📥 Save/Download Plan File</button>
+            <button class="btn btn-secondary" onclick="app.openRoundRobinModal()" title="Every player against every other, once">🏆 1v1 Round Robin</button>
           </div>
         </div>
 

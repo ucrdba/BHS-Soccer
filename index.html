@@ -404,6 +404,25 @@
     </div>
   </div>
 
+  <!-- 1v1 Round Robin -->
+  <div id="roundRobinModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3>&#127942; 1v1 ROUND ROBIN</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin:0 0 10px 0;">
+        Every player meets every other once. Built from this team's roster each time it is opened,
+        so nothing goes stale &mdash; add a player and re-open to get a new schedule.
+      </p>
+      <div id="roundRobinBody"></div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn btn-gold" style="flex:1;" onclick="app.printRoundRobin()">&#128424; Print / Save as PDF</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="app.downloadRoundRobinCsv()">&#128202; Download CSV</button>
+      </div>
+    </div>
+  </div>
+
   <div id="matrixSessionModal" class="modal-overlay">
     <!-- Wider than the 520px default: a row carries a name, a time, what it
          earns and an attendance, and at that width the names wrapped. -->
@@ -1342,6 +1361,7 @@
   <script src="./js/views/matrix-session.view.js"></script>
   <script src="./js/views/planner.view.js"></script>
   <script src="./js/views/thoughts.view.js"></script>
+  <script src="./js/views/roundrobin.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>
   <script src="./js/views/help.view.js"></script>
   <script src="./js/views/teamswitcher.view.js"></script>
