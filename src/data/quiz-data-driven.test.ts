@@ -168,13 +168,14 @@ describe('where the options come from', () => {
     expect(qs!.find((x: any) => x.question_id === Q1).answers).toHaveLength(5);
   });
 
-  it('falls back to the columns for a question with no rows yet', async () => {
-    // A question written before 0019 must still render its options.
+  it('gives a question with no rows no options, rather than inventing some', async () => {
+    // There is deliberately no fallback to the old option_a..d columns: they
+    // are dropped by the follow-up migration, so a fallback would be dead code
+    // pretending to be a safety net. A question with no options renders empty,
+    // which is visible and fixable in the editor.
     tables.quiz_answers = [];
     const qs = await supabaseService.fetchTeamQuiz(TEAM);
-    const q1 = qs!.find((x: any) => x.question_id === Q1);
-    expect(q1.answers.map((a: any) => a.text)).toEqual(['Low block', 'High press', 'Dribble', 'Long balls']);
-    expect(q1.answers.find((a: any) => a.isCorrect).letter).toBe('B');
+    expect(qs!.find((x: any) => x.question_id === Q1).answers).toEqual([]);
   });
 
   it('ignores a deleted option row', async () => {

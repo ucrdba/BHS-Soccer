@@ -1269,14 +1269,48 @@ class SupabaseService {
     const text = String(q.question || '').trim();
     if (!text) return { ok: false, error: 'The question text is empty.' };
 
-    const options = ['a', 'b', 'c', 'd'].map(k => String(q['option_' + k] || '').trim());
-    if (options.some(o => !o)) {
-      return { ok: false, error: 'All four options are required.' };
+    // Options arrive either as an answers array -- which is how a question with
+    // other than four options is expressed -- or as option_a..d from a
+    // spreadsheet or the editor. Both become rows in quiz_answers (0019); the
+    // columns are no longer written.
+    const correct = String(q.correct_option || '').trim().toUpperCase().charAt(0);
+
+    const answers: { letter: string; text: string; isCorrect: boolean }[] =
+      (q.answers && q.answers.length)
+        ? q.answers
+            .map((a: any, i: number) => ({
+              letter: String(a.letter || String.fromCharCode(65 + i)).toUpperCase(),
+              text: String(a.text ?? a.answer_text ?? '').trim(),
+              isCorrect: !!(a.isCorrect ?? a.is_correct)
+            }))
+            .filter((a: any) => a.text)
+        : ['A', 'B', 'C', 'D']
+            .map(letter => ({
+              letter,
+              text: String(q['option_' + letter.toLowerCase()] || '').trim(),
+              isCorrect: correct === letter
+            }))
+            .filter(a => a.text);
+
+    // A caller may supply the options and name the correct one separately --
+    // a spreadsheet has an OptionA..D block and a CorrectAnswer column, not a
+    // per-option flag. Resolve that here so every caller can express it either
+    // way.
+    if (!answers.some(a => a.isCorrect) && correct) {
+      const match = answers.find(a => a.letter === correct);
+      if (match) match.isCorrect = true;
     }
 
-    const correct = String(q.correct_option || '').trim().toUpperCase().charAt(0);
-    if (!['A', 'B', 'C', 'D'].includes(correct)) {
-      return { ok: false, error: `Correct answer must be A, B, C or D (found "${q.correct_option ?? ''}").` };
+    // Two is the fewest that makes a question answerable. Four is no longer
+    // required: the answers table exists so a question can have three or six.
+    if (answers.length < 2) {
+      return { ok: false, error: 'A question needs at least two options.' };
+    }
+    if (!answers.some(a => a.isCorrect)) {
+      return {
+        ok: false,
+        error: `No correct answer marked${correct ? ` (found "${q.correct_option}", which is not one of the options given)` : ''}.`
+      };
     }
 
     // 0017 gave the bank an organization. Without one a question belongs to
@@ -1291,8 +1325,9 @@ class SupabaseService {
 
     const payload: Record<string, any> = {
       question: text,
-      option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
-      correct_option: correct,
+      // The letter of the correct answer stays on the question: player_answers
+      // records A/B/C/D and the marking compares against it.
+      correct_option: (answers.find(a => a.isCorrect) || answers[0]).letter,
       explanation: String(q.explanation || '').trim() || null,
       category: String(q.category || '').trim() || 'Tactical',
       school_id: schoolId,
@@ -1331,7 +1366,7 @@ class SupabaseService {
         return { ok: false, error: 'The database refused that write. Coach or admin access is required.' };
       }
       const savedId = data[0].question_id;
-      await this.saveQuizAnswers(savedId, q.answers, correct, options);
+      await this.saveQuizAnswers(savedId, answers, '', []);
       return { ok: true, id: savedId };
     } catch (e: any) {
       return { ok: false, error: e?.message || String(e) };
@@ -2448,7 +2483,7 @@ class SupabaseService {
 
     const { data, error } = await this.client!
       .from('team_quiz_questions')
-      .select('question_id, quiz_questions(question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, thought_id, is_deleted)')
+      .select('question_id, quiz_questions(question_id, question, correct_option, explanation, category, thought_id, is_deleted)')
       .eq('team_id', teamId);
     if (error) { console.warn('Supabase fetchTeamQuiz notice:', error.message); return null; }
 
@@ -2469,10 +2504,10 @@ class SupabaseService {
   /**
    * Attach each question's options, which live in quiz_answers as rows (0019).
    *
-   * Falls back to the option_a..d columns when a question has no answer rows.
-   * Those columns are still present and still written during the transition, so
-   * a question created by code that predates this keeps working rather than
-   * rendering with no options at all.
+   * A question with no rows renders with no options, which is visible and
+   * fixable in the editor. There is deliberately no fallback to the old
+   * option_a..d columns -- they are dropped by the follow-up migration, so a
+   * fallback would be dead code pretending to be a safety net.
    */
   async attachAnswers(questions: Record<string, any>[]): Promise<Record<string, any>[]> {
     if (!questions.length) return questions;
@@ -2492,16 +2527,10 @@ class SupabaseService {
 
     return questions.map(q => {
       const rows = (byQuestion[q.question_id] || []).sort((a, b) => (a.ordinal || 0) - (b.ordinal || 0));
-      const answers = rows.length
-        ? rows.map(a => ({ letter: a.letter, text: a.answer_text, isCorrect: !!a.is_correct }))
-        : ['A', 'B', 'C', 'D']
-            .map(letter => ({
-              letter,
-              text: q['option_' + letter.toLowerCase()],
-              isCorrect: String(q.correct_option || '').toUpperCase() === letter
-            }))
-            .filter(a => a.text);
-      return { ...q, answers };
+      return {
+        ...q,
+        answers: rows.map(a => ({ letter: a.letter, text: a.answer_text, isCorrect: !!a.is_correct }))
+      };
     });
   }
 
@@ -2581,7 +2610,7 @@ class SupabaseService {
 
     const [questions, selections] = await Promise.all([
       this.client!.from('quiz_questions')
-        .select('question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, thought_id, import_key')
+        .select('question_id, question, correct_option, explanation, category, thought_id, import_key')
         .eq('school_id', schoolId)
         .or('is_deleted.is.null,is_deleted.eq.false'),
       this.client!.from('team_quiz_questions').select('team_id, question_id')

@@ -90,6 +90,9 @@ const REAL_SHEET =
   '"It eliminates the need for technical skill.",' +
   'A,"It allows the ball to move faster and increases the team\'s speed of play.",FALSE\n';
 
+const optText = (q: any, letter: string) =>
+  (q.answers || []).find((a: any) => a.letter === letter)?.text;
+
 describe('the id column as a link to the daily message', () => {
   it('resolves the message that number belongs to', async () => {
     // The coach numbers messages on the thoughts sheet and repeats that number
@@ -127,13 +130,13 @@ describe('the id column as a link to the daily message', () => {
 describe('an option with its own letter typed into it', () => {
   it('strips the letter prefix so the quiz does not read "B) B. ..."', async () => {
     await importCsv(makeApp(), REAL_SHEET);
-    expect(upserted[0].option_b).toBe('It guarantees that every pass will create a scoring opportunity.');
+    expect(optText(upserted[0], 'B')).toBe('It guarantees that every pass will create a scoring opportunity.');
   });
 
   it('leaves the other options untouched', async () => {
     await importCsv(makeApp(), REAL_SHEET);
-    expect(upserted[0].option_a).toBe("It allows the ball to move faster and increases the team's speed of play");
-    expect(upserted[0].option_d).toBe('It eliminates the need for technical skill.');
+    expect(optText(upserted[0], 'A')).toBe("It allows the ball to move faster and increases the team's speed of play");
+    expect(optText(upserted[0], 'D')).toBe('It eliminates the need for technical skill.');
   });
 
   it('only strips a letter matching that option\'s own position', async () => {
@@ -141,10 +144,10 @@ describe('an option with its own letter typed into it', () => {
     await importCsv(makeApp(),
       'id,QuestionText,OptionA,OptionB,OptionC,OptionD,CorrectAnswer\n' +
       '2,Which side?,"A. Squad","A. Team","C) Reserves","D - Youth",A\n');
-    expect(upserted[0].option_a).toBe('Squad');       // A. on option A -> stripped
-    expect(upserted[0].option_b).toBe('A. Team');     // A. on option B -> kept
-    expect(upserted[0].option_c).toBe('Reserves');    // C) on option C -> stripped
-    expect(upserted[0].option_d).toBe('Youth');       // D - on option D -> stripped
+    expect(optText(upserted[0], 'A')).toBe('Squad');       // A. on option A -> stripped
+    expect(optText(upserted[0], 'B')).toBe('A. Team');     // A. on option B -> kept
+    expect(optText(upserted[0], 'C')).toBe('Reserves');    // C) on option C -> stripped
+    expect(optText(upserted[0], 'D')).toBe('Youth');       // D - on option D -> stripped
   });
 });
 

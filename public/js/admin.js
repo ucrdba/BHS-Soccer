@@ -766,12 +766,12 @@ Object.assign(BHSSoccerApp.prototype, {
       return t ? (t.title || 'Untitled message') : null;
     };
 
-    const optionRow = (letter, value) => `
+    const optionRow = (letter, value, isCorrect) => `
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
         <span style="color:var(--bhs-gold-accent); font-weight:700; font-size:0.8rem; width:16px;">${letter}</span>
         <input type="text" id="qOption${letter}" class="form-control" style="flex:1; font-size:0.8rem;" value="${this._attrArg(value || '')}" />
         <label style="display:flex; align-items:center; gap:4px; font-size:0.76rem; color:var(--text-muted); cursor:pointer;">
-          <input type="radio" name="qCorrect" value="${letter}" ${(this._editingCorrect || 'A') === letter ? 'checked' : ''} /> correct
+          <input type="radio" name="qCorrect" value="${letter}" ${isCorrect ? 'checked' : ''} /> correct
         </label>
       </div>`;
 
@@ -781,10 +781,20 @@ Object.assign(BHSSoccerApp.prototype, {
           <label style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted);">Question</label>
           <textarea id="qText" class="form-control" rows="2" style="font-size:0.82rem;">${this._text(q.question || '')}</textarea>
         </div>
-        ${optionRow('A', q.option_a)}
-        ${optionRow('B', q.option_b)}
-        ${optionRow('C', q.option_c)}
-        ${optionRow('D', q.option_d)}
+        ${(() => {
+          // One box per existing option, plus one spare -- so a question can
+          // grow past four or be saved with three. Blank boxes are dropped on
+          // save. Four minimum so a new question looks like a quiz question.
+          const existing = q.answers || [];
+          const count = Math.max(4, existing.length + 1);
+          let out = '';
+          for (let i = 0; i < count; i++) {
+            const letter = String.fromCharCode(65 + i);
+            const a = existing[i];
+            out += optionRow(letter, a ? a.text : '', a ? a.isCorrect : false);
+          }
+          return out;
+        })()}
         <div class="form-group" style="margin:8px 0;">
           <label style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted);">Explanation (shown when a player gets it wrong)</label>
           <input type="text" id="qExplanation" class="form-control" style="font-size:0.8rem;" value="${this._attrArg(q.explanation || '')}" />
@@ -925,8 +935,11 @@ Object.assign(BHSSoccerApp.prototype, {
     const payload = {
       schoolId: team.school_id,
       question: val('qText'),
-      option_a: val('qOptionA'), option_b: val('qOptionB'),
-      option_c: val('qOptionC'), option_d: val('qOptionD'),
+      // However many option boxes the form rendered, blanks dropped.
+      answers: Array.from(document.querySelectorAll('[id^="qOption"]')).map(el => {
+        const letter = el.id.replace('qOption', '');
+        return { letter, text: el.value.trim(), isCorrect: !!checked && checked.value === letter };
+      }).filter(a => a.text),
       correct_option: checked ? checked.value : 'A',
       explanation: val('qExplanation'),
       category: val('qCategory'),
@@ -2689,10 +2702,12 @@ Object.assign(BHSSoccerApp.prototype, {
                 // "B) B. It guarantees...". Stripped only when the letter
                 // matches that option's OWN position, so "A. Team" sitting in
                 // option B -- a real answer -- is left alone.
-                option_a:    stripOwnLetter('A', pick(r, 'OptionA', 'option_a')),
-                option_b:    stripOwnLetter('B', pick(r, 'OptionB', 'option_b')),
-                option_c:    stripOwnLetter('C', pick(r, 'OptionC', 'option_c')),
-                option_d:    stripOwnLetter('D', pick(r, 'OptionD', 'option_d')),
+                // Options are rows now (0019), so a sheet may carry OptionE and
+                // beyond rather than exactly four.
+                answers: 'ABCDEFGH'.split('').map(letter => ({
+                  letter,
+                  text: stripOwnLetter(letter, pick(r, 'Option' + letter, 'option_' + letter.toLowerCase()))
+                })).filter(a => a.text),
                 correct_option: pick(r, 'CorrectAnswer', 'CorrectOption', 'correct_option'),
                 explanation: pick(r, 'Explanation', 'explanation'),
                 category:    pick(r, 'Category', 'category'),

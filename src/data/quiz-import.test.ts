@@ -72,7 +72,11 @@ describe('upsertQuizQuestion', () => {
     expect(res.ok).toBe(true);
     expect(captured[0].table).toBe('quiz_questions');
     expect(payload().question).toBe('Why are fewer touches encouraged?');
-    expect(payload().option_d).toBe('It removes the need for skill');
+    // The options are no longer columns on the question -- they are rows in
+    // quiz_answers (0019), so the question row must not carry them.
+    expect(payload().option_a).toBeUndefined();
+    expect(payload().option_d).toBeUndefined();
+    expect(payload().correct_option).toBe('A');
   });
 
   it('drops a spreadsheet row number rather than sending it as a key', async () => {
@@ -93,19 +97,28 @@ describe('upsertQuizQuestion', () => {
     expect(payload().correct_option).toBe('B');
   });
 
-  it('rejects an answer the CHECK constraint would refuse, in plain words', async () => {
-    // correct_option is CHECK (A,B,C,D). Letting it through would surface as
-    // a raw constraint violation the coach cannot act on.
+  it('rejects a correct answer that names none of the options', async () => {
+    // 'E' with only A-D supplied leaves the question unanswerable. Caught here
+    // in plain words rather than stored and marked wrong for every player.
     const res = await supabaseService.upsertQuizQuestion(dbRow({ correct_option: 'E' }));
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('A, B, C or D');
+    expect(res.error).toMatch(/no correct answer/i);
     expect(captured).toHaveLength(0);
   });
 
-  it('requires all four options, which are NOT NULL', async () => {
+  it('accepts three options, now that they are rows rather than four columns', async () => {
+    // The reason for the answers table (0019): four columns could only ever
+    // hold four. A blank option is simply not an option.
     const res = await supabaseService.upsertQuizQuestion(dbRow({ option_c: '   ' }));
+    expect(res.ok).toBe(true);
+  });
+
+  it('still refuses a question with fewer than two options', async () => {
+    const res = await supabaseService.upsertQuizQuestion(
+      dbRow({ option_b: '', option_c: '', option_d: '' })
+    );
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('four options');
+    expect(res.error).toMatch(/at least two/i);
     expect(captured).toHaveLength(0);
   });
 

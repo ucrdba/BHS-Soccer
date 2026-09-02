@@ -105,6 +105,9 @@ beforeEach(() => {
   app.populateCategoryDropdowns = () => {};
 });
 
+const optText = (q: any, letter: string) =>
+  (q.answers || []).find((a: any) => a.letter === letter)?.text;
+
 describe('parseCsvText', () => {
   it('keeps a comma that lives inside a quoted field', () => {
     // The whole reason this parser exists. split(',') turned one field into
@@ -168,7 +171,7 @@ describe('quiz import header mapping', () => {
     // The comma inside the quotes survives, and every column after it still
     // lines up.
     expect(upserted[0].question).toBe('In soccer, why is using fewer touches generally encouraged?');
-    expect(upserted[0].option_b).toBe('It guarantees a goal');
+    expect(optText(upserted[0], 'B')).toBe('It guarantees a goal');
     expect(upserted[0].correct_option).toBe('A');
     expect(upserted[0].category).toBe('Speed of Play');
   });
@@ -181,7 +184,7 @@ describe('quiz import header mapping', () => {
 
     expect(upserted).toHaveLength(1);
     expect(upserted[0].question).toBe('Sample Question?');
-    expect(upserted[0].option_d).toBe('Option 4');
+    expect(optText(upserted[0], 'D')).toBe('Option 4');
     expect(upserted[0].correct_option).toBe('B');
   });
 
