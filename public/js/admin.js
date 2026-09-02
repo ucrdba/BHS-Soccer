@@ -1672,7 +1672,13 @@ Object.assign(BHSSoccerApp.prototype, {
     content.innerHTML = `
       <div style="text-align: center; margin-bottom: 20px;">
         <img src="${this.photoOrPlaceholder(player.photo)}" alt="${player.name}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--bhs-blue-electric); object-fit: cover;" />
-        <h2 style="color: #FFF; margin-top: 10px;">#${player.number} ${player.name}</h2>
+        <!-- Unguarded, this printed "#undefined Cesar Alva" once 0021 cleared
+             the shirt numbers. The recording number is shown too: it is what
+             the paper sheets identify this player by. -->
+        <h2 style="color: #FFF; margin-top: 10px;">${player.number ? '#' + player.number + ' ' : ''}${player.name}</h2>
+        ${player.recordingNumber != null
+          ? `<p class="text-muted" style="font-size:0.78rem; margin:2px 0 0 0;">Recording number ${player.recordingNumber}</p>`
+          : ''}
         <p class="text-cyan" style="font-weight: 600;">${player.position} • ${player.classYear}</p>
       </div>
 
