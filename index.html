@@ -404,6 +404,28 @@
     </div>
   </div>
 
+  <!-- Import team routing. Raised BEFORE any row is written, because a sheet
+       naming a squad that does not exist is nearly always a spelling that
+       missed, and the moment to find out is before 26 players land on a team
+       nobody asked for. -->
+  <div id="importTeamResolveModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3>&#128203; WHICH TEAM?</h3>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin:0 0 12px 0;">
+        This sheet routes rows to squads that do not exist yet. Pick the team each one means,
+        or create it. Nothing is written until you continue.
+      </p>
+      <div id="importTeamResolveBody"></div>
+      <p id="importTeamResolveError" class="text-danger" style="font-size:0.8rem; min-height:1em; margin:8px 0 0 0;"></p>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn btn-gold" style="flex:1;" onclick="app.confirmImportTeamChoices()">Continue import</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="app.cancelImportTeamChoices()">Cancel import</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Squad performance report -->
   <div id="squadReportModal" class="modal-overlay">
     <div class="modal-window" style="max-width: 860px;">

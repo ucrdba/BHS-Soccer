@@ -2259,37 +2259,6 @@ Object.assign(BHSSoccerApp.prototype, {
     }
   },
 
-  /** The teams an import could route to: this organization's, by name. */
-  importableTeamNames(active) {
-    return (this.data.teams || [])
-      .filter(t => t.school_id === active.school_id && !t.is_deleted)
-      .map(t => t.name)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  },
-
-  /**
-   * Confirm a team the sheet names but the organization does not have.
-   *
-   * Split out from resolveImportTeam so a test can decide the answer without
-   * a browser, and so the wording lives in one place.
-   */
-  confirmNewImportTeam(wanted, active) {
-    const existing = this.importableTeamNames(active);
-    return window.confirm(
-      `This sheet routes rows to a team called "${wanted}", which does not exist in `
-      + `${active.school_name || 'this organization'}.
-
-`
-      + `Teams that do exist: ${existing.length ? existing.join(', ') : '(none yet)'}
-
-`
-      + `OK — create "${wanted}" as a new squad.
-`
-      + `Cancel — skip those rows and change the Team column to match an existing team.`
-    );
-  },
-
   /**
    * Resolves an import row's Team column to a real team.
    *
@@ -2299,21 +2268,15 @@ Object.assign(BHSSoccerApp.prototype, {
    * CREATED, which is what makes loading a season's worth of squads a single
    * import rather than a round of SQL first.
    *
-   * Creating one is CONFIRMED first, never silent. A JV sheet whose Team
-   * column said "Jr Varsity" while the squad in the app was called "JV" quietly
-   * produced a second, parallel squad: 25 players on a team nobody had asked
-   * for, and the real JV still empty. The import reported success, because by
-   * its own rules it had succeeded. A name that matches nothing is far more
-   * often a spelling that missed than a squad the coach meant to create, so the
-   * coach is shown what exists and decides.
+   * Nothing is invented here. prepareImportTeams settles every name the sheet
+   * uses BEFORE a row is written, so by the time this runs each one is already
+   * decided and sitting in `cache`. A name that reaches here undecided is
+   * skipped, never created: silently minting a squad mid-write is what put 25
+   * players on a parallel "Jr Varsity" while the real "JV" stayed empty.
    *
-   * Declining skips those rows rather than rerouting them to the active team:
-   * a sheet that names a team means it, and silently landing 26 strangers on
-   * the selected squad is the worse of the two mistakes.
-   *
-   * Creating a team also needs admin, because teams_write is admin-only — a
-   * coach importing a sheet that names a new team gets those rows skipped with
-   * a warning rather than the whole sheet failing.
+   * Creating a team needs admin, because teams_write is admin-only — a coach
+   * importing a sheet that names a new team gets those rows skipped with a
+   * warning rather than the whole sheet failing.
    *
    * `cache` is a Map shared across one import so a 30-row sheet resolves each
    * distinct team once, not thirty times.
@@ -2333,29 +2296,166 @@ Object.assign(BHSSoccerApp.prototype, {
 
     if (!active) { cache.set(key, null); return null; }
 
-    // Asked once per distinct name, because the cache short-circuits every
-    // later row naming the same team.
-    if (!this.confirmNewImportTeam(wanted, active)) {
-      warnings.push(`Team "${wanted}" does not exist — rows naming it were skipped. `
-        + `Change that Team column to one of: ${this.importableTeamNames(active).join(', ')}.`);
-      cache.set(key, null);
-      return null;
-    }
+    // Undecided and unknown. Refusing is right: the coach either chose to skip
+    // this name in the pre-flight dialog, or a caller forgot to run it.
+    warnings.push(`Team "${wanted}" does not exist — rows naming it were skipped.`);
+    cache.set(key, null);
+    return null;
+  },
 
-    const created = await window.supabaseService.createTeam(active.school_id, wanted);
-    if (!created || !created.id) {
-      warnings.push(`Team "${wanted}" does not exist and could not be created (admin access required) — rows naming it were skipped.`);
-      cache.set(key, null);
-      return null;
+  /**
+   * Settle every team a sheet names, BEFORE anything is written.
+   *
+   * This is the check that was missing. The importer used to resolve a row's
+   * team as it wrote that row, and invent one when the name matched nothing.
+   * So a JV sheet whose Team column said "Jr Varsity" created a second squad,
+   * put 25 players on it, left the real JV empty, and reported success.
+   *
+   * Names that already match cost nothing and never prompt. Only the leftovers
+   * reach the coach, who picks an existing squad, creates the named one, or
+   * skips those rows.
+   *
+   * Fills `cache` in place — the same Map resolveImportTeam reads — so the write
+   * loop afterwards resolves every row from memory and asks nothing. Returns
+   * false when the coach cancels, which abandons the sheet before any write.
+   */
+  async prepareImportTeams(rows, cache, warnings) {
+    const active = (this.data.teams || []).find(t => t.id === this.activeTeamId) || null;
+    if (!active) return true;
+
+    // First-seen spelling wins, so the coach is shown what the sheet actually
+    // says rather than a lowercased version of it.
+    const unknown = [];
+    const counts = new Map();
+    for (const row of rows || []) {
+      const wanted = String(row.importTeamName || '').trim();
+      if (!wanted) continue;                      // blank means the active team
+      const key = wanted.toLowerCase();
+      if (counts.has(key)) { counts.get(key).rows += 1; continue; }
+      counts.set(key, { name: wanted, rows: 1 });
+
+      const existing = (this.data.teams || []).find(t =>
+        String(t.name || '').toLowerCase() === key && t.school_id === active.school_id);
+      if (existing) cache.set(key, existing);
+      else unknown.push(key);
     }
-    const team = {
-      id: created.id, school_id: active.school_id, name: wanted,
-      season: null, is_public_default: false,
-      school_name: active.school_name, school_kind: active.school_kind
-    };
-    this.data.teams.push(team);
-    cache.set(key, team);
-    return team;
+    if (unknown.length === 0) return true;
+
+    const choices = await this.askImportTeamChoices(unknown.map(k => counts.get(k)), active);
+    if (!choices) return false;                   // cancelled: write nothing
+
+    for (const key of unknown) {
+      const wanted = counts.get(key).name;
+      const choice = choices.get(key) || { action: 'skip' };
+
+      if (choice.action === 'existing') {
+        const team = (this.data.teams || []).find(t => t.id === choice.teamId);
+        cache.set(key, team || null);
+        if (team) warnings.push(`Rows naming "${wanted}" were imported into ${team.name}.`);
+        continue;
+      }
+
+      if (choice.action === 'create') {
+        const created = await window.supabaseService.createTeam(active.school_id, wanted);
+        if (!created || !created.id) {
+          warnings.push(`Team "${wanted}" could not be created (admin access required) — rows naming it were skipped.`);
+          cache.set(key, null);
+          continue;
+        }
+        const team = {
+          id: created.id, school_id: active.school_id, name: wanted,
+          season: null, is_public_default: false,
+          school_name: active.school_name, school_kind: active.school_kind
+        };
+        this.data.teams.push(team);
+        cache.set(key, team);
+        continue;
+      }
+
+      warnings.push(`Team "${wanted}" does not exist — rows naming it were skipped.`);
+      cache.set(key, null);
+    }
+    return true;
+  },
+
+  /**
+   * The teams an import may route to: this organization's only.
+   *
+   * Never another club's. Offering one would let a Beaumont sheet file players
+   * into a club squad, which the composite foreign key rejects anyway.
+   */
+  importableTeams(active) {
+    return (this.data.teams || [])
+      .filter(t => t.school_id === active.school_id && !t.is_deleted && t.name)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  },
+
+  /**
+   * Ask where each unmatched name should go.
+   *
+   * Resolves to a Map of lowercased name to choice, or null if cancelled.
+   * Settled by confirmImportTeamChoices / cancelImportTeamChoices, which the
+   * modal's buttons call.
+   */
+  askImportTeamChoices(unknowns, active) {
+    return new Promise(resolve => {
+      this._importTeamUnknowns = unknowns;
+      this._importTeamResolver = resolve;
+
+      const options = this.importableTeams(active);
+      const body = document.getElementById('importTeamResolveBody');
+      if (body) {
+        body.innerHTML = unknowns.map((u, i) => `
+          <div style="padding:10px 0; border-bottom:1px solid var(--bhs-navy-border);">
+            <div style="font-size:0.86rem; color:#FFF;">
+              The sheet says <strong>&ldquo;${this._text(u.name)}&rdquo;</strong>
+              <span class="text-muted">&middot; ${u.rows} row${u.rows === 1 ? '' : 's'}</span>
+            </div>
+            <select id="importTeamChoice${i}" class="form-control" style="margin-top:6px; font-size:0.84rem;">
+              <option value="">&mdash; choose &mdash;</option>
+              ${options.map(t => `<option value="existing:${this._attrArg(t.id)}">Import into ${this._text(t.name)}</option>`).join('')}
+              <option value="create">Create a new team called &ldquo;${this._text(u.name)}&rdquo;</option>
+              <option value="skip">Skip these rows</option>
+            </select>
+          </div>`).join('');
+      }
+      const err = document.getElementById('importTeamResolveError');
+      if (err) err.textContent = '';
+      const modal = document.getElementById('importTeamResolveModal');
+      if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+    });
+  },
+
+  confirmImportTeamChoices() {
+    const unknowns = this._importTeamUnknowns || [];
+    const choices = new Map();
+
+    for (let i = 0; i < unknowns.length; i++) {
+      const el = document.getElementById('importTeamChoice' + i);
+      const val = el ? el.value : '';
+      if (!val) {
+        // Refusing to guess is the whole point of this dialog.
+        const err = document.getElementById('importTeamResolveError');
+        if (err) err.textContent = 'Choose what to do with "' + unknowns[i].name + '" before continuing.';
+        return;
+      }
+      choices.set(String(unknowns[i].name).toLowerCase(),
+        val.startsWith('existing:')
+          ? { action: 'existing', teamId: val.slice('existing:'.length) }
+          : { action: val });
+    }
+    this._settleImportTeamChoices(choices);
+  },
+
+  cancelImportTeamChoices() { this._settleImportTeamChoices(null); },
+
+  _settleImportTeamChoices(value) {
+    const modal = document.getElementById('importTeamResolveModal');
+    if (modal) { modal.classList.remove('active'); modal.style.display = 'none'; }
+    const resolve = this._importTeamResolver;
+    this._importTeamResolver = null;
+    this._importTeamUnknowns = null;
+    if (resolve) resolve(value);
   },
 
   /**
@@ -2609,6 +2709,11 @@ Object.assign(BHSSoccerApp.prototype, {
               const allIdentities = (await window.supabaseService.fetchAllPlayerIdentities()) || [];
               const identityByName = new Map(allIdentities.map(r => [String(r.name || '').trim().toLowerCase(), r.id]));
               const teamCache = new Map();
+              // Settle every squad the sheet names before writing a single row.
+              if (!await this.prepareImportTeams(imported, teamCache, warnings)) {
+                warnings.push('Players sheet cancelled — nothing was imported.');
+                continue;
+              }
 
               totalRejected += await persistAll(imported, async p => {
                 const team = await this.resolveImportTeam(p.importTeamName, teamCache, warnings);
@@ -2687,6 +2792,10 @@ Object.assign(BHSSoccerApp.prototype, {
             totalCount += imported.length; totalUpdated += resS.updated; totalInserted += resS.inserted;
             if (window.supabaseService?.isConfigured()) {
               const schedTeamCache = new Map();
+              if (!await this.prepareImportTeams(resS.toPersist, schedTeamCache, warnings)) {
+                warnings.push('Schedule sheet cancelled — nothing was imported.');
+                continue;
+              }
               totalRejected += await persistAll(resS.toPersist, async m => {
                 const team = await this.resolveImportTeam(m.importTeamName, schedTeamCache, warnings);
                 if (!team) return false;
