@@ -62,6 +62,44 @@ describe('splitting a full name into parts', () => {
     expect(split('  Kai   Nakamura  ')).toEqual({ firstName: 'Kai', lastName: 'Nakamura' });
   });
 
+  it('reads "Last, First" when the name carries a comma', () => {
+    // A roster exported from a school information system almost always looks
+    // like this. Split on the first space it produced first_name = 'Brady,'
+    // and last_name = 'Braelyn A.' -- reversed, with the comma attached -- for
+    // 48 players in one import.
+    expect(split('Brady, Braelyn A.'))
+      .toEqual({ firstName: 'Braelyn A.', lastName: 'Brady' });
+  });
+
+  it('keeps a compound surname whole in comma form, which spaces cannot', () => {
+    // "Bustillos Correa, Luis A." is unambiguous with a comma and guesswork
+    // without one. This is the format's real advantage.
+    expect(split('Bustillos Correa, Luis A.'))
+      .toEqual({ firstName: 'Luis A.', lastName: 'Bustillos Correa' });
+    expect(split('De la Paz, Giovany E.'))
+      .toEqual({ firstName: 'Giovany E.', lastName: 'De la Paz' });
+  });
+
+  it('keeps a parenthesised preferred name with the first name', () => {
+    expect(split('Frias, Brendon N. (Noah)'))
+      .toEqual({ firstName: 'Brendon N. (Noah)', lastName: 'Frias' });
+  });
+
+  it('splits on the FIRST comma, so a suffix stays with the given names', () => {
+    expect(split('Smith, John, Jr.'))
+      .toEqual({ firstName: 'John, Jr.', lastName: 'Smith' });
+  });
+
+  it('falls back to the space rule when a comma has nothing after it', () => {
+    // "Herrera," is a surname with a stray comma, not a reversed name.
+    expect(split('Herrera,')).toEqual({ firstName: 'Herrera', lastName: '' });
+  });
+
+  it('still reads ordinary "First Last" names, which have no comma', () => {
+    // The common case must not regress.
+    expect(split('Mateo Herrera')).toEqual({ firstName: 'Mateo', lastName: 'Herrera' });
+  });
+
   it('survives an empty value rather than throwing', () => {
     expect(split('')).toEqual({ firstName: '', lastName: '' });
     expect(split(null as any)).toEqual({ firstName: '', lastName: '' });

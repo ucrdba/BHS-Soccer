@@ -1816,8 +1816,27 @@ class SupabaseService {
   splitPlayerName(full: string): { firstName: string; lastName: string } {
     const trimmed = (full || '').trim().replace(/\s+/g, ' ');
     if (!trimmed) return { firstName: '', lastName: '' };
+
+    // "Last, First" -- how school information systems export a roster, and the
+    // format that broke an import of 48 players when it was read as a plain
+    // space-separated name ('Brady, Braelyn A.' became first_name 'Brady,').
+    //
+    // Read before the space rule because it is unambiguous where that rule can
+    // only guess: "Bustillos Correa, Luis A." keeps its two-word surname whole,
+    // and so does "De la Paz, Giovany E.".
+    //
+    // The FIRST comma divides it, so a suffix stays with the given names
+    // ("Smith, John, Jr."). A comma with nothing after it is a stray on a plain
+    // name, not a reversal, so that falls through to the space rule below.
+    const comma = trimmed.indexOf(',');
+    if (comma > 0) {
+      const surname = trimmed.slice(0, comma).trim();
+      const given = trimmed.slice(comma + 1).trim();
+      if (surname && given) return { firstName: given, lastName: surname };
+    }
+
     const gap = trimmed.indexOf(' ');
-    if (gap === -1) return { firstName: trimmed, lastName: '' };
+    if (gap === -1) return { firstName: trimmed.replace(/,+$/, ''), lastName: '' };
     return { firstName: trimmed.slice(0, gap), lastName: trimmed.slice(gap + 1) };
   }
 

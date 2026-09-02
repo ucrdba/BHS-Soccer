@@ -139,6 +139,52 @@ describe('a sheet written before names were split', () => {
   });
 });
 
+describe('a sheet exported as "Last, First"', () => {
+  // The real shape of the coach's roster export, and the one that produced 48
+  // reversed players in a single import before the splitter understood commas.
+  it('reads the surname and given names the right way round', async () => {
+    const app = makeApp();
+    await importCsv(app, 'Number,Name,Position\n10,"Brady, Braelyn A.",Midfielder\n');
+
+    expect(identityWrites).toHaveLength(1);
+    expect(identityWrites[0].firstName).toBe('Braelyn A.');
+    expect(identityWrites[0].lastName).toBe('Brady');
+    expect(identityWrites[0].name).toBe('Braelyn A. Brady');
+  });
+
+  it('keeps a two-word surname whole', async () => {
+    const app = makeApp();
+    await importCsv(app, 'Number,Name\n7,"Bustillos Correa, Luis A."\n');
+    expect(identityWrites[0].lastName).toBe('Bustillos Correa');
+    expect(identityWrites[0].firstName).toBe('Luis A.');
+  });
+
+  it('handles a whole squad without crossing any of them over', async () => {
+    const app = makeApp();
+    await importCsv(app,
+      'Number,Name\n' +
+      '1,"Heitritter, Grady W."\n' +
+      '2,"Heitritter, Oliver C."\n' +
+      '3,"De la Paz, Giovany E."\n' +
+      '4,"Frias, Brendon N. (Noah)"\n');
+
+    expect(identityWrites.map(w => `${w.firstName} | ${w.lastName}`)).toEqual([
+      'Grady W. | Heitritter',
+      'Oliver C. | Heitritter',
+      'Giovany E. | De la Paz',
+      'Brendon N. (Noah) | Frias'
+    ]);
+  });
+
+  it('still reads an ordinary "First Last" sheet the same way', async () => {
+    // Both formats have to work; coaches will have sheets of each.
+    const app = makeApp();
+    await importCsv(app, 'Number,Name\n9,Diego Salcedo\n');
+    expect(identityWrites[0].firstName).toBe('Diego');
+    expect(identityWrites[0].lastName).toBe('Salcedo');
+  });
+});
+
 describe('rows that name nobody', () => {
   it('skips a row with no name at all rather than writing a blank player', async () => {
     const app = makeApp();
