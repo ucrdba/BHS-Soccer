@@ -806,14 +806,43 @@ class SupabaseService {
     }
   }
 
-  async createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null> {
-    if (!this.isConfigured() || !schoolId || !name) return null;
+  /**
+   * Create a team, and say why when it fails.
+   *
+   * This used to return a bare null for every kind of failure, so both callers
+   * guessed at the reason and both guessed "admin access required". An admin hit
+   * it during an import and was told they lacked admin rights, which sent the
+   * diagnosis in exactly the wrong direction -- the real message was only ever
+   * in console.warn. Returning {ok, error} is the house convention precisely
+   * because an RLS refusal comes back with no error AND no rows.
+   */
+  async createTeam(
+    schoolId: string,
+    name: string,
+    season?: string
+  ): Promise<{ ok: boolean; id?: string; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!schoolId) return { ok: false, error: 'A team needs an organization.' };
+    if (!name) return { ok: false, error: 'A team needs a name.' };
+
     const payload: Record<string, any> = { school_id: schoolId, name, is_deleted: false };
     if (season) payload.season = season;
+
     const { data, error } = await this.client!
       .from('teams').insert([payload]).select();
-    if (error) { console.warn('Supabase createTeam notice:', error.message); return null; }
-    return data && data[0] ? data[0] : null;
+
+    if (error) {
+      console.warn('Supabase createTeam notice:', error.message);
+      if (error.code === '23505') {
+        return { ok: false, error: `There is already a team called "${name}" in that organization.` };
+      }
+      return { ok: false, error: error.message };
+    }
+    // No error and no rows is an RLS refusal, not an empty result.
+    if (!data || !data[0]) {
+      return { ok: false, error: 'The database refused that change. Creating a team requires an admin account.' };
+    }
+    return { ok: true, id: data[0].id };
   }
 
   async searchPlayersByName(query: string): Promise<Record<string, any>[] | null> {

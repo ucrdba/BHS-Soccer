@@ -35,7 +35,7 @@ const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
 let app: ImportApp;
 let created: { schoolId: string; name: string }[];
-let createTeamReturns: { id?: string } | null;
+let createTeamReturns: { ok: boolean; id?: string; error?: string } | null;
 
 beforeEach(() => {
   const w = globalThis as any;
@@ -48,7 +48,7 @@ beforeEach(() => {
   w.can = () => true;
 
   created = [];
-  createTeamReturns = { id: 'team-new' };
+  createTeamReturns = { ok: true, id: 'team-new' };
   w.supabaseService = {
     isConfigured: () => false,
     createTeam: async (schoolId: string, name: string) => {
@@ -220,12 +220,23 @@ describe('prepareImportTeams', () => {
     expect(warnings[0]).toContain('Jr Varsity');
   });
 
-  it('says so when a chosen creation is refused for lack of admin', async () => {
+  it('repeats the database\'s own reason when a creation is refused', async () => {
+    // Never a guess. Inventing "admin access required" once told an actual
+    // admin they were not one, and sent the diagnosis the wrong way entirely.
+    createTeamReturns = { ok: false, error: 'duplicate key value violates unique constraint' };
+    answer(app, new Map([['freshman', { action: 'create' }]]));
+    const warnings: string[] = [];
+    await app.prepareImportTeams(rows('Freshman'), new Map(), warnings);
+    expect(warnings[0]).toContain('duplicate key value');
+  });
+
+  it('still says something useful when the service returns nothing at all', async () => {
     createTeamReturns = null;
     answer(app, new Map([['freshman', { action: 'create' }]]));
     const warnings: string[] = [];
     await app.prepareImportTeams(rows('Freshman'), new Map(), warnings);
-    expect(warnings[0]).toContain('admin');
+    expect(warnings[0]).toContain('Freshman');
+    expect(warnings[0]).toContain('skipped');
   });
 
   it('abandons the sheet when the coach cancels', async () => {

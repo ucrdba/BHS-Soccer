@@ -111,7 +111,7 @@ declare global {
     fetchAssignableCoaches(): Promise<Record<string, any>[] | null>;
     assignCoachToTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
-    createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null>;
+    createTeam(schoolId: string, name: string, season?: string): Promise<{ ok: boolean; id?: string; error?: string }>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     // Paper Matrix sheets carry a recording number rather than a name,
     // because handwriting is not always readable (0021). An unknown number

@@ -1597,7 +1597,9 @@ Object.assign(BHSSoccerApp.prototype, {
     set('Creating...');
     const created = await window.supabaseService.createTeam(schoolId, name, season || undefined);
     if (!created || !created.id) {
-      return set('Could not create that team. Only an admin can, and the name must be unique within the organization.');
+      // Say what the database said. Guessing here once told an admin they were
+      // not an admin.
+      return set(created?.error || 'Could not create that team.');
     }
     // Name the organization back. The picker defaults to the first one, so a
     // team can silently land somewhere the admin did not intend.
@@ -2358,7 +2360,8 @@ Object.assign(BHSSoccerApp.prototype, {
       if (choice.action === 'create') {
         const created = await window.supabaseService.createTeam(active.school_id, wanted);
         if (!created || !created.id) {
-          warnings.push(`Team "${wanted}" could not be created (admin access required) — rows naming it were skipped.`);
+          warnings.push(`Team "${wanted}" could not be created: ${created?.error || 'the database refused it'} `
+            + `— rows naming it were skipped.`);
           cache.set(key, null);
           continue;
         }
