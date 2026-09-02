@@ -2314,6 +2314,26 @@ class SupabaseService {
     return data && data.length > 0 ? data[0] : null;
   }
 
+  /**
+   * A value usable as daily_thoughts.coach_id, or null.
+   *
+   * Verified against the coaches table rather than merely checked for uuid
+   * shape: a signed-in user's profile id IS a uuid, and passing it is exactly
+   * what broke every save. Null is safe -- the column is nullable and unread.
+   */
+  async resolveCoachRowId(candidate: any): Promise<string | null> {
+    const id = String(candidate || '').trim();
+    if (!id || !this.isUuid(id)) return null;
+
+    const { data, error } = await this.client!
+      .from('coaches')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) { console.warn('Supabase resolveCoachRowId notice:', error.message); return null; }
+    return data ? data.id : null;
+  }
+
   async upsertDailyThought(teamId: string, thought: any = {}): Promise<any> {
     if (!this.isConfigured()) return { error: 'Cloud database is not configured.' };
     // Without a team the row is invisible to every read that follows, and the
@@ -2322,9 +2342,19 @@ class SupabaseService {
     // team_id is a uuid column and would otherwise fail the write with 22P02.
     if (!teamId || !this.isUuid(teamId)) return { error: 'No team selected; refusing to write an unscoped thought.' };
 
+    // coach_id references public.coaches(id) -- the STAFF display roster, not
+    // the signed-in user. The form was sending a profile id, which is a real
+    // uuid belonging to a different table, so every save was rejected with
+    // daily_thoughts_coach_id_fkey and the coach was told to check the table
+    // existed. The import sent the literal 'c1'.
+    //
+    // Nothing reads this column; every screen shows coach_name, stored beside
+    // it as text. So write the reference only when it really is a staff row.
+    const coachRowId = await this.resolveCoachRowId(thought.coachId);
+
     const payload: Record<string, any> = {
       team_id: teamId,
-      coach_id: thought.coachId || 'c1',
+      coach_id: coachRowId,
       coach_name: thought.coachName || '',
       // Short name a quiz question refers to when it names the message it
       // tests (0018). Null rather than '' so an untitled message cannot be
