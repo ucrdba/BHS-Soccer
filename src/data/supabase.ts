@@ -1691,6 +1691,24 @@ class SupabaseService {
     return data;
   }
 
+  /**
+   * Every scored line for a team, so the board can be filtered to one exercise.
+   *
+   * The same view fetchPlayerBreakdown reads, unfiltered by player. Aggregating
+   * it in the client rather than adding a per-exercise view keeps the scoring
+   * rules in one place -- the client only groups rows the database has already
+   * scored, and never re-derives what a line is worth.
+   */
+  async fetchTeamExercisePoints(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('matrix_exercise_points')
+      .select('player_id, drill_id, exercise, kind, raw_value, weight, earned, available, w, dr, ls, occurred_on')
+      .eq('team_id', teamId);
+    if (error) { console.warn('Supabase fetchTeamExercisePoints notice:', error.message); return null; }
+    return data;
+  }
+
   async fetchMatrixSessionResults(sessionId: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured() || !sessionId) return null;
     const { data, error } = await this.client!

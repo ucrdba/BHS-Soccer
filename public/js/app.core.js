@@ -449,6 +449,11 @@ class BHSSoccerApp {
         // per-team standings live in Postgres, derived from matrix_logs, not
         // stored on the player or the membership row. This block is what
         // populates `player.matrixStats` for the roster card and leaderboard.
+        // Every scored line, so the leaderboard can be filtered to one
+        // exercise without a second round trip when the coach picks one.
+        this._exercisePoints =
+          (await window.supabaseService.fetchTeamExercisePoints(this.activeTeamId)) || [];
+
         const dbStandings = await window.supabaseService.fetchMatrixStandings(this.activeTeamId);
         const standingsById = new Map((dbStandings || []).map(s => [s.player_id, s]));
         const unrankedFrom = (dbStandings || []).length + 1;

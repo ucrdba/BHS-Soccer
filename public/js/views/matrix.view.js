@@ -7,6 +7,201 @@
 Object.assign(BHSSoccerApp.prototype, {
 
   /**
+   * The leaderboard for ONE exercise.
+   *
+   * The overall board answers "who is ahead". This answers "who has the most
+   * small-sided wins" and "who is best at Coopers", which are different
+   * questions with different natural answers.
+   *
+   * `best` is each player's PEAK, and which direction that means depends on the
+   * measure: the highest count for a counted exercise, the FASTEST time for a
+   * timed one. Taking the maximum for a timed drill would call a player's worst
+   * run their best and put the slowest of them on top.
+   *
+   * Points are totalled across every attempt rather than taken from the best
+   * one, so this column still agrees with the overall board.
+   */
+  exerciseLeaderboard(drillId, sortBy) {
+    const rows = (this._exercisePoints || []).filter(r => r.drill_id === drillId);
+    if (rows.length === 0) return [];
+
+    const drill = (this.data.drillsBank || []).find(d => d.id === drillId);
+    const measure = (drill && drill.measure) || 'count_high';
+    const timed = measure === 'time_low' || measure === 'time_bands';
+    const byId = new Map((this.data.players || []).map(p => [p.id, p]));
+
+    const acc = {};
+    rows.forEach(r => {
+      const a = acc[r.player_id] = acc[r.player_id] || {
+        playerId: r.player_id,
+        wins: 0, draws: 0, losses: 0,
+        earned: 0, available: 0, attempts: 0,
+        best: null, timed
+      };
+
+      a.wins += Number(r.w) || 0;
+      a.draws += Number(r.dr) || 0;
+      a.losses += Number(r.ls) || 0;
+      a.earned += Number(r.earned) || 0;
+      a.available += Number(r.available) || 0;
+
+      // A row with no value is an absence or a session never filled in: it
+      // counts against the points, but it is not an attempt and cannot be a
+      // personal best.
+      if (r.raw_value === null || r.raw_value === undefined) return;
+      a.attempts += 1;
+      const v = Number(r.raw_value);
+      if (a.best === null) a.best = v;
+      else a.best = timed ? Math.min(a.best, v) : Math.max(a.best, v);
+    });
+
+    const out = Object.values(acc).map(a => {
+      const p = byId.get(a.playerId);
+      return {
+        ...a,
+        name: (p && p.name) || 'Former squad member',
+        recordingNumber: p ? p.recordingNumber : null,
+        share: a.available ? (100 * a.earned) / a.available : 0
+      };
+    });
+
+    return out.sort((x, y) => this.compareExerciseRows(x, y, sortBy, timed));
+  },
+
+  /**
+   * Order two rows of a single-exercise board.
+   *
+   * Points first by default -- the board's own currency, and the only figure
+   * that means the same thing for every measure. A player with no figure at all
+   * sorts last whichever column is chosen, so a column of blanks never leads.
+   */
+  compareExerciseRows(x, y, sortBy, timed) {
+    const by = sortBy || 'earned';
+
+    if (by === 'best') {
+      if (x.best === null || y.best === null) {
+        if (x.best === y.best) return 0;
+        return x.best === null ? 1 : -1;
+      }
+      // Fastest first for a timed exercise; highest first for a counted one.
+      return timed ? x.best - y.best : y.best - x.best;
+    }
+
+    if (by === 'wins') {
+      if (y.wins !== x.wins) return y.wins - x.wins;
+      return y.earned - x.earned;
+    }
+
+    if (by === 'name') return String(x.name || '').localeCompare(String(y.name || ''));
+
+    if (by === 'number') {
+      const nx = x.recordingNumber == null ? NaN : Number(x.recordingNumber);
+      const ny = y.recordingNumber == null ? NaN : Number(y.recordingNumber);
+      const gx = Number.isFinite(nx), gy = Number.isFinite(ny);
+      if (gx !== gy) return gx ? -1 : 1;
+      if (gx && nx !== ny) return nx - ny;
+      return String(x.name || '').localeCompare(String(y.name || ''));
+    }
+
+    // Default: points earned, with the best figure breaking a tie rather than
+    // leaving two equal players in whatever order they happened to arrive.
+    if (y.earned !== x.earned) return y.earned - x.earned;
+    if (x.best !== null && y.best !== null && x.best !== y.best) {
+      return timed ? x.best - y.best : y.best - x.best;
+    }
+    return String(x.name || '').localeCompare(String(y.name || ''));
+  },
+
+  /** Exercises that actually have results, for the picker. */
+  exercisesWithResults() {
+    const ids = new Set((this._exercisePoints || []).map(r => r.drill_id).filter(Boolean));
+    return (this.data.drillsBank || [])
+      .filter(d => ids.has(d.id) && !d.is_deleted && !d.isDeleted)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  },
+
+  /** How a player's best figure reads for this exercise. */
+  formatExerciseBest(row) {
+    if (row.best === null || row.best === undefined) return '—';
+    return row.timed ? window.supabaseService.formatSecondsAsTime(row.best) : String(row.best);
+  },
+
+  async setExerciseFilter(drillId) {
+    this._exerciseFilter = drillId || '';
+    this._exerciseSort = 'earned';
+    if (this._exerciseFilter && !(this._exercisePoints || []).length) {
+      await this.loadExercisePoints();
+    }
+    this.renderCurrentView();
+  },
+
+  setExerciseSort(by) {
+    this._exerciseSort = by;
+    this.renderCurrentView();
+  },
+
+  async loadExercisePoints() {
+    if (!window.supabaseService?.isConfigured() || !this.activeTeamId) {
+      this._exercisePoints = [];
+      return;
+    }
+    this._exercisePoints =
+      (await window.supabaseService.fetchTeamExercisePoints(this.activeTeamId)) || [];
+  },
+
+  /**
+   * The single-exercise table.
+   *
+   * Columns differ by measure because the natural figure does: wins and draws
+   * for a head-to-head or small-sided drill, a best count or a best time for
+   * the others. Showing all of them for every exercise would fill the table
+   * with columns that are always zero.
+   */
+  renderExerciseLeaderboard() {
+    const drillId = this._exerciseFilter;
+    const drill = (this.data.drillsBank || []).find(d => d.id === drillId);
+    if (!drill) return '';
+
+    const rows = this.exerciseLeaderboard(drillId, this._exerciseSort);
+    const measure = drill.measure || 'count_high';
+    const isWinLoss = measure === 'win_loss' || measure === 'head_to_head';
+    const esc = (v) => String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (rows.length === 0) {
+      return `<p class="text-muted" style="font-size:0.85rem;">No results recorded for ${esc(drill.name)} yet.</p>`;
+    }
+
+    const sortable = (key, label) =>
+      `<th style="cursor:pointer;" title="Sort by ${esc(label)}" onclick="app.setExerciseSort('${key}')">
+         ${esc(label)}${this._exerciseSort === key ? ' ▾' : ''}</th>`;
+
+    return `
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr>
+            ${sortable('number', '#')}
+            ${sortable('name', 'Player')}
+            ${isWinLoss ? sortable('wins', 'W-D-L') : sortable('best', measure === 'time_bands' || measure === 'time_low' ? 'Best time' : 'Best')}
+            ${sortable('earned', 'Points')}
+            <th>Of</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td class="text-muted">${r.recordingNumber != null ? '(' + r.recordingNumber + ')' : '—'}</td>
+              <td><strong>${esc(r.name)}</strong></td>
+              <td>${isWinLoss ? `${r.wins} - ${r.draws} - ${r.losses}` : this.formatExerciseBest(r)}</td>
+              <td><strong>${r.earned.toFixed(2)}</strong></td>
+              <td class="text-muted">${r.available.toFixed(2)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  },
+
+
+  /**
    * The individual results behind the leaderboard, with edit and delete.
    *
    * Points are derived in Postgres rather than stored, and the argument for
@@ -103,6 +298,25 @@ Object.assign(BHSSoccerApp.prototype, {
               <h3 style="color:#FFF">CURRENT PRACTICE MATRIX LEADERBOARD</h3>
               <span class="badge badge-coach">UPDATED DAILY</span>
             </div>
+
+            <!-- Filtering to one exercise answers a different question from the
+                 overall board: who has the most small-sided wins, who is best
+                 at Coopers. -->
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+              <label for="matrixExerciseFilter" class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Exercise</label>
+              <select id="matrixExerciseFilter" class="form-control" style="max-width:240px; font-size:0.8rem;"
+                      onchange="app.setExerciseFilter(this.value)">
+                <option value="">All exercises &mdash; overall points</option>
+                ${this.exercisesWithResults().map(d =>
+                  `<option value="${d.id}"${this._exerciseFilter === d.id ? ' selected' : ''}>${d.name}</option>`
+                ).join('')}
+              </select>
+              ${this._exerciseFilter
+                ? '<span class="text-muted" style="font-size:0.76rem;">Click a column heading to re-sort.</span>'
+                : ''}
+            </div>
+
+            ${this._exerciseFilter ? this.renderExerciseLeaderboard() : `
             
             <table class="matrix-table">
               <thead>
@@ -175,7 +389,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   }).join('');
                 })()}
               </tbody>
-            </table>
+            </table>`}
 
             ${isCoach ? `<div class="planner-card" style="margin-top:12px;">
               <h3 style="color: var(--bhs-gold-accent); margin-bottom: 12px;">

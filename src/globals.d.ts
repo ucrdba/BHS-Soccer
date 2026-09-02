@@ -117,6 +117,9 @@ declare global {
     // because handwriting is not always readable (0021). An unknown number
     // is refused and named rather than guessed at.
     fetchTeamLookup(teamId: string): Promise<Record<string, any>[] | null>;
+    // Every scored line for a team, so the leaderboard can be filtered to a
+    // single exercise without re-deriving what anything is worth.
+    fetchTeamExercisePoints(teamId: string): Promise<Record<string, any>[] | null>;
     findPlayerByRecordingNumber(teamId: string, value: unknown):
       Promise<{ ok: boolean; error?: string; player?: Record<string, any> }>;
     findPlayerOnTeam(teamId: string, value: unknown):
