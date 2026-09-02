@@ -177,6 +177,10 @@ Object.assign(BHSSoccerApp.prototype, {
     this.saveData();
 
     if (window.supabaseService && window.supabaseService.isConfigured()) {
+      // PHASE 2: this passes a school CODE where a team id belongs. The
+      // service now refuses a non-uuid outright, so activating this file
+      // unchanged would silently save no fixtures at all. Pass
+      // this.activeTeamId when it is wired into the module graph.
       const cloudRes = await window.supabaseService.upsertMatch(this.data.school?.code || 'bhs', newMatch);
       if (cloudRes && cloudRes.id) newMatch.id = cloudRes.id;
     }
@@ -235,6 +239,8 @@ Object.assign(BHSSoccerApp.prototype, {
       this.saveData();
 
       if (window.supabaseService && window.supabaseService.isConfigured()) {
+        // PHASE 2: a school code where a team id belongs -- see the note on
+        // the add path above.
         await window.supabaseService.upsertMatch(this.data.school?.code || 'bhs', updated);
       }
 

@@ -829,7 +829,10 @@ class SupabaseService {
   }
 
   async fetchSchedule(teamId: string): Promise<Record<string, any>[] | null> {
-    if (!this.isConfigured() || !teamId) return null;
+    // Same uuid guard as the write: a school code here returned null via a
+    // 22P02 round trip, so the schedule rendered empty with the reason only
+    // visible in a Postgres log.
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
     const { data, error } = await this.client!
       .from('schedule')
       .select('*')
@@ -849,8 +852,20 @@ class SupabaseService {
   async upsertMatch(teamId: string, match: any): Promise<{ id?: string } | null> {
     if (!this.isConfigured()) return null;
     // Without a team the row is invisible to every read that follows, and the
-    // caller would report success over a permanent silent loss.
-    if (!teamId) { console.warn('upsertMatch: no team selected; refusing to write an unscoped fixture.'); return null; }
+    // caller would report success over a permanent silent loss. A WRONG team is
+    // the other half: schedule.team_id is a uuid, so a school code like 'bhs'
+    // fails the cast with 22P02 -- refused here rather than after a round trip,
+    // which is the shape that kept daily thoughts dead for months.
+    //
+    // Returns null rather than {ok, error} like the newer methods, deliberately:
+    // admin.js does `return !!(await upsertMatch(...))` and `if (res)`, so an
+    // object would make every refusal count as a success. The callers already
+    // treat a falsy return as failure and tell the coach the fixture was not
+    // saved.
+    if (!teamId || !this.isUuid(teamId)) {
+      console.warn('upsertMatch: no valid team; refusing to write an unscoped fixture. Got:', teamId);
+      return null;
+    }
     const payload: Record<string, any> = {
       opponent: match.opponent,
       match_date: match.date || match.match_date,
@@ -862,7 +877,7 @@ class SupabaseService {
       result: match.result || null,
       is_deleted: match.is_deleted || match.isDeleted || false
     };
-    if (teamId) payload.team_id = teamId;
+    payload.team_id = teamId;
     if (match.id && this.isUuid(match.id)) payload.id = match.id;
     const { data, error } = await this.client!
       .from('schedule')
