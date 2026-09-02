@@ -21,7 +21,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * Points are totalled across every attempt rather than taken from the best
    * one, so this column still agrees with the overall board.
    */
-  exerciseLeaderboard(drillId, sortBy) {
+  exerciseLeaderboard(drillId, sortBy, reversed) {
     const rows = (this._exercisePoints || []).filter(r => r.drill_id === drillId);
     if (rows.length === 0) return [];
 
@@ -65,7 +65,7 @@ Object.assign(BHSSoccerApp.prototype, {
       };
     });
 
-    return out.sort((x, y) => this.compareExerciseRows(x, y, sortBy, timed));
+    return out.sort((x, y) => this.compareExerciseRows(x, y, sortBy, timed, reversed));
   },
 
   /**
@@ -75,8 +75,12 @@ Object.assign(BHSSoccerApp.prototype, {
    * that means the same thing for every measure. A player with no figure at all
    * sorts last whichever column is chosen, so a column of blanks never leads.
    */
-  compareExerciseRows(x, y, sortBy, timed) {
+  compareExerciseRows(x, y, sortBy, timed, reversed) {
     const by = sortBy || 'earned';
+    // Reversing flips the comparison of VALUES only. Rows with nothing to
+    // compare keep sinking either way -- a column of blanks must never lead
+    // the board just because it was clicked twice.
+    const flip = reversed ? -1 : 1;
 
     if (by === 'best') {
       if (x.best === null || y.best === null) {
@@ -84,30 +88,32 @@ Object.assign(BHSSoccerApp.prototype, {
         return x.best === null ? 1 : -1;
       }
       // Fastest first for a timed exercise; highest first for a counted one.
-      return timed ? x.best - y.best : y.best - x.best;
+      return flip * (timed ? x.best - y.best : y.best - x.best);
     }
 
     if (by === 'wins') {
-      if (y.wins !== x.wins) return y.wins - x.wins;
-      return y.earned - x.earned;
+      if (y.wins !== x.wins) return flip * (y.wins - x.wins);
+      return flip * (y.earned - x.earned);
     }
 
-    if (by === 'name') return String(x.name || '').localeCompare(String(y.name || ''));
+    if (by === 'name') {
+      return flip * String(x.name || '').localeCompare(String(y.name || ''));
+    }
 
     if (by === 'number') {
       const nx = x.recordingNumber == null ? NaN : Number(x.recordingNumber);
       const ny = y.recordingNumber == null ? NaN : Number(y.recordingNumber);
       const gx = Number.isFinite(nx), gy = Number.isFinite(ny);
-      if (gx !== gy) return gx ? -1 : 1;
-      if (gx && nx !== ny) return nx - ny;
-      return String(x.name || '').localeCompare(String(y.name || ''));
+      if (gx !== gy) return gx ? -1 : 1;          // unnumbered always last
+      if (gx && nx !== ny) return flip * (nx - ny);
+      return flip * String(x.name || '').localeCompare(String(y.name || ''));
     }
 
     // Default: points earned, with the best figure breaking a tie rather than
     // leaving two equal players in whatever order they happened to arrive.
-    if (y.earned !== x.earned) return y.earned - x.earned;
+    if (y.earned !== x.earned) return flip * (y.earned - x.earned);
     if (x.best !== null && y.best !== null && x.best !== y.best) {
-      return timed ? x.best - y.best : y.best - x.best;
+      return flip * (timed ? x.best - y.best : y.best - x.best);
     }
     return String(x.name || '').localeCompare(String(y.name || ''));
   },
@@ -129,15 +135,41 @@ Object.assign(BHSSoccerApp.prototype, {
   async setExerciseFilter(drillId) {
     this._exerciseFilter = drillId || '';
     this._exerciseSort = 'earned';
+    this._exerciseSortReversed = false;
     if (this._exerciseFilter && !(this._exercisePoints || []).length) {
       await this.loadExercisePoints();
     }
     this.renderCurrentView();
   },
 
+  /**
+   * Click a column to sort by it; click the same one again to reverse.
+   *
+   * There was no direction at all before: every click re-applied the same
+   * fixed order, so the board sorted one way and the arrow in the header
+   * implied a second way that did not exist.
+   */
   setExerciseSort(by) {
-    this._exerciseSort = by;
+    if (this._exerciseSort === by) {
+      this._exerciseSortReversed = !this._exerciseSortReversed;
+    } else {
+      this._exerciseSort = by;
+      this._exerciseSortReversed = false;
+    }
     this.renderCurrentView();
+  },
+
+  /**
+   * Which way a column reads on its FIRST click.
+   *
+   * Points and wins read highest-first, a time reads fastest-first, and a name
+   * or number reads lowest-first. Knowing this is what lets the header arrow
+   * show the order actually in force rather than just "sorted".
+   */
+  exerciseSortDescends(by, timed) {
+    if (by === 'name' || by === 'number') return false;
+    if (by === 'best') return !timed;
+    return true;                        // earned, wins
   },
 
   async loadExercisePoints() {
@@ -162,7 +194,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const drill = (this.data.drillsBank || []).find(d => d.id === drillId);
     if (!drill) return '';
 
-    const rows = this.exerciseLeaderboard(drillId, this._exerciseSort);
+    const rows = this.exerciseLeaderboard(drillId, this._exerciseSort, this._exerciseSortReversed);
     const measure = drill.measure || 'count_high';
     const isWinLoss = measure === 'win_loss' || measure === 'head_to_head';
     const esc = (v) => String(v == null ? '' : v)
@@ -172,9 +204,16 @@ Object.assign(BHSSoccerApp.prototype, {
       return `<p class="text-muted" style="font-size:0.85rem;">No results recorded for ${esc(drill.name)} yet.</p>`;
     }
 
-    const sortable = (key, label) =>
-      `<th style="cursor:pointer;" title="Sort by ${esc(label)}" onclick="app.setExerciseSort('${key}')">
-         ${esc(label)}${this._exerciseSort === key ? ' ▾' : ''}</th>`;
+    const timed = measure === 'time_low' || measure === 'time_bands';
+    const sortable = (key, label) => {
+      const on = this._exerciseSort === key;
+      // The arrow shows the order in force, not merely that a column is sorted.
+      const desc = this.exerciseSortDescends(key, timed) !== !!this._exerciseSortReversed;
+      const arrow = on ? (desc ? ' \u25BC' : ' \u25B2') : '';
+      const cls = key === 'name' ? 'col-text' : '';
+      return `<th class="${cls}" style="cursor:pointer;" title="Sort by ${esc(label)}"
+                  onclick="app.setExerciseSort('${key}')">${esc(label)}${arrow}</th>`;
+    };
 
     return `
       <table class="data-table" style="width:100%;">
@@ -184,14 +223,14 @@ Object.assign(BHSSoccerApp.prototype, {
             ${sortable('name', 'Player')}
             ${isWinLoss ? sortable('wins', 'W-D-L') : sortable('best', measure === 'time_bands' || measure === 'time_low' ? 'Best time' : 'Best')}
             ${sortable('earned', 'Points')}
-            <th>Of</th>
+            <th title="Points available from this exercise">Of</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map(r => `
             <tr>
               <td class="text-muted">${r.recordingNumber != null ? '(' + r.recordingNumber + ')' : '—'}</td>
-              <td><strong>${esc(r.name)}</strong></td>
+              <td class="col-text"><strong>${esc(r.name)}</strong></td>
               <td>${isWinLoss ? `${r.wins} - ${r.draws} - ${r.losses}` : this.formatExerciseBest(r)}</td>
               <td><strong>${r.earned.toFixed(2)}</strong></td>
               <td class="text-muted">${r.available.toFixed(2)}</td>

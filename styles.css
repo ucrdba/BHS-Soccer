@@ -573,6 +573,45 @@
   background: rgba(30, 144, 255, 0.08);
 }
 
+/* ---------------------------------------------------------------------------
+   Single-exercise leaderboard.
+
+   Carried no styles of its own, so it rendered with browser defaults: headers
+   centred, cells left, nothing aligned to anything. A header now sits over its
+   own column -- names left, figures centred -- because a header that does not
+   line up with its data reads as a different column.
+   --------------------------------------------------------------------------- */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th {
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--bhs-silver);
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--bhs-navy-border);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bhs-navy-border);
+  font-size: 0.9rem;
+}
+
+.data-table tr:hover { background: rgba(30, 144, 255, 0.08); }
+
+/* Text reads from the left; figures are compared down a column, so they centre.
+   Applied to th and td together so the two can never drift apart. */
+.data-table th, .data-table td { text-align: center; }
+.data-table th.col-text, .data-table td.col-text { text-align: left; }
+
 .rank-pill {
   width: 32px;
   height: 32px;

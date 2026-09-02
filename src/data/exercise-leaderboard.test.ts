@@ -177,3 +177,131 @@ describe('the default order', () => {
     expect(rows[0].playerId).toBe('p2');
   });
 });
+
+describe('reversing a column', () => {
+  /**
+   * Clicking a heading a second time reverses it. There was no direction at
+   * all before -- every click re-applied the same fixed order, so the board
+   * sorted one way while the arrow in the header implied a second way that did
+   * not exist.
+   */
+  const counted = [
+    row({ player_id: 'p1', raw_value: 2600, earned: 0.6, available: 1 }),
+    row({ player_id: 'p2', raw_value: 2900, earned: 1.0, available: 1 }),
+    row({ player_id: 'p3', raw_value: 2400, earned: 0.3, available: 1 })
+  ];
+
+  const timedRows = [
+    row({ drill_id: LAPS, kind: 'time_band', player_id: 'p1', raw_value: 288, earned: 0.25 }),
+    row({ drill_id: LAPS, kind: 'time_band', player_id: 'p2', raw_value: 255, earned: 1 }),
+    row({ drill_id: LAPS, kind: 'time_band', player_id: 'p3', raw_value: 274, earned: 0.5 })
+  ];
+
+  it('puts the highest count first by default', () => {
+    const rows = makeApp(counted).exerciseLeaderboard(COOPERS, 'best');
+    expect(rows.map((r: any) => r.best)).toEqual([2900, 2600, 2400]);
+  });
+
+  it('actually reverses a counted column', () => {
+    const rows = makeApp(counted).exerciseLeaderboard(COOPERS, 'best', true);
+    expect(rows.map((r: any) => r.best)).toEqual([2400, 2600, 2900]);
+  });
+
+  it('puts the fastest time first by default', () => {
+    const rows = makeApp(timedRows).exerciseLeaderboard(LAPS, 'best');
+    expect(rows.map((r: any) => r.best)).toEqual([255, 274, 288]);
+  });
+
+  it('reverses a timed column to slowest first', () => {
+    const rows = makeApp(timedRows).exerciseLeaderboard(LAPS, 'best', true);
+    expect(rows.map((r: any) => r.best)).toEqual([288, 274, 255]);
+  });
+
+  it('reverses points', () => {
+    const rows = makeApp(counted).exerciseLeaderboard(COOPERS, 'earned', true);
+    expect(rows.map((r: any) => r.earned)).toEqual([0.3, 0.6, 1.0]);
+  });
+
+  it('reverses the player name', () => {
+    const rows = makeApp(counted).exerciseLeaderboard(COOPERS, 'name', true);
+    expect(rows.map((r: any) => r.name)).toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+  });
+
+  it('reverses the recording number', () => {
+    const rows = makeApp(counted).exerciseLeaderboard(COOPERS, 'number', true);
+    expect(rows.map((r: any) => r.recordingNumber)).toEqual([18, 4, 1]);
+  });
+
+  it('keeps a player with no figure last in BOTH directions', () => {
+    // Reversing flips the values, not the rule that a blank has nothing to
+    // compare. A column of blanks must never lead the board.
+    const withBlank = [
+      row({ player_id: 'p1', raw_value: 2600, earned: 0.6 }),
+      row({ player_id: 'p2', kind: 'not_entered', raw_value: null, earned: 0 })
+    ];
+    expect(makeApp(withBlank).exerciseLeaderboard(COOPERS, 'best')[1].playerId).toBe('p2');
+    expect(makeApp(withBlank).exerciseLeaderboard(COOPERS, 'best', true)[1].playerId).toBe('p2');
+  });
+
+  it('keeps an unnumbered player last in BOTH directions', () => {
+    const app = makeApp(counted);
+    app.data.players[2].recordingNumber = null;
+    expect(app.exerciseLeaderboard(COOPERS, 'number').slice(-1)[0].playerId).toBe('p3');
+    expect(app.exerciseLeaderboard(COOPERS, 'number', true).slice(-1)[0].playerId).toBe('p3');
+  });
+});
+
+describe('the sort control', () => {
+  const counted = [
+    row({ player_id: 'p1', raw_value: 2600, earned: 0.6 }),
+    row({ player_id: 'p2', raw_value: 2900, earned: 1.0 })
+  ];
+
+  const app = () => {
+    const a = makeApp(counted);
+    a.renderCurrentView = () => {};
+    return a;
+  };
+
+  it('sorts by a newly clicked column in its natural order', () => {
+    const a = app();
+    a.setExerciseSort('name');
+    expect(a._exerciseSort).toBe('name');
+    expect(a._exerciseSortReversed).toBe(false);
+  });
+
+  it('reverses when the same column is clicked again', () => {
+    const a = app();
+    a.setExerciseSort('name');
+    a.setExerciseSort('name');
+    expect(a._exerciseSortReversed).toBe(true);
+  });
+
+  it('returns to the natural order on a third click', () => {
+    const a = app();
+    a.setExerciseSort('name');
+    a.setExerciseSort('name');
+    a.setExerciseSort('name');
+    expect(a._exerciseSortReversed).toBe(false);
+  });
+
+  it('starts fresh when a different column is clicked', () => {
+    // Carrying the reversal over would silently invert the new column.
+    const a = app();
+    a.setExerciseSort('name');
+    a.setExerciseSort('name');
+    a.setExerciseSort('earned');
+    expect(a._exerciseSortReversed).toBe(false);
+  });
+
+  it('knows which way each column reads first', () => {
+    // This is what lets the header arrow show the order actually in force.
+    const a = app();
+    expect(a.exerciseSortDescends('earned', false)).toBe(true);
+    expect(a.exerciseSortDescends('wins', false)).toBe(true);
+    expect(a.exerciseSortDescends('best', false)).toBe(true);   // counted: highest first
+    expect(a.exerciseSortDescends('best', true)).toBe(false);   // timed: fastest first
+    expect(a.exerciseSortDescends('name', false)).toBe(false);
+    expect(a.exerciseSortDescends('number', false)).toBe(false);
+  });
+});
