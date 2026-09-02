@@ -1279,17 +1279,46 @@ class SupabaseService {
       return { ok: false, error: `Correct answer must be A, B, C or D (found "${q.correct_option ?? ''}").` };
     }
 
+    // 0017 gave the bank an organization. Without one a question belongs to
+    // nobody and appears in no team's quiz, while the import still reports
+    // success -- so refuse rather than write an unreachable row.
+    const schoolId = q.schoolId || q.school_id || null;
+    if (!schoolId || !this.isUuid(schoolId)) {
+      return { ok: false, error: 'No organization for this question. Select a team first, so its organization is known.' };
+    }
+
+    const importKey = String(q.importKey ?? q.import_key ?? '').trim() || null;
+
     const payload: Record<string, any> = {
       question: text,
       option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
       correct_option: correct,
       explanation: String(q.explanation || '').trim() || null,
       category: String(q.category || '').trim() || 'Tactical',
+      school_id: schoolId,
+      import_key: importKey,
+      // The message this question tests, if it names one (0018). Null means
+      // evergreen: asked whatever the current focus is.
+      thought_id: q.thoughtId || q.thought_id || null,
       is_deleted: q.is_deleted === true || String(q.is_deleted || '').toLowerCase() === 'true'
     };
     // A spreadsheet's "1" in the id column is a row number, not a key. Passing
     // it would fail the uuid cast; letting the default fire is correct.
     if (q.question_id && this.isUuid(q.question_id)) payload.question_id = q.question_id;
+
+    // Coaches reword questions, so an imported row is matched on its key rather
+    // than its text -- matching on text would mint a duplicate every time a
+    // typo was fixed. Scoped to the organization: two clubs may both number
+    // from 100 without colliding.
+    if (!payload.question_id && importKey) {
+      const { data: existing } = await this.client!
+        .from('quiz_questions')
+        .select('question_id, is_deleted')
+        .eq('school_id', schoolId)
+        .eq('import_key', importKey);
+      const live = (existing || []).find((r: any) => !r.is_deleted);
+      if (live) payload.question_id = live.question_id;
+    }
 
     try {
       const { data, error } = await this.client!
@@ -2297,6 +2326,10 @@ class SupabaseService {
       team_id: teamId,
       coach_id: thought.coachId || 'c1',
       coach_name: thought.coachName || '',
+      // Short name a quiz question refers to when it names the message it
+      // tests (0018). Null rather than '' so an untitled message cannot be
+      // matched by an empty Thought column.
+      title: String(thought.title || '').trim() || null,
       thoughts_text: thought.text || '',
       is_active: thought.isActive !== false,
       is_deleted: thought.is_deleted || thought.isDeleted || false
@@ -2381,13 +2414,92 @@ class SupabaseService {
 
     const { data, error } = await this.client!
       .from('team_quiz_questions')
-      .select('question_id, quiz_questions(question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, is_deleted)')
+      .select('question_id, quiz_questions(question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, thought_id, is_deleted)')
       .eq('team_id', teamId);
     if (error) { console.warn('Supabase fetchTeamQuiz notice:', error.message); return null; }
 
+    // A question may name the daily message it tests (0018). Those are asked
+    // only while that message is the active one, so last week's questions stop
+    // being asked on their own rather than testing a focus nobody remembers.
+    // A question naming no message is evergreen and always asked.
+    const activeThoughtId = await this.fetchActiveThoughtId(teamId);
+
     return (data || [])
       .map((row: any) => row.quiz_questions)
-      .filter((q: any) => q && !q.is_deleted);
+      .filter((q: any) => q && !q.is_deleted)
+      .filter((q: any) => !q.thought_id || q.thought_id === activeThoughtId);
+  }
+
+  /**
+   * Switch a question on or off for one team.
+   *
+   * The bank belongs to the organization; this is what decides whether a given
+   * squad is actually asked a question. A question in the bank with no row here
+   * exists and is asked by nobody, which is the state every imported question
+   * was left in before this.
+   */
+  async setTeamQuizQuestion(
+    teamId: string, questionId: string, on: boolean
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!questionId || !this.isUuid(questionId)) return { ok: false, error: 'No question given.' };
+
+    if (on) {
+      const { error } = await this.client!
+        .from('team_quiz_questions')
+        .upsert([{ team_id: teamId, question_id: questionId }], { onConflict: 'team_id,question_id' });
+      if (error) { console.warn('Supabase setTeamQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+      return { ok: true };
+    }
+
+    const { error } = await this.client!
+      .from('team_quiz_questions')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('question_id', questionId);
+    if (error) { console.warn('Supabase setTeamQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true };
+  }
+
+  /** The id of the team's currently active daily message, or null. */
+  async fetchActiveThoughtId(teamId: string): Promise<string | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('daily_thoughts')
+      .select('id, is_active, is_deleted')
+      .eq('team_id', teamId)
+      .eq('is_active', true)
+      .or('is_deleted.is.null,is_deleted.eq.false');
+    if (error) { console.warn('Supabase fetchActiveThoughtId notice:', error.message); return null; }
+    const live = (data || []).find((t: any) => !t.is_deleted);
+    return live ? live.id : null;
+  }
+
+  /**
+   * Resolve a daily message by the title a spreadsheet names.
+   *
+   * A title rather than a number, deliberately: a mistyped number is
+   * indistinguishable from a valid one, so a question would attach to the wrong
+   * message in silence. A title that does not exist returns null and the import
+   * can say which one it could not find.
+   */
+  async findThoughtIdByTitle(teamId: string, title: string): Promise<string | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const wanted = String(title || '').trim().toLowerCase();
+    if (!wanted) return null;
+
+    const { data, error } = await this.client!
+      .from('daily_thoughts')
+      .select('id, title, is_deleted')
+      .eq('team_id', teamId)
+      .or('is_deleted.is.null,is_deleted.eq.false');
+    if (error) { console.warn('Supabase findThoughtIdByTitle notice:', error.message); return null; }
+
+    const hit = (data || []).find(
+      (t: any) => !t.is_deleted && String(t.title || '').trim().toLowerCase() === wanted
+    );
+    return hit ? hit.id : null;
   }
 
   async saveQuizAttempt(playerData: any = {}, answers: any[] = [], score: number = 0, totalQuestions: number = 5, teamId?: string): Promise<any> {

@@ -2350,6 +2350,8 @@ Object.assign(BHSSoccerApp.prototype, {
               id: 'dt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
               coachId: 'c1',
               coachName: toStr(r.CoachName || r.coachName) || 'Coach Bob Miller',
+              // The short name a quiz sheet's Thought column refers to (0018).
+              title: toStr(r.Title || r.title),
               text: toStr(r.ThoughtsText || r.text),
               isActive: toStr(r.IsActive || r.isActive).toLowerCase() === 'yes' || toStr(r.IsActive || r.isActive).toLowerCase() === 'true',
               createdAt: toStr(r.CreatedAt || r.createdAt) || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
@@ -2366,14 +2368,22 @@ Object.assign(BHSSoccerApp.prototype, {
 
             if (window.supabaseService?.isConfigured()) {
               for (const t of imported) {
-                await window.supabaseService.upsertDailyThought(this.activeTeamId, {
+                // The result was discarded here, so a row the database refused
+                // still counted as imported -- the same silent-success shape
+                // the category import had.
+                const res = await window.supabaseService.upsertDailyThought(this.activeTeamId, {
                   id: t.id,
                   coachId: t.coachId,
                   coachName: t.coachName,
+                  title: t.title,
                   text: t.text,
                   isActive: t.isActive,
                   is_deleted: t.is_deleted
                 });
+                if (res && res.error) {
+                  totalRejected++;
+                  warnings.push(`Daily thought "${(t.title || t.text).slice(0, 40)}…" rejected: ${res.error}`);
+                }
               }
             }
           } else if (activeTarget === 'categories') {
@@ -2414,9 +2424,20 @@ Object.assign(BHSSoccerApp.prototype, {
               return '';
             };
 
+            // The organization the bank belongs to, resolved from the active
+            // team. Without it upsertQuizQuestion refuses, because a question
+            // with no organization appears in nobody's quiz (0017).
+            const quizTeam = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+            if (!this.activeTeamId || !quizTeam) {
+              warnings.push('Quiz questions skipped — no team is selected. Choose a team in the header first, so the question bank knows which organization it belongs to.');
+              continue;
+            }
+
             let quizAdded = 0;
             for (const r of rows) {
               const q = {
+                schoolId: quizTeam.school_id,
+                importKey: pick(r, 'Key', 'ImportKey', 'import_key'),
                 question_id: pick(r, 'QuestionId', 'question_id'),
                 question:    pick(r, 'QuestionText', 'Question', 'question'),
                 option_a:    pick(r, 'OptionA', 'option_a'),
@@ -2434,9 +2455,27 @@ Object.assign(BHSSoccerApp.prototype, {
                 warnings.push('Quiz questions need the cloud database; nothing was written.');
                 break;
               }
+
+              // The daily message this question tests, named by its title. A
+              // title that matches nothing is reported rather than silently
+              // dropped -- the whole reason for a title over a number.
+              const thoughtTitle = pick(r, 'Thought', 'ThoughtTitle', 'thought');
+              if (thoughtTitle) {
+                const thoughtId = await window.supabaseService.findThoughtIdByTitle(this.activeTeamId, thoughtTitle);
+                if (!thoughtId) {
+                  totalRejected++;
+                  warnings.push(`"${q.question.slice(0, 40)}…" rejected: no daily message titled "${thoughtTitle}" on this team.`);
+                  continue;
+                }
+                q.thoughtId = thoughtId;
+              }
+
               const res = await window.supabaseService.upsertQuizQuestion(q);
               if (res.ok) {
                 quizAdded++;
+                // Switch it on for this team, or it exists in the bank and is
+                // asked by nobody.
+                await window.supabaseService.setTeamQuizQuestion(this.activeTeamId, res.id, true);
               } else {
                 totalRejected++;
                 // Name the question, truncated: "row 4 was rejected" is

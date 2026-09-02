@@ -46,7 +46,13 @@ beforeEach(() => {
 const payload = () => captured[0].rows[0];
 
 // The shape of a row from the live table export the coach actually used.
+// Every question must name an organization now: 0017 gave the bank a
+// school_id, and one written without it belongs to nobody and is asked in no
+// quiz. upsertQuizQuestion refuses rather than writing an unreachable row.
+const SCHOOL = '7ebbe980-b87e-421f-a11f-788ca2519504';
+
 const dbRow = (over: Record<string, any> = {}) => ({
+  schoolId: SCHOOL,
   question_id: '1',
   question: 'Why are fewer touches encouraged?',
   option_a: 'It moves the ball faster',

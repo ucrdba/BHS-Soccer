@@ -78,7 +78,11 @@ beforeEach(() => {
   w.can = () => true;
   w.supabaseService = {
     isConfigured: () => true,
-    upsertQuizQuestion: async (q: any) => { upserted.push(q); return upsertResult; }
+    upsertQuizQuestion: async (q: any) => { upserted.push(q); return upsertResult; },
+    // The bank belongs to an organization and a question has to be switched on
+    // for the team, or it is asked by nobody (0017).
+    setTeamQuizQuestion: async () => ({ ok: true }),
+    findThoughtIdByTitle: async () => null
   };
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -88,8 +92,13 @@ beforeEach(() => {
   )() as { prototype: ImportApp };
 
   app = Object.create(ctor.prototype) as ImportApp;
-  app.activeTeamId = 't-varsity';
-  app.data = { players: [], schedule: [], drillsBank: [], matrixLogs: [], teams: [], soccerCategories: [] };
+  // A real uuid team carrying its organization: the quiz import resolves the
+  // school from the active team, and upsertQuizQuestion refuses without one.
+  app.activeTeamId = '65d376d3-2a77-49c0-80f7-f8f2586f9f2b';
+  app.data = {
+    players: [], schedule: [], drillsBank: [], matrixLogs: [], soccerCategories: [],
+    teams: [{ id: '65d376d3-2a77-49c0-80f7-f8f2586f9f2b', name: 'Varsity', school_id: '7ebbe980-b87e-421f-a11f-788ca2519504' }]
+  };
   app.syncFromSupabase = async () => {};
   app.renderCurrentView = () => {};
   app.saveData = () => {};
