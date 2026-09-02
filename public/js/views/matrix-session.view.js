@@ -401,7 +401,21 @@ Object.assign(BHSSoccerApp.prototype, {
           .filter(id => !roster.some(p => p.id === id))
           .map(id => ({ id, name: 'Former squad member', number: null, _gone: true }))
       : [];
-    const players = roster.concat(gone);
+    // Ordered by recording number by default, because that is the order the
+    // paper sheet is written in and the coach reads down it. Players with no
+    // number sort last rather than leading with a run of blanks.
+    const by = this._sessionSort === 'name' ? 'name' : 'number';
+    const players = roster.concat(gone).sort((a, b) => {
+      if (by === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
+      // Number(null) is 0, which would sort an unnumbered player to the very
+      // top -- a run of blanks above the squad reads as broken data.
+      const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
+      const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
+      const ga = Number.isFinite(na), gb = Number.isFinite(nb);
+      if (ga !== gb) return ga ? -1 : 1;
+      if (ga && na !== nb) return na - nb;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
 
     if (players.length === 0) {
       return '<p class="text-muted" style="font-size:0.85rem;">This team has no players yet.</p>';
@@ -433,6 +447,13 @@ Object.assign(BHSSoccerApp.prototype, {
         ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
       </p>
       ${bandNote}
+      <div style="display:flex; gap:8px; align-items:center; margin:0 0 8px 0;">
+        <span class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Order by</span>
+        <span class="filter-chip ${by === 'number' ? 'active' : ''}" style="font-size:0.72rem; cursor:pointer;"
+              onclick="app.setSessionSort('number')">Recording no.</span>
+        <span class="filter-chip ${by === 'name' ? 'active' : ''}" style="font-size:0.72rem; cursor:pointer;"
+              onclick="app.setSessionSort('name')">Name</span>
+      </div>
       ${players.map(p => {
         // A player who joined after this session was recorded has no stored
         // row. Default them to excused rather than present: they were not
@@ -444,7 +465,8 @@ Object.assign(BHSSoccerApp.prototype, {
         return `
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
           <span style="flex:1; color:#FFF; font-size:0.85rem;">
-            ${p.name} <span class="text-muted">#${p.number || '—'}</span>
+            <span style="display:inline-block; min-width:28px; color:var(--bhs-gold-accent); font-weight:700;">${p.recordingNumber != null ? p.recordingNumber : '—'}</span>
+            ${p.name}
             ${p._gone ? '<span class="badge badge-coach" style="font-size:0.65rem;">no longer on this team</span>' : ''}
           </span>
           ${measure === 'win_loss'
@@ -504,6 +526,29 @@ Object.assign(BHSSoccerApp.prototype, {
     const factor = window.supabaseService.factorForTime(seconds, this._sessionBands || []);
     out.textContent = factor > 0 ? `earns ${factor}` : 'no band';
     out.style.color = factor > 0 ? 'var(--bhs-cyan-accent)' : 'var(--text-muted)';
+  },
+
+  /**
+   * Reorder the session grid.
+   *
+   * Whatever has been typed is read back into the prefill first, so changing
+   * the order mid-entry does not discard times already entered -- the rows are
+   * re-rendered from scratch, and anything only in the DOM would be lost.
+   */
+  setSessionSort(by) {
+    const typed = this.collectSessionResults();
+    this._sessionPrefill = this._sessionPrefill || {};
+    typed.forEach(r => {
+      this._sessionPrefill[r.playerId] = {
+        attendance: r.attendance,
+        rawValue: r.rawValue,
+        outcome: r.outcome
+      };
+    });
+
+    this._sessionSort = by === 'name' ? 'name' : 'number';
+    const rows = document.getElementById('sessionRows');
+    if (rows) rows.innerHTML = this.renderSessionRows();
   },
 
   collectSessionResults() {
