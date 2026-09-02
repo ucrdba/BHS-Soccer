@@ -418,9 +418,24 @@
         What each player writes on a paper score sheet &mdash; not their shirt number.
         Numbers must be different from each other and stay put all season.
       </p>
+      <p class="text-muted" style="font-size:0.78rem; margin:0 0 8px 0;">
+        Numbers run in a block per squad &mdash; Varsity 1&ndash;29, JV 30&ndash;59, Fr/So 60&ndash;79 &mdash;
+        so a number says which squad as well as which player. Type them yourself; the
+        two fill buttons only touch players who have no number yet, and never change one you set.
+      </p>
+      <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+        <label for="recNumStart" class="text-muted" style="font-size:0.76rem; text-transform:uppercase;">Start at</label>
+        <input type="number" id="recNumStart" class="form-control" min="1" step="1" value="1"
+               style="width:88px; text-align:center;" />
+        <button class="btn btn-secondary" style="flex:1; min-width:150px;" onclick="app.autoNumberRoster()"
+                title="Only fills players who have no number yet">
+          Fill blanks by surname
+        </button>
+      </div>
       <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-        <button class="btn btn-secondary" style="flex:1; min-width:150px;" onclick="app.autoNumberRoster()">
-          Number 1&ndash;N by surname
+        <button class="btn btn-secondary" style="flex:1; min-width:150px;" onclick="app.useShirtNumbersAsRecording()"
+                title="Only fills players who have no number yet">
+          Fill blanks from shirt numbers
         </button>
         <button class="btn btn-secondary" style="flex:1; min-width:110px;" onclick="app.clearRecordingNumberDrafts()">
           Clear all

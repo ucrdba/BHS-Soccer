@@ -17,14 +17,20 @@
 Object.assign(BHSSoccerApp.prototype, {
 
   /**
-   * Propose 1..N over the squad, in the order a coach reads a team sheet.
+   * Propose consecutive numbers over the squad, from `startAt`.
+   *
+   * Numbers are allocated in a BLOCK PER SQUAD, not 1..N within each one:
+   * Varsity 1-29, JV 30-59, Fr/So 60-79. A number therefore identifies the
+   * player AND the squad, which is what makes a paper sheet unambiguous when
+   * two teams train together. Starting every squad at 1 would break that, so
+   * the block start is the coach's to set.
    *
    * Surname order, because that is how a roster is printed and how a coach
    * looks somebody up. Players who already have a number keep it — renumbering
    * a squad mid-season would invalidate every paper sheet already filled in —
-   * so this only fills the gaps, taking the lowest numbers still free.
+   * so this only fills the gaps, taking the lowest free number in the block.
    */
-  proposeRecordingNumbers(players) {
+  proposeRecordingNumbers(players, startAt) {
     const taken = new Set(
       players.map(p => p.recordingNumber).filter(n => n != null).map(Number)
     );
@@ -35,7 +41,7 @@ Object.assign(BHSSoccerApp.prototype, {
       return sa.localeCompare(sb) || String(a.name || '').localeCompare(String(b.name || ''));
     });
 
-    let next = 1;
+    let next = Number.isFinite(Number(startAt)) && Number(startAt) >= 1 ? Math.floor(Number(startAt)) : 1;
     const out = new Map();
     bySurname.forEach(p => {
       if (p.recordingNumber != null) { out.set(p.id, Number(p.recordingNumber)); return; }
@@ -92,6 +98,43 @@ Object.assign(BHSSoccerApp.prototype, {
     ];
   },
 
+  /**
+   * Where this squad's block starts.
+   *
+   * Taken from the numbers already in use if there are any, so a squad part
+   * way through numbering continues its own block rather than jumping back to
+   * 1. Otherwise the coach types it.
+   */
+  suggestedNumberStart() {
+    const nums = this.rosterForNumbering()
+      .map(p => p.recordingNumber).filter(n => n != null).map(Number);
+    if (nums.length) return Math.min(...nums);
+    return 1;
+  },
+
+  /**
+   * Copy the shirt numbers into the draft.
+   *
+   * A roster sheet is often written with the squad's recording numbers in a
+   * column called "Number", which the importer reads as the shirt number --
+   * that is how a whole JV squad ended up with shirt numbers 30-55 and no
+   * recording numbers at all. This moves them across without a re-import, and
+   * leaves the shirt numbers where they are.
+   */
+  useShirtNumbersAsRecording() {
+    this.captureRecordingNumberDrafts();
+    const draft = this._recNumDraft || {};
+    this.rosterForNumbering().forEach(p => {
+      // Blanks only. A number already on screen was assigned by the coach and
+      // is not this button's to overwrite.
+      if (String(draft[p.id] ?? '').trim() !== '') return;
+      draft[p.id] = p.number != null && p.number !== '' ? String(p.number) : '';
+    });
+    this._recNumDraft = draft;
+    this._recNumError = '';
+    this.renderRecordingNumbersBody();
+  },
+
   rosterForNumbering() {
     return (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
   },
@@ -100,6 +143,8 @@ Object.assign(BHSSoccerApp.prototype, {
     this._recNumError = '';
     this._recNumDraft = null;
     this.renderRecordingNumbersBody();
+    const start = document.getElementById('recNumStart');
+    if (start) start.value = String(this.suggestedNumberStart());
     const modal = document.getElementById('recordingNumbersModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
   },
@@ -114,9 +159,30 @@ Object.assign(BHSSoccerApp.prototype, {
     this._recNumDraft = draft;
   },
 
+  /**
+   * Fill the blanks, and only the blanks.
+   *
+   * The coach assigns these numbers and they do not change: a recording number
+   * is written on paper sheets all season, so reassigning one silently
+   * invalidates every sheet already filled in. This reads what is on screen
+   * first, so a number typed a moment ago is as safe as one already saved.
+   */
   autoNumberRoster() {
+    this.captureRecordingNumberDrafts();
+    const onScreen = this._recNumDraft || {};
     const players = this.rosterForNumbering();
-    const proposed = this.proposeRecordingNumbers(players);
+
+    // Anything currently showing a number counts as assigned, whether it came
+    // from the database or from the coach typing it just now.
+    const asAssigned = players.map(p => {
+      const typed = String(onScreen[p.id] ?? '').trim();
+      return { ...p, recordingNumber: typed === '' ? null : Number(typed) };
+    });
+
+    const el = document.getElementById('recNumStart');
+    const startAt = el && String(el.value).trim() !== '' ? Number(el.value) : 1;
+    const proposed = this.proposeRecordingNumbers(asAssigned, startAt);
+
     const draft = {};
     players.forEach(p => { draft[p.id] = String(proposed.get(p.id) ?? ''); });
     this._recNumDraft = draft;
@@ -124,8 +190,17 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderRecordingNumbersBody();
   },
 
+  /**
+   * Wipe every number on screen. Confirmed, because it is the one control here
+   * that destroys work the coach did by hand.
+   */
   clearRecordingNumberDrafts() {
-    this.captureRecordingNumberDrafts();
+    const n = this.rosterForNumbering().filter(p => p.recordingNumber != null).length;
+    if (n > 0 && !window.confirm(
+      `Clear the recording number for all ${n} player${n === 1 ? '' : 's'} on this squad?\n\n`
+      + `They are written on paper score sheets, so clearing them means renumbering.\n`
+      + `Nothing is saved until you press Save numbers.`)) return;
+
     const draft = {};
     this.rosterForNumbering().forEach(p => { draft[p.id] = ''; });
     this._recNumDraft = draft;

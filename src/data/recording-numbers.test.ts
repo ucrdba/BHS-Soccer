@@ -1,8 +1,10 @@
 /**
  * Recording numbers — what a player writes on a paper score sheet.
  *
- * Not the shirt number. It runs 1..N over the squad, stays put all season, and
- * is unique per team in the database (0021).
+ * Not the shirt number. Numbers are allocated in a BLOCK PER SQUAD -- Varsity
+ * 1-29, JV 30-59, Fr/So 60-79 -- so a number says which squad as well as which
+ * player, which is what keeps a sheet unambiguous when two teams train
+ * together. They stay put all season and are unique per team (0021).
  *
  * Three rules carry the weight, and each of them failed for real:
  *
@@ -209,5 +211,191 @@ describe('reading the column whatever the sheet calls it', () => {
 
   it('returns undefined when the column is simply absent', () => {
     expect(app.pickColumn({ Team: 'JV', Last: 'Corona' }, A)).toBeUndefined();
+  });
+});
+
+describe('numbering in a block per squad', () => {
+  // Varsity 1-29, JV 30-59, Fr/So 60-79. A recording number identifies the
+  // player AND the squad, which is what keeps a paper sheet unambiguous when
+  // two teams train together. Starting every squad at 1 would break that.
+
+  it("starts a squad's numbering where its block starts", () => {
+    const players = squad();
+    const out = makeApp(players).proposeRecordingNumbers(players, 30);
+    expect(Array.from(out.values()).sort((a: any, b: any) => a - b)).toEqual([30, 31, 32]);
+  });
+
+  it('keeps surname order within the block', () => {
+    const players = squad();
+    const out = makeApp(players).proposeRecordingNumbers(players, 30);
+    expect(out.get('p2')).toBe(30);   // Alva
+    expect(out.get('p1')).toBe(31);   // Corona
+    expect(out.get('p3')).toBe(32);   // Davila
+  });
+
+  it('numbers a third squad from its own block', () => {
+    const players = squad();
+    const out = makeApp(players).proposeRecordingNumbers(players, 60);
+    expect(Array.from(out.values()).sort((a: any, b: any) => a - b)).toEqual([60, 61, 62]);
+  });
+
+  it('still starts at 1 when no block is given', () => {
+    const players = squad();
+    const out = makeApp(players).proposeRecordingNumbers(players);
+    expect(Array.from(out.values()).sort((a: any, b: any) => a - b)).toEqual([1, 2, 3]);
+  });
+
+  it('fills a gap inside the block rather than running past it', () => {
+    const players = squad();
+    players[0].recordingNumber = 31;                 // Corona already has 31
+    const out = makeApp(players).proposeRecordingNumbers(players, 30);
+    expect(out.get('p1')).toBe(31);
+    expect(Array.from(out.values()).sort((a: any, b: any) => a - b)).toEqual([30, 31, 32]);
+  });
+});
+
+describe('continuing a squad already part-numbered', () => {
+  it("suggests the squad's own block, not 1", () => {
+    // Opening the editor on a half-numbered JV must not offer to renumber it
+    // from 1 and walk over the block scheme.
+    const players = squad();
+    players[0].recordingNumber = 30;
+    players[1].recordingNumber = 31;
+    expect(makeApp(players).suggestedNumberStart()).toBe(30);
+  });
+
+  it('suggests 1 for a squad with no numbers at all', () => {
+    expect(makeApp(squad()).suggestedNumberStart()).toBe(1);
+  });
+});
+
+describe('copying the shirt numbers across', () => {
+  // A roster sheet is often written with the squad's recording numbers in a
+  // column called "Number", which the importer reads as the shirt number.
+  // That is exactly how JV ended up with shirt numbers 30-55 and no recording
+  // numbers at all.
+
+  const withShirts = () => [
+    { id: 'p1', name: 'Kevin Corona', lastName: 'Corona', number: 30, recordingNumber: null },
+    { id: 'p2', name: 'JP Davila', lastName: 'Davila', number: 31, recordingNumber: null },
+    { id: 'p3', name: 'Aiden Diaz', lastName: 'Diaz', number: null, recordingNumber: null }
+  ];
+
+  it('proposes each shirt number as that player\'s recording number', () => {
+    const app = makeApp(withShirts());
+    (app as any).renderRecordingNumbersBody = () => {};
+    app.useShirtNumbersAsRecording();
+    expect(app._recNumDraft.p1).toBe('30');
+    expect(app._recNumDraft.p2).toBe('31');
+  });
+
+  it('leaves a player with no shirt number blank rather than guessing', () => {
+    const app = makeApp(withShirts());
+    (app as any).renderRecordingNumbersBody = () => {};
+    app.useShirtNumbersAsRecording();
+    expect(app._recNumDraft.p3).toBe('');
+  });
+
+  it('is only a draft, so nothing is written until it is saved', () => {
+    const players = withShirts();
+    const app = makeApp(players);
+    (app as any).renderRecordingNumbersBody = () => {};
+    app.useShirtNumbersAsRecording();
+    expect(players[0].recordingNumber).toBeNull();
+  });
+});
+
+describe('a number the coach assigned never changes', () => {
+  /**
+   * The standing rule, in the coach's words: "I assign the recording numbers to
+   * each player, I don't want them changing." They are written on paper score
+   * sheets all season, so silently reassigning one invalidates every sheet
+   * already filled in.
+   *
+   * These run against the real DOM the editor reads, because "already assigned"
+   * includes a number typed a moment ago and not yet saved.
+   */
+  const withShirts = () => [
+    { id: 'p1', name: 'Kevin Corona', lastName: 'Corona', number: 30, recordingNumber: null },
+    { id: 'p2', name: 'JP Davila', lastName: 'Davila', number: 31, recordingNumber: null },
+    { id: 'p3', name: 'Aiden Diaz', lastName: 'Diaz', number: 32, recordingNumber: null }
+  ];
+
+  function mount(players: any[], typed: Record<string, string>, start = '30') {
+    const app = makeApp(players);
+    document.body.innerHTML =
+      `<input id="recNumStart" value="${start}" />` +
+      players.map(p => `<input id="recNum_${p.id}" value="${typed[p.id] ?? ''}" />`).join('');
+    (app as any).renderRecordingNumbersBody = () => {};
+    return app;
+  }
+
+  it('leaves a typed number alone when filling blanks from shirt numbers', () => {
+    const app = mount(withShirts(), { p1: '45' });
+    app.useShirtNumbersAsRecording();
+    expect(app._recNumDraft.p1).toBe('45');     // the coach's, untouched
+    expect(app._recNumDraft.p2).toBe('31');     // filled, was blank
+  });
+
+  it('leaves a typed number alone when filling blanks by surname', () => {
+    const app = mount(withShirts(), { p1: '45' });
+    app.autoNumberRoster();
+    expect(app._recNumDraft.p1).toBe('45');
+  });
+
+  it('does not hand a typed number out to somebody else', () => {
+    // If 45 is taken by hand, nobody else may be proposed 45.
+    const app = mount(withShirts(), { p1: '45' });
+    app.autoNumberRoster();
+    const all = Object.values(app._recNumDraft);
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.filter(v => v === '45')).toHaveLength(1);
+  });
+
+  it('fills the blanks around it from the block start', () => {
+    const app = mount(withShirts(), { p1: '45' });
+    app.autoNumberRoster();
+    expect(app._recNumDraft.p2).toBe('30');
+    expect(app._recNumDraft.p3).toBe('31');
+  });
+
+  it('leaves a saved number alone too', () => {
+    const players = withShirts();
+    players[0].recordingNumber = 45;
+    const app = mount(players, { p1: '45' });
+    app.autoNumberRoster();
+    expect(app._recNumDraft.p1).toBe('45');
+  });
+
+  it('asks before wiping numbers, since that is work done by hand', () => {
+    const players = withShirts();
+    players[0].recordingNumber = 45;
+    const app = mount(players, { p1: '45' });
+    (window as any).confirm = () => false;
+
+    app.clearRecordingNumberDrafts();
+    // Declined: nothing wiped. No draft at all, or one that still holds 45 --
+    // what must not happen is a draft of blanks.
+    expect(app._recNumDraft == null || app._recNumDraft.p1 === '45').toBe(true);
+  });
+
+  it('wipes them when that is confirmed', () => {
+    const players = withShirts();
+    players[0].recordingNumber = 45;
+    const app = mount(players, { p1: '45' });
+    (window as any).confirm = () => true;
+
+    app.clearRecordingNumberDrafts();
+    expect(app._recNumDraft.p1).toBe('');
+  });
+
+  it('writes nothing for a player whose number did not move', () => {
+    // The save path is what finally protects them: an unchanged row is never
+    // written, so it cannot be refused, reordered, or clobbered.
+    const app = makeApp(withShirts());
+    expect(app.planRecordingNumberWrites([
+      { playerId: 'p1', value: 45, current: 45 },
+      { playerId: 'p2', value: 31, current: null }
+    ])).toEqual([{ playerId: 'p2', value: 31 }]);
   });
 });
