@@ -181,12 +181,17 @@ describe('saveEditPlayer', () => {
       upsertTeamMembership: vi.fn(async () => ({ ok: true }))
     };
 
-    await app.saveEditPlayer('p-1', newPlayerData({ number: '9', name: 'New Name', position: 'Center Back' }));
+    await app.saveEditPlayer('p-1', newPlayerData({
+      number: '9', firstName: 'New', lastName: 'Name', position: 'Center Back'
+    }));
 
     const identityArg = (window as any).supabaseService.upsertPlayerIdentity.mock.calls[0][0];
     expect(identityArg).not.toHaveProperty('number');
     expect(identityArg).not.toHaveProperty('position');
-    expect(identityArg.name).toBe('New Name');
+    // The form now collects the two halves; the full name is composed by the
+    // service and kept in step by a database trigger (0016).
+    expect(identityArg.firstName).toBe('New');
+    expect(identityArg.lastName).toBe('Name');
 
     const membershipArg = (window as any).supabaseService.upsertTeamMembership.mock.calls[0][2];
     expect(membershipArg.number).toBe(9);

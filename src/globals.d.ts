@@ -84,6 +84,9 @@ declare global {
     createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;
+    // Mirrors the backfill rule in 0016: splits on the FIRST space so a
+    // compound surname stays whole.
+    splitPlayerName(full: string): { firstName: string; lastName: string };
     upsertTeamMembership(teamId: string, schoolId: string, membership: Record<string, any>): Promise<{ ok: boolean; error?: string }>;
     deleteTeamMembership(teamId: string, playerId: string): Promise<{ ok: boolean; error?: string }>;
 

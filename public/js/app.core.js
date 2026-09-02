@@ -419,7 +419,13 @@ class BHSSoccerApp {
         this.data.players = (roster || []).map(m => ({
           id: m.players?.id,
           membershipId: m.id,
+          // `name` is maintained by a database trigger from the two parts
+          // (0016), and stays in state because the roster cards, Matrix
+          // standings, planner and export all read it. The parts come along
+          // for the roster editor, which edits them rather than the whole.
           name: m.players?.name,
+          firstName: m.players?.first_name || '',
+          lastName: m.players?.last_name || '',
           classYear: m.players?.class_year,
           height: m.players?.height,
           photo: m.players?.photo_url,

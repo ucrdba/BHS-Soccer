@@ -983,7 +983,8 @@
       </div>
       <form onsubmit="event.preventDefault(); app.addPlayer({
         number: document.getElementById('newPlayerNumber').value,
-        name: document.getElementById('newPlayerName').value,
+        firstName: document.getElementById('newPlayerFirstName').value,
+        lastName: document.getElementById('newPlayerLastName').value,
         position: document.getElementById('newPlayerPosition').value,
         classYear: document.getElementById('newPlayerClass').value,
         height: document.getElementById('newPlayerHeight').value,
@@ -1006,14 +1007,18 @@
             not retyped — that keeps one person with one photo across both teams.
           </p>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr; gap: 12px;">
           <div class="form-group">
             <label>Jersey #</label>
             <input type="number" id="newPlayerNumber" class="form-control" placeholder="10" required />
           </div>
           <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="newPlayerName" class="form-control" placeholder="Player Name" required />
+            <label>First Name</label>
+            <input type="text" id="newPlayerFirstName" class="form-control" placeholder="Mateo" required />
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="newPlayerLastName" class="form-control" placeholder="Herrera" required />
           </div>
         </div>
 
@@ -1087,7 +1092,8 @@
       </div>
       <form onsubmit="event.preventDefault(); app.saveEditPlayer(document.getElementById('editPlayerId').value, {
         number: document.getElementById('editPlayerNumber').value,
-        name: document.getElementById('editPlayerName').value,
+        firstName: document.getElementById('editPlayerFirstName').value,
+        lastName: document.getElementById('editPlayerLastName').value,
         position: document.getElementById('editPlayerPosition').value,
         classYear: document.getElementById('editPlayerClass').value,
         height: document.getElementById('editPlayerHeight').value,
@@ -1101,14 +1107,18 @@
       });">
         <input type="hidden" id="editPlayerId" />
 
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr; gap: 12px;">
           <div class="form-group">
             <label>Jersey #</label>
             <input type="number" id="editPlayerNumber" class="form-control" required />
           </div>
           <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="editPlayerName" class="form-control" required />
+            <label>First Name</label>
+            <input type="text" id="editPlayerFirstName" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="editPlayerLastName" class="form-control" required />
           </div>
         </div>
 

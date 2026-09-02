@@ -195,7 +195,8 @@ Object.assign(BHSSoccerApp.prototype, {
     };
 
     const identity = await window.supabaseService.upsertPlayerIdentity({
-      name: playerData.name,
+      firstName: playerData.firstName,
+      lastName: playerData.lastName,
       classYear: playerData.classYear,
       height: playerData.height || "5'10\"",
       // Stored empty rather than defaulted to a stock photo: assigning a random
@@ -274,7 +275,8 @@ Object.assign(BHSSoccerApp.prototype, {
     const fields = {
       editPlayerId: player.id,
       editPlayerNumber: player.number,
-      editPlayerName: player.name,
+      editPlayerFirstName: player.firstName || window.supabaseService.splitPlayerName(player.name).firstName,
+      editPlayerLastName: player.lastName || window.supabaseService.splitPlayerName(player.name).lastName,
       editPlayerPosition: player.position,
       editPlayerClass: player.classYear,
       editPlayerHeight: player.height || '',
@@ -337,7 +339,8 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const identity = await window.supabaseService.upsertPlayerIdentity({
       id: playerId,
-      name: playerData.name,
+      firstName: playerData.firstName,
+      lastName: playerData.lastName,
       classYear: playerData.classYear,
       height: playerData.height,
       photo: playerData.photo

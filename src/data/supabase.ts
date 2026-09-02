@@ -680,7 +680,7 @@ class SupabaseService {
     if (!this.isConfigured() || !teamId) return null;
     const { data, error } = await this.client!
       .from('team_players')
-      .select('id, team_id, school_id, number, position, season_stats, ratings, is_deleted, players(id, name, class_year, height, photo_url)')
+      .select('id, team_id, school_id, number, position, season_stats, ratings, is_deleted, players(id, name, first_name, last_name, class_year, height, photo_url)')
       .eq('team_id', teamId)
       .eq('is_deleted', false);
     if (error) { console.warn('Supabase fetchTeamRoster notice:', error.message); return null; }
@@ -1736,14 +1736,57 @@ class SupabaseService {
   }
 
   /**
+   * Split a full name into a first name and a surname.
+   *
+   * Splits on the FIRST space, so a compound surname stays whole: "Ana Maria
+   * Rodriguez Gomez" keeps "Maria Rodriguez Gomez" rather than being reduced to
+   * "Gomez". A single word is a first name with no surname recorded -- this
+   * must not invent one.
+   *
+   * Used for the import path and for any caller still passing a single `name`.
+   * It mirrors the backfill in 0016_player_first_last_name.sql; change both
+   * together if the rule ever changes.
+   */
+  splitPlayerName(full: string): { firstName: string; lastName: string } {
+    const trimmed = (full || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) return { firstName: '', lastName: '' };
+    const gap = trimmed.indexOf(' ');
+    if (gap === -1) return { firstName: trimmed, lastName: '' };
+    return { firstName: trimmed.slice(0, gap), lastName: trimmed.slice(gap + 1) };
+  }
+
+  /**
    * Writes only the identity columns a player row still owns once per-team
    * data (number, position, season_stats, ratings, matrix_stats, school_id)
    * has moved to team_players. Same upsert shape as upsertPlayer.
+   *
+   * Accepts either the parts (firstName/lastName) or a single legacy `name`,
+   * which is split. `name` is sent as well as the parts: a database trigger
+   * (0016) rebuilds it anyway, but sending it keeps the row correct even before
+   * that migration is applied.
    */
   async upsertPlayerIdentity(player: any): Promise<{ id?: string } | null> {
     if (!this.isConfigured()) return null;
+
+    const fromParts = (player.firstName || player.first_name || '').trim();
+    const parts = fromParts
+      ? {
+          firstName: fromParts,
+          lastName: (player.lastName || player.last_name || '').trim()
+        }
+      : this.splitPlayerName(player.name || '');
+
+    // A blank row would show as an unnamed player on the roster that nobody can
+    // identify or search for, so refuse rather than write one.
+    if (!parts.firstName) {
+      console.warn('Supabase upsertPlayerIdentity notice: a player needs a name.');
+      return null;
+    }
+
     const payload: Record<string, any> = {
-      name: player.name,
+      first_name: parts.firstName,
+      last_name: parts.lastName,
+      name: `${parts.firstName} ${parts.lastName}`.trim(),
       class_year: player.classYear || player.class_year || 'Senior',
       height: player.height || '',
       photo_url: player.photo || player.photo_url || null

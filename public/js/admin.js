@@ -1519,7 +1519,7 @@ Object.assign(BHSSoccerApp.prototype, {
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'players') {
             fileName = '3_Roster_Players.xlsx'; sheetName = 'Players';
-            const rows = (this.data.players || []).map(p => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Number: p.number, Name: p.name, Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.players || []).map(p => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Number: p.number, FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position, Class: p.classYear || p.class_year || 'Senior', Height: p.height || '', Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '', Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '', Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '', Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '', Photo: p.photo || '', IsDeleted: p.is_deleted || p.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'schedule') {
             fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
@@ -1615,7 +1615,7 @@ Object.assign(BHSSoccerApp.prototype, {
     // 3. PLAYERS SHEET
     if (type === 'players' || type === 'all') {
       const rows = (this.data.players || []).map(p => ({
-        Number: p.number, Name: p.name, Position: p.position,
+        Number: p.number, FirstName: p.firstName || '', LastName: p.lastName || '', Position: p.position,
         Class: p.classYear || p.class_year || 'Senior', Height: p.height || '',
         Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '',
         Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '',
@@ -1744,7 +1744,7 @@ Object.assign(BHSSoccerApp.prototype, {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Profiles');
       XLSX.writeFile(wb, 'BHS_Profiles_Template.xlsx');
     } else if (type === 'players') {
-      const headers = [{ Team:'blank = current team', Number:'', Name:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
+      const headers = [{ Team:'blank = current team', Number:'', FirstName:'', LastName:'', Position:'', Class:'', Height:'', Goals:'', Assists:'', Saves:'', CleanSheets:'', Tech:'', Tactical:'', Physical:'', Mental:'', Photo:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
       XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
     } else if (type === 'schedule') {
@@ -2002,7 +2002,20 @@ Object.assign(BHSSoccerApp.prototype, {
               seasonStats: { goals: 0, assists: 0, games: 1 },
               isDeleted: false, is_deleted: false
             };
-            const imported = rows.filter(r => r.Name).map(r => {
+            // A sheet written before names were split has one Name column; one
+            // written after has FirstName/LastName. Accept either.
+            const rowName = (r) => {
+              const first = toStr(r.FirstName || r.First || '').trim();
+              const last  = toStr(r.LastName  || r.Last  || '').trim();
+              if (first) return { firstName: first, lastName: last, name: (first + ' ' + last).trim() };
+              const split = window.supabaseService && window.supabaseService.splitPlayerName
+                ? window.supabaseService.splitPlayerName(toStr(r.Name || ''))
+                : { firstName: toStr(r.Name || '').trim(), lastName: '' };
+              return { firstName: split.firstName, lastName: split.lastName,
+                       name: (split.firstName + ' ' + split.lastName).trim() };
+            };
+            const imported = rows.filter(r => r.Name || r.FirstName || r.First).map(r => {
+              const parts = rowName(r);
               // Build seasonStats/ratings from whichever columns the sheet
               // actually supplied — not from a shape chosen by the sheet's
               // Position column, which only reads the sheet and never the
@@ -2026,7 +2039,9 @@ Object.assign(BHSSoccerApp.prototype, {
               return {
                 id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
                 number: optI(r.Number),
-                name: toStr(r.Name), position: opt(r.Position),
+                name: parts.name,
+                firstName: parts.firstName, lastName: parts.lastName,
+                position: opt(r.Position),
                 classYear: opt(r.Class || r.ClassYear), height: opt(r.Height),
                 photo: opt(r.Photo || r.PhotoUrl),
                 seasonStats,
