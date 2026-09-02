@@ -303,10 +303,26 @@ Object.assign(BHSSoccerApp.prototype, {
     a.click();
   },
 
+  /**
+   * Coach-written text lands inside HTML. Escaped rather than interpolated
+   * raw: a question containing "<" would otherwise silently swallow the rest
+   * of the option list.
+   */
+  escapeQuizText(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  },
+
   openTakeQuizModal(tab = 'quiz') {
     const activeThought = this.getActiveThought();
     const container = document.getElementById('quizModalContent');
     if (!container) return;
+
+    // The questions this team asks, loaded by syncFromSupabase. Was five blocks
+    // of hardcoded markup with the answer key written into submitQuizAnswer.
+    const questions = this.data.quizQuestions || [];
 
     // An attempt is attributed to a person, so it needs a real one. This used to
     // fall back to a demo player, which meant a signed-out visitor's attempt was
@@ -331,7 +347,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     container.innerHTML = `
       <div style="display: flex; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid var(--bhs-navy-border); padding-bottom: 10px;">
-        <button class="btn ${!isLeaderboard ? 'btn-gold' : 'btn-secondary'}" onclick="app.openTakeQuizModal('quiz')" style="font-size: 0.82rem; font-weight: 700;">📝 Take 5-Question Quiz</button>
+        <button class="btn ${!isLeaderboard ? 'btn-gold' : 'btn-secondary'}" onclick="app.openTakeQuizModal('quiz')" style="font-size: 0.82rem; font-weight: 700;">📝 Take Quiz${questions.length ? ' (' + questions.length + ')' : ''}</button>
         <button class="btn ${isLeaderboard ? 'btn-gold' : 'btn-secondary'}" onclick="app.openTakeQuizModal('leaderboard')" style="font-size: 0.82rem; font-weight: 700;">🏆 Quiz Results Leaderboard</button>
       </div>
 
@@ -346,118 +362,29 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
 
         <form id="dailyQuizForm" onsubmit="event.preventDefault(); app.submitQuizAnswer();" style="max-height: 440px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin;">
-          <!-- Player Identity Header -->
-          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">Player Taking Quiz:</span>
-            <strong style="color: var(--bhs-gold-accent); font-size: 0.95rem;">⚽ ${currentUser.name}</strong>
-          </div>
+          ${questions.length === 0 ? `
+            <div style="text-align:center; padding:26px; color:var(--text-muted);">
+              <p style="font-size:1.05rem; margin-bottom:6px;">No quiz questions for this team yet.</p>
+              <p style="font-size:0.85rem;">A coach adds them in the admin panel, then switches on the ones
+                this squad should be asked.</p>
+            </div>` : questions.map((q, i) => `
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;">
+              <label style="display:block; color:#FFF; font-weight:700; font-size:0.9rem; margin-bottom:8px;">
+                ${i + 1}. ${this.escapeQuizText(q.question)}
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
+                ${['A','B','C','D'].map(letter => {
+                  const text = q['option_' + letter.toLowerCase()];
+                  if (!text) return '';
+                  return `
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                    <input type="radio" name="quiz_${q.question_id}" value="${letter}" required /> ${letter}) ${this.escapeQuizText(text)}
+                  </label>`;
+                }).join('')}
+              </div>
+            </div>`).join('')}
 
-          <!-- Question 1 -->
-          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
-            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
-              1. What is the primary tactical objective emphasized in Coach's Daily Thoughts?
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q1" value="A" required /> A) Drop back into low-block passive defense
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-                <input type="radio" name="q1" value="B" required /> B) High intensity pressing &amp; quick 2-touch passing transitions
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q1" value="C" required /> C) Dribble individually without passing options
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q1" value="D" required /> D) Long high balls into penalty box only
-              </label>
-            </div>
-          </div>
-
-          <!-- Question 2 -->
-          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-cyan-accent);">
-            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
-              2. How should players handle possession under pressure according to today's focus?
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-                <input type="radio" name="q2" value="A" required /> A) Make the simple, quick pass as first option
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q2" value="B" required /> B) Hold the ball until surrounded by defenders
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q2" value="C" required /> C) Turn around and kick the ball out of bounds
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q2" value="D" required /> D) Stop moving completely and wait for whistle
-              </label>
-            </div>
-          </div>
-
-          <!-- Question 3 -->
-          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
-            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
-              3. According to Coach's Daily Focus, what is faster than any dribble on the pitch?
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-                <input type="radio" name="q3" value="A" required /> A) A passing ball moving twenty yards
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q3" value="B" required /> B) Juggling in place
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q3" value="C" required /> C) Throw-ins from sideline
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q3" value="D" required /> D) Running backwards
-              </label>
-            </div>
-          </div>
-
-          <!-- Question 4 -->
-          <div class="form-group" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-cyan-accent);">
-            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
-              4. What is the primary tactical formation for Beaumont Varsity 11v11 matches?
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q4" value="A" required /> A) 5-4-1 Ultra Defensive Park-the-Bus
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-                <input type="radio" name="q4" value="B" required /> B) 4-3-3 High Press / Attack-Minded
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q4" value="C" required /> C) 2-2-6 All-Out Attack
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q4" value="D" required /> D) No tactical formation
-              </label>
-            </div>
-          </div>
-
-          <!-- Question 5 -->
-          <div class="form-group" style="margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border-left: 3px solid var(--bhs-gold-accent);">
-            <label style="color: #FFF; font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9rem;">
-              5. What is the minimum practice participation requirement for starting lineup consideration?
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q5" value="A" required /> A) 25%
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q5" value="B" required /> B) 50%
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #FFF;">
-                <input type="radio" name="q5" value="C" required /> C) 90%+ Match Readiness &amp; Practice Participation
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                <input type="radio" name="q5" value="D" required /> D) 10%
-              </label>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700; padding: 10px; font-size: 0.95rem;">🎯 Submit &amp; Grade Quiz</button>
+          ${questions.length ? `<button type="submit" class="btn btn-gold" style="width: 100%; font-weight: 700; padding: 10px; font-size: 0.95rem;">🎯 Submit &amp; Grade Quiz</button>` : ''}
         </form>
         <div id="quizScoreResult" style="margin-top: 14px;"></div>
       `}
@@ -480,32 +407,25 @@ Object.assign(BHSSoccerApp.prototype, {
       return;
     }
 
-    const q1 = document.querySelector('input[name="q1"]:checked')?.value;
-    const q2 = document.querySelector('input[name="q2"]:checked')?.value;
-    const q3 = document.querySelector('input[name="q3"]:checked')?.value;
-    const q4 = document.querySelector('input[name="q4"]:checked')?.value;
-    const q5 = document.querySelector('input[name="q5"]:checked')?.value;
-
-    const answerKeys = [
-      { questionId: 1, correct: 'B', selected: q1 },
-      { questionId: 2, correct: 'A', selected: q2 },
-      { questionId: 3, correct: 'A', selected: q3 },
-      { questionId: 4, correct: 'B', selected: q4 },
-      { questionId: 5, correct: 'C', selected: q5 }
-    ];
+    // Scored against the stored correct_option, not a key written into this
+    // file. The old version hardcoded ['B','A','A','B','C'] here, so editing a
+    // question in the database would have silently broken the marking.
+    const questions = this.data.quizQuestions || [];
+    if (questions.length === 0) return;
 
     let score = 0;
-    const playerAnswers = answerKeys.map(a => {
-      const isCorrect = a.selected === a.correct;
+    const playerAnswers = questions.map(q => {
+      const selected = document.querySelector(`input[name="quiz_${q.question_id}"]:checked`)?.value;
+      const isCorrect = !!selected && selected === q.correct_option;
       if (isCorrect) score += 1;
       return {
-        questionId: a.questionId,
-        selectedOption: a.selected || 'A',
+        questionId: q.question_id,
+        selectedOption: selected || null,
         isCorrect: isCorrect
       };
     });
 
-    const totalQuestions = 5;
+    const totalQuestions = questions.length;
     const percentage = Math.round((score / totalQuestions) * 100);
 
     // Save attempt to local memory
@@ -524,24 +444,46 @@ Object.assign(BHSSoccerApp.prototype, {
 
     // Save attempt & individual player_answers to Supabase Cloud
     if (window.supabaseService && window.supabaseService.isConfigured()) {
-      await window.supabaseService.saveQuizAttempt(currentUser, playerAnswers, score, totalQuestions);
+      await window.supabaseService.saveQuizAttempt(currentUser, playerAnswers, score, totalQuestions, this.activeTeamId);
     }
 
     const resultDiv = document.getElementById('quizScoreResult');
     if (resultDiv) {
+      // Perfect is every question, not five: the quiz is however many
+      // questions this team has switched on.
+      const perfect = score === totalQuestions;
+
+      // Explanations are written per question and nothing displayed them
+      // before. Shown only for the ones missed -- a wall of text against
+      // answers they already got right is noise.
+      const missed = playerAnswers
+        .map((a, i) => ({ a, q: questions[i] }))
+        .filter(({ a, q }) => !a.isCorrect && q && q.explanation);
+
       resultDiv.innerHTML = `
-        <div style="background: ${score === 5 ? 'rgba(34, 197, 94, 0.25)' : 'rgba(234, 179, 8, 0.25)'}; border: 2px solid ${score === 5 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; padding: 16px; border-radius: 10px; text-align: center;">
+        <div style="background: ${perfect ? 'rgba(34, 197, 94, 0.25)' : 'rgba(234, 179, 8, 0.25)'}; border: 2px solid ${perfect ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; padding: 16px; border-radius: 10px; text-align: center;">
           <h4 style="color: #FFF; margin-bottom: 6px;">
-            ${score === 5 ? '🌟 PERFECT SCORE! 100%' : '🎯 QUIZ GRADED RESULT'}
+            ${perfect ? '🌟 PERFECT SCORE! 100%' : '🎯 QUIZ GRADED RESULT'}
           </h4>
-          <div style="font-size: 1.8rem; font-weight: 800; color: ${score >= 4 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; margin-bottom: 6px;">
+          <div style="font-size: 1.8rem; font-weight: 800; color: ${percentage >= 80 ? 'var(--color-success)' : 'var(--bhs-gold-accent)'}; margin-bottom: 6px;">
             ${score} / ${totalQuestions} (${percentage}%)
           </div>
           <p style="font-size: 0.85rem; color: #FFF; margin: 0;">
-            ${score === 5 ? 'Awesome job! Attempt saved to database table <strong>quiz_attempts</strong>.' : 'Review Coach Steele\'s Daily Thoughts and attempt again to reach 100%!'}
+            ${perfect
+              ? 'Awesome job! Your attempt has been saved.'
+              : "Review the coach's daily thoughts and attempt again to reach 100%!"}
           </p>
           <button class="btn btn-gold" onclick="app.openTakeQuizModal('leaderboard')" style="margin-top: 12px; font-size: 0.8rem;">🏆 View Leaderboard &amp; Results</button>
         </div>
+        ${missed.length ? `
+          <div style="margin-top: 12px; text-align: left;">
+            <div style="color: var(--bhs-gold-accent); font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">WHY THOSE ANSWERS</div>
+            ${missed.map(({ q }) => `
+              <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;">
+                <div style="color:#FFF; font-size:0.82rem; font-weight:700; margin-bottom:3px;">${this.escapeQuizText(q.question)}</div>
+                <div class="text-muted" style="font-size:0.8rem;">${this.escapeQuizText(q.explanation)}</div>
+              </div>`).join('')}
+          </div>` : ''}
       `;
     }
   },

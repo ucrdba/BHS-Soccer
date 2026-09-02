@@ -2343,7 +2343,35 @@ class SupabaseService {
     if (err2) console.error('Supabase setActiveDailyThought set error:', err2);
   }
 
-  async saveQuizAttempt(playerData: any = {}, answers: any[] = [], score: number = 0, totalQuestions: number = 5): Promise<any> {
+  /**
+   * The questions one team's quiz asks.
+   *
+   * The bank belongs to an organization (quiz_questions.school_id, added by
+   * 0017) and each squad picks from it through team_quiz_questions, so an
+   * under-14 side can switch off a question pitched at seventeen-year-olds
+   * without deleting it for everyone. Same split the planner uses: shared
+   * library, per-team selection.
+   *
+   * Flattened to one object per question, because the renderer should not have
+   * to know this is a join.
+   */
+  async fetchTeamQuiz(teamId: string): Promise<Record<string, any>[] | null> {
+    // team_id is a uuid; a school code here fails the cast with 22P02 and the
+    // quiz renders empty, which reads as "no questions" rather than as an error.
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+
+    const { data, error } = await this.client!
+      .from('team_quiz_questions')
+      .select('question_id, quiz_questions(question_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, category, is_deleted)')
+      .eq('team_id', teamId);
+    if (error) { console.warn('Supabase fetchTeamQuiz notice:', error.message); return null; }
+
+    return (data || [])
+      .map((row: any) => row.quiz_questions)
+      .filter((q: any) => q && !q.is_deleted);
+  }
+
+  async saveQuizAttempt(playerData: any = {}, answers: any[] = [], score: number = 0, totalQuestions: number = 5, teamId?: string): Promise<any> {
     if (!this.isConfigured()) return null;
 
     // An attempt names a person, so refuse to invent one. This previously fell
@@ -2363,7 +2391,11 @@ class SupabaseService {
       completed_at: new Date().toISOString(),
       score: score,
       total_questions: totalQuestions,
-      percentage: percentage
+      percentage: percentage,
+      // Nullable on purpose. Unlike a fixture or a plan, an unscoped attempt is
+      // not lost -- it still names a person and shows on their own history --
+      // so a missing team is worth recording rather than refusing.
+      team_id: teamId && this.isUuid(teamId) ? teamId : null
     };
 
     // 1. Insert row into quiz_attempts
@@ -2381,12 +2413,19 @@ class SupabaseService {
 
     // 2. Insert rows into player_answers if attemptId exists
     if (attemptId && answers.length > 0) {
-      const answerRows = answers.map(a => ({
-        attempt_id: attemptId,
-        question_id: a.questionId,
-        selected_option: a.selectedOption,
-        is_correct: !!a.isCorrect
-      }));
+      // question_id is a uuid. The pre-data-driven quiz wrote 1..5 here, so
+       // every answer ever saved pointed at nothing. Anything that is not a
+       // uuid is dropped rather than allowed to fail the whole insert with
+       // 22P02, which would lose the other answers and leave the attempt with
+       // none at all.
+      const answerRows = answers
+        .filter(a => this.isUuid(String(a.questionId || '')))
+        .map(a => ({
+          attempt_id: attemptId,
+          question_id: a.questionId,
+          selected_option: a.selectedOption,
+          is_correct: !!a.isCorrect
+        }));
 
       const { error: ansErr } = await this.client!
         .from('player_answers')

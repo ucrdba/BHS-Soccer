@@ -53,6 +53,7 @@ class BHSSoccerApp {
       drillsBank: [],
       currentPracticePlan: [],
       savedPlans: [],
+      quizQuestions: [],
       activePlanName: '',
       coaches: [],
       dailyThoughts: [],
@@ -361,6 +362,7 @@ class BHSSoccerApp {
         // discards it, and only once a DIFFERENT team has actually resolved.
         this.data.savedPlans = [];
         this.data.dailyThoughts = [];
+        this.data.quizQuestions = [];
       }
 
       // Sync School Profile & Multi-tenant Schools list from Supabase DB
@@ -566,6 +568,11 @@ class BHSSoccerApp {
         // team with no daily_thoughts rows must show no coaching message, not
         // the previous team's. `daily_thoughts` is empty by construction after
         // 0014, so every team starts here.
+        // The questions this squad is asked. Team-scoped like the rest of the
+        // planner: the bank belongs to the organization and each team picks
+        // from it, so this must run once activeTeamId is known.
+        this.data.quizQuestions = (await window.supabaseService.fetchTeamQuiz(this.activeTeamId)) || [];
+
         const dbThoughts = await window.supabaseService.fetchDailyThoughts(this.activeTeamId);
         this.data.dailyThoughts = (dbThoughts || []).map(t => ({
           id: t.id,
