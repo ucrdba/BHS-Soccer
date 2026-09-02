@@ -27,16 +27,23 @@ const TEAM = '65d376d3-2a77-49c0-80f7-f8f2586f9f2b';
 const Q1 = '11111111-1111-1111-1111-111111111111';
 const Q2 = '22222222-2222-2222-2222-222222222222';
 
+// Options arrive as rows now (0019), attached by fetchTeamQuiz as `answers`.
+const opts = (texts: string[], correct: string) =>
+  texts.map((text, i) => {
+    const letter = String.fromCharCode(65 + i);
+    return { letter, text, isCorrect: letter === correct };
+  });
+
 const QUESTIONS = [
   {
     question_id: Q1, question: 'Primary tactical objective?',
-    option_a: 'Low block', option_b: 'High press', option_c: 'Dribble', option_d: 'Long balls',
-    correct_option: 'B', explanation: 'Pressing wins the ball high up the pitch.'
+    correct_option: 'B', explanation: 'Pressing wins the ball high up the pitch.',
+    answers: opts(['Low block', 'High press', 'Dribble', 'Long balls'], 'B')
   },
   {
     question_id: Q2, question: 'Possession under pressure?',
-    option_a: 'Simple quick pass', option_b: 'Hold it', option_c: 'Kick it out', option_d: 'Stop',
-    correct_option: 'A', explanation: null
+    correct_option: 'A', explanation: null,
+    answers: opts(['Simple quick pass', 'Hold it', 'Kick it out', 'Stop'], 'A')
   }
 ];
 
@@ -134,7 +141,10 @@ describe('marking', () => {
   it('follows a changed answer key rather than the old hardcoded one', async () => {
     // The old code always treated 'B' as right for question one. If the coach
     // edits the question so 'C' is right, marking must follow.
-    const app = makeApp([{ ...QUESTIONS[0], correct_option: 'C' }]);
+    const app = makeApp([{
+      ...QUESTIONS[0], correct_option: 'C',
+      answers: opts(['Low block', 'High press', 'Dribble', 'Long balls'], 'C')
+    }]);
     app.openTakeQuizModal('quiz');
     answer(Q1, 'B');
     await app.submitQuizAnswer();

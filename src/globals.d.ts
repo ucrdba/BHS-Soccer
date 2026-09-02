@@ -50,6 +50,11 @@ declare global {
     setTeamQuizQuestion(teamId: string, questionId: string, on: boolean): Promise<{ ok: boolean; error?: string }>;
     retireQuizQuestion(questionId: string): Promise<{ ok: boolean; error?: string }>;
     findThoughtIdByTitle(teamId: string, title: string): Promise<string | null>;
+    // A quiz sheet points at its daily message by the number the coach gave
+    // it on the thoughts sheet (0019).
+    findThoughtIdByKey(teamId: string, key: string): Promise<string | null>;
+    attachAnswers(questions: Record<string, any>[]): Promise<Record<string, any>[]>;
+    saveQuizAnswers(questionId: string, answers: any[] | undefined, correctLetter: string, fallback: string[]): Promise<void>;
     fetchActiveThoughtId(teamId: string): Promise<string | null>;
     upsertQuizQuestion(q: any): Promise<{ ok: boolean; error?: string; id?: string }>;
     fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null>;

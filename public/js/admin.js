@@ -2589,6 +2589,8 @@ Object.assign(BHSSoccerApp.prototype, {
               coachName: toStr(r.CoachName || r.coachName) || 'Coach Bob Miller',
               // The short name a quiz sheet's Thought column refers to (0018).
               title: toStr(r.Title || r.title),
+              // The number a quiz sheet's id column points at (0019).
+              importKey: toStr(r.id || r.Id || r.ID || r.Key || r.import_key),
               text: toStr(r.ThoughtsText || r.text),
               isActive: toStr(r.IsActive || r.isActive).toLowerCase() === 'yes' || toStr(r.IsActive || r.isActive).toLowerCase() === 'true',
               createdAt: toStr(r.CreatedAt || r.createdAt) || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase(),
@@ -2613,6 +2615,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   coachId: t.coachId,
                   coachName: t.coachName,
                   title: t.title,
+                  importKey: t.importKey,
                   text: t.text,
                   isActive: t.isActive,
                   is_deleted: t.is_deleted
@@ -2670,6 +2673,11 @@ Object.assign(BHSSoccerApp.prototype, {
               continue;
             }
 
+            const stripOwnLetter = (letter, value) => {
+              const re = new RegExp('^' + letter + '\\s*[.):\\-]\\s*', 'i');
+              return String(value || '').replace(re, '').trim();
+            };
+
             let quizAdded = 0;
             for (const r of rows) {
               const q = {
@@ -2677,10 +2685,14 @@ Object.assign(BHSSoccerApp.prototype, {
                 importKey: pick(r, 'Key', 'ImportKey', 'import_key'),
                 question_id: pick(r, 'QuestionId', 'question_id'),
                 question:    pick(r, 'QuestionText', 'Question', 'question'),
-                option_a:    pick(r, 'OptionA', 'option_a'),
-                option_b:    pick(r, 'OptionB', 'option_b'),
-                option_c:    pick(r, 'OptionC', 'option_c'),
-                option_d:    pick(r, 'OptionD', 'option_d'),
+                // "B. It guarantees..." typed into option B renders as
+                // "B) B. It guarantees...". Stripped only when the letter
+                // matches that option's OWN position, so "A. Team" sitting in
+                // option B -- a real answer -- is left alone.
+                option_a:    stripOwnLetter('A', pick(r, 'OptionA', 'option_a')),
+                option_b:    stripOwnLetter('B', pick(r, 'OptionB', 'option_b')),
+                option_c:    stripOwnLetter('C', pick(r, 'OptionC', 'option_c')),
+                option_d:    stripOwnLetter('D', pick(r, 'OptionD', 'option_d')),
                 correct_option: pick(r, 'CorrectAnswer', 'CorrectOption', 'correct_option'),
                 explanation: pick(r, 'Explanation', 'explanation'),
                 category:    pick(r, 'Category', 'category'),
@@ -2696,12 +2708,20 @@ Object.assign(BHSSoccerApp.prototype, {
               // The daily message this question tests, named by its title. A
               // title that matches nothing is reported rather than silently
               // dropped -- the whole reason for a title over a number.
+              // Which daily message this question belongs to. A coach numbers
+              // messages on the thoughts sheet and repeats that number against
+              // every question of that message, so `id` here is a reference to
+              // a thought -- NOT this question's own key.
+              const thoughtKey = pick(r, 'id', 'Id', 'ID', 'ThoughtId', 'ThoughtKey');
               const thoughtTitle = pick(r, 'Thought', 'ThoughtTitle', 'thought');
-              if (thoughtTitle) {
-                const thoughtId = await window.supabaseService.findThoughtIdByTitle(this.activeTeamId, thoughtTitle);
+              if (thoughtKey || thoughtTitle) {
+                const thoughtId = thoughtKey
+                  ? await window.supabaseService.findThoughtIdByKey(this.activeTeamId, thoughtKey)
+                  : await window.supabaseService.findThoughtIdByTitle(this.activeTeamId, thoughtTitle);
                 if (!thoughtId) {
                   totalRejected++;
-                  warnings.push(`"${q.question.slice(0, 40)}…" rejected: no daily message titled "${thoughtTitle}" on this team.`);
+                  const named = thoughtKey ? `numbered ${thoughtKey}` : `titled "${thoughtTitle}"`;
+                  warnings.push(`"${q.question.slice(0, 40)}…" rejected: no daily message ${named} on this team. Import the thoughts sheet first.`);
                   continue;
                 }
                 q.thoughtId = thoughtId;

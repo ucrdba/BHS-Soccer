@@ -1330,7 +1330,9 @@ class SupabaseService {
       if (!data || data.length === 0) {
         return { ok: false, error: 'The database refused that write. Coach or admin access is required.' };
       }
-      return { ok: true, id: data[0].question_id };
+      const savedId = data[0].question_id;
+      await this.saveQuizAnswers(savedId, q.answers, correct, options);
+      return { ok: true, id: savedId };
     } catch (e: any) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -2360,6 +2362,8 @@ class SupabaseService {
       // tests (0018). Null rather than '' so an untitled message cannot be
       // matched by an empty Thought column.
       title: String(thought.title || '').trim() || null,
+      // The number a quiz sheet uses to point at this message (0019).
+      import_key: String(thought.importKey ?? thought.import_key ?? '').trim() || null,
       thoughts_text: thought.text || '',
       is_active: thought.isActive !== false,
       is_deleted: thought.is_deleted || thought.isDeleted || false
@@ -2454,10 +2458,114 @@ class SupabaseService {
     // A question naming no message is evergreen and always asked.
     const activeThoughtId = await this.fetchActiveThoughtId(teamId);
 
-    return (data || [])
+    const asked = (data || [])
       .map((row: any) => row.quiz_questions)
       .filter((q: any) => q && !q.is_deleted)
       .filter((q: any) => !q.thought_id || q.thought_id === activeThoughtId);
+
+    return this.attachAnswers(asked);
+  }
+
+  /**
+   * Attach each question's options, which live in quiz_answers as rows (0019).
+   *
+   * Falls back to the option_a..d columns when a question has no answer rows.
+   * Those columns are still present and still written during the transition, so
+   * a question created by code that predates this keeps working rather than
+   * rendering with no options at all.
+   */
+  async attachAnswers(questions: Record<string, any>[]): Promise<Record<string, any>[]> {
+    if (!questions.length) return questions;
+
+    const ids = questions.map(q => q.question_id).filter(Boolean);
+    const { data, error } = await this.client!
+      .from('quiz_answers')
+      .select('question_id, letter, answer_text, is_correct, ordinal, is_deleted')
+      .in('question_id', ids);
+    if (error) console.warn('Supabase attachAnswers notice:', error.message);
+
+    const byQuestion: Record<string, any[]> = {};
+    (data || []).forEach((a: any) => {
+      if (a.is_deleted) return;
+      (byQuestion[a.question_id] = byQuestion[a.question_id] || []).push(a);
+    });
+
+    return questions.map(q => {
+      const rows = (byQuestion[q.question_id] || []).sort((a, b) => (a.ordinal || 0) - (b.ordinal || 0));
+      const answers = rows.length
+        ? rows.map(a => ({ letter: a.letter, text: a.answer_text, isCorrect: !!a.is_correct }))
+        : ['A', 'B', 'C', 'D']
+            .map(letter => ({
+              letter,
+              text: q['option_' + letter.toLowerCase()],
+              isCorrect: String(q.correct_option || '').toUpperCase() === letter
+            }))
+            .filter(a => a.text);
+      return { ...q, answers };
+    });
+  }
+
+  /**
+   * Resolve a daily message by the number a spreadsheet gives it.
+   *
+   * The coach numbers messages 1, 2, 3 on the thoughts sheet and every question
+   * of that message carries the same number. Scoped to the team, because
+   * Varsity's message 1 and JV's message 1 are different messages.
+   */
+  async findThoughtIdByKey(teamId: string, key: string): Promise<string | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const wanted = String(key || '').trim();
+    if (!wanted) return null;
+
+    const { data, error } = await this.client!
+      .from('daily_thoughts')
+      .select('id, import_key, is_deleted')
+      .eq('team_id', teamId)
+      .eq('import_key', wanted);
+    if (error) { console.warn('Supabase findThoughtIdByKey notice:', error.message); return null; }
+    const hit = (data || []).find((t: any) => !t.is_deleted);
+    return hit ? hit.id : null;
+  }
+
+  /**
+   * Write a question's options as rows (0019).
+   *
+   * Accepts either an explicit answers array -- which is how a variable number
+   * of options arrives -- or the four A..D values, which is what a spreadsheet
+   * and the editor still produce. Existing rows for the question are cleared
+   * first, so editing an option changes it rather than leaving the old text
+   * behind as a second choice with the same letter.
+   */
+  async saveQuizAnswers(
+    questionId: string, answers: any[] | undefined, correctLetter: string, fallback: string[]
+  ): Promise<void> {
+    if (!questionId || !this.isUuid(questionId)) return;
+
+    const rows = (answers && answers.length
+      ? answers.map((a: any, i: number) => ({
+          letter: String(a.letter || String.fromCharCode(65 + i)).toUpperCase(),
+          answer_text: String(a.text ?? a.answer_text ?? '').trim(),
+          is_correct: !!a.isCorrect || !!a.is_correct,
+          ordinal: i + 1
+        }))
+      : ['A', 'B', 'C', 'D'].map((letter, i) => ({
+          letter,
+          answer_text: String(fallback[i] || '').trim(),
+          is_correct: correctLetter === letter,
+          ordinal: i + 1
+        }))
+    ).filter(r => r.answer_text);
+
+    if (!rows.length) return;
+
+    const { error: clearErr } = await this.client!
+      .from('quiz_answers').delete().eq('question_id', questionId);
+    if (clearErr) { console.warn('Supabase saveQuizAnswers clear notice:', clearErr.message); return; }
+
+    const { error } = await this.client!
+      .from('quiz_answers')
+      .insert(rows.map(r => ({ ...r, question_id: questionId })));
+    if (error) console.warn('Supabase saveQuizAnswers notice:', error.message);
   }
 
   /**

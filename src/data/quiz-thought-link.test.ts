@@ -51,7 +51,8 @@ beforeEach(() => {
       { team_id: TEAM, question_id: Q_TODAY, quiz_questions: q(Q_TODAY, THOUGHT_LIVE, "What is today's focus?") },
       { team_id: TEAM, question_id: Q_STALE, quiz_questions: q(Q_STALE, THOUGHT_OLD, 'Why sit deep?') }
     ],
-    quiz_questions: [q(Q_EVERGREEN, null, 'What is our formation?')]
+    quiz_questions: [q(Q_EVERGREEN, null, 'What is our formation?')],
+    quiz_answers: []
   };
 
   svc.isConfigured = () => true;
@@ -64,6 +65,9 @@ beforeEach(() => {
         order() { return api; },
         limit() { return api; },
         eq(col: string, val: any) { sel = sel.filter(r => r[col] === val); return api; },
+        // attachAnswers reads the option rows for the questions asked.
+        in(col: string, vals: any[]) { sel = sel.filter(r => vals.includes(r[col])); return api; },
+        delete() { return api; },
         maybeSingle: async () => ({ data: sel[0] || null, error: null }),
         upsert(rows: any[]) {
           rows.forEach(r => sent.push({ table, ...r }));

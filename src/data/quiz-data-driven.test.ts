@@ -28,13 +28,15 @@ const Q2 = '22222222-2222-2222-2222-222222222222';
 let inserted: any[];
 let lastTable: string;
 let queries: { table: string; filters: Record<string, any> }[];
+// Hoisted so a test can reshape the fixture before calling the service.
+let tables: Record<string, any[]>;
 
 beforeEach(() => {
   inserted = [];
   queries = [];
   lastTable = '';
 
-  const rows: Record<string, any[]> = {
+  tables = {
     team_quiz_questions: [
       {
         team_id: TEAM,
@@ -57,6 +59,12 @@ beforeEach(() => {
         }
       }
     ],
+    quiz_answers: [
+      { question_id: Q1, letter: 'A', answer_text: 'Low block', is_correct: false, ordinal: 1, is_deleted: false },
+      { question_id: Q1, letter: 'B', answer_text: 'High press', is_correct: true, ordinal: 2, is_deleted: false },
+      { question_id: Q2, letter: 'A', answer_text: 'Simple quick pass', is_correct: true, ordinal: 1, is_deleted: false },
+      { question_id: Q2, letter: 'B', answer_text: 'Hold it', is_correct: false, ordinal: 2, is_deleted: false }
+    ],
     quiz_attempts: [],
     player_answers: []
   };
@@ -65,13 +73,15 @@ beforeEach(() => {
   svc.client = {
     from(table: string) {
       lastTable = table;
-      let sel = (rows[table] || []).slice();
+      let sel = (tables[table] || []).slice();
       const filters: Record<string, any> = {};
       const api: any = {
         select() { return api; },
         or() { return api; },
         order() { return api; },
         eq(col: string, val: any) { filters[col] = val; sel = sel.filter(r => r[col] === val); return api; },
+        // attachAnswers fetches the option rows for the questions asked.
+        in(col: string, vals: any[]) { sel = sel.filter(r => vals.includes(r[col])); return api; },
         insert(newRows: any[]) {
           newRows.forEach(r => inserted.push({ table, ...r }));
           sel = newRows.map((r, i) => ({ attempt_id: `att-${i}`, ...r }));
@@ -118,6 +128,62 @@ describe('fetching a team\'s quiz', () => {
   it('refuses a missing team', async () => {
     expect(await supabaseService.fetchTeamQuiz('')).toBeNull();
     expect(queries).toHaveLength(0);
+  });
+});
+
+describe('where the options come from', () => {
+  it('uses the answer ROWS, not the old option columns', async () => {
+    // 0019 moved options out of option_a..d into quiz_answers. The columns are
+    // still present during the transition, so a test whose rows and columns
+    // agree proves nothing -- these deliberately disagree.
+    tables.quiz_answers = [
+      { question_id: Q1, letter: 'A', answer_text: 'FROM THE ROWS', is_correct: true, ordinal: 1, is_deleted: false }
+    ];
+    const qs = await supabaseService.fetchTeamQuiz(TEAM);
+    const q1 = qs!.find((x: any) => x.question_id === Q1);
+    expect(q1.answers.map((a: any) => a.text)).toEqual(['FROM THE ROWS']);
+    expect(q1.answers[0].isCorrect).toBe(true);
+  });
+
+  it('orders the options by ordinal, not by insertion', async () => {
+    tables.quiz_answers = [
+      { question_id: Q1, letter: 'B', answer_text: 'second', is_correct: false, ordinal: 2, is_deleted: false },
+      { question_id: Q1, letter: 'A', answer_text: 'first', is_correct: true, ordinal: 1, is_deleted: false }
+    ];
+    const qs = await supabaseService.fetchTeamQuiz(TEAM);
+    expect(qs!.find((x: any) => x.question_id === Q1).answers.map((a: any) => a.text))
+      .toEqual(['first', 'second']);
+  });
+
+  it('allows a question with more or fewer than four options', async () => {
+    // The reason for the table: four columns could only ever hold four.
+    tables.quiz_answers = [
+      { question_id: Q1, letter: 'A', answer_text: 'one', is_correct: true, ordinal: 1, is_deleted: false },
+      { question_id: Q1, letter: 'B', answer_text: 'two', is_correct: false, ordinal: 2, is_deleted: false },
+      { question_id: Q1, letter: 'C', answer_text: 'three', is_correct: false, ordinal: 3, is_deleted: false },
+      { question_id: Q1, letter: 'D', answer_text: 'four', is_correct: false, ordinal: 4, is_deleted: false },
+      { question_id: Q1, letter: 'E', answer_text: 'five', is_correct: false, ordinal: 5, is_deleted: false }
+    ];
+    const qs = await supabaseService.fetchTeamQuiz(TEAM);
+    expect(qs!.find((x: any) => x.question_id === Q1).answers).toHaveLength(5);
+  });
+
+  it('falls back to the columns for a question with no rows yet', async () => {
+    // A question written before 0019 must still render its options.
+    tables.quiz_answers = [];
+    const qs = await supabaseService.fetchTeamQuiz(TEAM);
+    const q1 = qs!.find((x: any) => x.question_id === Q1);
+    expect(q1.answers.map((a: any) => a.text)).toEqual(['Low block', 'High press', 'Dribble', 'Long balls']);
+    expect(q1.answers.find((a: any) => a.isCorrect).letter).toBe('B');
+  });
+
+  it('ignores a deleted option row', async () => {
+    tables.quiz_answers = [
+      { question_id: Q1, letter: 'A', answer_text: 'kept', is_correct: true, ordinal: 1, is_deleted: false },
+      { question_id: Q1, letter: 'B', answer_text: 'gone', is_correct: false, ordinal: 2, is_deleted: true }
+    ];
+    const qs = await supabaseService.fetchTeamQuiz(TEAM);
+    expect(qs!.find((x: any) => x.question_id === Q1).answers.map((a: any) => a.text)).toEqual(['kept']);
   });
 });
 

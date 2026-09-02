@@ -373,14 +373,10 @@ Object.assign(BHSSoccerApp.prototype, {
                 ${i + 1}. ${this.escapeQuizText(q.question)}
               </label>
               <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;">
-                ${['A','B','C','D'].map(letter => {
-                  const text = q['option_' + letter.toLowerCase()];
-                  if (!text) return '';
-                  return `
+                ${(q.answers || []).map(a => `
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
-                    <input type="radio" name="quiz_${q.question_id}" value="${letter}" required /> ${letter}) ${this.escapeQuizText(text)}
-                  </label>`;
-                }).join('')}
+                    <input type="radio" name="quiz_${q.question_id}" value="${a.letter}" required /> ${a.letter}) ${this.escapeQuizText(a.text)}
+                  </label>`).join('')}
               </div>
             </div>`).join('')}
 
@@ -416,7 +412,11 @@ Object.assign(BHSSoccerApp.prototype, {
     let score = 0;
     const playerAnswers = questions.map(q => {
       const selected = document.querySelector(`input[name="quiz_${q.question_id}"]:checked`)?.value;
-      const isCorrect = !!selected && selected === q.correct_option;
+      // Marked against the answer row flagged correct (0019), falling back
+      // to correct_option for a question whose options are still columns.
+      const right = (q.answers || []).find(a => a.isCorrect);
+      const rightLetter = right ? right.letter : q.correct_option;
+      const isCorrect = !!selected && selected === rightLetter;
       if (isCorrect) score += 1;
       return {
         questionId: q.question_id,
