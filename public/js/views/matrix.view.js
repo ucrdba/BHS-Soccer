@@ -25,7 +25,10 @@ Object.assign(BHSSoccerApp.prototype, {
     const nameOf = (id) => {
       const p = byId.get(id);
       if (!p) return '<span class="text-muted">(removed player)</span>';
-      return `${p.name}${p.number ? ' <span class="text-muted">#' + p.number + '</span>' : ''}`;
+      // The RECORDING number, not the shirt: the Matrix is read alongside the
+      // paper sheets, which carry recording numbers, and 0021 cleared the shirt
+      // number for the whole squad when it moved those values across.
+      return `${p.recordingNumber != null ? '<span class="text-muted">(' + p.recordingNumber + ')</span> ' : ''}${p.name}`;
     };
     const drillById = new Map((this.data.drillsBank || []).map(d => [d.id, d]));
 
@@ -156,7 +159,7 @@ Object.assign(BHSSoccerApp.prototype, {
                               style="background:none; border:0; padding:0; cursor:pointer; text-align:left; font:inherit; color:inherit;">
                         <strong style="border-bottom:1px dotted var(--bhs-cyan-accent);">${p.name}</strong>
                       </button>
-                      <span class="text-muted">#${p.number || '—'}</span>
+                      <span class="text-muted">${p.recordingNumber != null ? '(' + p.recordingNumber + ')' : '—'}</span>
                     </td>
                     <td>${m.exercises}</td>
                     <td>${m.wins} - ${m.draws} - ${m.losses}</td>
