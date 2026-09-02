@@ -103,6 +103,13 @@
           <label>Drill (optional)</label>
           <select class="form-control" id="matrixDrill"></select>
         </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+          <span class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Order by</span>
+          <span class="filter-chip active" data-matrix-sort="number" style="font-size:0.72rem; cursor:pointer;"
+                onclick="app.setMatrixSort('number')">Recording no.</span>
+          <span class="filter-chip" data-matrix-sort="name" style="font-size:0.72rem; cursor:pointer;"
+                onclick="app.setMatrixSort('name')">Name</span>
+        </div>
         <div class="form-group">
           <label>Player A</label>
           <div style="display:flex; gap:8px; align-items:center;">

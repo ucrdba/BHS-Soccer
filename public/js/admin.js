@@ -1744,24 +1744,81 @@ Object.assign(BHSSoccerApp.prototype, {
     if (err) err.textContent = '';
   },
 
+  /**
+   * Compare two players for the 1v1 pickers.
+   *
+   * Recording number by default: the label leads with it, and a list labelled
+   * by number but ordered by surname reads as unordered. Players without one
+   * sort last -- Number(null) is 0, which would otherwise put them on top.
+   */
+  compareMatrixPlayers(a, b, by) {
+    if (by === 'name') {
+      // By SURNAME, the way a team sheet reads. Sorting on the full name puts
+      // "Ashton Lanza" before "Cesar Alva", which is alphabetical by first
+      // name and not how anyone looks a player up.
+      const la = String(a.lastName || a.name || '');
+      const lb = String(b.lastName || b.name || '');
+      const cmp = la.localeCompare(lb);
+      return cmp !== 0 ? cmp : String(a.name || '').localeCompare(String(b.name || ''));
+    }
+    const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
+    const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
+    const ga = Number.isFinite(na), gb = Number.isFinite(nb);
+    if (ga !== gb) return ga ? -1 : 1;
+    if (ga && na !== nb) return na - nb;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  },
+
+  /**
+   * The <option> list for both player pickers.
+   *
+   * Leads with the recording number, because that is what the paper sheet says
+   * and what the coach is reading from. The shirt number is not on those
+   * sheets and is often unset.
+   *
+   * Leads with a blank so nothing is chosen by default. A pre-filled pair means
+   * one stray click records a result between two arbitrary players, and there
+   * is no way to correct a wrong entry from the roster view -- only from the
+   * LOGGED RESULTS panel, after you notice.
+   */
+  matrixPlayerOptions() {
+    const by = this._matrixSort === 'name' ? 'name' : 'number';
+    return '<option value="">— select a player —</option>' + (this.data.players || [])
+      .filter(p => !p.is_deleted && !p.isDeleted)
+      .slice()
+      .sort((a, b) => this.compareMatrixPlayers(a, b, by))
+      .map(p => `<option value="${p.id}">${p.recordingNumber != null ? p.recordingNumber + ' — ' : ''}${p.name}</option>`)
+      .join('');
+  },
+
+  /**
+   * Reorder both pickers, keeping whoever is already chosen.
+   *
+   * Rewriting innerHTML drops a select's value, so a coach who had picked
+   * Player A and then re-sorted would silently lose them and could record the
+   * result against nobody.
+   */
+  setMatrixSort(by) {
+    this._matrixSort = by === 'name' ? 'name' : 'number';
+    const a = document.getElementById('matrixPlayerA');
+    const b = document.getElementById('matrixPlayerB');
+    const chosenA = a ? a.value : '';
+    const chosenB = b ? b.value : '';
+
+    const opts = this.matrixPlayerOptions();
+    if (a) { a.innerHTML = opts; a.value = chosenA; }
+    if (b) { b.innerHTML = opts; b.value = chosenB; }
+
+    document.querySelectorAll('[data-matrix-sort]').forEach(chip => {
+      chip.classList.toggle('active', chip.getAttribute('data-matrix-sort') === this._matrixSort);
+    });
+  },
+
   openAddDrillModal(logId) {
     const idField = document.getElementById('matrixLogId');
     if (idField) idField.value = '';
 
-    const players = (this.data.players || [])
-      .filter(p => !p.is_deleted && !p.isDeleted)
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-
-    // Leads with a blank so nothing is chosen by default. A pre-filled pair
-    // means one stray click records a result between two arbitrary players, and
-    // there is no way to correct a wrong entry from the roster view -- only from
-    // the LOGGED RESULTS panel, after you notice.
-    const playerOptions = '<option value="">— select a player —</option>' + players
-      // Leads with the recording number, because that is what the paper sheet
-      // says and what the coach is reading from. The shirt number is not on
-      // these sheets and is often unset.
-      .map(p => `<option value="${p.id}">${p.recordingNumber != null ? p.recordingNumber + ' — ' : ''}${p.name}</option>`)
-      .join('');
+    const playerOptions = this.matrixPlayerOptions();
 
     const drillOptions = '<option value="">— none —</option>' + (this.data.drillsBank || [])
       .filter(d => !d.is_deleted && !d.isDeleted)
@@ -1784,7 +1841,8 @@ Object.assign(BHSSoccerApp.prototype, {
     // result the coach has ever entered.
     this._matrixRecordedCount = 0;
 
-    if (players.length < 2 && err) {
+    const squadSize = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted).length;
+    if (squadSize < 2 && err) {
       err.textContent = 'At least two players are needed to record a head-to-head result.';
     }
 
