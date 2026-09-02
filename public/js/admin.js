@@ -1710,6 +1710,40 @@ Object.assign(BHSSoccerApp.prototype, {
    * instead of adding one — a data-loss bug with no visible symptom, so the
    * reset must not depend on the modal having been closed a particular way.
    */
+  /**
+   * Resolve a typed recording number or name onto one of the player selects.
+   *
+   * Entering results from paper means reading numbers, not scrolling a list of
+   * 24 names. An unresolved entry clears the select rather than leaving the
+   * previous player chosen -- otherwise a mistyped number would silently record
+   * the result against whoever was selected before.
+   */
+  async resolveMatrixPlayer(which) {
+    const box = document.getElementById('matrixQuick' + which);
+    const select = document.getElementById('matrixPlayer' + which);
+    const err = document.getElementById('matrixFormError');
+    if (!box || !select) return;
+
+    const typed = box.value.trim();
+    if (!typed) return;
+
+    if (!window.supabaseService || !window.supabaseService.isConfigured() || !this.activeTeamId) {
+      if (err) err.textContent = 'Choose a team in the header first.';
+      return;
+    }
+
+    const res = await window.supabaseService.findPlayerOnTeam(this.activeTeamId, typed);
+    if (!res || !res.ok) {
+      select.value = '';
+      if (err) { err.style.color = 'var(--color-danger)'; err.textContent = (res && res.error) || 'Could not find that player.'; }
+      return;
+    }
+
+    select.value = res.player.id;
+    box.value = res.player.recordingNumber != null ? String(res.player.recordingNumber) : res.player.name;
+    if (err) err.textContent = '';
+  },
+
   openAddDrillModal(logId) {
     const idField = document.getElementById('matrixLogId');
     if (idField) idField.value = '';
@@ -1723,7 +1757,10 @@ Object.assign(BHSSoccerApp.prototype, {
     // there is no way to correct a wrong entry from the roster view -- only from
     // the LOGGED RESULTS panel, after you notice.
     const playerOptions = '<option value="">— select a player —</option>' + players
-      .map(p => `<option value="${p.id}">${p.name}${p.number ? ' (#' + p.number + ')' : ''}</option>`)
+      // Leads with the recording number, because that is what the paper sheet
+      // says and what the coach is reading from. The shirt number is not on
+      // these sheets and is often unset.
+      .map(p => `<option value="${p.id}">${p.recordingNumber != null ? p.recordingNumber + ' — ' : ''}${p.name}</option>`)
       .join('');
 
     const drillOptions = '<option value="">— none —</option>' + (this.data.drillsBank || [])

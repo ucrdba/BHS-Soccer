@@ -78,7 +78,7 @@ beforeEach(() => {
   app.activeTeamId = 't-varsity';
   app.data = {
     players: [
-      { id: 'p1', name: 'Cesar Alva', number: 9 },
+      { id: 'p1', name: 'Cesar Alva', number: 9, recordingNumber: 1 },
       { id: 'p2', name: 'Caleb Carver', number: 10 },
       { id: 'p3', name: 'Dylan Strothers', number: 1 }
     ],
@@ -108,9 +108,12 @@ describe('record-a-result modal defaults', () => {
     expect(a.innerHTML).toContain('Dylan Strothers');
   });
 
-  it('shows the jersey number alongside the name', () => {
+  it('leads each name with the RECORDING number, not the shirt number', () => {
+    // The paper sheet a coach reads from carries recording numbers (0021).
+    // Shirt numbers are not on it and are often unset entirely.
     app.openAddDrillModal();
-    expect(sel('matrixPlayerA').innerHTML).toContain('(#9)');
+    expect(sel('matrixPlayerA').innerHTML).toContain('1 — Cesar Alva');
+    expect(sel('matrixPlayerA').innerHTML).not.toContain('(#9)');
   });
 
   it('leaves the drill optional, as it already was', () => {

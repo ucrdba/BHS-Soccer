@@ -105,11 +105,23 @@
         </div>
         <div class="form-group">
           <label>Player A</label>
-          <select class="form-control" id="matrixPlayerA" required></select>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="matrixQuickA" class="form-control" style="max-width:120px;"
+                   placeholder="No. or name"
+                   title="Type the recording number from the paper sheet, or a surname."
+                   onchange="app.resolveMatrixPlayer('A')" />
+            <select class="form-control" id="matrixPlayerA" required style="flex:1;"></select>
+          </div>
         </div>
         <div class="form-group">
           <label>Player B</label>
-          <select class="form-control" id="matrixPlayerB" required></select>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="matrixQuickB" class="form-control" style="max-width:120px;"
+                   placeholder="No. or name"
+                   title="Type the recording number from the paper sheet, or a surname."
+                   onchange="app.resolveMatrixPlayer('B')" />
+            <select class="form-control" id="matrixPlayerB" required style="flex:1;"></select>
+          </div>
         </div>
         <div class="form-group">
           <label>Result</label>
