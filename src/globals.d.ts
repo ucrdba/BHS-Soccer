@@ -83,6 +83,9 @@ declare global {
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     createTeam(schoolId: string, name: string, season?: string): Promise<{ id?: string } | null>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
+    // People on no team, each with a resultCount so a caller knows whether
+    // retiring them would strand Matrix history.
+    fetchUnassignedPlayers(): Promise<Record<string, any>[] | null>;
     upsertPlayerIdentity(player: unknown): Promise<{ id?: string } | null>;
     // Mirrors the backfill rule in 0016: splits on the FIRST space so a
     // compound surname stays whole.

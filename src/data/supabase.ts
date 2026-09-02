@@ -1910,6 +1910,64 @@ class SupabaseService {
     }
   }
 
+  /**
+   * People in the program who are on no team.
+   *
+   * `players` is the person, `team_players` is the membership, so removing
+   * someone from a squad leaves the person behind. That is deliberate -- they
+   * may play for a club side, and their Matrix history keys on the person, not
+   * the membership -- but nothing in the app shows them, so they accumulate
+   * unseen, duplicates among them.
+   *
+   * `resultCount` is the load-bearing field: retiring someone who still owns
+   * results would orphan that history, so a caller must know before offering
+   * the button.
+   *
+   * Diffed client-side rather than with a NOT EXISTS, which PostgREST cannot
+   * express. These tables are small -- tens of rows, not thousands -- and the
+   * alternative is a database view for a maintenance screen.
+   */
+  async fetchUnassignedPlayers(): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+
+    const [people, memberships, logs, sessionResults] = await Promise.all([
+      this.client!.from('players')
+        .select('id, name, first_name, last_name, class_year')
+        .or('is_deleted.is.null,is_deleted.eq.false'),
+      this.client!.from('team_players')
+        .select('player_id, is_deleted'),
+      this.client!.from('matrix_logs')
+        .select('player_a_id, player_b_id, is_deleted'),
+      this.client!.from('matrix_session_results')
+        .select('player_id, is_deleted')
+    ]);
+
+    if (people.error) { console.warn('Supabase fetchUnassignedPlayers notice:', people.error.message); return null; }
+
+    const onATeam = new Set(
+      (memberships.data || [])
+        .filter((m: any) => !m.is_deleted)
+        .map((m: any) => m.player_id)
+    );
+
+    const results: Record<string, number> = {};
+    const bump = (id: string) => { if (id) results[id] = (results[id] || 0) + 1; };
+    (logs.data || []).forEach((l: any) => {
+      if (l.is_deleted) return;
+      bump(l.player_a_id);
+      bump(l.player_b_id);
+    });
+    (sessionResults.data || []).forEach((r: any) => {
+      if (r.is_deleted) return;
+      bump(r.player_id);
+    });
+
+    return (people.data || [])
+      .filter((p: any) => !onATeam.has(p.id))
+      .map((p: any) => ({ ...p, resultCount: results[p.id] || 0 }))
+      .sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
+  }
+
   async deletePlayer(playerId: string): Promise<any> {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!

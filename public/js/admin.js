@@ -149,6 +149,8 @@ Object.assign(BHSSoccerApp.prototype, {
 
       ${this.renderCategoryAdminSection()}
 
+      ${this.renderUnassignedPlayersSection()}
+
       <!-- Section 2: School & Club Profile Settings -->
       <details class="admin-accordion">
         <summary class="admin-accordion-summary">
@@ -733,6 +735,136 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * People in the program who are on no team.
+   *
+   * Removing a player from a roster deletes their team_players row, not the
+   * person -- correctly, since they may play for a club side and their Matrix
+   * history keys on the person. But nothing else in the app shows them, so they
+   * pile up unseen and duplicates hide among them.
+   *
+   * Retiring is offered only for someone who owns no results. Someone who does
+   * is shown with the count and no button: soft-deleting them would leave that
+   * history pointing at a person no screen can reach, and re-adding them to a
+   * team is the right move instead.
+   */
+  renderUnassignedPlayersSection() {
+    if (!(window.auth.isCoach() || window.auth.isAdmin())) return '';
+
+    const notice = this._unassignedNotice || '';
+    this._unassignedNotice = '';
+    const error = this._unassignedError || '';
+    this._unassignedError = '';
+
+    const people = this._unassignedPlayers || [];
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+
+    // A name held by more than one live person. The pair may be one human
+    // entered twice, or two people who share a name -- this cannot tell them
+    // apart, so it flags and leaves the judgement to the coach.
+    const nameCounts = {};
+    (this.data.players || []).concat(people).forEach(p => {
+      const k = String(p.name || '').trim().toLowerCase();
+      if (k) nameCounts[k] = (nameCounts[k] || 0) + 1;
+    });
+
+    const rows = people.map(p => {
+      const dup = (nameCounts[String(p.name || '').trim().toLowerCase()] || 0) > 1;
+      const nameArg = this._attrArg(p.name);
+      return `
+        <div style="background:rgba(0,0,0,0.25); border:1px solid ${dup ? 'rgba(255,193,7,0.45)' : 'var(--bhs-navy-border)'}; border-radius:8px; padding:9px 12px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:200px;">
+            <strong style="color:#FFF; font-size:0.87rem;">${this._text(p.name)}</strong>
+            <span class="text-muted" style="font-size:0.75rem; margin-left:8px;">${this._text(p.class_year || '')}</span>
+            ${dup ? '<span class="badge badge-gold" style="margin-left:8px;">SAME NAME AS ANOTHER</span>' : ''}
+            <div class="text-muted" style="font-size:0.76rem; margin-top:2px;">
+              ${p.resultCount > 0
+                ? `${p.resultCount} Matrix result${p.resultCount === 1 ? '' : 's'} on record`
+                : 'No results on record'}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${team ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem;"
+                    onclick="app.addUnassignedPlayerToTeam('${p.id}','${nameArg}')">+ Add to ${this._text(team.name)}</button>` : ''}
+            ${p.resultCount === 0
+              ? `<button class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; color:var(--color-danger); border-color:var(--color-danger);"
+                       onclick="app.retireUnassignedPlayer('${p.id}','${nameArg}')">Retire</button>`
+              : `<span class="text-muted" style="font-size:0.73rem; align-self:center;">Keeps their results &mdash; add to a team instead</span>`}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <details class="admin-accordion" ${this._unassignedOpen ? 'open' : ''}>
+        <summary class="admin-accordion-summary">
+          <span>&#128100; PLAYERS NOT ON A TEAM</span>
+          <span class="badge badge-coach">${people.length}</span>
+        </summary>
+        <div class="admin-accordion-content">
+          ${notice ? `<div style="background:rgba(46,160,67,0.12); border:1px solid rgba(46,160,67,0.5); color:#7ee2a8; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">&#10003; ${this._text(notice)}</div>` : ''}
+          ${error ? `<div style="background:rgba(239,68,68,0.12); border:1px solid var(--color-danger); color:#ffb4b4; padding:8px 10px; border-radius:4px; font-size:0.8rem; margin-bottom:12px;">${this._text(error)}</div>` : ''}
+          <p class="text-muted" style="font-size:0.8rem; margin:0 0 12px 0;">
+            Removing a player from a roster takes them off that team but keeps the person,
+            so they can rejoin later with their history intact &mdash; and so a club team they
+            also play for is untouched. These are the people currently on no team at all.
+          </p>
+
+          ${rows || '<p class="text-muted" style="font-size:0.85rem;">Everyone in the program is on a team.</p>'}
+        </div>
+      </details>`;
+  },
+
+  async loadUnassignedPlayers() {
+    if (!window.supabaseService?.isConfigured()) return;
+    this._unassignedPlayers = (await window.supabaseService.fetchUnassignedPlayers()) || [];
+  },
+
+  async addUnassignedPlayerToTeam(playerId, name) {
+    this._unassignedOpen = true;
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) {
+      this._unassignedError = 'Choose a team in the header first.';
+      this.renderAdminModalContent();
+      return;
+    }
+    const res = await window.supabaseService.upsertTeamMembership(
+      this.activeTeamId, team.school_id, { player_id: playerId }
+    );
+    if (!res || res.ok === false) {
+      // The likeliest cause is unique (school_id, player_id): they are already
+      // on another team in this same organization, which the design forbids.
+      this._unassignedError = (res && res.error) ||
+        `Could not add ${name}. They may already be on another team in this organization.`;
+    } else {
+      this._unassignedNotice = `${name} joined ${team.name}. Set their number and position on the roster.`;
+    }
+    await this.syncFromSupabase();
+    await this.loadUnassignedPlayers();
+    this.renderAdminModalContent();
+  },
+
+  async retireUnassignedPlayer(playerId, name) {
+    this._unassignedOpen = true;
+    const person = (this._unassignedPlayers || []).find(p => p.id === playerId);
+    // Re-checked here rather than trusting the rendered button: the panel may
+    // have been open while a result was recorded elsewhere.
+    if (person && person.resultCount > 0) {
+      this._unassignedError = `${name} has ${person.resultCount} Matrix result(s) on record and cannot be retired — add them to a team instead.`;
+      this.renderAdminModalContent();
+      return;
+    }
+    if (!confirm(`Retire ${name}?\n\nThey are on no team and have no results. They will stop appearing here. This does not delete anything a coach can see elsewhere.`)) return;
+
+    const res = await window.supabaseService.deletePlayer(playerId);
+    if (!res || res.length === 0) {
+      this._unassignedError = `Could not retire ${name}. The database refused it — only a coach or admin can.`;
+    } else {
+      this._unassignedNotice = `Retired ${name}.`;
+    }
+    await this.loadUnassignedPlayers();
+    this.renderAdminModalContent();
+  },
+
+  /**
    * Drill categories.
    *
    * Coach-visible, unlike the team section: soccer_categories_write in
@@ -1261,6 +1393,7 @@ Object.assign(BHSSoccerApp.prototype, {
     // this load is not inside the isAdmin() branch above.
     if (window.auth.isCoach() || window.auth.isAdmin()) {
       await this.loadCategoryAdminData();
+      await this.loadUnassignedPlayers();
     }
     this.renderAdminModalContent();
     const modal = document.getElementById('adminModal');
