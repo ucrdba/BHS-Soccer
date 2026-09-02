@@ -41,37 +41,117 @@ Object.assign(BHSSoccerApp.prototype, {
   /**
    * The standards rows for one drill, for the active squad.
    *
-   * Always one spare row below the ones already set, so a fourth band needs no
-   * button. A row left entirely blank is ignored on save; one half-filled is
-   * refused, because points typed with no time is a band the coach meant.
+   * Rows are held as a DRAFT of what is in the boxes -- {time, factor} as the
+   * coach typed them -- rather than as saved seconds. That is what lets a row
+   * be added or removed without a save: a re-render that read from the database
+   * would blank whatever had been typed and not yet stored.
+   *
+   * The first version had no Add button and simply appended one spare row,
+   * which meant a coach could set exactly one standard per save-and-reopen
+   * cycle. Three standards took three round trips.
    */
   renderBandRows(drillId) {
-    const bands = (this._weightBands || {})[drillId] || [];
+    const rows = this.bandDraft(drillId);
     const label = this.activeTeamLabel ? (this.activeTeamLabel().team || 'this team') : 'this team';
-    const rows = bands.concat([{ max_seconds: '', factor: '' }]);
+    const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
     return `
       <div style="margin:4px 0 10px 12px; padding:8px 10px; background:rgba(0,0,0,0.25); border-left:2px solid var(--bhs-gold-accent); border-radius:0 6px 6px 0;">
         <div class="text-muted" style="font-size:0.73rem; text-transform:uppercase; margin-bottom:5px;">
-          Standards for ${this._text ? this._text(label) : label}
+          Standards for ${esc(label)}
         </div>
         ${rows.map((b, i) => `
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
             <span class="text-muted" style="font-size:0.75rem;">at or under</span>
             <input type="text" id="bandTime_${drillId}_${i}" class="form-control"
                    style="max-width:80px; font-size:0.78rem;" placeholder="4:30"
-                   value="${b.max_seconds === '' ? '' : window.supabaseService.formatSecondsAsTime(b.max_seconds)}" />
+                   value="${esc(b.time)}" />
             <span class="text-muted" style="font-size:0.75rem;">earns</span>
             <input type="number" id="bandFactor_${drillId}_${i}" class="form-control"
                    step="0.25" min="0" max="1" style="max-width:80px; font-size:0.78rem;" placeholder="1"
-                   value="${b.factor === '' ? '' : Number(b.factor)}" />
+                   value="${esc(b.factor)}" />
             <span class="text-muted" style="font-size:0.72rem;">of the exercise</span>
+            <button type="button" class="btn-card-delete" style="padding:0 7px; font-size:0.8rem;"
+                    title="Remove this standard"
+                    onclick="app.removeBandRow('${drillId}', ${i})">&times;</button>
           </div>`).join('')}
-        <div class="text-muted" style="font-size:0.72rem; margin-top:4px;">
+        <button type="button" class="btn btn-secondary" style="padding:3px 10px; font-size:0.76rem; margin-top:4px;"
+                onclick="app.addBandRow('${drillId}')">+ Add a standard</button>
+        <div class="text-muted" style="font-size:0.72rem; margin-top:6px;">
           A time meeting no standard scores nothing. Set none and this exercise is not counted for
-          ${this._text ? this._text(label) : label} at all.
+          ${esc(label)} at all.
         </div>
       </div>`;
+  },
+
+  /**
+   * The draft rows for a drill: always at least one, so there is somewhere to
+   * type. Seeded from the saved bands the first time it is asked for.
+   */
+  bandDraft(drillId) {
+    this._weightBands = this._weightBands || {};
+    let rows = this._weightBands[drillId];
+
+    if (!Array.isArray(rows)) rows = [];
+    rows = rows.map(b => (
+      // Saved bands arrive as seconds; drafts are already strings.
+      Object.prototype.hasOwnProperty.call(b, 'max_seconds')
+        ? { time: window.supabaseService.formatSecondsAsTime(b.max_seconds), factor: String(b.factor ?? '') }
+        : { time: String(b.time ?? ''), factor: String(b.factor ?? '') }
+    ));
+
+    if (rows.length === 0) rows = [{ time: '', factor: '' }];
+    this._weightBands[drillId] = rows;
+    return rows;
+  },
+
+  /** What is in the boxes right now, in order. */
+  readBandRows(drillId) {
+    const out = [];
+    for (let i = 0; ; i++) {
+      const t = document.getElementById(`bandTime_${drillId}_${i}`);
+      const f = document.getElementById(`bandFactor_${drillId}_${i}`);
+      if (!t || !f) break;
+      out.push({ time: t.value, factor: f.value });
+    }
+    return out;
+  },
+
+  /**
+   * Copy what is typed in every drill's boxes into the draft.
+   *
+   * Called BEFORE changing a draft, never after: re-reading the DOM once the
+   * state has been updated but the markup has not re-rendered reads the old
+   * rows back over the new ones, which silently undoes an added row.
+   */
+  captureBandDrafts() {
+    this._weightBands = this._weightBands || {};
+    (this._weightDrills || [])
+      .filter(d => d.measure === 'time_bands')
+      .forEach(d => {
+        const typed = this.readBandRows(d.id);
+        if (typed.length) this._weightBands[d.id] = typed;
+      });
+  },
+
+  /** Re-render the weights modal from the drafts as they now stand. */
+  redrawWeights() {
+    const rows = document.getElementById('matrixWeightsRows');
+    if (rows) rows.innerHTML = this.renderWeightsRows();
+  },
+
+  addBandRow(drillId) {
+    this.captureBandDrafts();
+    this._weightBands[drillId] = this.bandDraft(drillId).concat([{ time: '', factor: '' }]);
+    this.redrawWeights();
+  },
+
+  removeBandRow(drillId, index) {
+    this.captureBandDrafts();
+    const kept = this.bandDraft(drillId).filter((_, i) => i !== index);
+    // Never leave the section with no boxes at all.
+    this._weightBands[drillId] = kept.length ? kept : [{ time: '', factor: '' }];
+    this.redrawWeights();
   },
 
   renderWeightsRows() {
@@ -150,19 +230,18 @@ Object.assign(BHSSoccerApp.prototype, {
       if (!this.activeTeamId) {
         return set('Weights saved, but standards need a team. Choose one in the header.');
       }
-      const typed = [];
-      for (let i = 0; ; i++) {
-        const t = document.getElementById(`bandTime_${r.id}_${i}`);
-        const f = document.getElementById(`bandFactor_${r.id}_${i}`);
-        if (!t || !f) break;
-        typed.push({ time: t.value, factor: f.value });
-      }
-      const bandRes = await window.supabaseService.saveTimeBands(r.id, this.activeTeamId, typed);
+      const bandRes = await window.supabaseService.saveTimeBands(
+        r.id, this.activeTeamId, this.readBandRows(r.id)
+      );
       if (!bandRes.ok) {
         const name = (this._weightDrills.find(d => d.id === r.id) || {}).name || 'that exercise';
         return set(`Weights saved. Standards for ${name}: ${bandRes.error}`);
       }
       this._weightBands[r.id] = (await window.supabaseService.fetchTimeBands(r.id, this.activeTeamId)) || [];
+      // Re-render so the saved standards, and a fresh spare row, are there to
+      // carry on with. Without this the modal keeps the pre-save markup and a
+      // coach has to close and reopen to add another.
+      this.redrawWeights();
     }
 
     // Weights are looked up live, so every past result is re-scored. Re-sync
