@@ -2288,6 +2288,45 @@ class SupabaseService {
     return { ok: true };
   }
 
+  /**
+   * Set one player's uniform number, and touch nothing else.
+   *
+   * The shirt number the public sees, distinct from the recording number they
+   * write on a paper score sheet. Same reasoning as setRecordingNumber: going
+   * through upsertTeamMembership would carry the other columns along with it.
+   *
+   * null clears it.
+   */
+  async setUniformNumber(
+    teamId: string,
+    playerId: string,
+    number: number | null
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!playerId) return { ok: false, error: 'No player given.' };
+
+    const { data, error } = await this.client!
+      .from('team_players')
+      .update({ number })
+      .eq('team_id', teamId)
+      .eq('player_id', playerId)
+      .select();
+
+    if (error) {
+      console.warn('Supabase setUniformNumber notice:', error.message);
+      if (error.code === '23505') {
+        return { ok: false, error: `Uniform number ${number} is already used by someone on this team.` };
+      }
+      return { ok: false, error: error.message };
+    }
+    // An RLS refusal returns no error and no rows.
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'The database refused that change. You must coach this team.' };
+    }
+    return { ok: true };
+  }
+
   async upsertTeamMembership(
     teamId: string,
     schoolId: string,
@@ -2296,18 +2335,21 @@ class SupabaseService {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!teamId || !schoolId) return { ok: false, error: 'No team selected.' };
     try {
+      // Undefined means "not supplied" and must never clear a value already
+      // set; null is an explicit clear. Only recording_number was guarded this
+      // way, so an import whose sheet lacked a Number or Position column
+      // silently nulled those for the whole squad -- which is exactly how a JV
+      // roster lost all 25 uniform numbers when that column was renamed.
       const payload: Record<string, any> = {
         team_id: teamId,
         school_id: schoolId,
         player_id: membership.player_id,
-        number: membership.number ?? null,
-        // The paper-sheet number (0021). Undefined means "not supplied" and
-        // must not clear one already set; null is an explicit clear.
+        is_deleted: false,
+        ...(membership.number !== undefined ? { number: membership.number } : {}),
         ...(membership.recording_number !== undefined
               ? { recording_number: membership.recording_number }
               : {}),
-        position: membership.position ?? null,
-        is_deleted: false
+        ...(membership.position !== undefined ? { position: membership.position } : {})
       };
       if (membership.season_stats) payload.season_stats = membership.season_stats;
       if (membership.ratings) payload.ratings = membership.ratings;

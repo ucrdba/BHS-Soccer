@@ -399,3 +399,68 @@ describe('a number the coach assigned never changes', () => {
     ])).toEqual([{ playerId: 'p2', value: 31 }]);
   });
 });
+
+describe('uniform numbers, alongside the recording numbers', () => {
+  /**
+   * Two different things in one editor: the recording number is written on a
+   * paper score sheet, the uniform number is the shirt the public sees on the
+   * roster and on a lineup card. They may hold different values, and editing
+   * one must never disturb the other.
+   */
+  const withBoth = () => [
+    { id: 'p1', name: 'Kevin Corona', lastName: 'Corona', number: 7, recordingNumber: 30 },
+    { id: 'p2', name: 'JP Davila', lastName: 'Davila', number: null, recordingNumber: 31 }
+  ];
+
+  function mount(players: any[], rec: Record<string, string>, uni: Record<string, string>) {
+    const app = makeApp(players);
+    document.body.innerHTML =
+      '<input id="recNumStart" value="30" />' +
+      players.map(p =>
+        `<input id="recNum_${p.id}" value="${rec[p.id] ?? ''}" />` +
+        `<input id="uniNum_${p.id}" value="${uni[p.id] ?? ''}" />`
+      ).join('');
+    (app as any).renderRecordingNumbersBody = () => {};
+    return app;
+  }
+
+  it('reads both columns off the screen', () => {
+    const app = mount(withBoth(), { p1: '30' }, { p1: '7' });
+    app.captureRecordingNumberDrafts();
+    expect(app._recNumDraft.p1).toBe('30');
+    expect(app._uniNumDraft.p1).toBe('7');
+  });
+
+  it('leaves the uniform column alone when filling recording blanks', () => {
+    // The fill buttons are about the recording column. Rebuilding the drafts
+    // without carrying the uniform ones would silently blank them on save.
+    const app = mount(withBoth(), { p1: '30' }, { p1: '7', p2: '9' });
+    app.autoNumberRoster();
+    expect(app._uniNumDraft.p1).toBe('7');
+    expect(app._uniNumDraft.p2).toBe('9');
+  });
+
+  it('leaves the uniform column alone when clearing recording numbers', () => {
+    (window as any).confirm = () => true;
+    const app = mount(withBoth(), { p1: '30' }, { p1: '7' });
+    app.clearRecordingNumberDrafts();
+    expect(app._recNumDraft.p1).toBe('');
+    expect(app._uniNumDraft.p1).toBe('7');
+  });
+
+  it('fills a recording blank from the uniform number ON SCREEN', () => {
+    // Not from the saved roster: the coach may have typed a shirt number in
+    // this same sitting and not saved it yet.
+    const app = mount(withBoth(), { p2: '' }, { p2: '9' });
+    app.useShirtNumbersAsRecording();
+    expect(app._recNumDraft.p2).toBe('9');
+  });
+
+  it('refuses two players sharing a uniform number', () => {
+    const app = mount(withBoth(), {}, { p1: '7', p2: '7' });
+    const uniforms = [
+      { playerId: 'p1', value: 7 }, { playerId: 'p2', value: 7 }
+    ];
+    expect(app.duplicateRecordingNumbers(uniforms)).toEqual([7]);
+  });
+});

@@ -124,11 +124,15 @@ Object.assign(BHSSoccerApp.prototype, {
   useShirtNumbersAsRecording() {
     this.captureRecordingNumberDrafts();
     const draft = this._recNumDraft || {};
+    // Read the uniform column as it stands on screen, not from the saved
+    // roster: the coach may have typed numbers there in this same sitting.
+    const uni = this._uniNumDraft || {};
     this.rosterForNumbering().forEach(p => {
       // Blanks only. A number already on screen was assigned by the coach and
       // is not this button's to overwrite.
       if (String(draft[p.id] ?? '').trim() !== '') return;
-      draft[p.id] = p.number != null && p.number !== '' ? String(p.number) : '';
+      const from = String(uni[p.id] ?? (p.number != null ? p.number : '')).trim();
+      draft[p.id] = from;
     });
     this._recNumDraft = draft;
     this._recNumError = '';
@@ -142,6 +146,7 @@ Object.assign(BHSSoccerApp.prototype, {
   openRecordingNumbersModal() {
     this._recNumError = '';
     this._recNumDraft = null;
+    this._uniNumDraft = null;
     this.renderRecordingNumbersBody();
     const start = document.getElementById('recNumStart');
     if (start) start.value = String(this.suggestedNumberStart());
@@ -152,11 +157,15 @@ Object.assign(BHSSoccerApp.prototype, {
   /** Read what is on screen, so a redraw never discards half-typed edits. */
   captureRecordingNumberDrafts() {
     const draft = {};
+    const uni = {};
     this.rosterForNumbering().forEach(p => {
       const el = document.getElementById('recNum_' + p.id);
       if (el) draft[p.id] = el.value;
+      const un = document.getElementById('uniNum_' + p.id);
+      if (un) uni[p.id] = un.value;
     });
     this._recNumDraft = draft;
+    this._uniNumDraft = uni;
   },
 
   /**
@@ -185,7 +194,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const draft = {};
     players.forEach(p => { draft[p.id] = String(proposed.get(p.id) ?? ''); });
-    this._recNumDraft = draft;
+    this._recNumDraft = draft;                // _uniNumDraft left as captured
     this._recNumError = '';
     this.renderRecordingNumbersBody();
   },
@@ -201,6 +210,7 @@ Object.assign(BHSSoccerApp.prototype, {
       + `They are written on paper score sheets, so clearing them means renumbering.\n`
       + `Nothing is saved until you press Save numbers.`)) return;
 
+    this.captureRecordingNumberDrafts();      // keep the uniform column intact
     const draft = {};
     this.rosterForNumbering().forEach(p => { draft[p.id] = ''; });
     this._recNumDraft = draft;
@@ -227,17 +237,28 @@ Object.assign(BHSSoccerApp.prototype, {
       return;
     }
 
-    body.innerHTML = players.map(p => {
+    const uniDraft = this._uniNumDraft;
+
+    body.innerHTML = `
+      <div style="display:flex; gap:10px; padding:0 0 4px 0; font-size:0.66rem;
+                  letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted);">
+        <span style="width:78px; text-align:center;">Recording</span>
+        <span style="width:78px; text-align:center;">Uniform</span>
+        <span style="flex:1;">Player</span>
+      </div>` + players.map(p => {
       const val = draft ? (draft[p.id] ?? '') : (p.recordingNumber != null ? p.recordingNumber : '');
+      const uni = uniDraft ? (uniDraft[p.id] ?? '') : (p.number != null ? p.number : '');
       return `
         <div style="display:flex; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid var(--bhs-navy-border);">
           <input type="number" id="recNum_${esc(p.id)}" class="form-control" min="1" step="1"
                  style="width:78px; text-align:center;" value="${esc(val)}"
                  aria-label="Recording number for ${esc(p.name)}" />
+          <input type="number" id="uniNum_${esc(p.id)}" class="form-control" min="0" step="1"
+                 style="width:78px; text-align:center;" value="${esc(uni)}"
+                 aria-label="Uniform number for ${esc(p.name)}" />
           <span style="flex:1; min-width:0; color:#FFF; font-size:0.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
             ${esc(p.name)}
           </span>
-          <span class="text-muted" style="font-size:0.75rem;">${p.number != null ? '#' + esc(p.number) : ''}</span>
         </div>`;
     }).join('');
 
@@ -263,6 +284,26 @@ Object.assign(BHSSoccerApp.prototype, {
       };
     });
 
+    const uniforms = this.rosterForNumbering().map(p => {
+      const el = document.getElementById('uniNum_' + p.id);
+      const raw = el ? String(el.value).trim() : '';
+      return {
+        playerId: p.id,
+        name: p.name,
+        value: raw === '' ? null : Number(raw),
+        current: p.number == null ? null : Number(p.number)
+      };
+    });
+
+    const badUni = uniforms.find(a => a.value !== null
+      && (!Number.isInteger(a.value) || a.value < 0));
+    if (badUni) return setErr(`${badUni.name}: a uniform number must be a whole number.`);
+
+    const uniDupes = this.duplicateRecordingNumbers(uniforms);
+    if (uniDupes.length) {
+      return setErr(`Two players share uniform ${uniDupes.length === 1 ? 'number' : 'numbers'} ${uniDupes.join(', ')}.`);
+    }
+
     const bad = assignments.find(a => a.value !== null
       && (!Number.isInteger(a.value) || a.value < 1));
     if (bad) return setErr(`${bad.name}: a recording number must be a whole number of 1 or more.`);
@@ -275,7 +316,12 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     const writes = this.planRecordingNumberWrites(assignments);
-    if (writes.length === 0) { setErr(''); this.closeModals(); return; }
+    // Uniform numbers carry no unique index, so they need no clearing pass --
+    // only the rows that actually changed.
+    const uniWrites = uniforms.filter(a =>
+      Number(a.value) !== Number(a.current) || (a.value == null) !== (a.current == null));
+
+    if (writes.length === 0 && uniWrites.length === 0) { setErr(''); this.closeModals(); return; }
 
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     setErr('');
@@ -288,6 +334,11 @@ Object.assign(BHSSoccerApp.prototype, {
         const who = assignments.find(a => a.playerId === w.playerId);
         failures.push(`${who ? who.name : 'A player'}: ${res?.error || 'refused'}`);
       }
+    }
+    for (const w of uniWrites) {
+      const res = await window.supabaseService.setUniformNumber(
+        this.activeTeamId, w.playerId, w.value);
+      if (!res || !res.ok) failures.push(`${w.name} (uniform): ${res?.error || 'refused'}`);
     }
 
     if (btn) { btn.disabled = false; btn.textContent = 'Save numbers'; }

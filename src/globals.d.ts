@@ -113,6 +113,7 @@ declare global {
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     createTeam(schoolId: string, name: string, season?: string): Promise<{ ok: boolean; id?: string; error?: string }>;
     setRecordingNumber(teamId: string, playerId: string, recordingNumber: number | null): Promise<{ ok: boolean; error?: string }>;
+    setUniformNumber(teamId: string, playerId: string, number: number | null): Promise<{ ok: boolean; error?: string }>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     // Paper Matrix sheets carry a recording number rather than a name,
     // because handwriting is not always readable (0021). An unknown number
