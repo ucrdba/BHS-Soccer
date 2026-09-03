@@ -2323,6 +2323,25 @@ class SupabaseService {
   }
 
   /**
+   * Every lineup this team has saved, newest first.
+   *
+   * Header rows only — the players are fetched for the one actually opened.
+   * Used to mark which fixtures already have a lineup, and to offer them as
+   * something to copy from.
+   */
+  async fetchTeamLineups(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('lineups')
+      .select('id, match_id, formation, updated_at')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false)
+      .order('updated_at', { ascending: false });
+    if (error) { console.warn('Supabase fetchTeamLineups notice:', error.message); return null; }
+    return data || [];
+  }
+
+  /**
    * Save a lineup whole: the header, then its players, replacing what was there.
    *
    * Replace rather than merge, because the XI is a set. Merging would leave a

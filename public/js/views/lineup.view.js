@@ -294,6 +294,29 @@ Object.assign(BHSSoccerApp.prototype, {
 
   // ── The screen ───────────────────────────────────────────────────────────
 
+  /**
+   * Load a saved lineup into the working state.
+   *
+   * Split out from opening the modal so copying from another fixture goes
+   * through exactly the same path — a copy that took a different route would
+   * eventually diverge from a reopen.
+   */
+  applySavedLineup(saved) {
+    if (!saved) return false;
+    this._lineupFormation = saved.formation || '4-4-2';
+    const asg = {};
+    const bench = {};
+    (saved.players || []).forEach(r => {
+      if (r.role === 'bench') bench[r.player_id] = true;
+      else if (r.slot) asg[r.slot] = r.player_id;
+    });
+    this._lineupAssign = asg;
+    // Only narrow the bench if one was actually recorded; otherwise every
+    // non-starter is available, which is the sensible default.
+    this._lineupBench = Object.keys(bench).length ? bench : null;
+    return true;
+  },
+
   async openLineupModal(matchId) {
     this._lineupMatchId = matchId || null;
     this._lineupError = '';
@@ -301,27 +324,87 @@ Object.assign(BHSSoccerApp.prototype, {
     this._lineupAssign = {};
     this._lineupBench = null;
     this._lineupFormation = '4-4-2';
+    this._lineupLoaded = false;
+    this._lineupIndex = [];
 
     if (window.supabaseService?.isConfigured() && this.activeTeamId) {
+      // A saved lineup for THIS fixture reopens automatically — that is what
+      // recalling one means, and asking would be friction for the common case.
       const saved = await window.supabaseService.fetchLineup(this.activeTeamId, this._lineupMatchId);
-      if (saved) {
-        this._lineupFormation = saved.formation || '4-4-2';
-        const asg = {};
-        const bench = {};
-        (saved.players || []).forEach(r => {
-          if (r.role === 'bench') bench[r.player_id] = true;
-          else if (r.slot) asg[r.slot] = r.player_id;
-        });
-        this._lineupAssign = asg;
-        // Only narrow the bench if one was actually recorded; otherwise every
-        // non-starter is available, which is the sensible default.
-        this._lineupBench = Object.keys(bench).length ? bench : null;
-      }
+      this._lineupLoaded = this.applySavedLineup(saved);
+      this._lineupIndex =
+        (await window.supabaseService.fetchTeamLineups(this.activeTeamId)) || [];
     }
 
     this.renderLineupBody();
+    this.renderLineupSources();
     const modal = document.getElementById('lineupModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
+  },
+
+  /** A saved lineup described the way a coach would name it. */
+  lineupSourceLabel(row) {
+    if (!row.match_id) return 'Default lineup';
+    const m = (this.data.schedule || []).find(x => x.id === row.match_id);
+    if (!m) return 'A past fixture';
+    return `${m.opponent || 'Opponent'} — ${m.date || ''}`.trim();
+  },
+
+  /** The lineups worth offering as a starting point: every one but this one. */
+  lineupCopySources() {
+    return (this._lineupIndex || [])
+      .filter(r => (r.match_id || null) !== (this._lineupMatchId || null))
+      .map(r => ({ ...r, label: this.lineupSourceLabel(r) }));
+  },
+
+  renderLineupSources() {
+    const wrap = document.getElementById('lineupCopyWrap');
+    if (!wrap) return;
+    const esc = (v) => String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const sources = this.lineupCopySources();
+    if (sources.length === 0) { wrap.innerHTML = ''; return; }
+
+    wrap.innerHTML = `
+      <label for="lineupCopyFrom" class="text-muted" style="font-size:0.74rem; text-transform:uppercase;">Copy from</label>
+      <select id="lineupCopyFrom" class="form-control" style="max-width:230px;">
+        <option value="">&mdash; another match &mdash;</option>
+        ${sources.map(r => `<option value="${esc(r.match_id || '')}">${esc(r.label)}</option>`).join('')}
+      </select>
+      <button type="button" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem;"
+              onclick="app.copyLineupFrom()">Copy</button>`;
+  },
+
+  /**
+   * Take another fixture's arrangement as a starting point.
+   *
+   * Loads it into the working lineup WITHOUT saving: the same XI usually needs
+   * a change or two for the next opponent, and writing it immediately would
+   * commit a lineup the coach has not looked at yet. It is theirs once they
+   * press Save.
+   */
+  async copyLineupFrom() {
+    const sel = document.getElementById('lineupCopyFrom');
+    const err = document.getElementById('lineupError');
+    const say = (m) => { this._lineupError = m; if (err) err.textContent = m; };
+    if (!sel) return;
+
+    const value = sel.value;
+    if (!value && sel.selectedIndex <= 0) return say('Choose a match to copy from.');
+
+    const placed = Object.keys(this._lineupAssign || {}).length;
+    if (placed > 0 && !window.confirm(
+      `Replace the ${placed} player${placed === 1 ? '' : 's'} currently placed with that lineup?\n\n`
+      + `Nothing is saved until you press Save lineup.`)) return;
+
+    const saved = await window.supabaseService.fetchLineup(this.activeTeamId, value || null);
+    if (!saved) return say('That lineup could not be read.');
+
+    this.applySavedLineup(saved);
+    this._lineupPicked = null;
+    say('Copied. Press Save lineup to keep it for this match.');
+    this.renderLineupBody();
   },
 
   setLineupFormation(formation) {
@@ -459,6 +542,7 @@ Object.assign(BHSSoccerApp.prototype, {
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <strong style="color:#FFF; font-size:0.86rem;">Squad</strong>
+            ${this._lineupLoaded ? '<span class="badge badge-coach" style="font-size:0.62rem;">SAVED LINEUP LOADED</span>' : ''}
             <span class="text-muted" style="font-size:0.76rem;">${filled} of ${total} placed</span>
           </div>
           <div class="lineup-squad">${squad}</div>

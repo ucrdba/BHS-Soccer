@@ -611,3 +611,104 @@ describe('resetting the lineup', () => {
     expect(msg).toContain('Save lineup');
   });
 });
+
+describe('recalling and reusing a lineup', () => {
+  /**
+   * Recalling is automatic: opening a fixture that has a saved lineup loads
+   * it. Reusing is explicit: pick another fixture and copy its arrangement,
+   * which lands in the working lineup and is not written until Save.
+   */
+  const savedShape = () => ({
+    formation: '4-3-3',
+    players: [
+      { player_id: 'p1', role: 'starter', slot: 'GK' },
+      { player_id: 'p2', role: 'starter', slot: 'LB' },
+      { player_id: 'p3', role: 'bench', slot: null }
+    ]
+  });
+
+  it('loads the formation that was saved', () => {
+    const app = makeApp();
+    app.applySavedLineup(savedShape());
+    expect(app._lineupFormation).toBe('4-3-3');
+  });
+
+  it('puts the starters back in their slots', () => {
+    const app = makeApp();
+    app.applySavedLineup(savedShape());
+    expect(app._lineupAssign).toEqual({ GK: 'p1', LB: 'p2' });
+  });
+
+  it('restores who was on the bench', () => {
+    const app = makeApp();
+    app.applySavedLineup(savedShape());
+    expect(app._lineupBench).toEqual({ p3: true });
+  });
+
+  it('leaves the whole squad available when no bench was recorded', () => {
+    // An older lineup, or one saved before anyone was marked out.
+    const app = makeApp();
+    app.applySavedLineup({ formation: '4-4-2', players: [
+      { player_id: 'p1', role: 'starter', slot: 'GK' }
+    ] });
+    expect(app._lineupBench).toBeNull();
+  });
+
+  it('ignores a starter row with no slot rather than dropping it somewhere', () => {
+    const app = makeApp();
+    app.applySavedLineup({ formation: '4-4-2', players: [
+      { player_id: 'p1', role: 'starter', slot: null }
+    ] });
+    expect(app._lineupAssign).toEqual({});
+  });
+
+  it('reports that there was nothing to load', () => {
+    expect(makeApp().applySavedLineup(null)).toBe(false);
+  });
+});
+
+describe('choosing a lineup to copy', () => {
+  const index = () => ([
+    { match_id: null, formation: '4-4-2' },
+    { match_id: 'm1', formation: '4-3-3' },
+    { match_id: 'm2', formation: '3-5-2' }
+  ]);
+
+  function appWith(current: string | null) {
+    const app = makeApp();
+    app._lineupMatchId = current;
+    app._lineupIndex = index();
+    app.data.schedule = [
+      { id: 'm1', opponent: 'Redlands', date: '09/12/2026' },
+      { id: 'm2', opponent: 'Yucaipa', date: '09/19/2026' }
+    ];
+    return app;
+  }
+
+  it('never offers the lineup you are already editing', () => {
+    // Copying a lineup onto itself is a no-op that looks like a broken button.
+    const app = appWith('m1');
+    expect(app.lineupCopySources().map((r: any) => r.match_id)).toEqual([null, 'm2']);
+  });
+
+  it('excludes the default lineup when that is what you are editing', () => {
+    const app = appWith(null);
+    expect(app.lineupCopySources().map((r: any) => r.match_id)).toEqual(['m1', 'm2']);
+  });
+
+  it('names each one by opponent and date', () => {
+    const app = appWith(null);
+    expect(app.lineupCopySources()[0].label).toBe('Redlands — 09/12/2026');
+  });
+
+  it('names the one with no fixture as the default', () => {
+    const app = appWith('m1');
+    expect(app.lineupCopySources()[0].label).toBe('Default lineup');
+  });
+
+  it('copes with a lineup whose fixture has since been deleted', () => {
+    const app = appWith(null);
+    app.data.schedule = [];
+    expect(app.lineupCopySources()[0].label).toBe('A past fixture');
+  });
+});
