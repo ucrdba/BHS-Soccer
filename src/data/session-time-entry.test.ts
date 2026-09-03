@@ -154,3 +154,60 @@ describe('a squad with no standards set', () => {
     expect(html).toContain('4:50');
   });
 });
+
+describe('a full stop instead of a colon', () => {
+  /**
+   * A stopwatch reads 4:30 and a coach writing it down reaches for whichever
+   * key is nearer. Both mean the same thing.
+   *
+   * Emphatically NOT decimal minutes: "4.30" is four minutes thirty, not four
+   * and a third. Reading it the other way would score a player against the
+   * wrong band and move the standings with nothing on screen to show for it.
+   */
+  it('reads 4.30 as four minutes thirty', () => {
+    expect(supabaseService.parseTimeToSeconds('4.30')).toBe(270);
+  });
+
+  it('reads it the same as the colon form', () => {
+    expect(supabaseService.parseTimeToSeconds('4.30'))
+      .toBe(supabaseService.parseTimeToSeconds('4:30'));
+  });
+
+  it('is not decimal minutes', () => {
+    // 4.30 decimal minutes would be 258 seconds. It must not be that.
+    expect(supabaseService.parseTimeToSeconds('4.30')).not.toBe(258);
+  });
+
+  it('handles a leading zero in the seconds', () => {
+    expect(supabaseService.parseTimeToSeconds('4.05')).toBe(245);
+  });
+
+  it('handles a double-digit minute', () => {
+    expect(supabaseService.parseTimeToSeconds('12.45')).toBe(765);
+  });
+
+  it('still refuses sixty or more seconds', () => {
+    expect(supabaseService.parseTimeToSeconds('4.60')).toBeNull();
+    expect(supabaseService.parseTimeToSeconds('4.99')).toBeNull();
+  });
+
+  it('refuses a single digit after the stop, rather than guessing', () => {
+    // "4.5" could be 4:05 or 4:50 and there is no way to tell. A rejected
+    // entry is visible; a misread one is scored silently against a band.
+    expect(supabaseService.parseTimeToSeconds('4.5')).toBeNull();
+  });
+
+  it('refuses more than one separator', () => {
+    expect(supabaseService.parseTimeToSeconds('1.4.30')).toBeNull();
+    expect(supabaseService.parseTimeToSeconds('4.30.')).toBeNull();
+  });
+
+  it('leaves a bare number meaning seconds', () => {
+    expect(supabaseService.parseTimeToSeconds('270')).toBe(270);
+  });
+
+  it('still displays as mm:ss whichever way it was typed', () => {
+    const s = supabaseService.parseTimeToSeconds('4.30')!;
+    expect(supabaseService.formatSecondsAsTime(s)).toBe('4:30');
+  });
+});

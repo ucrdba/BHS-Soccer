@@ -1417,7 +1417,14 @@ class SupabaseService {
 
     if (/^\d+$/.test(raw)) return parseInt(raw, 10);
 
-    const m = /^(\d+):([0-5]\d)$/.exec(raw);
+    // A full stop means the same as a colon. A stopwatch reads 4:30 and a
+    // coach writing it down reaches for whichever key is nearer, so refusing
+    // one of the two is friction with nothing behind it.
+    //
+    // NOT decimal minutes: "4.30" is four minutes thirty, not four and a third.
+    // Reading it the other way would score a player against the wrong band and
+    // move the standings with nothing on screen to show for it.
+    const m = /^(\d+)[:.]([0-5]\d)$/.exec(raw);
     if (!m) return null;
     return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
   }
@@ -1499,7 +1506,7 @@ class SupabaseService {
 
       const seconds = this.parseTimeToSeconds(rawTime);
       if (seconds === null) {
-        return { ok: false, error: `"${rawTime}" is not a time. Use mm:ss, for example 4:30.` };
+        return { ok: false, error: `"${rawTime}" is not a time. Use mm:ss, for example 4:30 or 4.30.` };
       }
 
       const factor = Number(rawFactor);

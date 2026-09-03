@@ -64,7 +64,7 @@ Object.assign(BHSSoccerApp.prototype, {
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
             <span class="text-muted" style="font-size:0.75rem;">at or under</span>
             <input type="text" id="bandTime_${drillId}_${i}" class="form-control"
-                   style="max-width:80px; font-size:0.78rem;" placeholder="4:30"
+                   style="max-width:80px; font-size:0.78rem;" placeholder="4:30 or 4.30"
                    value="${esc(b.time)}" />
             <span class="text-muted" style="font-size:0.75rem;">earns</span>
             <input type="number" id="bandFactor_${drillId}_${i}" class="form-control"
@@ -417,7 +417,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const measure = drill.measure || 'count_high';
     const bands = (this._sessionBands || []);
     const hint = measure === 'time_low' ? 'seconds — fastest wins'
-               : measure === 'time_bands' ? 'mm:ss — scored against the standard'
+               : measure === 'time_bands' ? 'mm:ss — type 4:30 or 4.30 — scored against the standard'
                : measure === 'win_loss' ? 'result'
                : 'number — higher wins';
 
@@ -500,7 +500,7 @@ Object.assign(BHSSoccerApp.prototype, {
                  <option value="loss"${out === 'loss' ? ' selected' : ''}>Lost</option>
                </select>`
             : measure === 'time_bands'
-            ? `<input type="text" id="sessionValue_${p.id}" class="form-control" placeholder="4:30"
+            ? `<input type="text" id="sessionValue_${p.id}" class="form-control" placeholder="4:30 or 4.30"
                       style="max-width:110px; font-size:0.8rem;"
                       value="${val === '' ? '' : window.supabaseService.formatSecondsAsTime(val)}"
                       oninput="app.showBandEarned('${p.id}')" />
