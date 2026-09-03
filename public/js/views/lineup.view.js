@@ -38,7 +38,9 @@ Object.assign(BHSSoccerApp.prototype, {
     const back3 = [
       { slot: 'LCB', x: 25, y: 22 }, { slot: 'CB', x: 50, y: 18 }, { slot: 'RCB', x: 75, y: 22 }
     ];
-    const gk = { slot: 'GK', x: 50, y: 6 };
+    // y=6 put the slot's lower half within a couple of percent of the goal
+    // line, which the pitch's overflow:hidden clipped on a short viewport.
+    const gk = { slot: 'GK', x: 50, y: 10 };
 
     return {
       '4-4-2': [gk, ...back4,

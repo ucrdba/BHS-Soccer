@@ -673,18 +673,26 @@
 }
 
 /* The centre circle and the two boxes, drawn rather than imported. */
+/* pointer-events: none is load-bearing, not decoration. A pseudo-element is
+   inserted as the LAST child, so both of these paint on top of the slot
+   buttons and would swallow every click that lands on them -- the penalty box
+   covers the GK, the centre circle covers the central midfielders. */
 .lineup-pitch::before {
   content: ''; position: absolute; left: 50%; top: 50%;
   width: 26%; aspect-ratio: 1; transform: translate(-50%, -50%);
   border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 50%;
+  pointer-events: none;
 }
 .lineup-pitch::after {
   content: ''; position: absolute; left: 22%; right: 22%; bottom: 0; height: 14%;
   border: 2px solid rgba(255, 255, 255, 0.35); border-bottom: 0;
+  pointer-events: none;
 }
 
 .lineup-slot {
   position: absolute;
+  /* Above the pitch markings, so a slot is never hidden behind one. */
+  z-index: 1;
   transform: translate(-50%, 50%);
   min-width: 58px;
   min-height: 44px;              /* a thumb, not a cursor */

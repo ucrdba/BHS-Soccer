@@ -94,6 +94,22 @@ describe('the formations', () => {
     });
   });
 
+  it('keeps every slot clear of the edge, so none is clipped', () => {
+    // The pitch clips its overflow, and a slot is centred on its coordinate --
+    // so a slot sitting on the boundary loses half of itself, including the
+    // half you tap. The keeper is the one that gets close.
+    const app = makeApp();
+    const all = app.lineupFormations();
+    Object.keys(all).forEach(name => {
+      all[name].forEach((s: any) => {
+        expect(s.y).toBeGreaterThanOrEqual(8);
+        expect(s.y).toBeLessThanOrEqual(92);
+        expect(s.x).toBeGreaterThanOrEqual(8);
+        expect(s.x).toBeLessThanOrEqual(92);
+      });
+    });
+  });
+
   it('falls back to a real formation when asked for one that does not exist', () => {
     expect(makeApp().lineupSlots('9-9-9')).toHaveLength(11);
   });
