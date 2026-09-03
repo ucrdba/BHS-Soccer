@@ -6,13 +6,13 @@
  * confined to `public/js/` leaves the hashed bundle name identical and a site
  * one commit behind looks byte-for-byte the same from outside.
  *
- * What is tested here is the formatting and the degradation. The substitution
- * itself is Vite's, and is checked by the build asserting the commit reached
- * the bundle.
+ * What is tested here is the reading and the formatting. The injection itself
+ * is Vite's, and is verified by checking that dist/index.html and the dev
+ * server both carry a real commit.
  */
 
 import { describe, it, expect } from 'vitest';
-import { shortCommit, formatBuildStamp, buildStampTitle, type BuildInfo } from '../build-info';
+import { buildInfo, shortCommit, formatBuildStamp, buildStampTitle, type BuildInfo } from '../build-info';
 
 const info = (over: Partial<BuildInfo> = {}): BuildInfo => ({
   commit: 'cb490c70fb625696e56ec8f41b3bd26320d2e8c8',
@@ -93,5 +93,57 @@ describe('the hover detail', () => {
     expect(t).toContain('commit unknown');
     expect(t).toContain('branch unknown');
     expect(t).toContain('built unknown');
+  });
+});
+
+describe('reading the stamp the page was served with', () => {
+  /**
+   * Injected as window.__BUILD__ by vite.config.ts, in BOTH dev and build.
+   *
+   * It began as Vite's `define`, which substitutes at build time only — so the
+   * dev server served the identifiers untouched and localhost showed "build
+   * unknown", which is precisely where you most want to know what you are
+   * running. These tests pin the reading side of that fix.
+   */
+  it('reads the commit, branch and time that were injected', () => {
+    const info = buildInfo({
+      commit: 'cb490c70fb625696e56ec8f41b3bd26320d2e8c8',
+      ref: 'main',
+      builtAt: '2026-09-03T23:09:23.342Z'
+    });
+    expect(info.short).toBe('cb490c7');
+    expect(info.ref).toBe('main');
+    expect(info.builtAt).toBe('2026-09-03T23:09:23.342Z');
+  });
+
+  it('survives a page with no stamp at all', () => {
+    // Opened from somewhere that never went through Vite. It must degrade to
+    // "unknown", not throw and take the footer down with it.
+    expect(() => buildInfo({})).not.toThrow();
+    expect(buildInfo({}).short).toBe('unknown');
+  });
+
+  it('does not let one missing field cost the others', () => {
+    const info = buildInfo({ commit: 'abc1234def', builtAt: '' });
+    expect(info.short).toBe('abc1234');
+    expect(info.ref).toBe('');
+  });
+
+  it('ignores a field of the wrong type rather than rendering it', () => {
+    const info = buildInfo({ commit: 12345, ref: null, builtAt: {} });
+    expect(info.short).toBe('unknown');
+    expect(info.ref).toBe('');
+    expect(info.builtAt).toBe('');
+  });
+
+  it('falls back to the window when given nothing', () => {
+    (window as any).__BUILD__ = { commit: 'feedface0000', ref: 'main', builtAt: '' };
+    expect(buildInfo().short).toBe('feedfac');
+    delete (window as any).__BUILD__;
+  });
+
+  it('is unknown when the window carries no stamp', () => {
+    delete (window as any).__BUILD__;
+    expect(buildInfo().short).toBe('unknown');
   });
 });

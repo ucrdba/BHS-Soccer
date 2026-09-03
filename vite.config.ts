@@ -26,26 +26,40 @@ function buildStamp() {
   };
 }
 
-const stamp = buildStamp();
-
 export default defineConfig({
   root: '.',
-  define: {
-    __BUILD_COMMIT__: JSON.stringify(stamp.commit),
-    __BUILD_REF__: JSON.stringify(stamp.ref),
-    __BUILD_AT__: JSON.stringify(stamp.builtAt)
-  },
   plugins: [
     {
+      name: 'build-stamp',
+
+      /**
+       * Injected into the HTML rather than substituted into the source.
+       *
+       * Vite's `define` is applied at BUILD time only: the dev server serves
+       * `__BUILD_COMMIT__` untouched, so the identifier is undefined at
+       * runtime and the footer reads "build unknown" on localhost — which is
+       * precisely where you most want to know what you are running.
+       *
+       * transformIndexHtml runs in dev AND build, so one mechanism covers
+       * both. Recomputed per request in dev so the commit follows a checkout
+       * without restarting the server.
+       */
+      transformIndexHtml() {
+        return [{
+          tag: 'script',
+          attrs: { id: 'build-stamp' },
+          children: `window.__BUILD__ = ${JSON.stringify(buildStamp())};`,
+          injectTo: 'head'
+        }];
+      },
+
       // Also written as a file, so the deployed commit can be read with one
       // request — by a script, or by anyone checking without a browser.
-      name: 'emit-version-json',
-      apply: 'build',
       generateBundle() {
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
-          source: JSON.stringify(stamp, null, 2)
+          source: JSON.stringify(buildStamp(), null, 2)
         });
       }
     }

@@ -167,18 +167,6 @@ declare global {
     JSZip?: any;
   }
 
-  /**
-   * Replaced at build time by vite.config.ts. Declared rather than imported
-   * because `define` performs a textual substitution — there is no module to
-   * import from, and without these tsc has no idea the identifiers exist.
-   *
-   * Inside `declare global` because this file has `export {}` and is therefore
-   * a module: a top-level declare here would be scoped to the module and
-   * invisible to every file that needs it.
-   */
-  const __BUILD_COMMIT__: string;
-  const __BUILD_REF__: string;
-  const __BUILD_AT__: string;
 }
 
 export {};

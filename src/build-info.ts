@@ -7,8 +7,13 @@
  * `public/js/` leaves the hashed bundle name identical, so a site one commit
  * behind looks byte-for-byte the same from outside.
  *
- * The constants are substituted at build time by `vite.config.ts`, so what
- * this reports IS the commit that produced the running code.
+ * `vite.config.ts` injects the values into the page head as `window.__BUILD__`,
+ * so what this reports IS the commit that produced the running code.
+ *
+ * Injected rather than substituted through Vite's `define`, which is applied
+ * at build time only: the dev server serves the identifiers untouched, and the
+ * footer read "build unknown" on localhost — precisely where you most want to
+ * know what you are running.
  *
  * Kept apart from `main.ts` so it can be tested without booting the app, auth
  * and the database client along with it.
@@ -22,15 +27,19 @@ export interface BuildInfo {
 }
 
 /**
- * `typeof` guards rather than direct reads: `define` is a textual
- * substitution, so in any context that did not go through Vite — a test, a
- * bare tsc run — the identifiers do not exist at all and reading one throws a
- * ReferenceError rather than yielding undefined.
+ * Read the stamp the page was served with.
+ *
+ * Every field is defended separately: a page opened from a context that never
+ * went through Vite has no `__BUILD__` at all, and one field being absent must
+ * not cost the others.
  */
-export function buildInfo(): BuildInfo {
-  const commit = typeof __BUILD_COMMIT__ === 'string' ? __BUILD_COMMIT__ : '';
-  const ref = typeof __BUILD_REF__ === 'string' ? __BUILD_REF__ : '';
-  const builtAt = typeof __BUILD_AT__ === 'string' ? __BUILD_AT__ : '';
+export function buildInfo(source?: Record<string, any>): BuildInfo {
+  const raw = source
+    ?? (typeof window !== 'undefined' ? (window as any).__BUILD__ : null)
+    ?? {};
+  const commit = typeof raw.commit === 'string' ? raw.commit : '';
+  const ref = typeof raw.ref === 'string' ? raw.ref : '';
+  const builtAt = typeof raw.builtAt === 'string' ? raw.builtAt : '';
   return { commit, short: shortCommit(commit), ref, builtAt };
 }
 
