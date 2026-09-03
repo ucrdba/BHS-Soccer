@@ -16,7 +16,11 @@ Object.assign(BHSSoccerApp.prototype, {
             <h2 class="section-title">SCHEDULE &amp; GAME RESULTS</h2>
             <p class="text-muted">${label.org}${label.team ? " &mdash; " + label.team : ""} Season Fixtures &amp; Match Results</p>
           </div>
-          <button class="btn btn-gold" onclick="app.openAddMatchModal()" style="font-weight:700;">➕ Add New Match</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-gold" onclick="app.openAddMatchModal()" style="font-weight:700;">➕ Add New Match</button>
+            ${window.auth.isCoach() ? `<button class="btn btn-secondary" onclick="app.openLineupModal(null)"
+                    title="A default shape for this squad, not tied to a fixture">⚽ Default lineup</button>` : ''}
+          </div>
         </div>
 
         <div class="schedule-list" style="display:flex; flex-direction:column; gap:12px;">
@@ -42,7 +46,10 @@ Object.assign(BHSSoccerApp.prototype, {
                   <div class="result-badge result-upcoming" style="background:rgba(0,71,171,0.2); color:var(--bhs-cyan-accent); border:1px solid var(--bhs-blue-electric); padding:4px 10px; border-radius:6px; font-weight:700; font-size:0.85rem;">UPCOMING</div>
                 `}
               </div>
-              <div style="display:flex; gap:8px;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                ${window.auth.isCoach() ? `<button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
+                        title="Set the XI for this fixture and print the card"
+                        onclick="app.openLineupModal('${m.id}')">⚽ Lineup</button>` : ''}
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="app.openEditMatchModal('${m.id}')">✏️ Edit</button>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger); border-color:rgba(239, 68, 68, 0.4);" onclick="app.deleteMatch('${m.id}')">🗑️ Delete</button>
               </div>

@@ -649,6 +649,118 @@
 .session-row { transition: background-color 0.4s ease; }
 .session-row-found { background: rgba(0, 240, 255, 0.16); }
 
+/* ---------------------------------------------------------------------------
+   Lineup builder.
+
+   The pitch is DOM, not canvas: slots have to be tappable, focusable and
+   labelled, and a canvas would give up all three for a drawing nobody edits
+   freehand. Slots are positioned from the bottom, so y=0 is the team's own
+   goal line and the shape reads the way a coach draws it.
+   --------------------------------------------------------------------------- */
+
+.lineup-shell { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+
+.lineup-pitch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background:
+    linear-gradient(0deg, rgba(255,255,255,0.10) 0 2px, transparent 2px 100%) 0 50%/100% 2px no-repeat,
+    repeating-linear-gradient(0deg, #14532d 0 8%, #166534 8% 16%);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* The centre circle and the two boxes, drawn rather than imported. */
+.lineup-pitch::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 26%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 50%;
+}
+.lineup-pitch::after {
+  content: ''; position: absolute; left: 22%; right: 22%; bottom: 0; height: 14%;
+  border: 2px solid rgba(255, 255, 255, 0.35); border-bottom: 0;
+}
+
+.lineup-slot {
+  position: absolute;
+  transform: translate(-50%, 50%);
+  min-width: 58px;
+  min-height: 44px;              /* a thumb, not a cursor */
+  padding: 4px 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px;
+  background: rgba(10, 20, 40, 0.72);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.lineup-slot.filled {
+  background: var(--bhs-blue-primary);
+  border-style: solid;
+  border-color: var(--bhs-cyan-accent);
+  color: #FFF;
+}
+
+/* While a player is in hand, every empty slot invites the second tap. */
+.lineup-slot.awaiting:not(.filled) { border-color: var(--bhs-gold-accent); }
+
+.lineup-slot .lineup-num { font-weight: 700; font-size: 0.82rem; color: var(--bhs-gold-accent); }
+.lineup-slot .lineup-who { font-size: 0.66rem; white-space: nowrap; }
+.lineup-slotlabel { font-size: 0.7rem; letter-spacing: 0.04em; }
+
+.lineup-squad { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+
+.lineup-pick {
+  display: flex; align-items: center; gap: 6px;
+  border-bottom: 1px solid var(--bhs-navy-border);
+}
+
+.lineup-pick-main {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 6px;
+  background: none; border: 0; color: inherit; font: inherit;
+  cursor: pointer; text-align: left;
+}
+
+.lineup-pick.picked { background: rgba(255, 215, 0, 0.14); }
+/* Already placed: still visible, because a coach looks players up by name
+   whether or not they are on the pitch. */
+.lineup-pick.onpitch .lineup-pick-main { opacity: 0.55; }
+
+.lineup-pick .lineup-num {
+  width: 30px; text-align: right;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--bhs-gold-accent);
+}
+.lineup-pick .lineup-who {
+  flex: 1; min-width: 0; color: #FFF; font-size: 0.85rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lineup-pick .lineup-grade { color: var(--text-muted); font-size: 0.74rem; }
+
+.lineup-tag {
+  font-size: 0.66rem; padding: 3px 7px; border-radius: 4px;
+  border: 1px solid var(--bhs-navy-border);
+  background: none; color: var(--text-muted); cursor: default; font: inherit;
+}
+.lineup-tag.benchtag { cursor: pointer; }
+.lineup-tag.benchtag.on { color: var(--bhs-cyan-accent); border-color: var(--bhs-cyan-accent); }
+
+@media (max-width: 640px) {
+  /* The pitch above the list, both full width: side by side leaves neither
+     usable on a phone. */
+  .lineup-shell { grid-template-columns: 1fr; }
+  .lineup-pitch { aspect-ratio: 3 / 4; }
+  .lineup-slot { min-width: 52px; }
+  .lineup-squad { max-height: 40vh; }
+}
+
 .rank-pill {
   width: 32px;
   height: 32px;

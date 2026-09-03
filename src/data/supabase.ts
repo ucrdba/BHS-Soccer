@@ -2289,6 +2289,127 @@ class SupabaseService {
   }
 
   /**
+   * The lineup for a fixture, or the team's default shape when matchId is null.
+   *
+   * Returns null when there is none yet — which is not an error, it is a coach
+   * who has not set one. `0023` gives a team one live lineup per fixture, so
+   * at most one row can come back.
+   */
+  async fetchLineup(
+    teamId: string, matchId?: string | null
+  ): Promise<Record<string, any> | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+
+    let q = this.client!
+      .from('lineups')
+      .select('id, team_id, school_id, match_id, formation, notes')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false);
+    q = matchId && this.isUuid(matchId) ? q.eq('match_id', matchId) : q.is('match_id', null);
+
+    const { data, error } = await q.maybeSingle();
+    if (error) { console.warn('Supabase fetchLineup notice:', error.message); return null; }
+    if (!data) return null;
+
+    const { data: rows, error: rowErr } = await this.client!
+      .from('lineup_players')
+      .select('id, player_id, role, slot, x, y, sort_order')
+      .eq('lineup_id', data.id)
+      .eq('is_deleted', false)
+      .order('sort_order');
+    if (rowErr) { console.warn('Supabase fetchLineup rows notice:', rowErr.message); return null; }
+
+    return { ...data, players: rows || [] };
+  }
+
+  /**
+   * Save a lineup whole: the header, then its players, replacing what was there.
+   *
+   * Replace rather than merge, because the XI is a set. Merging would leave a
+   * player who was dropped from the sheet still sitting in the database, and a
+   * lineup card that lists twelve is worse than one that fails to save.
+   *
+   * The delete and the insert are two round trips — PostgREST has no
+   * transaction across them — so the insert is checked and the failure names
+   * what state the lineup is in rather than reporting a bare error.
+   */
+  async saveLineup(
+    teamId: string,
+    schoolId: string,
+    matchId: string | null,
+    formation: string,
+    players: Record<string, any>[],
+    notes?: string | null
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!schoolId) return { ok: false, error: 'No organization for that team.' };
+
+    const existing = await this.fetchLineup(teamId, matchId);
+    let lineupId = existing?.id;
+
+    if (lineupId) {
+      const { data, error } = await this.client!
+        .from('lineups')
+        .update({ formation, notes: notes ?? null, updated_at: new Date().toISOString() })
+        .eq('id', lineupId)
+        .select();
+      if (error) { console.warn('Supabase saveLineup notice:', error.message); return { ok: false, error: error.message }; }
+      if (!data || data.length === 0) {
+        return { ok: false, error: 'The database refused that change. You must coach this team.' };
+      }
+    } else {
+      const { data, error } = await this.client!
+        .from('lineups')
+        .insert([{
+          team_id: teamId, school_id: schoolId,
+          match_id: matchId && this.isUuid(matchId) ? matchId : null,
+          formation, notes: notes ?? null, is_deleted: false
+        }])
+        .select();
+      if (error) { console.warn('Supabase saveLineup insert notice:', error.message); return { ok: false, error: error.message }; }
+      if (!data || !data[0]) {
+        return { ok: false, error: 'The database refused that change. You must coach this team.' };
+      }
+      lineupId = data[0].id;
+    }
+
+    const { error: delErr } = await this.client!
+      .from('lineup_players').delete().eq('lineup_id', lineupId);
+    if (delErr) {
+      console.warn('Supabase saveLineup clear notice:', delErr.message);
+      return { ok: false, error: delErr.message };
+    }
+
+    const rows = (players || [])
+      .filter(p => p && p.player_id)
+      .map((p, i) => ({
+        lineup_id: lineupId,
+        player_id: p.player_id,
+        role: p.role === 'bench' ? 'bench' : 'starter',
+        slot: p.slot ?? null,
+        x: p.x ?? null,
+        y: p.y ?? null,
+        sort_order: p.sort_order ?? i,
+        is_deleted: false
+      }));
+
+    if (rows.length === 0) return { ok: true, id: lineupId };
+
+    const { data: ins, error: insErr } = await this.client!
+      .from('lineup_players').insert(rows).select();
+    if (insErr) {
+      console.warn('Supabase saveLineup players notice:', insErr.message);
+      // Say where it stopped: the old players are already gone.
+      return { ok: false, error: `${insErr.message} — the lineup is now empty; set it again.` };
+    }
+    if (!ins || ins.length === 0) {
+      return { ok: false, error: 'The database refused the players. The lineup is now empty; set it again.' };
+    }
+    return { ok: true, id: lineupId };
+  }
+
+  /**
    * Set one player's uniform number, and touch nothing else.
    *
    * The shirt number the public sees, distinct from the recording number they

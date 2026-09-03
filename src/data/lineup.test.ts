@@ -1,0 +1,318 @@
+/**
+ * The lineup builder and the card it prints.
+ *
+ * A coach picks a formation, puts players in its slots, and hands the card to
+ * the officials. The rules that carry the weight:
+ *
+ *   A slot holds one player and a player holds one slot. Allowing either to
+ *   double up prints a card with twelve names on it, which is the one thing a
+ *   lineup card must never do.
+ *
+ *   Changing formation keeps the players whose slot still exists. Dropping the
+ *   whole XI because the coach tried 4-3-3 and went back would make the
+ *   formation picker unusable.
+ */
+
+/// <reference types="vite/client" />
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+
+import appCoreSrc from '../../public/js/app.core.js?raw';
+import lineupSrc from '../../public/js/views/lineup.view.js?raw';
+
+let ctor: any;
+
+beforeAll(() => {
+  const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+  ctor = new Function(
+    [appCoreSrc, lineupSrc].map(strip).join('\n;\n') + '\nreturn BHSSoccerApp;'
+  )();
+});
+
+const squad = () => [
+  { id: 'p1', name: 'Kevin Corona', number: 1, classYear: 'Senior' },
+  { id: 'p2', name: 'JP Davila', number: 4, classYear: '11' },
+  { id: 'p3', name: 'Aiden Diaz', number: 9, classYear: 'Junior (2028)' },
+  { id: 'p4', name: 'Blake Francis', number: null, classYear: 'Freshman' }
+];
+
+function makeApp(players: any[] = squad()): any {
+  const app = Object.create(ctor.prototype);
+  app.activeTeamId = 't1';
+  app.data = { players, teams: [{ id: 't1', school_id: 's1', name: 'JV' }], schedule: [] };
+  app._lineupAssign = {};
+  app._lineupFormation = '4-4-2';
+  app.renderLineupBody = () => {};
+  return app;
+}
+
+beforeEach(() => {
+  (globalThis as any).window = globalThis as any;
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+describe('the formations', () => {
+  it('all field eleven players', () => {
+    const app = makeApp();
+    const all = app.lineupFormations();
+    Object.keys(all).forEach(name => {
+      expect(all[name]).toHaveLength(11);
+    });
+  });
+
+  it('give every slot a distinct label, since the label is the key', () => {
+    // Assignments are keyed by slot, so a duplicate label would make two
+    // positions share one player.
+    const app = makeApp();
+    const all = app.lineupFormations();
+    Object.keys(all).forEach(name => {
+      const slots = all[name].map((s: any) => s.slot);
+      expect(new Set(slots).size).toBe(slots.length);
+    });
+  });
+
+  it('keep every slot on the pitch', () => {
+    const app = makeApp();
+    const all = app.lineupFormations();
+    Object.keys(all).forEach(name => {
+      all[name].forEach((s: any) => {
+        expect(s.x).toBeGreaterThanOrEqual(0);
+        expect(s.x).toBeLessThanOrEqual(100);
+        expect(s.y).toBeGreaterThanOrEqual(0);
+        expect(s.y).toBeLessThanOrEqual(100);
+      });
+    });
+  });
+
+  it('put exactly one keeper nearest the goal line in each', () => {
+    const app = makeApp();
+    const all = app.lineupFormations();
+    Object.keys(all).forEach(name => {
+      const gk = all[name].filter((s: any) => s.slot === 'GK');
+      expect(gk).toHaveLength(1);
+      const lowest = Math.min(...all[name].map((s: any) => s.y));
+      expect(gk[0].y).toBe(lowest);
+    });
+  });
+
+  it('falls back to a real formation when asked for one that does not exist', () => {
+    expect(makeApp().lineupSlots('9-9-9')).toHaveLength(11);
+  });
+});
+
+describe('placing a player', () => {
+  it('puts them in the slot', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    expect(app._lineupAssign.GK).toBe('p1');
+  });
+
+  it('moves them rather than cloning them', () => {
+    // A player in two slots would print twelve names on the card.
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('LB', 'p1');
+    expect(app._lineupAssign.GK).toBeUndefined();
+    expect(app._lineupAssign.LB).toBe('p1');
+  });
+
+  it('displaces whoever was in the slot', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('GK', 'p2');
+    expect(app._lineupAssign.GK).toBe('p2');
+    expect(Object.values(app._lineupAssign)).toEqual(['p2']);
+  });
+
+  it('empties the slot when given nobody', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('GK', null);
+    expect(app._lineupAssign.GK).toBeUndefined();
+  });
+});
+
+describe('tapping', () => {
+  it('places the player in hand', () => {
+    const app = makeApp();
+    app._lineupPicked = 'p1';
+    app.tapLineupSlot('GK');
+    expect(app._lineupAssign.GK).toBe('p1');
+    expect(app._lineupPicked).toBeNull();
+  });
+
+  it('lifts a player back off when nothing is in hand', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app._lineupPicked = null;
+    app.tapLineupSlot('GK');
+    expect(app._lineupAssign.GK).toBeUndefined();
+    expect(app._lineupPicked).toBe('p1');
+  });
+
+  it('does nothing on an empty slot with empty hands', () => {
+    const app = makeApp();
+    app._lineupPicked = null;
+    app.tapLineupSlot('GK');
+    expect(app._lineupAssign.GK).toBeUndefined();
+    expect(app._lineupPicked).toBeNull();
+  });
+
+  it('puts a picked player down when tapped again', () => {
+    const app = makeApp();
+    app.pickLineupPlayer('p1');
+    app.pickLineupPlayer('p1');
+    expect(app._lineupPicked).toBeNull();
+  });
+});
+
+describe('changing formation', () => {
+  it('keeps players whose slot still exists', () => {
+    // GK and LB are in both shapes; trying a formation and going back must not
+    // cost the coach the whole XI.
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('LB', 'p2');
+    app.setLineupFormation('4-3-3');
+    expect(app._lineupAssign.GK).toBe('p1');
+    expect(app._lineupAssign.LB).toBe('p2');
+  });
+
+  it('frees a player whose slot is gone', () => {
+    const app = makeApp();
+    app.assignLineupSlot('LM', 'p3');      // 4-4-2 has LM; 4-3-3 does not
+    app.setLineupFormation('4-3-3');
+    expect(app._lineupAssign.LM).toBeUndefined();
+    expect(Object.values(app._lineupAssign)).not.toContain('p3');
+  });
+});
+
+describe('the starting XI', () => {
+  it('comes back in the formation order, not the order they were placed', () => {
+    const app = makeApp();
+    app.assignLineupSlot('LST', 'p3');
+    app.assignLineupSlot('GK', 'p1');
+    const xi = app.lineupStarters('4-4-2');
+    expect(xi[0].slot).toBe('GK');
+  });
+
+  it('carries the slot and the coordinates', () => {
+    // Both are stored: the slot is what prints, x/y is where it sits.
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    const [row] = app.lineupStarters('4-4-2');
+    expect(row.slot).toBe('GK');
+    expect(typeof row.x).toBe('number');
+    expect(typeof row.y).toBe('number');
+  });
+
+  it('ignores a slot pointing at somebody no longer on the roster', () => {
+    const app = makeApp();
+    app._lineupAssign = { GK: 'gone' };
+    expect(app.lineupStarters('4-4-2')).toEqual([]);
+  });
+});
+
+describe('the bench', () => {
+  it('is everyone not starting, by default', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    expect(app.lineupBench('4-4-2').map((p: any) => p.id)).toEqual(['p2', 'p3', 'p4']);
+  });
+
+  it('never lists a starter', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    expect(app.lineupBench('4-4-2').map((p: any) => p.id)).not.toContain('p1');
+  });
+
+  it('drops a player the coach leaves out', () => {
+    const app = makeApp();
+    app.toggleLineupBench('p4');
+    expect(app.lineupBench('4-4-2').map((p: any) => p.id)).not.toContain('p4');
+  });
+
+  it('takes them back', () => {
+    const app = makeApp();
+    app.toggleLineupBench('p4');
+    app.toggleLineupBench('p4');
+    expect(app.lineupBench('4-4-2').map((p: any) => p.id)).toContain('p4');
+  });
+});
+
+describe('the rows that get saved', () => {
+  it('marks starters and bench distinctly', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    const rows = app.lineupRowsForSave('4-4-2');
+    expect(rows.find((r: any) => r.player_id === 'p1').role).toBe('starter');
+    expect(rows.find((r: any) => r.player_id === 'p2').role).toBe('bench');
+  });
+
+  it('never lists a player twice', () => {
+    // The database enforces this too, but hitting that constraint mid-save
+    // leaves the lineup empty.
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('LB', 'p2');
+    const ids = app.lineupRowsForSave('4-4-2').map((r: any) => r.player_id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('gives the bench no slot or coordinates', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    const bench = app.lineupRowsForSave('4-4-2').filter((r: any) => r.role === 'bench');
+    bench.forEach((r: any) => {
+      expect(r.slot).toBeNull();
+      expect(r.x).toBeNull();
+    });
+  });
+
+  it('orders starters before the bench', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    const rows = app.lineupRowsForSave('4-4-2');
+    const starter = rows.find((r: any) => r.role === 'starter');
+    const sub = rows.find((r: any) => r.role === 'bench');
+    expect(starter.sort_order).toBeLessThan(sub.sort_order);
+  });
+});
+
+describe('what the card prints', () => {
+  it('shortens a name to fit a slot on the pitch', () => {
+    expect(makeApp().lineupShortName({ name: 'Kevin Corona' })).toBe('K. Corona');
+  });
+
+  it('copes with a single-word name', () => {
+    expect(makeApp().lineupShortName({ name: 'Ronaldinho' })).toBe('Ronaldinho');
+  });
+
+  it('reduces every grade shape the roster actually holds to a year', () => {
+    // These arrived from different imports and all three shapes are live.
+    const app = makeApp();
+    expect(app.lineupGrade({ classYear: 'Senior' })).toBe('12');
+    expect(app.lineupGrade({ classYear: 'Junior (2028)' })).toBe('11');
+    expect(app.lineupGrade({ classYear: '11' })).toBe('11');
+    expect(app.lineupGrade({ classYear: 'Freshman' })).toBe('9');
+    expect(app.lineupGrade({ classYear: 'Sophomore' })).toBe('10');
+  });
+
+  it('passes an unrecognised grade through rather than inventing one', () => {
+    expect(makeApp().lineupGrade({ classYear: 'Post-grad' })).toBe('Post-grad');
+  });
+
+  it('is blank when no grade is recorded', () => {
+    expect(makeApp().lineupGrade({})).toBe('');
+  });
+});
+
+describe('the squad list', () => {
+  it('reads in uniform number order', () => {
+    expect(makeApp().lineupSquad().map((p: any) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('puts a player with no uniform number last, not first', () => {
+    // Number(null) is 0, which would otherwise sort them above the whole squad.
+    expect(makeApp().lineupSquad().slice(-1)[0].id).toBe('p4');
+  });
+});

@@ -114,6 +114,8 @@ declare global {
     createTeam(schoolId: string, name: string, season?: string): Promise<{ ok: boolean; id?: string; error?: string }>;
     setRecordingNumber(teamId: string, playerId: string, recordingNumber: number | null): Promise<{ ok: boolean; error?: string }>;
     setUniformNumber(teamId: string, playerId: string, number: number | null): Promise<{ ok: boolean; error?: string }>;
+    fetchLineup(teamId: string, matchId?: string | null): Promise<Record<string, any> | null>;
+    saveLineup(teamId: string, schoolId: string, matchId: string | null, formation: string, players: Record<string, any>[], notes?: string | null): Promise<{ ok: boolean; error?: string; id?: string }>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     // Paper Matrix sheets carry a recording number rather than a name,
     // because handwriting is not always readable (0021). An unknown number

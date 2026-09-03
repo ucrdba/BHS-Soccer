@@ -449,6 +449,36 @@
     </div>
   </div>
 
+  <!-- Lineup builder. Tap a player, tap a position: HTML5 drag events do not
+       fire on touch, and this is used on a phone at the ground. -->
+  <div id="lineupModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 980px;">
+      <div class="modal-header">
+        <h3>&#9917; LINEUP</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+        <label for="lineupFormation" class="text-muted" style="font-size:0.74rem; text-transform:uppercase;">Formation</label>
+        <select id="lineupFormation" class="form-control" style="max-width:150px;"
+                onchange="app.setLineupFormation(this.value)">
+          <option value="4-4-2">4-4-2</option>
+          <option value="4-3-3">4-3-3</option>
+          <option value="4-2-3-1">4-2-3-1</option>
+          <option value="3-5-2">3-5-2</option>
+          <option value="4-4-1-1">4-4-1-1</option>
+        </select>
+        <span id="lineupError" style="font-size:0.8rem; color:var(--color-danger);"></span>
+      </div>
+      <div id="lineupBody"></div>
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+        <button id="lineupSave" class="btn btn-gold" style="flex:1; min-width:140px;"
+                onclick="app.saveLineup()">Save lineup</button>
+        <button class="btn btn-secondary" style="flex:1; min-width:140px;"
+                onclick="app.printLineupCard()">&#128424; Print lineup card</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Import team routing. Raised BEFORE any row is written, because a sheet
        naming a squad that does not exist is nearly always a spelling that
        missed, and the moment to find out is before 26 players land on a team
@@ -1449,6 +1479,7 @@
   <script src="./js/views/roundrobin.view.js"></script>
   <script src="./js/views/report.view.js"></script>
   <script src="./js/views/recording-numbers.view.js"></script>
+  <script src="./js/views/lineup.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>
   <script src="./js/views/help.view.js"></script>
   <script src="./js/views/teamswitcher.view.js"></script>
