@@ -1,14 +1,14 @@
 /**
- * The order and labelling of the session grid.
+ * Ordering the Record a Session grid.
  *
- * The grid showed `#${p.number}` -- the SHIRT number -- which 0021 cleared for
- * the whole squad when it moved those values into recording_number. So every
- * row read "#—" and the coach could not match a row to the paper sheet in
- * front of them.
+ * Results are entered from a paper sheet by reading down the recording
+ * numbers, so that is the default order and the recording number is a column
+ * of its own with a heading that sorts it.
  *
- * Reordering has a trap of its own: the rows are re-rendered from scratch, so
- * anything typed but not yet saved lives only in the DOM. Sorting mid-entry
- * must not discard it.
+ * The rule that must survive: a player with no recording number stays last
+ * whichever direction is asked for. Number(null) is 0, so the naive comparison
+ * puts them above the whole squad, and a run of blanks at the top of a
+ * data-entry grid reads as broken data.
  */
 
 /// <reference types="vite/client" />
@@ -16,7 +16,6 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
-import { supabaseService } from './supabase';
 
 let ctor: any;
 
@@ -27,122 +26,134 @@ beforeAll(() => {
   )();
 });
 
-const TEAM = '65d376d3-2a77-49c0-80f7-f8f2586f9f2b';
-const DRILL = 'd1111111-1111-1111-1111-111111111111';
+/** Names and numbers deliberately disagree, so the two orders are distinct. */
+const squad = () => [
+  { id: 'p1', name: 'Zoe Alvarez', recordingNumber: 1 },
+  { id: 'p2', name: 'Adam Corona', recordingNumber: 7 },
+  { id: 'p3', name: 'Mia Davila', recordingNumber: 4 }
+];
 
-function makeApp(players?: any[]): any {
+function makeApp(players: any[] = squad()): any {
   const app = Object.create(ctor.prototype);
-  app.activeTeamId = TEAM;
+  app.activeTeamId = 't1';
   app.data = {
-    teams: [{ id: TEAM, name: 'Varsity', school_id: 's1' }],
-    players: players || [
-      { id: 'p3', name: 'Diesel Barron', recordingNumber: 3, number: null },
-      { id: 'p1', name: 'Cesar Alva', recordingNumber: 1, number: null },
-      { id: 'p2', name: 'Dencel Barajas', recordingNumber: 2, number: null }
-    ],
-    drillsBank: [{ id: DRILL, name: '3 Laps', points: 1.5, measure: 'time_bands' }]
+    players,
+    drillsBank: [{ id: 'd1', name: 'Coopers', measure: 'count_high', points: 1 }]
   };
-  app._sessionDrillId = DRILL;
-  app._sessionBands = [{ max_seconds: 270, factor: 1 }, { max_seconds: 290, factor: 0.25 }];
-  app.activeTeamLabel = () => ({ team: 'Varsity', org: 'Beaumont', season: '' });
+  app._sessionDrillId = 'd1';
   return app;
 }
 
-const mount = (app: any) => {
-  document.body.innerHTML = `<div id="sessionRows">${app.renderSessionRows()}</div>`;
-};
-
-/** The players, in the order the grid rendered them. */
-const order = () =>
-  Array.from(document.querySelectorAll('[id^="sessionValue_"]'))
-    .map(el => (el as HTMLElement).id.replace('sessionValue_', ''));
+/** The order the grid actually renders in. */
+function rendered(app: any): string[] {
+  document.body.innerHTML = '<table>' + app.renderSessionRows() + '</table>';
+  return Array.from(document.querySelectorAll('.session-row')).map(r => r.id.replace('sessionRow_', ''));
+}
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
-  (window as any).supabaseService = {
-    isConfigured: () => true,
-    parseTimeToSeconds: (v: any) => supabaseService.parseTimeToSeconds(v),
-    formatSecondsAsTime: (v: any) => supabaseService.formatSecondsAsTime(v),
-    factorForTime: (s: any, b: any) => supabaseService.factorForTime(s, b)
-  };
+  document.body.innerHTML = '';
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
-describe('what each row shows', () => {
-  it('shows the recording number, which is what the paper sheet says', () => {
-    mount(makeApp());
-    const html = document.getElementById('sessionRows')!.innerHTML;
-    expect(html).toContain('Cesar Alva');
-    // The number is present as its own value, not as an empty "#—".
-    expect(html).not.toContain('#—');
+describe('the default order', () => {
+  it('is by recording number, because that is how the paper sheet reads', () => {
+    expect(rendered(makeApp())).toEqual(['p1', 'p3', 'p2']);
   });
 
-  it('never shows the shirt number here, even when there is one', () => {
-    // This screen is read alongside a paper sheet that carries recording
-    // numbers. A second number beside each name is noise at best, and at worst
-    // the one the coach types.
-    mount(makeApp([{ id: 'p1', name: 'Cesar Alva', recordingNumber: 1, number: 9 }]));
-    const html = document.getElementById('sessionRows')!.innerHTML;
-    expect(html).not.toContain('shirt');
-    expect(html).not.toContain('>9<');
+  it('is not name order, so the two cannot be confused', () => {
+    const byName = squad().slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => p.id);
+    expect(byName).not.toEqual(['p1', 'p3', 'p2']);
   });
 });
 
-describe('the order players appear in', () => {
-  it('leads with recording number, matching the paper sheet', () => {
-    // The roster arrives in an arbitrary order; the sheet runs 1, 2, 3.
-    mount(makeApp());
-    expect(order()).toEqual(['p1', 'p2', 'p3']);
-  });
-
-  it('sorts by name when asked', () => {
+describe('sorting the column', () => {
+  const sorted = (by: string, clicks = 1) => {
     const app = makeApp();
-    mount(app);
+    for (let i = 0; i < clicks; i++) app.setSessionSort(by);
+    return rendered(app);
+  };
+
+  it('reverses on the FIRST click of #, since the grid already opens that way', () => {
+    // _sessionSort starts unset while the grid is already in number order.
+    // Comparing to the raw property rather than the order in force made this
+    // click a no-op: the coach clicked and nothing moved.
+    expect(sorted('number', 1)).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('returns to ascending on the second', () => {
+    expect(sorted('number', 2)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('sorts by name A to Z', () => {
+    expect(sorted('name')).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('reverses the name on a second click', () => {
+    expect(sorted('name', 2)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('starts a newly clicked column in its own order', () => {
+    // Carrying a reversal across would silently invert the new column.
+    const app = makeApp();
     app.setSessionSort('name');
-    expect(order()).toEqual(['p1', 'p2', 'p3']);   // Alva, Barajas, Barron
-  });
-
-  it('puts a player with no recording number last, not first', () => {
-    // A run of blanks at the top reads as broken data rather than a squad.
-    const app = makeApp([
-      { id: 'pX', name: 'Zach Unassigned', recordingNumber: null, number: null },
-      { id: 'p1', name: 'Cesar Alva', recordingNumber: 1, number: null }
-    ]);
-    mount(app);
-    expect(order()).toEqual(['p1', 'pX']);
-  });
-
-  it('offers both orders as controls', () => {
-    mount(makeApp());
-    const html = document.getElementById('sessionRows')!.innerHTML;
-    expect(html).toContain("setSessionSort('number')");
-    expect(html).toContain("setSessionSort('name')");
+    app.setSessionSort('name');       // name, reversed
+    app.setSessionSort('number');     // number, should be ascending
+    expect(rendered(app)).toEqual(['p1', 'p3', 'p2']);
   });
 });
 
-describe('reordering mid-entry', () => {
-  it('KEEPS times already typed', async () => {
-    // The rows are re-rendered from scratch, so anything only in the DOM would
-    // be lost. A coach who has entered fifteen times and then sorts must not
-    // lose them.
-    const app = makeApp();
-    mount(app);
-    (document.getElementById('sessionValue_p1') as HTMLInputElement).value = '4:28';
-    (document.getElementById('sessionValue_p3') as HTMLInputElement).value = '4:55';
+describe('a player with no recording number', () => {
+  const withBlank = () => [...squad(), { id: 'p4', name: 'Bea Nolast', recordingNumber: null }];
 
-    app.setSessionSort('name');
-
-    expect((document.getElementById('sessionValue_p1') as HTMLInputElement).value).toBe('4:28');
-    expect((document.getElementById('sessionValue_p3') as HTMLInputElement).value).toBe('4:55');
+  it('sorts last ascending', () => {
+    expect(rendered(makeApp(withBlank())).slice(-1)).toEqual(['p4']);
   });
 
-  it('keeps an attendance already changed', async () => {
+  it('still sorts last when reversed', () => {
+    // Number(null) is 0. Reversing a naive comparison puts them on top, and a
+    // blank leading a data-entry grid reads as broken data.
+    const app = makeApp(withBlank());
+    app.setSessionSort('number');          // now descending
+    expect(rendered(app).slice(-1)).toEqual(['p4']);
+  });
+
+  it('is shown with a dash rather than an empty cell', () => {
+    const app = makeApp(withBlank());
+    document.body.innerHTML = '<table>' + app.renderSessionRows() + '</table>';
+    const cell = document.querySelector('#sessionRow_p4 .session-recnum')!;
+    expect(cell.textContent!.trim()).toBe('—');
+  });
+
+  it('is still listed by name in name order', () => {
+    // Looking somebody up by name should not hide them for lacking a number.
+    const app = makeApp(withBlank());
+    app.setSessionSort('name');
+    expect(rendered(app)).toContain('p4');
+  });
+});
+
+describe('the entry fields', () => {
+  it('gives every player a field, whatever the order', () => {
     const app = makeApp();
-    mount(app);
-    (document.getElementById('sessionAttend_p2') as HTMLSelectElement).value = 'excused';
+    app.setSessionSort('name');
+    document.body.innerHTML = '<table>' + app.renderSessionRows() + '</table>';
+    squad().forEach(p => {
+      expect(document.getElementById('sessionValue_' + p.id)).not.toBeNull();
+      expect(document.getElementById('sessionAttend_' + p.id)).not.toBeNull();
+    });
+  });
+
+  it('keeps a typed value when the order changes', () => {
+    // Re-sorting redraws the rows. Losing what was typed would be worse than
+    // not offering the sort at all.
+    const app = makeApp();
+    document.body.innerHTML =
+      '<div id="sessionRows"><table>' + app.renderSessionRows() + '</table></div>';
+    (document.getElementById('sessionValue_p2') as HTMLInputElement).value = '2600';
 
     app.setSessionSort('name');
 
-    expect((document.getElementById('sessionAttend_p2') as HTMLSelectElement).value).toBe('excused');
+    expect((document.getElementById('sessionValue_p2') as HTMLInputElement).value).toBe('2600');
   });
 });

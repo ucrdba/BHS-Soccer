@@ -612,9 +612,41 @@
 .data-table th, .data-table td { text-align: center; }
 .data-table th.col-text, .data-table td.col-text { text-align: left; }
 
-/* The row jumped to in Record a Session. Fades out on its own, because the
+/* ---------------------------------------------------------------------------
+   Record a Session.
+
+   The recording number is a COLUMN, not a prefix on the name: 25 results are
+   entered by reading down the numbers on a paper sheet, and a number buried in
+   a sentence cannot be scanned that way.
+   --------------------------------------------------------------------------- */
+
+.session-table { table-layout: auto; }
+
+.session-table td, .session-table th { padding: 4px 8px; }
+
+/* Wide enough for three digits, and set in the gold the rest of the app uses
+   for a recording number so it reads as the same thing here. */
+.session-recnum {
+  width: 52px;
+  color: var(--bhs-gold-accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One line per player, so the grid can be scanned against a paper sheet
+   without rows changing height. A long name is clipped rather than wrapped. */
+.session-playername {
+  color: #FFF;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+/* The row jumped to by the Find box. Fades out on its own, because the
    highlight answers "where did it go" and then stops being useful. */
-.session-row { border-radius: 6px; transition: background-color 0.4s ease; }
+.session-row { transition: background-color 0.4s ease; }
 .session-row-found { background: rgba(0, 240, 255, 0.16); }
 
 .rank-pill {

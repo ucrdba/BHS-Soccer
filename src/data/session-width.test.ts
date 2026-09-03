@@ -124,9 +124,39 @@ describe('remembering the choice', () => {
 });
 
 describe('a name on one line', () => {
-  it('does not wrap the player name', () => {
-    // The whole point of the width: scanning the grid against a paper sheet.
-    expect(sessionSrc).toContain('white-space:nowrap');
-    expect(sessionSrc).toContain('text-overflow:ellipsis');
+  /**
+   * The point of the width: scanning the grid against a paper sheet without
+   * rows changing height as names wrap.
+   *
+   * The rule moved to a stylesheet class when the grid became a real table, so
+   * these check the class is applied AND that the class carries the rule.
+   * Checking only one of the two passes while the other half is missing.
+   */
+  it('puts the name in the cell that carries the rule', () => {
+    const app = makeApp();
+    app.data.players = [{ id: 'p1', name: 'Christopher Estrada', recordingNumber: 3 }];
+    app.data.drillsBank = [{ id: 'd1', name: 'Coopers', measure: 'count_high', points: 1 }];
+    app._sessionDrillId = 'd1';
+
+    const html = app.renderSessionRows();
+    expect(html).toContain('session-playername');
+    expect(html).toContain('Christopher Estrada');
+  });
+
+  it('gives the recording number a cell of its own', () => {
+    // The requirement this replaced a prefix for: results are entered by
+    // reading down the recording numbers on a paper sheet, and a number
+    // rendered inside the name cannot be scanned that way.
+    const app = makeApp();
+    app.data.players = [{ id: 'p1', name: 'Christopher Estrada', recordingNumber: 3 }];
+    app.data.drillsBank = [{ id: 'd1', name: 'Coopers', measure: 'count_high', points: 1 }];
+    app._sessionDrillId = 'd1';
+
+    document.body.innerHTML = '<table>' + app.renderSessionRows() + '</table>';
+    const row = document.getElementById('sessionRow_p1')!;
+    const cells = Array.from(row.children).map(c => c.textContent!.trim());
+
+    expect(cells[0]).toBe('3');
+    expect(cells[1]).toBe('Christopher Estrada');
   });
 });

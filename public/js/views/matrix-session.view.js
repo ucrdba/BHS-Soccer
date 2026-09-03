@@ -406,17 +406,9 @@ Object.assign(BHSSoccerApp.prototype, {
     // paper sheet is written in and the coach reads down it. Players with no
     // number sort last rather than leading with a run of blanks.
     const by = this._sessionSort === 'name' ? 'name' : 'number';
-    const players = roster.concat(gone).sort((a, b) => {
-      if (by === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
-      // Number(null) is 0, which would sort an unnumbered player to the very
-      // top -- a run of blanks above the squad reads as broken data.
-      const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
-      const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
-      const ga = Number.isFinite(na), gb = Number.isFinite(nb);
-      if (ga !== gb) return ga ? -1 : 1;
-      if (ga && na !== nb) return na - nb;
-      return String(a.name || '').localeCompare(String(b.name || ''));
-    });
+    const reversed = !!this._sessionSortReversed;
+    const players = roster.concat(gone)
+      .sort((a, b) => this.compareSessionPlayers(a, b, by, reversed));
 
     if (players.length === 0) {
       return '<p class="text-muted" style="font-size:0.85rem;">This team has no players yet.</p>';
@@ -428,6 +420,21 @@ Object.assign(BHSSoccerApp.prototype, {
                : measure === 'time_bands' ? 'mm:ss — scored against the standard'
                : measure === 'win_loss' ? 'result'
                : 'number — higher wins';
+
+    // What the entry column is actually for, so the header is not just "Value".
+    const valueLabel = measure === 'win_loss' ? 'Result'
+                     : measure === 'time_low' || measure === 'time_bands' ? 'Time'
+                     : 'Score';
+
+    // Click a heading to reorder. Reading 25 results off a paper sheet means
+    // going down the recording numbers, so that order is the default.
+    const sessionTh = (key, label) => {
+      const on = by === key;
+      const arrow = on ? (this._sessionSortReversed ? ' \u25B2' : ' \u25BC') : '';
+      const cls = key === 'name' ? 'col-text' : '';
+      return `<th class="${cls}" style="cursor:pointer;" title="Sort by ${label}"
+                  onclick="app.setSessionSort('${key}')">${label}${arrow}</th>`;
+    };
 
     // A timed standard is only meaningful once the squad has one. Said here
     // rather than after saving, when the exercise would simply not be counted
@@ -460,13 +467,16 @@ Object.assign(BHSSoccerApp.prototype, {
                 onclick="app.jumpToSessionPlayer()">Find</button>
         <span id="sessionQuickError" style="font-size:0.76rem; color:var(--color-danger);"></span>
       </div>
-      <div style="display:flex; gap:8px; align-items:center; margin:0 0 8px 0;">
-        <span class="text-muted" style="font-size:0.72rem; text-transform:uppercase;">Order by</span>
-        <span class="filter-chip ${by === 'number' ? 'active' : ''}" style="font-size:0.72rem; cursor:pointer;"
-              onclick="app.setSessionSort('number')">Recording no.</span>
-        <span class="filter-chip ${by === 'name' ? 'active' : ''}" style="font-size:0.72rem; cursor:pointer;"
-              onclick="app.setSessionSort('name')">Name</span>
-      </div>
+      <table class="data-table session-table">
+        <thead>
+          <tr>
+            ${sessionTh('number', '#')}
+            ${sessionTh('name', 'Player')}
+            <th>${valueLabel}</th>
+            <th>Attendance</th>
+          </tr>
+        </thead>
+        <tbody>
       ${players.map(p => {
         // A player who joined after this session was recorded has no stored
         // row. Default them to excused rather than present: they were not
@@ -476,14 +486,13 @@ Object.assign(BHSSoccerApp.prototype, {
         const val = had && had.rawValue !== null && had.rawValue !== undefined ? had.rawValue : '';
         const out = had && had.outcome ? had.outcome : '';
         return `
-        <div id="sessionRow_${p.id}" class="session-row"
-             style="display:flex; gap:8px; align-items:center; margin-bottom:6px;${p._gone ? ' opacity:.75;' : ''}">
-          <span style="flex:1; min-width:0; color:#FFF; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-            <span style="display:inline-block; min-width:28px; color:var(--bhs-gold-accent); font-weight:700;">${p.recordingNumber != null ? p.recordingNumber : '—'}</span>
+        <tr id="sessionRow_${p.id}" class="session-row"${p._gone ? ' style="opacity:.75;"' : ''}>
+          <td class="session-recnum">${p.recordingNumber != null ? p.recordingNumber : '—'}</td>
+          <td class="col-text session-playername">
             ${p.name}
             ${p._gone ? '<span class="badge badge-coach" style="font-size:0.65rem;">no longer on this team</span>' : ''}
-          </span>
-          ${measure === 'win_loss'
+          </td>
+          <td>${measure === 'win_loss'
             ? `<select id="sessionOutcome_${p.id}" class="form-control" style="max-width:110px; font-size:0.8rem;">
                  <option value=""${out === '' ? ' selected' : ''}>— result —</option>
                  <option value="win"${out === 'win' ? ' selected' : ''}>Won</option>
@@ -495,15 +504,20 @@ Object.assign(BHSSoccerApp.prototype, {
                       style="max-width:110px; font-size:0.8rem;"
                       value="${val === '' ? '' : window.supabaseService.formatSecondsAsTime(val)}"
                       oninput="app.showBandEarned('${p.id}')" />
-               <span id="sessionEarned_${p.id}" class="text-muted" style="font-size:0.75rem; min-width:64px;"></span>`
+               <span id="sessionEarned_${p.id}" class="text-muted" style="font-size:0.75rem;"></span>`
             : `<input type="number" id="sessionValue_${p.id}" class="form-control" step="any"
                       style="max-width:110px; font-size:0.8rem;" value="${val}" />`}
-          <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
-            <option value="present"${att === 'present' ? ' selected' : ''}>Here</option>
-            <option value="excused"${att === 'excused' ? ' selected' : ''}>Excused</option>
-            <option value="unexcused"${att === 'unexcused' ? ' selected' : ''}>No-show</option>
-          </select>
-        </div>`; }).join('')}`;
+          </td>
+          <td>
+            <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
+              <option value="present"${att === 'present' ? ' selected' : ''}>Here</option>
+              <option value="excused"${att === 'excused' ? ' selected' : ''}>Excused</option>
+              <option value="unexcused"${att === 'unexcused' ? ' selected' : ''}>No-show</option>
+            </select>
+          </td>
+        </tr>`; }).join('')}
+        </tbody>
+      </table>`;
   },
 
   /**
@@ -601,6 +615,32 @@ Object.assign(BHSSoccerApp.prototype, {
     setTimeout(() => row.classList.remove('session-row-found'), 1600);
   },
 
+  /**
+   * Order two rows of the session grid.
+   *
+   * Recording number by default, because that is the order the paper sheet is
+   * written in and the coach reads straight down it.
+   *
+   * Reversing flips the comparison of VALUES only. A player with no recording
+   * number stays last either way: Number(null) is 0, which would otherwise
+   * sort them above the squad, and a run of blanks at the top of a data-entry
+   * grid reads as broken data whichever direction was asked for.
+   */
+  compareSessionPlayers(a, b, by, reversed) {
+    const flip = reversed ? -1 : 1;
+
+    if (by === 'name') {
+      return flip * String(a.name || '').localeCompare(String(b.name || ''));
+    }
+
+    const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
+    const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
+    const ga = Number.isFinite(na), gb = Number.isFinite(nb);
+    if (ga !== gb) return ga ? -1 : 1;
+    if (ga && na !== nb) return flip * (na - nb);
+    return flip * String(a.name || '').localeCompare(String(b.name || ''));
+  },
+
   setSessionSort(by) {
     const typed = this.collectSessionResults();
     this._sessionPrefill = this._sessionPrefill || {};
@@ -612,7 +652,20 @@ Object.assign(BHSSoccerApp.prototype, {
       };
     });
 
-    this._sessionSort = by === 'name' ? 'name' : 'number';
+    const wanted = by === 'name' ? 'name' : 'number';
+    // Compare against the order actually IN FORCE, not the stored value: the
+    // grid opens in recording-number order while _sessionSort is still unset,
+    // so comparing to the raw property made the first click on # a no-op.
+    const current = this._sessionSort === 'name' ? 'name' : 'number';
+    // Clicking the column already in force reverses it; a different column
+    // starts in its own natural order rather than inheriting the reversal.
+    if (current === wanted) {
+      this._sessionSortReversed = !this._sessionSortReversed;
+    } else {
+      this._sessionSort = wanted;
+      this._sessionSortReversed = false;
+    }
+
     const rows = document.getElementById('sessionRows');
     if (rows) rows.innerHTML = this.renderSessionRows();
   },
