@@ -501,6 +501,36 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * How tightly to set the card so it lands on ONE sheet.
+   *
+   * A lineup card that runs to a second page is useless: it is handed over at
+   * the touchline and read at a glance. The XI is always eleven rows, but the
+   * bench is whatever the squad has left, so the total varies from about
+   * twelve to nearly forty and a single fixed size cannot serve both.
+   *
+   * Two levers, applied together. The type scales down as the list grows, and
+   * a long bench splits into two columns — which halves its height and is worth
+   * far more than another point off the font.
+   *
+   * The thresholds are set against US Letter at 10mm margins, the smaller of
+   * the two common sheets, so anything that fits there fits A4 as well.
+   */
+  lineupCardDensity(starters, bench) {
+    const benchCols = bench > 8 ? 2 : 1;
+    // What actually drives the height: the bench contributes half its rows
+    // once it is in two columns.
+    const rows = starters + Math.ceil(bench / benchCols);
+
+    if (rows <= 16) return { font: 11.5, pad: 4.5, head: 17, benchCols };
+    if (rows <= 20) return { font: 10.5, pad: 3.5, head: 16, benchCols };
+    if (rows <= 24) return { font: 9.5,  pad: 2.8, head: 15, benchCols };
+    if (rows <= 28) return { font: 8.5,  pad: 2.2, head: 14, benchCols };
+    // Beyond this the squad is larger than any bench a match allows, but the
+    // card must still print rather than overflow.
+    return { font: 7.5, pad: 1.6, head: 13, benchCols };
+  },
+
+  /**
    * The card, printed in its own window.
    *
    * Same approach as the squad report: the print dialog's Save as PDF is the
@@ -538,28 +568,67 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const bench = this.lineupBench(formation);
 
+    const d = this.lineupCardDensity(starters.length, bench.length);
+
+    // The bench split across columns, filling down each in turn so the numbers
+    // still read in order rather than snaking across.
+    const per = Math.ceil(bench.length / d.benchCols);
+    const benchCols = [];
+    for (let i = 0; i < d.benchCols; i++) benchCols.push(bench.slice(i * per, (i + 1) * per));
+
     win.document.write(`<!doctype html><html><head><meta charset="utf-8" />
       <title>Lineup — ${esc(label.team || 'Team')}</title>
       <style>
-        body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 16mm; color: #111; }
-        h1 { font-size: 19pt; margin: 0; }
-        .sub { color: #555; font-size: 10pt; margin: 2px 0 14px 0; }
-        h2 { font-size: 12pt; margin: 14px 0 4px 0; border-bottom: 2px solid #111; padding-bottom: 3px; }
-        table { width: 100%; border-collapse: collapse; font-size: 12pt; }
-        th { text-align: left; font-size: 8pt; text-transform: uppercase; color: #555; padding: 3px 6px; }
-        td { padding: 5px 6px; border-bottom: 1px solid #ddd; }
+        /* One sheet, always. The margin is set here rather than on body so it
+           applies to the printed page rather than the preview only. */
+        @page { margin: 10mm; }
+        body {
+          font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+          margin: 0; color: #111;
+          font-size: ${d.font}pt;
+        }
+        /* The header is one line. It was three, which cost a fifth of the page
+           for information the coach already knows. */
+        .head {
+          display: flex; justify-content: space-between; align-items: baseline;
+          gap: 10px; border-bottom: 2px solid #111; padding-bottom: 3px; margin-bottom: 6px;
+        }
+        h1 { font-size: ${d.head}pt; margin: 0; white-space: nowrap; }
+        .meta { font-size: ${Math.max(7, d.font - 2)}pt; color: #555; text-align: right; }
+
+        h2 {
+          font-size: ${Math.max(8, d.font - 1)}pt; margin: 7px 0 2px 0;
+          text-transform: uppercase; letter-spacing: 0.06em; color: #333;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: ${d.font}pt; }
+        th {
+          text-align: left; font-size: ${Math.max(6, d.font - 3.5)}pt;
+          text-transform: uppercase; color: #666; padding: 1px 5px; font-weight: 600;
+        }
+        td { padding: ${d.pad}pt 5px; border-bottom: 1px solid #ddd; }
         /* Officials read down the number column, so it is fixed width and
            tabular rather than flowing with the name beside it. */
-        .num   { width: 42px; font-variant-numeric: tabular-nums; font-weight: 700; }
-        .slot  { width: 58px; color: #555; font-size: 9pt; }
-        .grade { width: 46px; color: #555; }
-        .sign { margin-top: 26px; font-size: 9pt; color: #555; }
-        @media print { body { margin: 12mm; } }
+        .num   { width: 8%; font-variant-numeric: tabular-nums; font-weight: 700; }
+        .slot  { width: 12%; color: #555; font-size: ${Math.max(6, d.font - 2)}pt; }
+        .grade { width: 8%; color: #555; }
+
+        .bench { display: flex; gap: 14px; align-items: flex-start; }
+        .bench > table { flex: 1; }
+
+        /* Nothing may break across a page, because there is only one. */
+        table, tr, .head { break-inside: avoid; page-break-inside: avoid; }
+
+        .sign {
+          margin-top: 10px; font-size: ${Math.max(7, d.font - 2.5)}pt; color: #555;
+          display: flex; justify-content: space-between; gap: 20px;
+        }
       </style></head><body>
-      <h1>${esc(label.org || '')} ${esc(label.team || '')}</h1>
-      <div class="sub">
-        ${match ? 'vs ' + esc(match.opponent) + ' &middot; ' + esc(match.date) + ' &middot; ' : ''}
-        Formation ${esc(formation)} &middot; ${new Date().toLocaleDateString()}
+      <div class="head">
+        <h1>${esc(label.org || '')} ${esc(label.team || '')}</h1>
+        <div class="meta">
+          ${match ? esc(match.opponent) + ' &middot; ' + esc(match.date) + '<br />' : ''}
+          ${esc(formation)} &middot; ${new Date().toLocaleDateString()}
+        </div>
       </div>
 
       <h2>Starting XI</h2>
@@ -567,10 +636,16 @@ Object.assign(BHSSoccerApp.prototype, {
         <tbody>${rows(starters, true)}</tbody></table>
 
       ${bench.length ? `<h2>Substitutes</h2>
-      <table><thead><tr><th></th><th>No.</th><th>Player</th><th>Gr</th></tr></thead>
-        <tbody>${rows(bench, false)}</tbody></table>` : ''}
+      <div class="bench">
+        ${benchCols.filter(c => c.length).map(col => `
+          <table><thead><tr><th></th><th>No.</th><th>Player</th><th>Gr</th></tr></thead>
+            <tbody>${rows(col, false)}</tbody></table>`).join('')}
+      </div>` : ''}
 
-      <div class="sign">Coach signature ________________________________</div>
+      <div class="sign">
+        <span>Coach ______________________________</span>
+        <span>Official ______________________________</span>
+      </div>
       </body></html>`);
     win.document.close();
     win.focus();

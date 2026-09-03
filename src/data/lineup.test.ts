@@ -460,3 +460,82 @@ describe('the drag handles in the markup', () => {
     expect(new Set(slots).size).toBe(11);
   });
 });
+
+describe('fitting the card on one sheet', () => {
+  /**
+   * A lineup card that runs to a second page is useless — it is handed over at
+   * the touchline and read at a glance. The XI is always eleven rows, but the
+   * bench is whatever the squad has left, so the total runs from about twelve
+   * to nearly forty and no single fixed size serves both.
+   *
+   * The thresholds are set against US Letter at 10mm margins, the smaller of
+   * the two common sheets, so what fits there fits A4 too.
+   */
+
+  /**
+   * Roughly how tall the card prints, in points, from the density it chose.
+   * Letter at 10mm margins leaves about 736pt of usable height.
+   */
+  const heightOf = (app: any, starters: number, bench: number) => {
+    const d = app.lineupCardDensity(starters, bench);
+    const rows = starters + Math.ceil(bench / d.benchCols);
+    const rowHeight = d.font + d.pad * 2 + 1;          // text + padding + rule
+    const headings = 2 * (d.font + 6);                 // the two section labels
+    const chrome = d.head + 30;                        // header block + signatures
+    return rows * rowHeight + headings + chrome;
+  };
+
+  const LETTER = 736;
+
+  it('fits a normal squad', () => {
+    expect(heightOf(makeApp(), 11, 7)).toBeLessThan(LETTER);
+  });
+
+  it('fits a full squad of twenty-five', () => {
+    expect(heightOf(makeApp(), 11, 14)).toBeLessThan(LETTER);
+  });
+
+  it('fits an unusually large squad', () => {
+    expect(heightOf(makeApp(), 11, 25)).toBeLessThan(LETTER);
+  });
+
+  it('fits even an absurd one, rather than overflowing', () => {
+    expect(heightOf(makeApp(), 11, 40)).toBeLessThan(LETTER);
+  });
+
+  it('splits a long bench into two columns, which is worth more than shrinking', () => {
+    const app = makeApp();
+    expect(app.lineupCardDensity(11, 14).benchCols).toBe(2);
+    expect(app.lineupCardDensity(11, 5).benchCols).toBe(1);
+  });
+
+  it('keeps a short card readable rather than shrinking it needlessly', () => {
+    // Scaling is for fitting, not a house style. A card with room to spare
+    // should be set large enough to read at arm's length.
+    expect(makeApp().lineupCardDensity(11, 4).font).toBeGreaterThanOrEqual(11);
+  });
+
+  it('never sets type too small to read', () => {
+    const app = makeApp();
+    [0, 7, 14, 25, 40].forEach(bench => {
+      expect(app.lineupCardDensity(11, bench).font).toBeGreaterThanOrEqual(7.5);
+    });
+  });
+
+  it('shrinks as the list grows, never the other way', () => {
+    const app = makeApp();
+    let last = Infinity;
+    [0, 5, 10, 15, 20, 30].forEach(bench => {
+      const f = app.lineupCardDensity(11, bench).font;
+      expect(f).toBeLessThanOrEqual(last);
+      last = f;
+    });
+  });
+
+  it('gives the header less room than the roster', () => {
+    // The header was three lines and cost a fifth of the page for things the
+    // coach already knows.
+    const d = makeApp().lineupCardDensity(11, 14);
+    expect(d.head).toBeLessThan(20);
+  });
+});
