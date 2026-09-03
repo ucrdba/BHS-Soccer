@@ -612,6 +612,90 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * Fixtures this lineup could be pushed out to.
+   *
+   * Only ones with NO lineup of their own. A fixture whose lineup a coach has
+   * already set is the last thing that should be quietly overwritten by a
+   * bulk action, so those are left alone and reported rather than skipped in
+   * silence.
+   */
+  fixturesWithoutLineup() {
+    const has = new Set((this._lineupIndex || [])
+      .filter(r => r.match_id).map(r => r.match_id));
+    return (this.data.schedule || [])
+      .filter(m => !m.is_deleted && !m.isDeleted && m.id && !has.has(m.id));
+  },
+
+  /**
+   * Put the current arrangement on every fixture that has none.
+   *
+   * The season's shape is usually one lineup with a change or two per match,
+   * so setting them one at a time is the same work repeated twenty times. This
+   * writes the starting point; each fixture is then edited and saved normally.
+   *
+   * Deliberately NOT an overwrite. Fixtures that already have a lineup keep
+   * it, because a bulk action that silently replaced a carefully set XI would
+   * be unforgivable, and the count of what was skipped is reported.
+   */
+  async applyLineupToAllFixtures() {
+    const err = document.getElementById('lineupError');
+    const say = (m) => { this._lineupError = m; if (err) err.textContent = m; };
+
+    if (!this.activeTeamId) return say('Choose a team in the header first.');
+    const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
+    if (!team) return say('Choose a team in the header first.');
+
+    const formation = this._lineupFormation || '4-4-2';
+    const rows = this.lineupRowsForSave(formation);
+    if (rows.filter(r => r.role === 'starter').length === 0) {
+      return say('Place some players before applying this to other matches.');
+    }
+
+    const targets = this.fixturesWithoutLineup();
+    const skipped = (this.data.schedule || [])
+      .filter(m => !m.is_deleted && !m.isDeleted && m.id).length - targets.length;
+
+    if (targets.length === 0) {
+      return say(skipped > 0
+        ? `Every fixture already has its own lineup — none were changed.`
+        : 'There are no fixtures to apply this to.');
+    }
+
+    if (!window.confirm(
+      `Apply this lineup to ${targets.length} fixture${targets.length === 1 ? '' : 's'} `
+      + `that have none?\n\n`
+      + (skipped > 0
+          ? `${skipped} fixture${skipped === 1 ? '' : 's'} already have a lineup and will NOT be changed.\n\n`
+          : '')
+      + `Each one can still be edited and saved separately afterwards.`)) return;
+
+    const btn = document.getElementById('lineupApplyAll');
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
+
+    let done = 0;
+    const failures = [];
+    for (const m of targets) {
+      const res = await window.supabaseService.saveLineup(
+        this.activeTeamId, team.school_id, m.id, formation, rows);
+      if (res && res.ok) done += 1;
+      else failures.push(`${m.opponent || 'a fixture'}: ${res?.error || 'refused'}`);
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Apply to all fixtures'; }
+
+    // Refresh the index so the picker and the skip count reflect what now exists.
+    this._lineupIndex =
+      (await window.supabaseService.fetchTeamLineups(this.activeTeamId)) || [];
+    this.renderLineupSources();
+
+    if (failures.length) {
+      return say(`Applied to ${done}. ${failures.length} failed — ${failures[0]}`);
+    }
+    say(`Applied to ${done} fixture${done === 1 ? '' : 's'}.`
+      + (skipped > 0 ? ` ${skipped} already had one and were left alone.` : ''));
+  },
+
+  /**
    * How tightly to set the card so it lands on ONE sheet.
    *
    * A lineup card that runs to a second page is useless: it is handed over at

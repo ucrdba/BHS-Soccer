@@ -712,3 +712,113 @@ describe('choosing a lineup to copy', () => {
     expect(app.lineupCopySources()[0].label).toBe('A past fixture');
   });
 });
+
+describe('applying one lineup to every fixture', () => {
+  /**
+   * A season's shape is usually one lineup with a change or two per match, so
+   * setting each fixture from scratch is the same work twenty times over.
+   *
+   * The rule that matters most here is what it REFUSES to do: a fixture that
+   * already has a lineup keeps it. A bulk action that silently replaced a
+   * carefully set XI would be unforgivable.
+   */
+  function appWith(schedule: any[], index: any[]) {
+    const app = makeApp();
+    app.data.schedule = schedule;
+    app._lineupIndex = index;
+    return app;
+  }
+
+  const fixtures = () => ([
+    { id: 'm1', opponent: 'Redlands' },
+    { id: 'm2', opponent: 'Yucaipa' },
+    { id: 'm3', opponent: 'Beaumont' }
+  ]);
+
+  it('targets every fixture when none has a lineup', () => {
+    const app = appWith(fixtures(), []);
+    expect(app.fixturesWithoutLineup().map((m: any) => m.id)).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('leaves out a fixture that already has one', () => {
+    const app = appWith(fixtures(), [{ match_id: 'm2' }]);
+    expect(app.fixturesWithoutLineup().map((m: any) => m.id)).toEqual(['m1', 'm3']);
+  });
+
+  it('is not confused by the default lineup, which belongs to no fixture', () => {
+    const app = appWith(fixtures(), [{ match_id: null }]);
+    expect(app.fixturesWithoutLineup()).toHaveLength(3);
+  });
+
+  it('skips a deleted fixture', () => {
+    const app = appWith([...fixtures(), { id: 'm4', opponent: 'Gone', is_deleted: true }], []);
+    expect(app.fixturesWithoutLineup().map((m: any) => m.id)).not.toContain('m4');
+  });
+
+  it('targets nothing when every fixture is already set', () => {
+    const app = appWith(fixtures(), [{ match_id: 'm1' }, { match_id: 'm2' }, { match_id: 'm3' }]);
+    expect(app.fixturesWithoutLineup()).toEqual([]);
+  });
+
+  it('refuses to apply an empty pitch', async () => {
+    // Writing eleven empty lineups across the season would be worse than
+    // doing nothing.
+    const app = appWith(fixtures(), []);
+    document.body.innerHTML = '<span id="lineupError"></span>';
+    let saved = 0;
+    (window as any).supabaseService = { saveLineup: async () => { saved += 1; return { ok: true }; } };
+
+    await app.applyLineupToAllFixtures();
+
+    expect(saved).toBe(0);
+    expect(document.getElementById('lineupError')!.textContent).toContain('Place some players');
+  });
+
+  it('writes one lineup per targeted fixture, and none for the rest', async () => {
+    const app = appWith(fixtures(), [{ match_id: 'm2' }]);
+    app.assignLineupSlot('GK', 'p1');
+    document.body.innerHTML = '<span id="lineupError"></span>';
+    (window as any).confirm = () => true;
+
+    const wrote: string[] = [];
+    (window as any).supabaseService = {
+      saveLineup: async (_t: string, _s: string, matchId: string) => {
+        wrote.push(matchId); return { ok: true };
+      },
+      fetchTeamLineups: async () => []
+    };
+    app.renderLineupSources = () => {};
+
+    await app.applyLineupToAllFixtures();
+
+    expect(wrote).toEqual(['m1', 'm3']);
+  });
+
+  it('does nothing when the confirmation is declined', async () => {
+    const app = appWith(fixtures(), []);
+    app.assignLineupSlot('GK', 'p1');
+    document.body.innerHTML = '<span id="lineupError"></span>';
+    (window as any).confirm = () => false;
+
+    let saved = 0;
+    (window as any).supabaseService = { saveLineup: async () => { saved += 1; return { ok: true }; } };
+
+    await app.applyLineupToAllFixtures();
+    expect(saved).toBe(0);
+  });
+
+  it('reports a failure rather than claiming success', async () => {
+    const app = appWith(fixtures(), []);
+    app.assignLineupSlot('GK', 'p1');
+    document.body.innerHTML = '<span id="lineupError"></span>';
+    (window as any).confirm = () => true;
+    (window as any).supabaseService = {
+      saveLineup: async () => ({ ok: false, error: 'You must coach this team.' }),
+      fetchTeamLineups: async () => []
+    };
+    app.renderLineupSources = () => {};
+
+    await app.applyLineupToAllFixtures();
+    expect(document.getElementById('lineupError')!.textContent).toContain('failed');
+  });
+});
