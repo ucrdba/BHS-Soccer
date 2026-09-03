@@ -368,6 +368,33 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderLineupBody();
   },
 
+  /**
+   * Take everybody off the pitch.
+   *
+   * Confirmed, because it throws away arranging work that took real thought,
+   * and the button sits beside Save where a mis-tap is easy.
+   *
+   * This clears the WORKING lineup only. Whatever was last saved is untouched
+   * until Save is pressed, so a reset done by accident is recovered by closing
+   * the modal and opening it again — which the confirmation says, so nobody
+   * has to guess.
+   */
+  resetLineup() {
+    const placed = Object.keys(this._lineupAssign || {}).length;
+    if (placed > 0 && !window.confirm(
+      `Take all ${placed} player${placed === 1 ? '' : 's'} off the pitch?
+
+`
+      + `The saved lineup is not changed until you press Save lineup, so closing `
+      + `and reopening brings it back.`)) return;
+
+    this._lineupAssign = {};
+    this._lineupPicked = null;
+    this._lineupBench = null;      // everyone available again, the default
+    this._lineupError = '';
+    this.renderLineupBody();
+  },
+
   renderLineupBody() {
     const body = document.getElementById('lineupBody');
     if (!body) return;

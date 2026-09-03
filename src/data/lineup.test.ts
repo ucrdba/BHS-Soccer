@@ -539,3 +539,75 @@ describe('fitting the card on one sheet', () => {
     expect(d.head).toBeLessThan(20);
   });
 });
+
+describe('resetting the lineup', () => {
+  /**
+   * Clears the WORKING lineup only. Whatever was last saved stays untouched
+   * until Save is pressed, which is what makes a mis-tap recoverable: close
+   * the modal, open it again.
+   */
+  it('takes everyone off the pitch', () => {
+    (window as any).confirm = () => true;
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('LB', 'p2');
+    app.resetLineup();
+    expect(app._lineupAssign).toEqual({});
+  });
+
+  it('puts down whoever was in hand', () => {
+    (window as any).confirm = () => true;
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app._lineupPicked = 'p3';
+    app.resetLineup();
+    expect(app._lineupPicked).toBeNull();
+  });
+
+  it('makes the whole squad available again', () => {
+    // A reset that left players marked "Out" would not be a reset.
+    (window as any).confirm = () => true;
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.toggleLineupBench('p4');
+    app.resetLineup();
+    expect(app.lineupBench('4-4-2').map((p: any) => p.id)).toContain('p4');
+  });
+
+  it('asks first, since it discards real work', () => {
+    (window as any).confirm = () => false;
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.resetLineup();
+    expect(app._lineupAssign.GK).toBe('p1');
+  });
+
+  it('does not ask when the pitch is already empty', () => {
+    // Nothing to lose, so nothing to confirm.
+    let asked = 0;
+    (window as any).confirm = () => { asked += 1; return true; };
+    const app = makeApp();
+    app.resetLineup();
+    expect(asked).toBe(0);
+    expect(app._lineupAssign).toEqual({});
+  });
+
+  it('says how many players are affected', () => {
+    let msg = '';
+    (window as any).confirm = (m: string) => { msg = m; return true; };
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.assignLineupSlot('LB', 'p2');
+    app.resetLineup();
+    expect(msg).toContain('2');
+  });
+
+  it('says the saved lineup is safe, so the way back is obvious', () => {
+    let msg = '';
+    (window as any).confirm = (m: string) => { msg = m; return true; };
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.resetLineup();
+    expect(msg).toContain('Save lineup');
+  });
+});
