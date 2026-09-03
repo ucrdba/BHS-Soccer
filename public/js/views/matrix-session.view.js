@@ -359,6 +359,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const rows = document.getElementById('sessionRows');
     if (rows) rows.innerHTML = this.renderSessionRows();
+    this.attachSessionKeys();
 
     const modal = document.getElementById('matrixSessionModal');
     if (modal) { modal.style.display = ''; modal.classList.add('active'); }
@@ -455,6 +456,9 @@ Object.assign(BHSSoccerApp.prototype, {
         ${drill.name} &middot; weight ${Number(drill.points ?? 3)} &middot; ${hint}
       </p>
       ${bandNote}
+      <p class="text-muted" style="font-size:0.74rem; margin:0 0 6px 0;">
+        Press <strong style="color:#FFF;">Enter</strong> to jump to the next player.
+      </p>
       <!-- Results are read off paper, where a player is written as a recording
            number or a scribbled surname. One box takes either, so the coach
            does not have to say which kind of thing they are typing. -->
@@ -641,6 +645,67 @@ Object.assign(BHSSoccerApp.prototype, {
     return flip * String(a.name || '').localeCompare(String(b.name || ''));
   },
 
+  /**
+   * The entry fields, in the order they appear on screen.
+   *
+   * Read from the DOM rather than from the roster, because the grid can be
+   * sorted: after sorting by name the visible order and the roster order are
+   * different, and tabbing down the screen has to follow what the eye follows.
+   */
+  sessionEntryFields() {
+    const rows = document.getElementById('sessionRows');
+    if (!rows) return [];
+    return Array.from(rows.querySelectorAll(
+      'input[id^="sessionValue_"], select[id^="sessionOutcome_"]'));
+  },
+
+  /**
+   * Enter moves to the next field instead of doing nothing.
+   *
+   * Results are entered from a paper sheet on the number pad, one hand on the
+   * keys and the other holding the sheet. Reaching for the mouse between every
+   * player is the slow part, and Enter is already under the little finger.
+   *
+   * Bound once on the container, which outlives the rows: they are replaced by
+   * innerHTML whenever the grid is sorted, so per-input listeners would be
+   * discarded and rebound on every sort.
+   */
+  attachSessionKeys() {
+    const rows = document.getElementById('sessionRows');
+    if (!rows || rows.dataset.keysBound === '1') return;
+    rows.dataset.keysBound = '1';
+
+    rows.addEventListener('keydown', (e) => {
+      // The number pad's Enter reports the same key as the main one; only the
+      // physical `code` differs, and both should do this.
+      if (e.key !== 'Enter') return;
+      const el = e.target;
+      if (!el || !el.id || !/^session(Value|Outcome)_/.test(el.id)) return;
+
+      // Otherwise the modal's form submits and the session saves half-entered.
+      e.preventDefault();
+
+      const fields = this.sessionEntryFields();
+      const i = fields.indexOf(el);
+      if (i === -1) return;
+
+      const next = fields[i + 1];
+      if (next) {
+        next.focus();
+        if (next.select) next.select();
+        // Keep the field being typed into on screen: on a phone the keyboard
+        // covers the lower half, and the next row is often under it.
+        if (next.scrollIntoView) next.scrollIntoView({ block: 'center' });
+        return;
+      }
+
+      // Past the last player. Move to Save rather than looping back to the top,
+      // which would quietly overwrite the first entry with the next keystroke.
+      const save = document.getElementById('sessionSaveBtn');
+      if (save && save.focus) save.focus();
+    });
+  },
+
   setSessionSort(by) {
     const typed = this.collectSessionResults();
     this._sessionPrefill = this._sessionPrefill || {};
@@ -668,6 +733,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     const rows = document.getElementById('sessionRows');
     if (rows) rows.innerHTML = this.renderSessionRows();
+    this.attachSessionKeys();
   },
 
   /**
