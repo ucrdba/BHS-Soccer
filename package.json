@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "invite": "node scripts/invite-users.mjs"
+    "invite": "node scripts/invite-users.mjs",
+    "deployed": "node scripts/deployed.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4"

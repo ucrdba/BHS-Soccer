@@ -1,5 +1,6 @@
 // src/main.ts
 import { supabaseService } from './data/supabase';
+import { buildInfo, formatBuildStamp, buildStampTitle } from './build-info';
 import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 import { backupLegacyBlob } from './data/cache';
@@ -72,3 +73,27 @@ window.authReady = supabaseService.completeEmailLink()
   });
 
 window.can = can;
+
+
+/**
+ * Show which build is serving this page, in the footer.
+ *
+ * The formatting lives in build-info.ts so it can be tested without booting
+ * the app; this only puts the result on screen and on `window.BUILD`, where a
+ * console or a later diagnostics panel can read it without re-deriving it.
+ */
+function showBuildStamp(): void {
+  const info = buildInfo();
+  (window as any).BUILD = info;
+
+  const el = document.getElementById('buildStamp');
+  if (!el) return;
+  el.textContent = formatBuildStamp(info);
+  el.setAttribute('title', buildStampTitle(info));
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', showBuildStamp);
+} else {
+  showBuildStamp();
+}
