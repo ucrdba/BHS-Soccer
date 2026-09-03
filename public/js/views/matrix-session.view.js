@@ -457,7 +457,10 @@ Object.assign(BHSSoccerApp.prototype, {
       </p>
       ${bandNote}
       <p class="text-muted" style="font-size:0.74rem; margin:0 0 6px 0;">
-        Press <strong style="color:#FFF;">Enter</strong> to jump to the next player.
+        Press <strong style="color:#FFF;">Enter</strong> to jump to the next player.${
+          measure === 'time_low' || measure === 'time_bands'
+            ? ' Everyone starts as <strong style="color:#FFF;">No-show</strong>; entering a time marks them Here.'
+            : ''}
       </p>
       <!-- Results are read off paper, where a player is written as a recording
            number or a scribbled surname. One box takes either, so the coach
@@ -486,7 +489,8 @@ Object.assign(BHSSoccerApp.prototype, {
         // row. Default them to excused rather than present: they were not
         // there, and a blank present row would block the save.
         const had = pre ? pre[p.id] : null;
-        const att = pre ? (had ? had.attendance : 'excused') : 'present';
+        const att = pre ? (had ? had.attendance : 'excused')
+                        : this.defaultSessionAttendance(measure);
         const val = had && had.rawValue !== null && had.rawValue !== undefined ? had.rawValue : '';
         const out = had && had.outcome ? had.outcome : '';
         return `
@@ -507,10 +511,11 @@ Object.assign(BHSSoccerApp.prototype, {
             ? `<input type="text" id="sessionValue_${p.id}" class="form-control" placeholder="4:30 or 4.30"
                       style="max-width:110px; font-size:0.8rem;"
                       value="${val === '' ? '' : window.supabaseService.formatSecondsAsTime(val)}"
-                      oninput="app.showBandEarned('${p.id}')" />
+                      oninput="app.onSessionValueInput('${p.id}','${measure}')" />
                <span id="sessionEarned_${p.id}" class="text-muted" style="font-size:0.75rem;"></span>`
             : `<input type="number" id="sessionValue_${p.id}" class="form-control" step="any"
-                      style="max-width:110px; font-size:0.8rem;" value="${val}" />`}
+                      style="max-width:110px; font-size:0.8rem;" value="${val}"
+                      oninput="app.onSessionValueInput('${p.id}','${measure}')" />`}
           </td>
           <td>
             <select id="sessionAttend_${p.id}" class="form-control" style="max-width:130px; font-size:0.8rem;">
@@ -704,6 +709,42 @@ Object.assign(BHSSoccerApp.prototype, {
       const save = document.getElementById('sessionSaveBtn');
       if (save && save.focus) save.focus();
     });
+  },
+
+  /**
+   * What attendance a fresh row starts on.
+   *
+   * A timed test starts every player at NO-SHOW. Running it is the whole
+   * point, so not having a time means they did not run — and starting them at
+   * "Here" would leave the coach turning twenty-five dropdowns the wrong way
+   * to record the two who were missing.
+   *
+   * Everything else starts at Here, where taking part is the normal case and
+   * the exceptions are few.
+   */
+  defaultSessionAttendance(measure) {
+    return measure === 'time_low' || measure === 'time_bands' ? 'unexcused' : 'present';
+  },
+
+  /**
+   * A time was typed, so the player was plainly there.
+   *
+   * Flips the row to Here as the value is entered. Clearing the value puts it
+   * back to the measure's default, so a mistyped entry deleted again does not
+   * leave somebody marked present with nothing recorded against them.
+   *
+   * Unconditional on the way in: a recorded time is evidence of attendance and
+   * outranks whatever the dropdown happened to say.
+   */
+  onSessionValueInput(playerId, measure) {
+    const val = document.getElementById('sessionValue_' + playerId);
+    const att = document.getElementById('sessionAttend_' + playerId);
+    if (att && val) {
+      const typed = String(val.value).trim() !== '';
+      att.value = typed ? 'present' : this.defaultSessionAttendance(measure);
+    }
+    // The banded exercises also show what the time earns as it is typed.
+    if (measure === 'time_bands') this.showBandEarned(playerId);
   },
 
   setSessionSort(by) {
