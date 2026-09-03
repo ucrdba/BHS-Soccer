@@ -723,6 +723,33 @@
 
 .lineup-squad { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
 
+/* touch-action: none is what makes dragging work on a phone. Without it the
+   browser claims the gesture for scrolling and the drag never starts. */
+.lineup-slot, .lineup-pick-main { touch-action: none; }
+
+/* The thing that follows the finger. pointer-events:none is load-bearing:
+   the ghost sits under the pointer, so without it elementFromPoint would
+   return the ghost on every drop and nothing would ever land. */
+.lineup-ghost {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  pointer-events: none;
+  padding: 6px 10px;
+  background: var(--bhs-blue-primary);
+  border: 2px solid var(--bhs-cyan-accent);
+  border-radius: 8px;
+  color: #FFF;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* No text selection while dragging across the list. */
+body.lineup-dragging { user-select: none; -webkit-user-select: none; }
+body.lineup-dragging .lineup-slot:not(.filled) { border-color: var(--bhs-gold-accent); }
+
 .lineup-pick {
   display: flex; align-items: center; gap: 6px;
   border-bottom: 1px solid var(--bhs-navy-border);

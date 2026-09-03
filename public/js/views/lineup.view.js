@@ -7,10 +7,14 @@
  *
  * Two decisions shape everything here.
  *
- * Placement is TAP-THEN-TAP, not drag-and-drop. HTML5 drag events do not fire
- * on touch, and this screen is used on a phone at the ground; a drag-only
- * interface would simply not work there. Tap a player, tap a slot. A mouse can
- * still drag, which is layered on top rather than being the only way in.
+ * Placement is DRAG AND DROP, built on Pointer Events rather than HTML5 drag.
+ * HTML5 drag events never fire on touch, and this screen is used on a phone at
+ * the ground, so a dragstart/drop implementation would work on the desk and
+ * not at the match. Pointer events are one API for mouse and finger alike.
+ *
+ * A press that never moves is still a tap, so tap-a-player then tap-a-slot
+ * keeps working — useful one-handed, and the only route available to a
+ * keyboard. Nothing was taken away to add dragging.
  *
  * The slot and the coordinates are BOTH stored. The slot ("LB", "CM") is what
  * the card prints and is stable; x/y is where the player sits on the diagram,
@@ -143,6 +147,151 @@ Object.assign(BHSSoccerApp.prototype, {
     return starters.concat(bench);
   },
 
+  /**
+   * What a drop should do, decided without touching the DOM.
+   *
+   * Kept separate from the pointer plumbing so the rules can be tested: the
+   * plumbing is browser behaviour, but "dropping a starter on the squad list
+   * takes them off the pitch" is a rule, and a rule that only exists inside an
+   * event handler is a rule nobody can check.
+   */
+  resolveLineupDrop({ playerId, fromSlot, overSlot, overSquad }) {
+    if (!playerId) return { action: 'none' };
+
+    if (overSlot) {
+      // Dropping a player back on the slot they came from changes nothing --
+      // it is how a drag is cancelled.
+      if (overSlot === fromSlot) return { action: 'none' };
+      return { action: 'place', playerId, slot: overSlot };
+    }
+
+    // Off the pitch. Dragging a starter to the squad list removes them; doing
+    // the same with somebody who was never on it is simply a cancelled drag.
+    if (overSquad && fromSlot) return { action: 'remove', slot: fromSlot };
+    return { action: 'none' };
+  },
+
+  /** Carry out a resolved drop. */
+  applyLineupDrop(drop) {
+    if (!drop || drop.action === 'none') return false;
+    if (drop.action === 'place') { this.assignLineupSlot(drop.slot, drop.playerId); return true; }
+    if (drop.action === 'remove') { this.clearLineupSlot(drop.slot); return true; }
+    return false;
+  },
+
+  /**
+   * Bind dragging once, by delegation.
+   *
+   * The body is rebuilt by innerHTML on every change, so per-element listeners
+   * would be thrown away each time and rebound wrongly. One listener on the
+   * container survives every redraw.
+   */
+  attachLineupDrag() {
+    const body = document.getElementById('lineupBody');
+    if (!body || body.dataset.dragBound === '1') return;
+    body.dataset.dragBound = '1';
+
+    let drag = null;
+
+    const ghostFor = (el) => {
+      const g = document.createElement('div');
+      g.className = 'lineup-ghost';
+      g.textContent = el.dataset.dragLabel || '';
+      document.body.appendChild(g);
+      return g;
+    };
+
+    const moveGhost = (e) => {
+      if (!drag || !drag.ghost) return;
+      drag.ghost.style.left = e.clientX + 'px';
+      drag.ghost.style.top = e.clientY + 'px';
+    };
+
+    body.addEventListener('pointerdown', (e) => {
+      // The bench toggle is a button in its own right and must not start a drag.
+      if (e.target.closest('.benchtag')) return;
+      const handle = e.target.closest('[data-player-id]');
+      if (!handle) return;
+
+      drag = {
+        playerId: handle.dataset.playerId,
+        fromSlot: handle.dataset.slot || null,
+        startX: e.clientX, startY: e.clientY,
+        moved: false, ghost: null, handle
+      };
+      // Capture so the drag survives the pointer leaving the element, and so
+      // a redraw mid-drag cannot strand it.
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    body.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (!drag.moved) {
+        // A few pixels of slop: a finger never holds perfectly still, and
+        // treating every press as a drag would break tapping.
+        const far = Math.abs(e.clientX - drag.startX) > 6 || Math.abs(e.clientY - drag.startY) > 6;
+        if (!far) return;
+        drag.moved = true;
+        drag.ghost = ghostFor(drag.handle);
+        document.body.classList.add('lineup-dragging');
+      }
+      moveGhost(e);
+    });
+
+    const finish = (e) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      if (d.ghost) d.ghost.remove();
+      document.body.classList.remove('lineup-dragging');
+      try { d.handle.releasePointerCapture(e.pointerId); } catch (_) {}
+
+      if (!d.moved) {
+        // Never moved: this was a tap.
+        if (d.fromSlot) this.tapLineupSlot(d.fromSlot);
+        else this.pickLineupPlayer(d.playerId);
+        return;
+      }
+
+      // The ghost follows the pointer, so it would always be the top element.
+      // It is pointer-events:none for exactly this reason.
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const slotEl = under && under.closest ? under.closest('.lineup-slot') : null;
+      const squadEl = under && under.closest ? under.closest('.lineup-squad') : null;
+
+      const changed = this.applyLineupDrop(this.resolveLineupDrop({
+        playerId: d.playerId,
+        fromSlot: d.fromSlot,
+        overSlot: slotEl ? slotEl.dataset.slot : null,
+        overSquad: !!squadEl
+      }));
+
+      // A dropped player is placed, so nothing stays in hand either way.
+      this._lineupPicked = null;
+      if (changed) this.renderLineupBody();
+      else this.renderLineupBody();
+    };
+
+    body.addEventListener('pointerup', finish);
+    body.addEventListener('pointercancel', (e) => {
+      if (!drag) return;
+      if (drag.ghost) drag.ghost.remove();
+      document.body.classList.remove('lineup-dragging');
+      drag = null;
+    });
+
+    // Pointer events do not fire for a keyboard activation, so Enter and Space
+    // on a focused control still need a way through.
+    body.addEventListener('click', (e) => {
+      if (e.detail !== 0) return;                 // 0 means keyboard-generated
+      if (e.target.closest('.benchtag')) return;
+      const handle = e.target.closest('[data-player-id]');
+      if (!handle) return;
+      if (handle.dataset.slot) this.tapLineupSlot(handle.dataset.slot);
+      else this.pickLineupPlayer(handle.dataset.playerId);
+    });
+  },
+
   // ── The screen ───────────────────────────────────────────────────────────
 
   async openLineupModal(matchId) {
@@ -231,6 +380,8 @@ Object.assign(BHSSoccerApp.prototype, {
     const byId = new Map(this.lineupSquad().map(p => [p.id, p]));
     const picked = this._lineupPicked;
 
+    // An empty slot carries no data-player-id, so pointerdown ignores it and a
+    // plain click still reaches tapLineupSlot below.
     const slots = this.lineupSlots(formation).map(s => {
       const p = byId.get(asg[s.slot]);
       const label = p
@@ -240,8 +391,10 @@ Object.assign(BHSSoccerApp.prototype, {
       return `
         <button type="button" class="lineup-slot${p ? ' filled' : ''}${picked ? ' awaiting' : ''}"
                 style="left:${s.x}%; bottom:${s.y}%;"
-                title="${p ? esc(p.name) + ' — tap to lift' : 'Empty ' + esc(s.slot)}"
-                onclick="app.tapLineupSlot('${esc(s.slot)}')">${label}</button>`;
+                data-slot="${esc(s.slot)}"
+                ${p ? `data-player-id="${esc(p.id)}" data-drag-label="${esc(this.lineupShortName(p))}"` : ''}
+                title="${p ? esc(p.name) + ' — drag off, or tap to lift' : 'Empty ' + esc(s.slot)}"
+                >${label}</button>`;
     }).join('');
 
     const starting = new Set(Object.values(asg));
@@ -250,8 +403,9 @@ Object.assign(BHSSoccerApp.prototype, {
       const dressed = this._lineupBench == null || !!this._lineupBench[p.id];
       return `
         <div class="lineup-pick${picked === p.id ? ' picked' : ''}${isOn ? ' onpitch' : ''}">
-          <button type="button" class="lineup-pick-main" onclick="app.pickLineupPlayer('${esc(p.id)}')"
-                  title="${isOn ? 'Already on the pitch' : 'Tap, then tap a position'}">
+          <button type="button" class="lineup-pick-main"
+                  data-player-id="${esc(p.id)}" data-drag-label="${esc(this.lineupShortName(p))}"
+                  title="${isOn ? 'Already on the pitch' : 'Drag onto a position, or tap then tap'}">
             <span class="lineup-num">${p.number != null ? esc(p.number) : '—'}</span>
             <span class="lineup-who">${esc(p.name)}</span>
             <span class="lineup-grade">${esc(this.lineupGrade(p))}</span>
@@ -271,7 +425,8 @@ Object.assign(BHSSoccerApp.prototype, {
         <div>
           <div class="lineup-pitch">${slots}</div>
           <p class="text-muted" style="font-size:0.76rem; margin:8px 0 0 0;">
-            ${picked ? 'Now tap a position to place them.' : 'Tap a player, then tap a position. Tap a filled position to lift that player off.'}
+            ${picked ? 'Now tap a position to place them.'
+              : 'Drag a player onto a position, or tap one then tap a position. Drag a player back to the squad list to take them off.'}
           </p>
         </div>
         <div>
@@ -282,6 +437,12 @@ Object.assign(BHSSoccerApp.prototype, {
           <div class="lineup-squad">${squad}</div>
         </div>
       </div>`;
+
+    // Empty slots have no drag handle, so they keep an ordinary click.
+    body.querySelectorAll('.lineup-slot:not([data-player-id])').forEach(el => {
+      el.addEventListener('click', () => this.tapLineupSlot(el.dataset.slot));
+    });
+    this.attachLineupDrag();
 
     const sel = document.getElementById('lineupFormation');
     if (sel && sel.value !== formation) sel.value = formation;

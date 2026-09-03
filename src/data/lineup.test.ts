@@ -332,3 +332,131 @@ describe('the squad list', () => {
     expect(makeApp().lineupSquad().slice(-1)[0].id).toBe('p4');
   });
 });
+
+describe('dragging a player', () => {
+  /**
+   * Drag and drop is built on Pointer Events, not HTML5 drag: dragstart never
+   * fires on touch, and this is used on a phone at the ground.
+   *
+   * The pointer plumbing is browser behaviour and not worth simulating. What
+   * IS worth pinning down is the decision a drop makes, which is why that
+   * lives in resolveLineupDrop rather than inside the event handler.
+   */
+
+  it('places a player dropped on an empty slot', () => {
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p1', fromSlot: null, overSlot: 'GK' }))
+      .toEqual({ action: 'place', playerId: 'p1', slot: 'GK' });
+  });
+
+  it('moves a starter dropped on a different slot', () => {
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p1', fromSlot: 'GK', overSlot: 'LB' }))
+      .toEqual({ action: 'place', playerId: 'p1', slot: 'LB' });
+  });
+
+  it('does nothing when a player is dropped back where they started', () => {
+    // Dropping a player on their own slot is how a drag gets cancelled.
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p1', fromSlot: 'GK', overSlot: 'GK' }))
+      .toEqual({ action: 'none' });
+  });
+
+  it('takes a starter off when dropped on the squad list', () => {
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p1', fromSlot: 'GK', overSquad: true }))
+      .toEqual({ action: 'remove', slot: 'GK' });
+  });
+
+  it('does nothing when a substitute is dropped back on the squad list', () => {
+    // They were never on the pitch, so there is nothing to remove.
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p2', fromSlot: null, overSquad: true }))
+      .toEqual({ action: 'none' });
+  });
+
+  it('does nothing when dropped on empty space', () => {
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: 'p1', fromSlot: 'GK' }))
+      .toEqual({ action: 'none' });
+  });
+
+  it('does nothing when there is no player in hand', () => {
+    const app = makeApp();
+    expect(app.resolveLineupDrop({ playerId: null, overSlot: 'GK' }))
+      .toEqual({ action: 'none' });
+  });
+});
+
+describe('carrying out a drop', () => {
+  it('places the player on the pitch', () => {
+    const app = makeApp();
+    app.applyLineupDrop({ action: 'place', playerId: 'p1', slot: 'GK' });
+    expect(app._lineupAssign.GK).toBe('p1');
+  });
+
+  it('takes the player off', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    app.applyLineupDrop({ action: 'remove', slot: 'GK' });
+    expect(app._lineupAssign.GK).toBeUndefined();
+  });
+
+  it('still moves rather than clones when dropped on a second slot', () => {
+    // The same rule the tap path obeys: one slot per player, or the card
+    // prints twelve names.
+    const app = makeApp();
+    app.applyLineupDrop({ action: 'place', playerId: 'p1', slot: 'GK' });
+    app.applyLineupDrop({ action: 'place', playerId: 'p1', slot: 'LB' });
+    expect(Object.values(app._lineupAssign)).toEqual(['p1']);
+    expect(app._lineupAssign.LB).toBe('p1');
+  });
+
+  it('reports whether anything actually changed', () => {
+    const app = makeApp();
+    expect(app.applyLineupDrop({ action: 'none' })).toBe(false);
+    expect(app.applyLineupDrop({ action: 'place', playerId: 'p1', slot: 'GK' })).toBe(true);
+  });
+});
+
+describe('the drag handles in the markup', () => {
+  /** The delegated handler finds its targets by data attribute, so the
+   *  markup has to carry them or nothing is draggable at all. */
+  function render(app: any) {
+    document.body.innerHTML = '<div id="lineupBody"></div>';
+    app.renderLineupBody = ctor.prototype.renderLineupBody;
+    app.attachLineupDrag = () => {};
+    app.renderLineupBody();
+    return document.getElementById('lineupBody')!;
+  }
+
+  it('marks every squad row as draggable', () => {
+    const app = makeApp();
+    const el = render(app);
+    expect(el.querySelectorAll('.lineup-pick-main[data-player-id]')).toHaveLength(4);
+  });
+
+  it('marks a filled slot as draggable, so it can be dragged off', () => {
+    const app = makeApp();
+    app.assignLineupSlot('GK', 'p1');
+    const el = render(app);
+    const gk = el.querySelector('.lineup-slot[data-slot="GK"]')!;
+    expect(gk.getAttribute('data-player-id')).toBe('p1');
+  });
+
+  it('leaves an empty slot without a player id, so a drag never starts on one', () => {
+    const app = makeApp();
+    const el = render(app);
+    const gk = el.querySelector('.lineup-slot[data-slot="GK"]')!;
+    expect(gk.getAttribute('data-player-id')).toBeNull();
+  });
+
+  it('gives every slot its label, since that is the drop target key', () => {
+    const app = makeApp();
+    const el = render(app);
+    const slots = Array.from(el.querySelectorAll('.lineup-slot'))
+      .map(s => s.getAttribute('data-slot'));
+    expect(slots).toHaveLength(11);
+    expect(new Set(slots).size).toBe(11);
+  });
+});
