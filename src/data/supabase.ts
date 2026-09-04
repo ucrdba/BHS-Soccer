@@ -1403,6 +1403,135 @@ class SupabaseService {
   }
 
   /**
+   * Read whatever a coach typed for a fixture date into the house format.
+   *
+   * Schedules arrive as spreadsheets other people made, so the same column
+   * holds "8-Dec", "09/Dec", "Dec 8 2026", "12/8/2026", a real Excel date, or
+   * an Excel serial number. All of them mean a day; only one of them is
+   * written the way this app stores dates.
+   *
+   * Returns "DEC 8 2026" — MON D YYYY, which is what parse_match_date() in
+   * migration 0008 reads to derive match_on. Returning anything else would
+   * store a row whose real date is null, which sorts and filters as though the
+   * fixture had no date at all.
+   *
+   * Null rather than a guess when it cannot be read: a fixture on the wrong
+   * day is worse than one the importer refused and named.
+   */
+  parseScheduleDate(value: any, reference?: Date): string | null {
+    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const today = reference instanceof Date && !isNaN(reference.getTime()) ? reference : new Date();
+
+    const fromParts = (year: number | null, month: number, day: number): string | null => {
+      if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return null;
+
+      // No year written. Choose the one that puts the fixture nearest to now:
+      // a schedule typed in September means December THIS year and February
+      // NEXT, which is exactly what a season spanning the new year needs.
+      let y = year;
+      if (y === null) {
+        const base = today.getFullYear();
+        let best: number | null = null;
+        let bestGap = Infinity;
+        for (const candidate of [base - 1, base, base + 1]) {
+          const gap = Math.abs(new Date(candidate, month - 1, day).getTime() - today.getTime());
+          if (gap < bestGap) { bestGap = gap; best = candidate; }
+        }
+        y = best!;
+      } else if (y < 100) {
+        y += 2000;
+      }
+
+      // Reject a day the month does not have. new Date(2026, 1, 30) rolls
+      // forward to March, so a bad date would otherwise become a real one on
+      // the wrong day rather than an error.
+      const d = new Date(y, month - 1, day);
+      if (d.getFullYear() !== y || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+
+      return `${MONTHS[month - 1]} ${day} ${y}`;
+    };
+
+    const fromDate = (d: Date): string | null =>
+      isNaN(d.getTime()) ? null : fromParts(d.getFullYear(), d.getMonth() + 1, d.getDate());
+
+    if (value instanceof Date) return fromDate(value);
+
+    // A date-formatted cell read by SheetJS without cellDates: days since
+    // 1899-12-30. A spreadsheet date has no timezone, so it is read back in
+    // UTC — reading it locally moved every date a day earlier anywhere west of
+    // Greenwich, which is a whole schedule off by one and looks plausible.
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value < 1 || value > 100000) return null;
+      const d = new Date(Date.UTC(1899, 11, 30) + Math.round(value) * 86400000);
+      if (isNaN(d.getTime())) return null;
+      return fromParts(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+    }
+
+    let raw = String(value ?? '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!raw) return null;
+
+    // "8-Dec-26 (Tue)" — a day of the week written beside the date, for
+    // people rather than for parsing. Dropped rather than checked: it is
+    // derived from the date, so the date is the authority and a disagreement
+    // is a typo in the label, not a different fixture.
+    raw = raw
+      .replace(/[({\[]\s*(mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun)[a-z]*\s*[)}\]]/i, '')
+      .replace(/^(mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun)[a-z]*\s+/i, '')
+      .replace(/\s+(mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun)[a-z]*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!raw) return null;
+
+    const monthOf = (name: string): number => {
+      const i = MONTHS.indexOf(name.slice(0, 3).toUpperCase());
+      return i === -1 ? 0 : i + 1;
+    };
+
+    // 2026-12-08
+    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
+    if (m) return fromParts(Number(m[1]), Number(m[2]), Number(m[3]));
+
+    // 8-Dec · 09/Dec · 8 Dec · 8-Dec-26 · 8 December 2026
+    m = /^(\d{1,2})[\s\/-]([A-Za-z]{3,})(?:[\s\/-](\d{2,4}))?$/.exec(raw);
+    if (m) {
+      const month = monthOf(m[2]);
+      return month ? fromParts(m[3] ? Number(m[3]) : null, month, Number(m[1])) : null;
+    }
+
+    // Dec 8 · Dec 8 2026 · December 8, 2026 · DEC/8
+    m = /^([A-Za-z]{3,})[\s\/-](\d{1,2})(?:[\s\/-](\d{2,4}))?$/.exec(raw);
+    if (m) {
+      const month = monthOf(m[1]);
+      return month ? fromParts(m[3] ? Number(m[3]) : null, month, Number(m[2])) : null;
+    }
+
+    // 12/8/2026 · 12-8 · 12/8. Month first, US convention — the schedule this
+    // reads is a US high school one, and a bare 12/8 has to mean something.
+    m = /^(\d{1,2})[\s\/-](\d{1,2})(?:[\s\/-](\d{2,4}))?$/.exec(raw);
+    if (m) return fromParts(m[3] ? Number(m[3]) : null, Number(m[1]), Number(m[2]));
+
+    return null;
+  }
+
+  /**
+   * The day of the week a fixture falls on, as "Tue".
+   *
+   * Derived from the date rather than read from the sheet, so it cannot
+   * disagree with it. A DOW column in a spreadsheet is for the person reading
+   * it; the date is what the fixture actually is.
+   */
+  scheduleDayOfWeek(matchDate: any): string | null {
+    const normal = this.parseScheduleDate(matchDate);
+    if (!normal) return null;
+    const [mon, day, year] = normal.split(' ');
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const m = months.indexOf(mon);
+    if (m === -1) return null;
+    const d = new Date(Number(year), m, Number(day));
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  }
+
+  /**
    * Read a time a coach typed into seconds, or null if it is not a time.
    *
    * Stored as seconds because raw_value is numeric and because comparing

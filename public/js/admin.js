@@ -2029,7 +2029,7 @@ Object.assign(BHSSoccerApp.prototype, {
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'schedule') {
             fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
-            const rows = (this.data.schedule || []).map(m => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Date: m.date, Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.schedule || []).map(m => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Date: m.date, DOW: window.supabaseService.scheduleDayOfWeek(m.date) || '', Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'drills') {
             fileName = '5_Master_Drills_Library.xlsx'; sheetName = 'MasterDrills';
@@ -2135,7 +2135,7 @@ Object.assign(BHSSoccerApp.prototype, {
     // 4. SCHEDULE SHEET
     if (type === 'schedule' || type === 'all') {
       const rows = (this.data.schedule || []).map(m => ({
-        Date: m.date, Time: m.time, Opponent: m.opponent,
+        Date: m.date, DOW: window.supabaseService.scheduleDayOfWeek(m.date) || '', Time: m.time, Opponent: m.opponent,
         Location: m.location, Home: m.isHome ? 'Home' : 'Away',
         Status: m.status, Score: m.score || '',
         IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE'
@@ -2254,7 +2254,16 @@ Object.assign(BHSSoccerApp.prototype, {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Players');
       XLSX.writeFile(wb, 'BHS_Player_Template.xlsx');
     } else if (type === 'schedule') {
-      const headers = [{ Team:'blank = current team', Date:'', Time:'', Opponent:'', Location:'', Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE' }];
+      // DOW sits beside the date for whoever reads the sheet. It is not
+      // imported: the day of the week is derived FROM the date, so a label
+      // that disagrees is a typo in the label rather than a different fixture.
+      const headers = [{
+        Team:'blank = current team',
+        Date:'8-Dec | 09/Dec | Dec 8 2026 | 12/8/2026 | 2026-12-08',
+        DOW:'derived from the date - not imported',
+        Time:'', Opponent:'', Location:'',
+        Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE'
+      }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
       XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
     } else if (type === 'drills') {
@@ -2829,7 +2838,13 @@ Object.assign(BHSSoccerApp.prototype, {
             };
             const imported = rows.filter(r => r.Opponent).map(r => ({
               id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-              date: toStr(r.Date).toUpperCase(),
+              // Read whatever the sheet holds — "8-Dec", "09/Dec (Tue)", an
+              // Excel date — into the MON D YYYY form parse_match_date() in
+              // 0008 needs to derive match_on. A row it cannot read keeps its
+              // original text so the fixture is still imported and visibly
+              // wrong, rather than being silently dropped.
+              date: window.supabaseService.parseScheduleDate(r.Date)
+                    || toStr(r.Date).toUpperCase(),
               // `time` is part of the [date, time] composite key upsertByDateTime
               // keys on, so it must be defaulted here, before the key is
               // computed — not in `defaults`, which is only applied after a row

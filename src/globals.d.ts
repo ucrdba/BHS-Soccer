@@ -62,6 +62,8 @@ declare global {
     // finishing position (0022). Bands are per team: a 4:30 that stretches a
     // varsity side is out of reach for an under-14.
     parseTimeToSeconds(value: unknown): number | null;
+    parseScheduleDate(value: unknown, reference?: Date): string | null;
+    scheduleDayOfWeek(matchDate: unknown): string | null;
     formatSecondsAsTime(seconds: unknown): string;
     factorForTime(seconds: unknown, bands: Record<string, any>[]): number;
     fetchTimeBands(drillId: string, teamId: string): Promise<Record<string, any>[] | null>;
