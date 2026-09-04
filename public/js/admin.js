@@ -2261,7 +2261,7 @@ Object.assign(BHSSoccerApp.prototype, {
         Team:'blank = current team',
         Date:'8-Dec | 09/Dec | Dec 8 2026 | 12/8/2026 | 2026-12-08',
         DOW:'derived from the date - not imported',
-        Time:'', Opponent:'', Location:'',
+        Time:'', Opponent:'', Location:'blank = the opponent is used',
         Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE'
       }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
@@ -2832,8 +2832,19 @@ Object.assign(BHSSoccerApp.prototype, {
               continue;
             }
 
+            // A default may fill in what does not matter. It must not assert a
+            // FACT about the fixture that the sheet never stated.
+            //
+            // These used to default to 'Home - Cougar Stadium' and isHome:true,
+            // so a sheet with no Location column gave every away fixture a home
+            // venue — nineteen cards reading "Home - Cougar Stadium" while
+            // eleven of them were away games. The badge was right and the line
+            // under it contradicted it, which reads as the badge being wrong.
+            //
+            // Unstated now means unknown: blank venue, and home/away left for
+            // the Home column to decide.
             const scheduleDefaults = {
-              location: 'Home - Cougar Stadium', isHome: true,
+              location: '', isHome: null,
               status: 'UPCOMING', score: null, isDeleted: false, is_deleted: false
             };
             const imported = rows.filter(r => r.Opponent).map(r => ({
@@ -2851,8 +2862,34 @@ Object.assign(BHSSoccerApp.prototype, {
               // is determined to be a new insert.
               time: toStr(r.Time) || '6:00 PM',
               opponent: toStr(r.Opponent),
-              location: opt(r.Location),
-              isHome: opt(r.Home) !== undefined ? (opt(r.Home).toLowerCase() !== 'away') : undefined,
+              // What the coach wrote, and failing that the opponent. The
+              // opponent is stated in the sheet, so this fills the venue in
+              // from something the coach actually said rather than inventing a
+              // stadium — which is what "Home - Cougar Stadium" on every away
+              // fixture was.
+              location: opt(r.Location) ?? opt(r.Opponent),
+              // The Home column decides. Failing that, a Location written as
+              // "Home - ..." or "Away - ..." says the same thing, which is how
+              // the exported sheet writes it — so an export edited and
+              // re-imported keeps its home and away without a Home column.
+              // The Home column decides: that is the column that exists to
+              // answer this, and it wins over everything else.
+              //
+              // Failing that, a venue the coach wrote as "Home - ..." or
+              // "Away - ..." says the same thing — which is how the EXPORT
+              // writes it, so an exported schedule edited and re-imported keeps
+              // its home and away without a Home column. Read from r.Location
+              // rather than the resolved venue, because the opponent standing
+              // in for a blank Location says nothing about which ground it is
+              // played on.
+              isHome: (() => {
+                const h = opt(r.Home);
+                if (h !== undefined) return String(h).trim().toLowerCase() !== 'away';
+                const written = String(opt(r.Location) ?? '').trim().toLowerCase();
+                if (written.startsWith('home')) return true;
+                if (written.startsWith('away')) return false;
+                return undefined;
+              })(),
               status: opt(r.Status) ? toStr(r.Status).toUpperCase() : undefined,
               score: opt(r.Score),
               isDeleted: optB(r.IsDeleted),
