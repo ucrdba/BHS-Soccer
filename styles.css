@@ -1885,3 +1885,64 @@ canvas { touch-action: none; max-width: 100%; }
   }
   .pm-table th:nth-child(2), .pm-table td:nth-child(2) { left: 40px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Plus / minus, full screen.
+
+   This is the one screen used at arm's length while something else has your
+   attention. Every other modal is a form you look at; this is a control
+   surface you hit without looking, so it takes the whole viewport and spends
+   all of it on making the players bigger.
+
+   Scoped to the id so no other modal changes.
+   --------------------------------------------------------------------------- */
+
+#plusMinusModal { align-items: stretch; justify-content: stretch; }
+
+#plusMinusModal .modal-window {
+  width: 100%;
+  max-width: 100%;
+  /* dvh, not vh: on a phone the browser toolbar resizes the viewport as you
+     scroll, and vh does not notice — the bottom of the sheet ends up under
+     the chrome. */
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The body scrolls, not the window, so the clock and the goal buttons stay
+   where they were when you reach for them. */
+#plusMinusBody { flex: 1; min-height: 0; overflow-y: auto; }
+
+#plusMinusModal .modal-header { flex: 0 0 auto; margin-bottom: 8px; }
+#plusMinusModal > .modal-window > .btn { flex: 0 0 auto; }
+
+/* ── Bigger players ────────────────────────────────────────────────────────
+   The chip is the target. At a match it is hit with a thumb, in sunlight,
+   while watching something else — so it is sized for that rather than for how
+   much fits on the screen. */
+
+#plusMinusModal .pm-chip {
+  min-height: 62px;
+  padding: 8px 14px;
+  gap: 9px;
+  border-radius: 10px;
+}
+#plusMinusModal .pm-num { font-size: 1.15rem; }
+#plusMinusModal .pm-name { font-size: 0.98rem; }
+#plusMinusModal .pm-score { font-size: 0.95rem; font-weight: 700; color: var(--bhs-silver); }
+
+/* The pitch takes the room that is going, so eleven larger chips still sit in
+   it without scrolling — a drop target that scrolls moves under the finger. */
+#plusMinusModal .pm-pitch .pm-chips { min-height: 34vh; align-content: flex-start; }
+#plusMinusModal .pm-bench .pm-chips { min-height: 84px; }
+
+@media (max-width: 640px) {
+  #plusMinusModal .modal-window { padding: 10px; }
+  #plusMinusModal .pm-chip { min-height: 56px; padding: 6px 10px; }
+  #plusMinusModal .pm-name { font-size: 0.9rem; max-width: 110px; }
+  #plusMinusModal .pm-pitch .pm-chips { min-height: 38vh; }
+}
