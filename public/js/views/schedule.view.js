@@ -35,6 +35,31 @@ Object.assign(BHSSoccerApp.prototype, {
     return dow ? `${normal} (${dow})` : normal;
   },
 
+  /**
+   * A maps link for a fixture, or null when there is nothing to point at.
+   *
+   * Returns null for a home fixture (a coach knows their own ground), and
+   * null when no address was recorded. That second one is the important
+   * case: `location` on an away fixture is usually just the opponent's name
+   * after the blank-Location fallback, and 'Redlands' as a map query lands
+   * in the middle of a city rather than at a school. This schedule contains
+   * both 'Redlands' and 'Redlands East Valley'. A link to the wrong town is
+   * worse than no link, so an address the coach stated is the only thing
+   * that earns one.
+   *
+   * The /dir/ form gives turn-by-turn from wherever the reader is standing,
+   * which is what "directions" means to a parent leaving the house. On a
+   * phone the OS hands this to the installed Maps app; on a laptop it opens
+   * Google Maps in a tab.
+   */
+  matchDirectionsUrl(match) {
+    if (!match || match.isHome !== false) return null;
+    const address = String(match.venueAddress == null ? '' : match.venueAddress).trim();
+    if (!address) return null;
+    return 'https://www.google.com/maps/dir/?api=1&destination='
+      + encodeURIComponent(address);
+  },
+
   renderScheduleView() {
     const label = this.activeTeamLabel();
     // Every control that writes to the schedule is gated on this. isCoach()
@@ -96,9 +121,24 @@ Object.assign(BHSSoccerApp.prototype, {
                   : `<div class="text-muted" style="font-size:0.9rem;" title="No location recorded for this fixture">&mdash;</div>`}
               </div>
               <div>
-                ${m.isHome === null || m.isHome === undefined
-                  ? `<span class="badge badge-coach" style="font-weight:700;" title="No Home or Away recorded for this fixture">&mdash;</span>`
-                  : `<span class="badge ${m.isHome ? 'badge-win' : 'badge-role'}" style="font-weight:700;">${m.isHome ? '🏠 HOME' : '✈️ AWAY'}</span>`}
+                ${(() => {
+                  if (m.isHome === null || m.isHome === undefined) {
+                    return `<span class="badge badge-coach" style="font-weight:700;" title="No Home or Away recorded for this fixture">&mdash;</span>`;
+                  }
+                  const badge = `<span class="badge ${m.isHome ? 'badge-win' : 'badge-role'}" style="font-weight:700;">${m.isHome ? '🏠 HOME' : '✈️ AWAY'}</span>`;
+                  const url = this.matchDirectionsUrl(m);
+                  if (!url) return badge;
+                  // An address goes into an href AND into a title, so it is
+                  // escaped for both: encodeURIComponent above for the URL,
+                  // and the attribute escape here. "O'Brien & Sons Field"
+                  // breaks a naive template in two different ways.
+                  const esc = v => String(v == null ? '' : v)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                  return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"
+                     style="text-decoration:none;"
+                     title="Directions to ${esc(m.venueAddress)}">${badge}</a>`;
+                })()}
               </div>
               <div>
                 ${m.status === 'COMPLETED' ? `
@@ -209,6 +249,7 @@ Object.assign(BHSSoccerApp.prototype, {
       rawTime: matchData.time,
       opponent: matchData.opponent,
       location: matchData.location,
+      venueAddress: (matchData.venueAddress || '').trim() || null,
       status: matchData.status,
       isHome: matchData.isHome === 'true' || matchData.isHome === true,
       score: matchData.score || null,
@@ -241,6 +282,7 @@ Object.assign(BHSSoccerApp.prototype, {
     const timeEl = document.getElementById('editMatchTime');
     const oppEl = document.getElementById('editMatchOpponent');
     const locEl = document.getElementById('editMatchLocation');
+    const addrEl = document.getElementById('editMatchVenueAddress');
     const statusEl = document.getElementById('editMatchStatus');
     const homeEl = document.getElementById('editMatchIsHome');
     const scoreEl = document.getElementById('editMatchScore');
@@ -250,6 +292,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (timeEl) timeEl.value = match.rawTime || this.format12hTo24h(match.time) || '';
     if (oppEl) oppEl.value = match.opponent || '';
     if (locEl) locEl.value = match.location || '';
+    if (addrEl) addrEl.value = match.venueAddress || '';
     if (statusEl) statusEl.value = match.status || 'UPCOMING';
     if (homeEl) homeEl.value = String(match.isHome);
     if (scoreEl) scoreEl.value = match.score || '';
@@ -272,6 +315,14 @@ Object.assign(BHSSoccerApp.prototype, {
         rawTime: matchData.time,
         opponent: matchData.opponent,
         location: matchData.location,
+        // Emptying the box clears the address, which must reach the database
+        // as null rather than being dropped -- a coach removing a wrong
+        // address needs the link to disappear. Only a caller that never
+        // supplied the key at all leaves it untouched, which is what the
+        // importer relies on.
+        ...(matchData.venueAddress !== undefined
+          ? { venueAddress: (matchData.venueAddress || '').trim() || null }
+          : {}),
         status: matchData.status,
         isHome: matchData.isHome === 'true' || matchData.isHome === true,
         score: matchData.score || null,
@@ -301,6 +352,7 @@ Object.assign(BHSSoccerApp.prototype, {
       time: document.getElementById('editMatchTime')?.value,
       opponent: document.getElementById('editMatchOpponent')?.value,
       location: document.getElementById('editMatchLocation')?.value,
+      venueAddress: document.getElementById('editMatchVenueAddress')?.value,
       status: document.getElementById('editMatchStatus')?.value,
       isHome: document.getElementById('editMatchIsHome')?.value,
       score: document.getElementById('editMatchScore')?.value

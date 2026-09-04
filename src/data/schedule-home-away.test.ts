@@ -415,10 +415,14 @@ describe("who may change the schedule", () => {
 
   const WRITE_CONTROLS = ["Edit", "Delete", "Add New Match", "Lineup", "Plus/Minus"];
 
-  // asRole replaces the shared global, so put the coach back afterwards
-  // rather than leaving the next test to inherit whatever ran last.
-  const coachAgain = (globalThis as any).auth;
-  afterEach(() => { (globalThis as any).auth = coachAgain; });
+  // asRole replaces the shared global, so put a coach back afterwards rather
+  // than leaving the next describe to inherit whatever role ran last.
+  //
+  // Rebuilt rather than snapshotted: a const captured out here evaluates when
+  // the describe is DEFINED, which is before beforeAll has installed auth --
+  // so it would restore undefined and every later block would fail on
+  // auth.isCoach() of undefined.
+  afterEach(() => { asRole("coach"); });
 
   it("shows a guest none of the controls that write", () => {
     const html = asRole("guest");
@@ -467,5 +471,116 @@ describe("who may change the schedule", () => {
     const body = scheduleSrc.slice(scheduleSrc.indexOf("renderScheduleView"),
                                    scheduleSrc.indexOf("formatIsoToDisplayDate"));
     expect(body.match(/canManage \?/g) || []).toHaveLength(2);
+  });
+});
+
+describe("directions to an away fixture", () => {
+  /**
+   * The AWAY badge becomes a link to turn-by-turn directions — but only when
+   * a coach has stated an address.
+   *
+   * That condition is the whole feature. `location` on an away fixture is
+   * usually just the opponent's name (the blank-Location fallback), and this
+   * very schedule contains both "Redlands" and "Redlands East Valley".
+   * "Redlands" as a map query lands in the middle of a city of 70,000. A
+   * link to the wrong town is worse than no link, so nothing but a stated
+   * address earns one.
+   */
+  const away = (over: any = {}) => card({
+    id: "m1", date: "DEC 8 2026", time: "4:00 PM", opponent: "Redlands",
+    location: "Redlands", isHome: false, ...over
+  });
+
+  const ADDRESS = "1200 E Colton Ave, Redlands, CA 92374";
+
+  it("links the AWAY badge when an address was recorded", () => {
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain("google.com/maps/dir/");
+    expect(html).toContain(encodeURIComponent(ADDRESS));
+  });
+
+  it("does NOT link when no address was recorded", () => {
+    const html = away({ venueAddress: null });
+    expect(html).toContain("AWAY");
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("does not fall back to the location text", () => {
+    // The whole point: "Redlands" is a city, not a soccer field. Pointing a
+    // map at it sends a parent downtown.
+    const html = away({ location: "Redlands", venueAddress: null });
+    expect(html).not.toContain("maps");
+  });
+
+  it("treats an address of only spaces as no address", () => {
+    expect(away({ venueAddress: "   " })).not.toContain("google.com/maps");
+  });
+
+  it("never links a home fixture, whatever address it carries", () => {
+    // A coach knows their own ground, and is_home is the field that decides.
+    const html = card({ id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                        opponent: "Yucaipa", location: "Cougar Stadium",
+                        isHome: true, venueAddress: ADDRESS });
+    expect(html).toContain("HOME");
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("does not link a fixture whose side was never recorded", () => {
+    // null is "not stated". Offering directions would assert it is away.
+    const html = away({ isHome: null, venueAddress: ADDRESS });
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("opens in a new tab without handing over the opener", () => {
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it("survives an address containing an ampersand and an apostrophe", () => {
+    // "O'Brien & Sons Field" is the shape that breaks a naive template: the
+    // bare & starts an entity, and the address lands in BOTH an href and a
+    // title attribute, which need different escaping from each other.
+    const ADDR = "O'Brien & Sons Field, Banning CA";
+    const html = away({ venueAddress: ADDR });
+
+    // The href carries it percent-encoded, so the map receives it intact.
+    expect(html).toContain(encodeURIComponent(ADDR));
+
+    // The title carries it HTML-escaped: an entity, never a bare ampersand.
+    const title = (html.match(/title="Directions to ([^"]*)"/) || [])[1];
+    expect(title).toBeDefined();
+    expect(title).toContain("&amp;");
+    expect(title).not.toMatch(/&(?!amp;|#|lt;|gt;|quot;)/);
+  });
+
+  it("asks for directions, not just a pin", () => {
+    // /dir/ with a destination routes from wherever the reader is standing,
+    // which is what a parent leaving the house needs. /search/ would only
+    // show the place.
+    //
+    // The & reads as &amp; because the URL sits in an href — correct HTML,
+    // which the browser decodes back to & before navigating.
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain("/maps/dir/?api=1&amp;destination=");
+    const href = (html.match(/href="([^"]*)"/) || [])[1];
+    expect(href!.replace(/&amp;/g, "&")).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(ADDRESS));
+  });
+});
+
+describe("the address round trip", () => {
+  it("is written only when the caller supplied it", () => {
+    // An older sheet with no Address column must not null out addresses
+    // typed in the app — the bug that cleared 25 JV uniform numbers.
+    expect(adminSrc).toContain("r.Address !== undefined");
+  });
+
+  it("is exported so an edited sheet can be re-imported", () => {
+    expect(adminSrc).toContain("Address: m.venueAddress || ''");
+  });
+
+  it("appears in the schedule template", () => {
+    expect(adminSrc).toMatch(/Address:'optional/);
   });
 });
