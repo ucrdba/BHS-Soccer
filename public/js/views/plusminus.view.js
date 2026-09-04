@@ -149,6 +149,73 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   /**
+   * Set the match clock to a value.
+   *
+   * Bracketed by a stop and a start, which is what keeps minutes honest: the
+   * stop credits everyone on the pitch up to the OLD time, and the start
+   * resumes from the NEW one. Without that, moving the clock forward would
+   * hand every player on the pitch the jump as minutes they did not play, and
+   * moving it back would silently stop their minutes until the clock caught up
+   * again.
+   *
+   * Events replay in the order they were recorded rather than by clock stamp,
+   * so winding the clock back does not reorder what already happened — see
+   * orderEvents() in src/data/plus-minus.ts.
+   */
+  async pmSetClock(seconds) {
+    const target = Math.max(0, Math.round(Number(seconds) || 0));
+    const wasRunning = !!this._pmRunningSince;
+
+    if (wasRunning) {
+      this._pmClockBase = this.pmClock();
+      this._pmRunningSince = null;
+      await this.pmAppend('clock_stop');
+    }
+
+    this._pmClockBase = target;
+    this.pmSay('');
+
+    if (wasRunning) {
+      this._pmRunningSince = Date.now();
+      await this.pmAppend('clock_start');
+    } else {
+      this.renderPlusMinus();
+    }
+  },
+
+  /**
+   * Ask for a time and set it.
+   *
+   * Read through parseTimeToSeconds, so "12:30", "12.30" and a bare "750" all
+   * work — the same rule as everywhere else a time is typed, rather than a
+   * second one to remember.
+   */
+  async pmPromptClock() {
+    const current = window.plusMinus.formatClock(this.pmClock());
+    const typed = window.prompt(
+      'Set the match clock.\n\nmm:ss — for example 12:30, or 12.30, or 750 for seconds.',
+      current);
+    if (typed === null) return;                       // cancelled
+
+    const seconds = window.supabaseService.parseTimeToSeconds(String(typed).trim());
+    if (seconds === null) {
+      this.pmSay(`"${typed}" is not a time. Use mm:ss, for example 12:30.`);
+      this.renderPlusMinus();
+      return;
+    }
+    await this.pmSetClock(seconds);
+  },
+
+  /** Back to 0:00, confirmed because it is rarely what you meant mid-match. */
+  async pmResetClock() {
+    if (this.pmClock() > 0 && !window.confirm(
+      `Set the match clock back to 0:00?\n\n`
+      + `Minutes already played are kept — the clock simply starts counting again `
+      + `from zero.`)) return;
+    await this.pmSetClock(0);
+  },
+
+  /**
    * End the period.
    *
    * Stops the clock first: a half that ends with the clock running keeps
@@ -659,6 +726,10 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
         <div class="pm-meta">
           <span class="text-muted">Period ${this._pmPeriod || 1}</span>
+          <button type="button" class="btn btn-secondary pm-small" title="Type the match clock"
+                  onclick="app.pmPromptClock()">Set clock</button>
+          <button type="button" class="btn btn-secondary pm-small" title="Back to 0:00"
+                  onclick="app.pmResetClock()">Reset clock</button>
           <button type="button" class="btn btn-secondary pm-small" onclick="app.pmEndPeriod()">End period</button>
           <button type="button" class="btn btn-secondary pm-small" onclick="app.pmUndo()">&#8630; Undo</button>
           <button type="button" class="btn btn-secondary pm-small" title="Put the saved lineup on the pitch"

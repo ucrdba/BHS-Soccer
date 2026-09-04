@@ -1238,3 +1238,180 @@ describe('which number is shown', () => {
     expect(cells).toContain('—');
   });
 });
+
+describe('setting the match clock', () => {
+  /**
+   * A statistician starts the clock late, or it drifts from the referee's.
+   *
+   * The change is bracketed by a stop and a start, which is what keeps minutes
+   * honest: the stop credits everyone on the pitch up to the OLD time, the
+   * start resumes from the NEW one. Without it, moving the clock forward would
+   * hand every player the jump as minutes they did not play.
+   */
+  function app() {
+    const a = makeApp();
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('sets the clock to the value given', async () => {
+    const a = app();
+    await a.pmSetClock(750);
+    expect(a.pmClock()).toBe(750);
+  });
+
+  it('never sets a negative clock', async () => {
+    const a = app();
+    await a.pmSetClock(-60);
+    expect(a.pmClock()).toBe(0);
+  });
+
+  it('does not hand out minutes for winding the clock FORWARD', async () => {
+    // The whole reason for the stop/start bracket. Ten minutes played, then
+    // the clock jumps to 40:00 — that jump is not playing time.
+    const a = app();
+    await a.pmAppend('clock_start');
+    await a.pmAppend('on', 'p1');
+    a._pmClockBase = 600;
+    a._pmRunningSince = null;
+    await a.pmAppend('clock_stop');
+
+    await a.pmSetClock(2400);
+    expect(a.pmStats().get('p1').secondsPlayed).toBe(600);
+  });
+
+  it('keeps minutes already played when the clock is wound BACK', async () => {
+    const a = app();
+    await a.pmAppend('clock_start');
+    await a.pmAppend('on', 'p1');
+    a._pmClockBase = 600;
+    a._pmRunningSince = null;
+    await a.pmAppend('clock_stop');
+
+    await a.pmSetClock(0);
+    expect(a.pmStats().get('p1').secondsPlayed).toBe(600);
+  });
+
+  it('stops and restarts a running clock around the change', async () => {
+    const a = app();
+    await a.pmToggleClock();
+    await a.pmSetClock(900);
+    expect(a._pmEvents.map((e: any) => e.kind))
+      .toEqual(['clock_start', 'clock_stop', 'clock_start']);
+    expect(a._pmRunningSince).not.toBeNull();
+  });
+
+  it('leaves a stopped clock stopped', async () => {
+    const a = app();
+    await a.pmSetClock(900);
+    expect(a._pmRunningSince).toBeNull();
+    expect(a._pmEvents).toHaveLength(0);
+  });
+
+  it('does not reorder what already happened', async () => {
+    // A player off, then the clock wound back, then a goal. The goal came
+    // after they left, so they must not be credited with it — which only
+    // holds because events replay in the order they were recorded.
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    a._pmClockBase = 600;
+    await a.pmAppend('off', 'p1');
+    await a.pmSetClock(30);
+    await a.pmAppend('goal_for');
+
+    expect(a.pmStats().get('p1').goalDiff).toBe(0);
+  });
+});
+
+describe('typing a clock value', () => {
+  function app() {
+    const a = makeApp();
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  beforeEach(() => {
+    (window as any).supabaseService = {
+      isConfigured: () => false,
+      parseTimeToSeconds: (v: any) => {
+        const raw = String(v == null ? '' : v).trim();
+        if (!raw) return null;
+        if (/^[0-9]+$/.test(raw)) return parseInt(raw, 10);
+        const m = /^([0-9]+)[:.]([0-5][0-9])$/.exec(raw);
+        return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+      }
+    };
+  });
+
+  it('accepts mm:ss', async () => {
+    (window as any).prompt = () => '12:30';
+    const a = app();
+    await a.pmPromptClock();
+    expect(a.pmClock()).toBe(750);
+  });
+
+  it('accepts a full stop, like every other time field', async () => {
+    (window as any).prompt = () => '12.30';
+    const a = app();
+    await a.pmPromptClock();
+    expect(a.pmClock()).toBe(750);
+  });
+
+  it('accepts bare seconds', async () => {
+    (window as any).prompt = () => '750';
+    const a = app();
+    await a.pmPromptClock();
+    expect(a.pmClock()).toBe(750);
+  });
+
+  it('refuses something that is not a time, and says so', async () => {
+    (window as any).prompt = () => 'half past';
+    const a = app();
+    a._pmClockBase = 100;
+    await a.pmPromptClock();
+    expect(a.pmClock()).toBe(100);
+    expect(a._pmError).toContain('is not a time');
+  });
+
+  it('changes nothing when cancelled', async () => {
+    (window as any).prompt = () => null;
+    const a = app();
+    a._pmClockBase = 100;
+    await a.pmPromptClock();
+    expect(a.pmClock()).toBe(100);
+  });
+});
+
+describe('resetting the clock', () => {
+  function app() {
+    const a = makeApp();
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('goes back to zero', async () => {
+    (window as any).confirm = () => true;
+    const a = app();
+    a._pmClockBase = 900;
+    await a.pmResetClock();
+    expect(a.pmClock()).toBe(0);
+  });
+
+  it('asks first, since it is rarely meant mid-match', async () => {
+    (window as any).confirm = () => false;
+    const a = app();
+    a._pmClockBase = 900;
+    await a.pmResetClock();
+    expect(a.pmClock()).toBe(900);
+  });
+
+  it('does not ask when the clock is already at zero', async () => {
+    let asked = 0;
+    (window as any).confirm = () => { asked += 1; return true; };
+    const a = app();
+    await a.pmResetClock();
+    expect(asked).toBe(0);
+  });
+});

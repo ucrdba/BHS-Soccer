@@ -52,16 +52,26 @@ export interface PlayerStats {
   onPitch: boolean;
 }
 
-/** Events in the order they happened, stable for those sharing a second. */
+/**
+ * Events in the order they were RECORDED, which is the order they happened.
+ *
+ * Not ordered by the match clock, and the difference matters. Nothing in the
+ * app can enter an event at a past clock time, so clock order protected a
+ * capability that does not exist — while making a clock CORRECTION unsafe: set
+ * the clock back three minutes and every event recorded afterwards would sort
+ * ahead of what came before it, changing who counts as on the pitch for goals
+ * already recorded.
+ *
+ * The clock is still what durations are measured from. It is only the sequence
+ * that comes from the log.
+ *
+ * If entering an event at a past time is ever added, this has to be revisited
+ * together with it — the two decisions are the same decision.
+ */
 export function orderEvents(events: StatEvent[]): StatEvent[] {
   return (events || [])
     .map((e, i) => ({ e, i }))
-    .sort((a, b) => {
-      if (a.e.atSeconds !== b.e.atSeconds) return a.e.atSeconds - b.e.atSeconds;
-      const sa = a.e.seq ?? a.i;
-      const sb = b.e.seq ?? b.i;
-      return sa - sb;
-    })
+    .sort((a, b) => (a.e.seq ?? a.i) - (b.e.seq ?? b.i))
     .map(x => x.e);
 }
 

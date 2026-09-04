@@ -292,13 +292,21 @@ describe('the clock and the score', () => {
 });
 
 describe('ordering', () => {
-  it('replays by clock time, not arrival order', () => {
-    // Events can be entered out of order when a statistician catches up.
+  /**
+   * Events replay in the order they were RECORDED, not by their clock stamp.
+   *
+   * Nothing in the app can enter an event at a past clock time, so clock order
+   * protected a capability that does not exist — while making a clock
+   * CORRECTION unsafe: setting the clock back three minutes would make every
+   * event recorded afterwards sort ahead of what came before it, changing who
+   * counts as on the pitch for goals already recorded.
+   */
+  it('replays in the order events were recorded', () => {
     const ordered = orderEvents([
-      ev('off', { playerId: 'p1', atSeconds: 300 }),
-      ev('on', { playerId: 'p1', atSeconds: 0 })
+      ev('on', { playerId: 'p1', atSeconds: 0 }),
+      ev('off', { playerId: 'p1', atSeconds: 300 })
     ]);
-    expect(ordered[0].kind).toBe('on');
+    expect(ordered.map(e => e.kind)).toEqual(['on', 'off']);
   });
 
   it('keeps events sharing a second in the order they arrived', () => {
@@ -309,13 +317,24 @@ describe('ordering', () => {
     expect(ordered.map(e => e.kind)).toEqual(['goal_for', 'goal']);
   });
 
-  it('gets the differential right even when a sub arrives late', () => {
-    // Recorded after the goal but timed before it: the differential must
-    // follow the clock, which is why it is derived.
+  it('follows an explicit seq over arrival position', () => {
+    // What the app stamps on events loaded back from the database, so a
+    // reopened match and a live one order identically.
+    const ordered = orderEvents([
+      ev('off', { playerId: 'p1', seq: 2 }),
+      ev('on', { playerId: 'p1', seq: 1 })
+    ]);
+    expect(ordered.map(e => e.kind)).toEqual(['on', 'off']);
+  });
+
+  it('survives the clock being wound back mid-match', () => {
+    // The reason record order is what replays. A player taken off, then the
+    // clock corrected back, then a goal: the goal came after they left, so
+    // they must not be credited with it.
     const s = replay([
-      ev('on', { playerId: 'p1', atSeconds: 0 }),
-      ev('goal_for', { atSeconds: 600 }),
-      ev('off', { playerId: 'p1', atSeconds: 300 })
+      ev('on', { playerId: 'p1', atSeconds: 0, seq: 1 }),
+      ev('off', { playerId: 'p1', atSeconds: 600, seq: 2 }),
+      ev('goal_for', { atSeconds: 30, seq: 3 })          // clock was set back
     ]);
     expect(of(s, 'p1').goalDiff).toBe(0);
   });
