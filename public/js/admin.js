@@ -287,16 +287,27 @@ Object.assign(BHSSoccerApp.prototype, {
                 These buttons <strong>save a file</strong> to your computer. They do not import anything.
               </p>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px;">
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('all')" style="font-size:0.75rem; border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📦 All Tables Template</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('players')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Players</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('schedule')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Schedule</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('drills')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Drills</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('plan')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Plans</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('coaches')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Coaches</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('thoughts')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Thoughts</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('quiz')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Quiz</button>
-                <button class="btn btn-secondary" onclick="app.downloadTemplate('categories')" style="font-size:0.75rem;" ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Categories</button>
+              <!-- A dropdown, matching Export above and Import below. Nine small
+                   buttons in a wrapping grid meant Schedule was there and could
+                   not be found, because the two steps either side of it are
+                   pickers and this one was not. -->
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;">
+                <select id="templateTarget" class="form-control" style="flex:1; min-width: 220px;" ${!isCoachOrAdmin ? 'disabled' : ''}>
+                  <option value="all">📦 ALL TABLES AT ONCE (Complete Multi-Sheet Workbook)</option>
+                  <option value="schools">🏫 Schools &amp; Team Config</option>
+                  <option value="profiles">👤 User Profiles &amp; Roles</option>
+                  <option value="players">👥 Players / Roster</option>
+                  <option value="schedule">📅 Schedule &amp; Results (games)</option>
+                  <option value="drills">📚 Master Drills Library</option>
+                  <option value="plan">📋 Practice Plans</option>
+                  <option value="coaches">👔 Coaching Staff</option>
+                  <option value="thoughts">💡 Coach Daily Thoughts</option>
+                  <option value="quiz">📝 Quiz Questions Bank</option>
+                  <option value="categories">🏷️ Soccer Categories Bank</option>
+                </select>
+                <button class="btn btn-secondary" style="border-color:var(--bhs-gold-accent); color:var(--bhs-gold-accent);"
+                        onclick="app.downloadTemplate(document.getElementById('templateTarget').value)"
+                        ${!isCoachOrAdmin ? 'disabled style="opacity:0.5;"' : ''}>📄 Download Template</button>
               </div>
 
               <div style="font-size: 0.78rem; font-weight: 700; color: var(--bhs-cyan-accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
@@ -2258,6 +2269,26 @@ Object.assign(BHSSoccerApp.prototype, {
       const headers = [{ Name:'Tactical / Attacking', Description:'Drills focused on offensive build-up, 1v1 gauntlets, overlapping runs, counter-pressing, and finishing in the box.', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'SoccerCategories');
       XLSX.writeFile(wb, 'BHS_Soccer_Categories_Template.xlsx');
+    } else if (type === 'plan') {
+      // One row per DRILL SLOT, not one per plan: a practice plan is the set
+      // of rows sharing a Name, which is how practice_plans stores it.
+      const headers = [{ Name:'Tuesday Session', TimeSlot:'4:00 PM - 4:20 PM', Duration:'20 min', DrillName:'', CoachNotes:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'PracticePlans');
+      XLSX.writeFile(wb, 'BHS_Practice_Plans_Template.xlsx');
+    } else if (type === 'coaches') {
+      const headers = [{ Name:'', Level:'Head Coach', Email:'', Phone:'', Address:'', Bio:'', Photo:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Coaches');
+      XLSX.writeFile(wb, 'BHS_Coaches_Template.xlsx');
+    } else if (type === 'thoughts') {
+      // Key is what links a thought to the quiz questions that test it.
+      const headers = [{ Key:'1', Title:'', ThoughtsText:'', CoachName:'', IsDeleted:'FALSE' }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'DailyThoughts');
+      XLSX.writeFile(wb, 'BHS_Daily_Thoughts_Template.xlsx');
+    } else {
+      // Reached only if the picker offers something this does not build. A
+      // button that silently does nothing is worse than one that says so —
+      // Plans, Coaches and Thoughts each did exactly that until now.
+      window.alert(`There is no template for "${type}" yet.`);
     }
   },
 
