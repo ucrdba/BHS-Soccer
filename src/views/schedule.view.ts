@@ -57,7 +57,7 @@ Object.assign(BHSSoccerApp.prototype, {
               </div>
               <div class="game-matchup" style="flex:1; min-width:180px;">
                 <div>
-                  <div class="opponent-name" style="font-weight:700; color:#FFF; font-size:1.05rem;">vs ${m.opponent}</div>
+                  <div class="opponent-name" style="font-weight:700; color:#FFF; font-size:1.05rem;">${m.opponent}</div>
                   <div class="location-tag text-muted" style="font-size:0.82rem;">📍 ${m.location}</div>
                 </div>
               </div>

@@ -274,3 +274,24 @@ describe('the mapping admin.js actually ships', () => {
     expect(isHome).not.toContain('opt(r.Opponent)');
   });
 });
+
+describe("the opponent line", () => {
+  /**
+   * The card already sits under "SCHEDULE & GAME RESULTS", beside a HOME or
+   * AWAY badge, in a column of fixtures. "vs" in front of the opponent adds
+   * nothing a reader does not already have — the row IS a fixture against
+   * someone.
+   */
+  it("names the opponent without a redundant vs", () => {
+    const html = card({ id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                        opponent: "Redlands", location: "", isHome: false });
+    expect(html).toContain("Redlands");
+    expect(html).not.toContain("vs Redlands");
+  });
+
+  it("keeps vs where it reads as a sentence", () => {
+    // Confirmations and delete prompts are prose, not a column heading:
+    // "delete the match vs Redlands" needs the word.
+    expect(scheduleSrc).toContain("delete the match vs");
+  });
+});
