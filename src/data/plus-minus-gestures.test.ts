@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
+import cssSrc from '../../styles.css?raw';
 // plusminus reuses the lineup's formations rather than defining its own.
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
 import * as plusMinus from './plus-minus';
@@ -67,6 +68,11 @@ beforeEach(() => {
  */
 const kickOff = (a: any) => {
   a._pmEvents.push({ kind: 'clock_start', playerId: null, atSeconds: 0 });
+  // Running, not merely started: plus and minus are refused whenever the
+  // clock is stopped, half time included. Set directly rather than through
+  // pmToggleClock() so _pmClockBase stays where the test put it and pmClock()
+  // remains predictable.
+  a._pmRunningSince = Date.now();
   return a;
 };
 
@@ -349,7 +355,11 @@ describe('undo', () => {
 describe('the numbers on screen', () => {
   it('derives every figure from the events', async () => {
     const app = makeApp();
-    await app.pmAppend('clock_start');
+    // Through the toggle, not pmAppend('clock_start'): the toggle is what
+    // actually starts the clock ticking, and plus and minus are refused while
+    // it is stopped. Appending the event alone leaves the clock at rest,
+    // which is a state the app itself never produces.
+    await app.pmToggleClock();
     await app.pmAppend('on', 'p1');
     await app.pmAppend('plus', 'p1');
     await app.pmAppend('plus', 'p1');
@@ -1450,7 +1460,7 @@ describe("plus and minus before the clock has started", () => {
     await a.pmAppend('plus', 'p1');
 
     expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
-    expect(a._pmError).toContain('Start the clock');
+    expect(a._pmError).toContain('start the clock to record plus and minus');
   });
 
   it("refuses a minus too", async () => {
@@ -1468,14 +1478,40 @@ describe("plus and minus before the clock has started", () => {
     expect(a.pmStats().get('p1').plus).toBe(1);
   });
 
-  it("still accepts them while the clock is PAUSED mid-match", async () => {
-    // Half time, or a stoppage. The clock has started, so the events stamp at
-    // a real minute — a coach catching up on something they missed is
-    // legitimate, and refusing it would be stricter than the problem.
+  it("refuses them while the clock is PAUSED mid-match", async () => {
+    // Reported: "I can still increment/decrement players even if the clock is
+    // not running."
+    //
+    // Stopped is stopped. At half time, or in any break in play, an event
+    // stamps at a minute that has already passed and lands against whoever
+    // was on the pitch then. Play is the only time plus and minus mean
+    // anything.
     const a = makeApp();
     await a.pmAppend('on', 'p1');
     await a.pmToggleClock();          // start
     await a.pmToggleClock();          // stop
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(0);
+  });
+
+  it("says the clock is STOPPED rather than telling a coach to start it", async () => {
+    // Different situations to the person reading it: one has never kicked
+    // off, the other is at half time and knows perfectly well they started
+    // the clock an hour ago.
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();
+    await a.pmToggleClock();
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError).toContain('stopped');
+  });
+
+  it("accepts them again once play restarts", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();          // start
+    await a.pmToggleClock();          // half time
+    await a.pmToggleClock();          // second half
     await a.pmAppend('plus', 'p1');
     expect(a.pmStats().get('p1').plus).toBe(1);
   });
@@ -1512,15 +1548,56 @@ describe("plus and minus before the clock has started", () => {
     const a = makeApp();
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
-    expect(a._pmError).toContain('Start the clock');
+    expect(a._pmError).toContain('start the clock to record plus and minus');
     await a.pmToggleClock();
     await a.pmAppend('plus', 'p1');
     expect(a._pmError).toBe('');
   });
 
+  it("keeps recording after a reload in the middle of a half", async () => {
+    // The risk this guard introduces: if reopening a match did not restore
+    // the RUNNING state, a coach who refreshed at half-time-plus-one would be
+    // refused for the rest of the match with the clock visibly ticking.
+    //
+    // openPlusMinus rebuilds it from the log via plusMinus.clockRunning(),
+    // which is what makes the stricter rule safe. This asserts that contract
+    // rather than the reload plumbing.
+    const log = [
+      { kind: 'clock_start', playerId: null, atSeconds: 0, seq: 0 },
+      { kind: 'on', playerId: 'p1', atSeconds: 0, seq: 1 },
+      { kind: 'clock_stop', playerId: null, atSeconds: 2400, seq: 2 },
+      { kind: 'clock_start', playerId: null, atSeconds: 2400, seq: 3 }
+    ];
+    expect(plusMinus.clockRunning(log as any)).toBe(true);
+
+    const a = makeApp();
+    a._pmEvents = log.slice();
+    a._pmRunningSince = plusMinus.clockRunning(log as any) ? Date.now() : null;
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(1);
+  });
+
+  it("is refused after a reload during half time", async () => {
+    // The mirror image: the log ends stopped, so the restored clock is
+    // stopped, so recording is refused — the same answer as before reloading.
+    const log = [
+      { kind: 'clock_start', playerId: null, atSeconds: 0, seq: 0 },
+      { kind: 'on', playerId: 'p1', atSeconds: 0, seq: 1 },
+      { kind: 'clock_stop', playerId: null, atSeconds: 2400, seq: 2 }
+    ];
+    expect(plusMinus.clockRunning(log as any)).toBe(false);
+
+    const a = makeApp();
+    a._pmEvents = log.slice();
+    a._pmRunningSince = plusMinus.clockRunning(log as any) ? Date.now() : null;
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(0);
+  });
+
   it("stays refused after a reset that clears the log", async () => {
-    // pmClockEverStarted reads the log rather than the clock base, because a
-    // base of zero means both "not started yet" and "reset back to zero".
+    // The wording of the refusal comes from pmClockEverStarted, which reads
+    // the log rather than the clock base, because a base of zero means both
+    // "not started yet" and "reset back to zero".
     const a = makeApp();
     await a.pmToggleClock();
     a._pmEvents = [];
@@ -1529,5 +1606,58 @@ describe("plus and minus before the clock has started", () => {
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
     expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+  });
+});
+
+describe("where the refusal appears", () => {
+  /**
+   * Reported: "I still need a message stating please start clock in order to
+   * record plus/minus values."
+   *
+   * The message existed. It was printed at the FOOT of the screen, below the
+   * pitch, below the substitutes, just above the statistics table — several
+   * hundred pixels past the fold on a full-height pitch, which is what this
+   * screen was deliberately made into. A coach taps a chip near the top and
+   * sees nothing happen.
+   *
+   * Same failure as the assign-coach errors: a message nobody can see is the
+   * same as no message.
+   */
+  it("puts the message above the pitch, not below it", () => {
+    const src = pmSrc;
+    const err = src.indexOf('id="pmError"');
+    const pitch = src.indexOf('id="pmPitch"');
+    const bench = src.indexOf('id="pmBench"');
+    expect(err).toBeGreaterThan(-1);
+    expect(err).toBeLessThan(pitch);
+    expect(err).toBeLessThan(bench);
+  });
+
+  it("sits with the clock button, which is the remedy", () => {
+    // Not merely "somewhere higher": the thing the coach must press is right
+    // above it.
+    const src = pmSrc;
+    const bar = src.indexOf('class="pm-bar"');
+    const err = src.indexOf('id="pmError"');
+    const events = src.indexOf('class="pm-events"');
+    expect(bar).toBeLessThan(err);
+    expect(err).toBeLessThan(events);
+  });
+
+  it("names what is being refused, not just the clock", async () => {
+    const a = makeApp();
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError.toLowerCase()).toContain('plus and minus');
+    expect(a._pmError.toLowerCase()).toContain('start the clock');
+  });
+
+  it("takes up no room when there is nothing to say", () => {
+    // An always-present banner under the control bar would push the pitch
+    // down on a phone, which is the screen this is used on.
+    expect(cssSrc).toContain('.pm-error:empty { display: none; }');
+  });
+
+  it("is announced to a screen reader when it changes", () => {
+    expect(pmSrc).toMatch(/id="pmError"[^>]*aria-live="polite"/);
   });
 });

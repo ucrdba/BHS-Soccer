@@ -114,13 +114,14 @@ beforeEach(() => {
 
   app = makeApp();
   app._pmEvents = [
-    // The clock is running: plus and minus are refused before kick-off, so a
-    // gesture test that never started it would be testing that guard rather
-    // than the gesture.
+    // The clock is RUNNING, which takes both the event and the flag: plus and
+    // minus are refused whenever it is stopped, so a gesture test with a
+    // resting clock would be testing that guard rather than the gesture.
     { kind: 'clock_start', playerId: null, atSeconds: 0 },
     { kind: 'on', playerId: 'p1', atSeconds: 0 },
     { kind: 'on', playerId: 'p2', atSeconds: 0 }
   ];
+  app._pmRunningSince = Date.now();
   (globalThis as any).app = app;
   (window as any).app = app;
   app.attachPlusMinusGestures();

@@ -75,23 +75,42 @@ Object.assign(BHSSoccerApp.prototype, {
    * a reload would show.
    */
   /**
+   * Is the match clock running right now?
+   *
+   * Plus and minus are gated on this, not on whether the clock has ever
+   * started. Stopped is stopped: at half time, or during any break in play,
+   * the clock is not counting, so an event recorded then is stamped at a
+   * minute that has already passed and lands against whoever happened to be
+   * on the pitch at that moment. Play is the only time plus and minus mean
+   * anything.
+   */
+  pmClockRunning() {
+    return !!this._pmRunningSince;
+  },
+
+  /**
    * Has this match's clock ever been started?
    *
-   * Read from the event log rather than from _pmClockBase, because the base
-   * is zero both before kick-off AND straight after a reset — the log is the
-   * only thing that distinguishes "not started yet" from "started, and back
-   * at zero".
+   * Only used to word the refusal, since "start the clock" and "the clock is
+   * stopped" are different situations to a coach. Read from the event log
+   * rather than from _pmClockBase, because the base is zero both before
+   * kick-off AND straight after a reset — the log is the only thing that
+   * distinguishes "not started yet" from "started, and back at zero".
    */
   pmClockEverStarted() {
     return (this._pmEvents || []).some(e => e.kind === 'clock_start');
   },
 
   async pmAppend(kind, playerId) {
-    // Plus and minus before kick-off are stamped at 0:00, and every player is
-    // credited zero minutes for the whole match, because minutes are derived
-    // from substitutions measured against the clock. Nothing at the time says
-    // so: the counters go up, the sheet looks right, and the minutes column
-    // is quietly worthless afterwards.
+    // Plus and minus are recorded against the match clock, so they only mean
+    // anything while it is running. Before kick-off they stamp at 0:00 and
+    // every player is credited zero minutes for the whole match, because
+    // minutes are derived from substitutions measured against the clock.
+    // While it is merely PAUSED they stamp at a minute that has already
+    // passed, against whoever was on the pitch then.
+    //
+    // Neither says so at the time: the counters go up and the sheet looks
+    // right.
     //
     // The first plus of a match is exactly when a coach would notice a
     // forgotten clock, so that is where to say it. Refused here rather than
@@ -99,8 +118,10 @@ Object.assign(BHSSoccerApp.prototype, {
     // reason: it is a fact about the match, not about one gesture, and the
     // tap, the long press, the two-finger press and the right click all
     // arrive through this one door.
-    if ((kind === 'plus' || kind === 'minus') && !this.pmClockEverStarted()) {
-      this.pmSay('Start the clock first — otherwise this lands at 0:00 and nobody is credited any minutes.');
+    if ((kind === 'plus' || kind === 'minus') && !this.pmClockRunning()) {
+      this.pmSay(this.pmClockEverStarted()
+        ? 'The clock is stopped. Start it to record plus and minus.'
+        : 'Please start the clock to record plus and minus — before kick-off they stamp at 0:00 and nobody is credited any minutes.');
       this.renderPlusMinus();
       return;
     }
@@ -775,6 +796,14 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
       </div>
 
+      <!-- Directly under the bar, not at the foot of the page.
+           A coach taps a chip near the top of a full-height pitch; a
+           complaint printed below the bench and the substitutes is several
+           hundred pixels past the fold, so it reads as nothing having
+           happened at all. It also sits beside the clock button, which is
+           the remedy for the message it most often carries. -->
+      <p id="pmError" class="pm-error" role="status" aria-live="polite">${esc(this._pmError || '')}</p>
+
       <div class="pm-events">
         ${evBtn('shot', 'SHOT')}${evBtn('goal', 'GOAL')}${evBtn('assist', 'ASSIST')}
         <span class="pm-armed-hint">${armed ? 'Now tap the player' : 'Tap an event, then a player'}</span>
@@ -815,8 +844,6 @@ Object.assign(BHSSoccerApp.prototype, {
             || '<span class="text-muted" style="font-size:0.8rem;">Everyone is on.</span>'}
         </div>
       </div>
-
-      <p id="pmError" class="text-danger" style="font-size:0.8rem; min-height:1em;">${esc(this._pmError || '')}</p>
 
       ${this.renderPlusMinusTable(stats, squad)}`;
 
