@@ -2832,8 +2832,19 @@ Object.assign(BHSSoccerApp.prototype, {
               continue;
             }
 
+            // A default may fill in what does not matter. It must not assert a
+            // FACT about the fixture that the sheet never stated.
+            //
+            // These used to default to 'Home - Cougar Stadium' and isHome:true,
+            // so a sheet with no Location column gave every away fixture a home
+            // venue — nineteen cards reading "Home - Cougar Stadium" while
+            // eleven of them were away games. The badge was right and the line
+            // under it contradicted it, which reads as the badge being wrong.
+            //
+            // Unstated now means unknown: blank venue, and home/away left for
+            // the Home column to decide.
             const scheduleDefaults = {
-              location: 'Home - Cougar Stadium', isHome: true,
+              location: '', isHome: null,
               status: 'UPCOMING', score: null, isDeleted: false, is_deleted: false
             };
             const imported = rows.filter(r => r.Opponent).map(r => ({
@@ -2852,7 +2863,18 @@ Object.assign(BHSSoccerApp.prototype, {
               time: toStr(r.Time) || '6:00 PM',
               opponent: toStr(r.Opponent),
               location: opt(r.Location),
-              isHome: opt(r.Home) !== undefined ? (opt(r.Home).toLowerCase() !== 'away') : undefined,
+              // The Home column decides. Failing that, a Location written as
+              // "Home - ..." or "Away - ..." says the same thing, which is how
+              // the exported sheet writes it — so an export edited and
+              // re-imported keeps its home and away without a Home column.
+              isHome: (() => {
+                const h = opt(r.Home);
+                if (h !== undefined) return String(h).trim().toLowerCase() !== 'away';
+                const loc = String(opt(r.Location) ?? '').trim().toLowerCase();
+                if (loc.startsWith('home')) return true;
+                if (loc.startsWith('away')) return false;
+                return undefined;
+              })(),
               status: opt(r.Status) ? toStr(r.Status).toUpperCase() : undefined,
               score: opt(r.Score),
               isDeleted: optB(r.IsDeleted),

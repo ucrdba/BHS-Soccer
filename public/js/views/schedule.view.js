@@ -62,11 +62,15 @@ Object.assign(BHSSoccerApp.prototype, {
               <div class="game-matchup" style="flex:1; min-width:180px;">
                 <div>
                   <div class="opponent-name" style="font-weight:700; color:#FFF; font-size:1.05rem;">vs ${m.opponent}</div>
-                  <div class="location-tag text-muted" style="font-size:0.82rem;">📍 ${m.location}</div>
+                  ${m.location
+                    ? `<div class="location-tag text-muted" style="font-size:0.82rem;">📍 ${m.location}</div>`
+                    : ''}
                 </div>
               </div>
               <div>
-                <span class="badge ${m.isHome ? 'badge-win' : 'badge-role'}" style="font-weight:700;">${m.isHome ? '🏠 HOME' : '✈️ AWAY'}</span>
+                ${m.isHome === null || m.isHome === undefined
+                  ? `<span class="badge badge-coach" style="font-weight:700;" title="No Home or Away recorded for this fixture">&mdash;</span>`
+                  : `<span class="badge ${m.isHome ? 'badge-win' : 'badge-role'}" style="font-weight:700;">${m.isHome ? '🏠 HOME' : '✈️ AWAY'}</span>`}
               </div>
               <div>
                 ${m.status === 'COMPLETED' ? `
