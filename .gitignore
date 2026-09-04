@@ -120,8 +120,14 @@ scratch/
 Resouces/CSV/dummyData/
 
 # Local reference material and scratch assets — source documents for the daily
-# thoughts and quiz content, an ad-hoc password-reset script, and a stray image.
+# thoughts and quiz content, ad-hoc account-admin notes, and a stray image.
 # The app reads none of them; the content that ships lives in Postgres.
+#
+# The account-admin files are working notes rather than runnable SQL, and they
+# name real people by email address. That is the reason they stay out: git
+# history is permanent, and a repo is a poor place to keep a coach's address.
 Resouces/Thoughts4TheDay/
 Resouces/SQL/resetPassword.sql
+Resouces/SQL/removeUser.sql
 assets/soccerPlayer.png
+deployed.bat
