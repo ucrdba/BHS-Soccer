@@ -31,6 +31,13 @@
  * result — see src/data/plus-minus.ts for why that matters.
  *
  * Classic script — no imports. Extends the prototype from app.core.js.
+ *
+ * Uses lineupFormations()/lineupSlots() from lineup.view.js for the shape
+ * picker rather than defining a second set of formations: two lists of the
+ * same shapes drift, and 4-3-3 means the same thing on both screens. Both
+ * files extend the prototype at load time, so the order they appear in
+ * index.html does not matter — but the dependency is real, and a test loading
+ * this file alone has to load that one too.
  */
 
 Object.assign(BHSSoccerApp.prototype, {
@@ -191,6 +198,98 @@ Object.assign(BHSSoccerApp.prototype, {
     await this.pmAppend(decision.kind, playerId);
   },
 
+  // ── Where players stand ──────────────────────────────────────────────────
+
+  /**
+   * Positions are PRESENTATION, not statistics.
+   *
+   * Where a chip sits on the pitch changes nothing about plus, minus, goal
+   * differential or minutes played — those come from the event log, and a
+   * position is only there so the shape on screen matches the shape on the
+   * grass and a statistician can find a player without reading names.
+   *
+   * So they are kept per device in localStorage rather than written as events
+   * or into the lineup table. Two consequences worth knowing: a second device
+   * tracking the same match arranges its own pitch, and reusing the coach's
+   * saved lineup here would let a statistician's drag overwrite the team sheet.
+   */
+  pmPosKey() { return 'bhs_pm_pos_' + (this._pmMatchId || this._pmMatchFixture || 'default'); },
+
+  pmLoadPositions() {
+    this._pmPos = {};
+    try {
+      const raw = localStorage.getItem(this.pmPosKey());
+      if (raw) this._pmPos = JSON.parse(raw) || {};
+    } catch (e) { /* private mode, or nonsense in storage; an empty pitch is fine */ }
+  },
+
+  pmSavePositions() {
+    try { localStorage.setItem(this.pmPosKey(), JSON.stringify(this._pmPos || {})); }
+    catch (e) { /* storage blocked; positions last as long as the screen does */ }
+  },
+
+  /**
+   * Clamped so a chip can never be dragged off its own pitch.
+   *
+   * The margin is half a chip: positions are the CENTRE of the chip, and
+   * without it half of one sits outside the boundary where it cannot be
+   * tapped.
+   */
+  pmClampPosition(x, y) {
+    const clamp = (v) => Math.max(8, Math.min(92, Number(v) || 0));
+    return { x: clamp(x), y: clamp(y) };
+  },
+
+  pmSetPosition(playerId, x, y) {
+    if (!this._pmPos) this._pmPos = {};
+    this._pmPos[playerId] = this.pmClampPosition(x, y);
+    this.pmSavePositions();
+  },
+
+  /**
+   * Lay the players out in a formation.
+   *
+   * Reuses lineupFormations() rather than defining a second set: two lists of
+   * the same shapes drift, and the coach who set 4-3-3 on the lineup screen
+   * means the same thing here.
+   *
+   * Only as many slots as there are players, in the order they went on, so a
+   * side playing with ten is not left with a gap where a formation says there
+   * should be somebody.
+   */
+  pmApplyFormation(name) {
+    this._pmFormation = name || '4-4-2';
+    const slots = this.lineupSlots(this._pmFormation);
+    const on = this.pmOnPitch();
+
+    if (!this._pmPos) this._pmPos = {};
+    on.forEach((id, i) => {
+      const slot = slots[i];
+      if (slot) this._pmPos[id] = this.pmClampPosition(slot.x, slot.y);
+    });
+    this.pmSavePositions();
+    this.renderPlusMinus();
+  },
+
+  /**
+   * Where a player sits, or a sensible place if nobody has said.
+   *
+   * Spread across the middle rather than stacked at one point: an unplaced
+   * squad piled on the centre spot is unusable, and the coach reaches for the
+   * formation button the moment they see it.
+   */
+  pmPositionFor(playerId, index, total) {
+    const pos = (this._pmPos || {})[playerId];
+    if (pos) return pos;
+    const perRow = Math.min(6, Math.max(3, Math.ceil(total / 2)));
+    const row = Math.floor(index / perRow);
+    const col = index % perRow;
+    return this.pmClampPosition(
+      12 + (col + 0.5) * (76 / perRow),
+      70 - row * 22
+    );
+  },
+
   // ── Substitutions ────────────────────────────────────────────────────────
 
   /**
@@ -219,11 +318,17 @@ Object.assign(BHSSoccerApp.prototype, {
       return { kind: 'on' };
     }
 
+    // Already on, dropped somewhere else on the pitch: that is a reposition,
+    // not a substitution. It appends NO event — where a player stands is not
+    // a statistic, and recording it would put noise in the log that undo would
+    // then have to step back through.
+    if (overPitch && wasOn) return { kind: 'move' };
+
     if (overBench && wasOn) return { kind: 'off' };
     return { kind: null };
   },
 
-  async pmMovePlayer(playerId, toPitch) {
+  async pmMovePlayer(playerId, toPitch, at) {
     const on = this.pmOnPitch();
     const drop = this.pmResolveDrop({
       playerId,
@@ -240,6 +345,15 @@ Object.assign(BHSSoccerApp.prototype, {
     }
     if (!drop.kind) return;
     this.pmSay('');
+
+    if (drop.kind === 'move') {
+      if (at) { this.pmSetPosition(playerId, at.x, at.y); this.renderPlusMinus(); }
+      return;
+    }
+
+    // A player coming on lands where they were dropped, so a substitution
+    // puts them in the position they are actually taking.
+    if (drop.kind === 'on' && at) this.pmSetPosition(playerId, at.x, at.y);
     await this.pmAppend(drop.kind, playerId);
   },
 
@@ -254,6 +368,8 @@ Object.assign(BHSSoccerApp.prototype, {
     this._pmRunningSince = null;
     this._pmPeriod = 1;
     this._pmMatchId = null;
+    this._pmFormation = '';
+    this.pmLoadPositions();
 
     const team = (this.data.teams || []).find(t => t.id === this.activeTeamId);
     if (window.supabaseService?.isConfigured() && team) {
@@ -272,6 +388,9 @@ Object.assign(BHSSoccerApp.prototype, {
         this._pmError = (opened && opened.error) || 'Could not open that match.';
       }
     }
+    // Re-read now the match id is known: the storage key depends on it, and
+    // the first read used the fixture id or nothing.
+    this.pmLoadPositions();
 
     this.renderPlusMinus();
     const modal = document.getElementById('plusMinusModal');
@@ -305,12 +424,15 @@ Object.assign(BHSSoccerApp.prototype, {
     const score = window.plusMinus.scoreLine(this._pmEvents || []);
     const running = !!this._pmRunningSince;
 
-    const chip = (p, isOn) => {
+    const chip = (p, isOn, place) => {
       const s = stats.get(p.id) || {};
+      const at = place
+        ? ` style="left:${place.x}%; bottom:${place.y}%;"`
+        : '';
       return `
-        <button type="button" class="pm-chip${isOn ? ' on' : ''}"
-                data-player-id="${esc(p.id)}"
-                title="${esc(p.name)} — tap +1, two fingers or right-click −1, drag to substitute">
+        <button type="button" class="pm-chip${isOn ? ' on' : ''}${place ? ' placed' : ''}"
+                data-player-id="${esc(p.id)}"${at}
+                title="${esc(p.name)} — tap +1, hold or two fingers −1, drag to move or substitute">
           <span class="pm-num">${p.recordingNumber != null ? esc(p.recordingNumber) : (p.number != null ? esc(p.number) : '—')}</span>
           <span class="pm-name">${esc(this.lineupShortName ? this.lineupShortName(p) : p.name)}</span>
           <span class="pm-score">${(s.score || 0) > 0 ? '+' : ''}${s.score || 0}</span>
@@ -347,18 +469,31 @@ Object.assign(BHSSoccerApp.prototype, {
       </div>
 
       <div class="pm-pitch-label">
-        ON THE PITCH &middot; ${on.length} / ${this.pmMaxOnPitch()}
-        <span class="pm-hint">tap +1 &middot; hold or two fingers &minus;1 &middot; drag to sub</span>
+        <span>
+          ON THE PITCH &middot; ${on.length} / ${this.pmMaxOnPitch()}
+          <span class="pm-hint">tap +1 &middot; hold or two fingers &minus;1 &middot; drag to move or sub</span>
+        </span>
+        <span class="pm-formation">
+          <label for="pmFormation">Shape</label>
+          <select id="pmFormation" class="form-control"
+                  onchange="app.pmApplyFormation(this.value)">
+            ${Object.keys(this.lineupFormations()).map(f =>
+              `<option value="${f}"${(this._pmFormation || '') === f ? ' selected' : ''}>${f}</option>`
+            ).join('')}
+          </select>
+        </span>
       </div>
 
       <!-- A drawn pitch rather than a green box, so the tracking screen reads
            the same way as the lineup one: markings, then players on top of
            them, then the bench underneath. -->
       <div class="pm-pitch" id="pmPitch">
-        <div class="pm-chips">
-          ${on.map(id => byId.get(id)).filter(Boolean).map(p => chip(p, true)).join('')
-            || '<span class="pm-empty">Drag players onto the pitch to start.</span>'}
-        </div>
+        ${on.map((id, i) => {
+          const p = byId.get(id);
+          if (!p) return '';
+          return chip(p, true, this.pmPositionFor(id, i, on.length));
+        }).join('')
+          || '<span class="pm-empty">Drag players onto the pitch to start.</span>'}
       </div>
 
       <div class="pm-pitch-label">SUBS &middot; ${squad.length - on.length}</div>
@@ -613,7 +748,24 @@ Object.assign(BHSSoccerApp.prototype, {
         const under = document.elementFromPoint(e.clientX, e.clientY);
         const toPitch = !!(under && under.closest && under.closest('#pmPitch'));
         const toBench = !!(under && under.closest && under.closest('#pmBench'));
-        if (toPitch || toBench) this.pmMovePlayer(d.playerId, toPitch);
+
+        // Where on the pitch, as a percentage, so a position survives the
+        // screen being rotated or the window resized.
+        let at = null;
+        const pitch = document.getElementById('pmPitch');
+        if (toPitch && pitch && pitch.getBoundingClientRect) {
+          const r = pitch.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            at = {
+              x: ((e.clientX - r.left) / r.width) * 100,
+              // Measured from the bottom: y=0 is the team's own goal line, the
+              // way a coach draws it and the way lineupFormations() defines it.
+              y: ((r.bottom - e.clientY) / r.height) * 100
+            };
+          }
+        }
+
+        if (toPitch || toBench) this.pmMovePlayer(d.playerId, toPitch, at);
         return;
       }
 

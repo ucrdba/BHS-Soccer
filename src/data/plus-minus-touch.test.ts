@@ -17,6 +17,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
+// plusminus reuses the lineup's formations rather than defining its own.
+import lineupSrc from '../../public/js/views/lineup.view.js?raw';
 import * as plusMinus from './plus-minus';
 
 let ctor: any;

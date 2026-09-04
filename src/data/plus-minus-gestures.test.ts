@@ -18,6 +18,8 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
+// plusminus reuses the lineup's formations rather than defining its own.
+import lineupSrc from '../../public/js/views/lineup.view.js?raw';
 import * as plusMinus from './plus-minus';
 
 let ctor: any;
@@ -25,7 +27,7 @@ let ctor: any;
 beforeAll(() => {
   const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
   ctor = new Function(
-    [appCoreSrc, pmSrc].map(strip).join('\n;\n') + '\nreturn BHSSoccerApp;'
+    [appCoreSrc, lineupSrc, pmSrc].map(strip).join('\n;\n') + '\nreturn BHSSoccerApp;'
   )();
 });
 
@@ -149,9 +151,14 @@ describe('dragging a player', () => {
     expect(drop({ wasOn: true, overBench: true })).toEqual({ kind: 'off' });
   });
 
-  it('back where they started does nothing', () => {
-    // How a drag gets cancelled.
-    expect(drop({ wasOn: true, overPitch: true, onCount: 1 })).toEqual({ kind: null });
+  it('moves a player already on the pitch, rather than doing nothing', () => {
+    // Dropping somewhere else on the pitch is a reposition, so the shape on
+    // screen can be made to match the shape on the grass.
+    expect(drop({ wasOn: true, overPitch: true, onCount: 1 })).toEqual({ kind: 'move' });
+  });
+
+  it('does nothing dropping a substitute back on the bench', () => {
+    // How a drag gets cancelled, for a player who was never on.
     expect(drop({ overBench: true })).toEqual({ kind: null });
   });
 
@@ -520,5 +527,96 @@ describe('the sheet on a narrow screen', () => {
       new Map([['p1', { plus: 1 }]]), app.data.players);
     const sorted = document.querySelector('.pm-table th.sorted')!;
     expect(sorted.textContent).toContain('Plus');
+  });
+});
+
+describe('placing players on the pitch', () => {
+  /**
+   * Where a chip sits is PRESENTATION, not a statistic. It changes nothing
+   * about plus, minus, goal differential or minutes — those come from the
+   * event log — and it exists so the shape on screen matches the shape on the
+   * grass.
+   *
+   * That is why a reposition appends no event: recording it would put noise in
+   * the log that undo would then have to step back through.
+   */
+  function app() {
+    const a = makeApp();
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('keeps a position inside the pitch', () => {
+    // Positions are the CENTRE of a chip; without a margin half of one sits
+    // outside the boundary where it cannot be tapped.
+    const a = app();
+    expect(a.pmClampPosition(-40, 140)).toEqual({ x: 8, y: 92 });
+    expect(a.pmClampPosition(50, 50)).toEqual({ x: 50, y: 50 });
+  });
+
+  it('remembers where a player was put', () => {
+    const a = app();
+    a.pmSetPosition('p1', 30, 70);
+    expect(a._pmPos.p1).toEqual({ x: 30, y: 70 });
+  });
+
+  it('records NO event when a player is repositioned', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    const before = a._pmEvents.length;
+    await a.pmMovePlayer('p1', true, { x: 40, y: 60 });
+    expect(a._pmEvents).toHaveLength(before);
+    expect(a._pmPos.p1).toEqual({ x: 40, y: 60 });
+  });
+
+  it('puts a substitute where they were dropped as they come on', async () => {
+    const a = app();
+    await a.pmMovePlayer('p2', true, { x: 25, y: 15 });
+    expect(a.pmOnPitch()).toEqual(['p2']);
+    expect(a._pmPos.p2).toEqual({ x: 25, y: 15 });
+  });
+
+  it('lays the squad out in the chosen formation', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('on', 'p2');
+    a.pmApplyFormation('4-4-2');
+
+    const slots = a.lineupSlots('4-4-2');
+    expect(a._pmPos.p1).toEqual({ x: slots[0].x, y: slots[0].y });
+    expect(a._pmPos.p2).toEqual({ x: slots[1].x, y: slots[1].y });
+  });
+
+  it('reuses the lineup formations rather than a second list', () => {
+    // Two lists of the same shapes drift, and 4-3-3 means the same thing on
+    // both screens.
+    const a = app();
+    expect(Object.keys(a.lineupFormations())).toContain('4-3-3');
+    expect(a.lineupSlots('4-3-3')).toHaveLength(11);
+  });
+
+  it('places only as many as are actually on', async () => {
+    // A side playing with ten must not be left with a gap where a formation
+    // says somebody should be.
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    a.pmApplyFormation('4-4-2');
+    expect(Object.keys(a._pmPos)).toEqual(['p1']);
+  });
+
+  it('spreads unplaced players out rather than stacking them', () => {
+    // A squad piled on the centre spot is unusable.
+    const a = app();
+    const spots = [0, 1, 2, 3].map(i => a.pmPositionFor(`q${i}`, i, 4));
+    const keys = spots.map(s => `${s.x},${s.y}`);
+    expect(new Set(keys).size).toBe(4);
+  });
+
+  it('prefers a saved position over the fallback', () => {
+    const a = app();
+    a.pmSetPosition('p1', 33, 44);
+    expect(a.pmPositionFor('p1', 0, 4)).toEqual({ x: 33, y: 44 });
   });
 });

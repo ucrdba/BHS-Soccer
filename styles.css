@@ -2010,3 +2010,46 @@ canvas { touch-action: none; max-width: 100%; }
   border-radius: 10px;
   padding: 10px;
 }
+
+/* ---------------------------------------------------------------------------
+   Plus / minus: players placed on the pitch.
+
+   Positioned rather than flowed, so the shape on screen matches the shape on
+   the grass and a statistician finds a player by where they are standing
+   instead of by reading twenty-two names.
+   --------------------------------------------------------------------------- */
+
+#plusMinusModal .pm-pitch {
+  /* A fixed proportion, because positions are percentages: without it the
+     shape stretches as the sheet below grows and every player drifts. */
+  min-height: 46vh;
+}
+
+#plusMinusModal .pm-chip.placed {
+  position: absolute;
+  /* The stored position is the CENTRE of the chip. Translating by half its own
+     size is what makes a dropped player land under the finger rather than
+     down and to the right of it. */
+  transform: translate(-50%, 50%);
+  z-index: 1;
+  margin: 0;
+}
+
+#plusMinusModal .pm-chip.placed.dragging { z-index: 3; opacity: 0.6; }
+
+/* The shape picker, beside the heading it belongs to. */
+#plusMinusModal .pm-formation {
+  display: flex; align-items: center; gap: 6px;
+  text-transform: none; letter-spacing: 0;
+}
+#plusMinusModal .pm-formation select {
+  padding: 6px 8px; font-size: 0.8rem; min-height: 40px; max-width: 110px;
+}
+
+@media (max-width: 640px) {
+  #plusMinusModal .pm-pitch { min-height: 52vh; }
+  /* Smaller once placed: eleven chips share the pitch rather than a row. */
+  #plusMinusModal .pm-chip.placed { min-height: 46px; padding: 4px 8px; gap: 5px; }
+  #plusMinusModal .pm-chip.placed .pm-name { max-width: 66px; font-size: 0.76rem; }
+  #plusMinusModal .pm-chip.placed .pm-num { font-size: 0.92rem; }
+}
