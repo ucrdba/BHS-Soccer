@@ -137,7 +137,16 @@ Resouces/CSV/*_roster_export.csv
 # The account-admin files are working notes rather than runnable SQL, and they
 # name real people by email address. That is the reason they stay out: git
 # history is permanent, and a repo is a poor place to keep a coach's address.
+#
+# pubschls.xlsx is the California Department of Education's public school
+# directory (https://www.cde.ca.gov/ds/si/ds/pubschls.asp) — ~9 MB of third-
+# party data, re-downloadable in one request, and stale the moment it lands.
+# It was the source for the away-venue addresses, and those are already
+# captured where they matter: in the database, and in the script under
+# Resouces/SQL/ that put them there. Carrying the whole directory in git
+# would add a large binary that nothing reads.
 Resouces/Thoughts4TheDay/
+Resouces/CSV/pubschls.xlsx
 Resouces/SQL/resetPassword.sql
 Resouces/SQL/removeUser.sql
 assets/soccerPlayer.png
