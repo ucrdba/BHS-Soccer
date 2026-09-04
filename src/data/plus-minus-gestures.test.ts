@@ -620,3 +620,121 @@ describe('placing players on the pitch', () => {
     expect(a.pmPositionFor('p1', 0, 4)).toEqual({ x: 33, y: 44 });
   });
 });
+
+describe('dropping one player onto another', () => {
+  /**
+   * Reported from a match: "when I drag a bench player over a field player
+   * they switch position and now the stats are for the sub who just came in."
+   *
+   * What was happening: the substitute was simply placed at the same
+   * coordinates. Two chips stacked, the newer drew over the older, and it read
+   * exactly as though the field player's statistics had become the
+   * substitute's. Both players were still on, both still accruing minutes, and
+   * nothing on screen said so.
+   *
+   * Dropping a substitute on a player now means what anyone doing it means:
+   * substitute them.
+   */
+  function app() {
+    const a = makeApp();
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('reads a substitute dropped on a player as a substitution', () => {
+    expect(app().pmResolveDrop({
+      playerId: 'p2', wasOn: false, overPitch: true, onCount: 1, overPlayerId: 'p1'
+    })).toEqual({ kind: 'sub', outId: 'p1' });
+  });
+
+  it('reads two players already on as swapping places', () => {
+    expect(app().pmResolveDrop({
+      playerId: 'p2', wasOn: true, overPitch: true, onCount: 2, overPlayerId: 'p1'
+    })).toEqual({ kind: 'swap', otherId: 'p1' });
+  });
+
+  it('ignores a player dropped on themselves', () => {
+    // The dragged chip stays put rather than following the pointer, so it can
+    // be the one under the finger at the end.
+    expect(app().pmResolveDrop({
+      playerId: 'p1', wasOn: true, overPitch: true, onCount: 1, overPlayerId: 'p1'
+    })).toEqual({ kind: 'move' });
+  });
+
+  it('takes the field player OFF and brings the substitute on', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmMovePlayer('p2', true, { x: 50, y: 50 }, 'p1');
+    expect(a.pmOnPitch()).toEqual(['p2']);
+  });
+
+  it('does not leave both on the pitch', async () => {
+    // The bug: both were on, both accruing minutes, one hidden under the other.
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmMovePlayer('p2', true, { x: 50, y: 50 }, 'p1');
+    expect(a.pmOnPitch()).not.toContain('p1');
+    expect(a.pmOnPitch()).toHaveLength(1);
+  });
+
+  it("keeps each player's own statistics", async () => {
+    // The reported symptom. The one going off keeps what they earned; the one
+    // coming on starts from their own record, not the other's.
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('plus', 'p1');
+    await a.pmAppend('plus', 'p1');
+    await a.pmMovePlayer('p2', true, { x: 50, y: 50 }, 'p1');
+
+    expect(a.pmStats().get('p1').plus).toBe(2);
+    expect(a.pmStats().get('p2').plus).toBe(0);
+  });
+
+  it('puts the substitute in the position being vacated', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    a.pmSetPosition('p1', 30, 70);
+    await a.pmMovePlayer('p2', true, { x: 5, y: 5 }, 'p1');
+    expect(a._pmPos.p2).toEqual({ x: 30, y: 70 });
+  });
+
+  it('substitutes onto a FULL pitch, which is when it is actually used', async () => {
+    // The one going off has to be recorded first, or an eleventh-and-twelfth
+    // pair exists for an instant and the limit refuses the player coming on.
+    const a = app();
+    a.data.players = Array.from({ length: 13 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    for (let i = 0; i < 11; i++) await a.pmAppend('on', `q${i}`);
+
+    await a.pmMovePlayer('q11', true, { x: 50, y: 50 }, 'q3');
+
+    expect(a.pmOnPitch()).toHaveLength(11);
+    expect(a.pmOnPitch()).toContain('q11');
+    expect(a.pmOnPitch()).not.toContain('q3');
+  });
+
+  it('records the substitution as two events, so it can be undone', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmMovePlayer('p2', true, { x: 50, y: 50 }, 'p1');
+    expect(a._pmEvents.map((e: any) => `${e.kind}:${e.playerId}`))
+      .toEqual(['on:p1', 'off:p1', 'on:p2']);
+  });
+
+  it('exchanges positions when both are already on, recording nothing', async () => {
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('on', 'p2');
+    a.pmSetPosition('p1', 20, 20);
+    a.pmSetPosition('p2', 80, 80);
+    const before = a._pmEvents.length;
+
+    await a.pmMovePlayer('p2', true, { x: 20, y: 20 }, 'p1');
+
+    expect(a._pmPos.p2).toEqual({ x: 20, y: 20 });
+    expect(a._pmPos.p1).toEqual({ x: 80, y: 80 });
+    expect(a._pmEvents).toHaveLength(before);
+    expect(a.pmOnPitch()).toHaveLength(2);
+  });
+});

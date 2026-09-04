@@ -305,8 +305,20 @@ Object.assign(BHSSoccerApp.prototype, {
    */
   pmMaxOnPitch() { return 11; },
 
-  pmResolveDrop({ playerId, wasOn, overPitch, overBench, onCount }) {
+  pmResolveDrop({ playerId, wasOn, overPitch, overBench, onCount, overPlayerId }) {
     if (!playerId) return { kind: null };
+
+    // Dropped onto somebody else. This is the case that was silently wrong:
+    // the incoming player was simply placed at the same coordinates, so two
+    // chips stacked and the newer drew over the older. It looked exactly like
+    // the field player's statistics had become the substitute's.
+    if (overPlayerId && overPlayerId !== playerId) {
+      // A substitute onto a player on the pitch is a SUBSTITUTION: that is
+      // what dropping one on the other means to anyone doing it.
+      if (!wasOn) return { kind: 'sub', outId: overPlayerId };
+      // Two players already on simply exchange places.
+      return { kind: 'swap', otherId: overPlayerId };
+    }
 
     if (overPitch && !wasOn) {
       // A twelfth player on the pitch is not a mistake anyone spots at the
@@ -328,14 +340,15 @@ Object.assign(BHSSoccerApp.prototype, {
     return { kind: null };
   },
 
-  async pmMovePlayer(playerId, toPitch, at) {
+  async pmMovePlayer(playerId, toPitch, at, overPlayerId) {
     const on = this.pmOnPitch();
     const drop = this.pmResolveDrop({
       playerId,
       wasOn: on.includes(playerId),
       overPitch: toPitch,
       overBench: !toPitch,
-      onCount: on.length
+      onCount: on.length,
+      overPlayerId: overPlayerId || null
     });
 
     if (drop.reason === 'full') {
@@ -348,6 +361,29 @@ Object.assign(BHSSoccerApp.prototype, {
 
     if (drop.kind === 'move') {
       if (at) { this.pmSetPosition(playerId, at.x, at.y); this.renderPlusMinus(); }
+      return;
+    }
+
+    if (drop.kind === 'swap') {
+      // Positions only. Both players stay on, so nothing about the match
+      // changed and no event belongs in the log.
+      const a = (this._pmPos || {})[playerId];
+      const b = (this._pmPos || {})[drop.otherId];
+      if (a && b) {
+        this.pmSetPosition(playerId, b.x, b.y);
+        this.pmSetPosition(drop.otherId, a.x, a.y);
+      }
+      this.renderPlusMinus();
+      return;
+    }
+
+    if (drop.kind === 'sub') {
+      // The one going off FIRST, or an eleventh-and-twelfth pair exists for an
+      // instant and the limit refuses the player coming on.
+      const spot = (this._pmPos || {})[drop.outId];
+      await this.pmAppend('off', drop.outId);
+      if (spot) this.pmSetPosition(playerId, spot.x, spot.y);
+      await this.pmAppend('on', playerId);
       return;
     }
 
@@ -765,7 +801,15 @@ Object.assign(BHSSoccerApp.prototype, {
           }
         }
 
-        if (toPitch || toBench) this.pmMovePlayer(d.playerId, toPitch, at);
+        // Whose chip is under the finger, if anyone's. The dragged chip stays
+        // where it was rather than following the pointer, so it can be the one
+        // returned — dropping a player on themselves is not a substitution.
+        const overChip = under && under.closest ? under.closest('.pm-chip') : null;
+        const overPlayerId = overChip && overChip.dataset.playerId !== d.playerId
+          ? overChip.dataset.playerId
+          : null;
+
+        if (toPitch || toBench) this.pmMovePlayer(d.playerId, toPitch, at, overPlayerId);
         return;
       }
 
