@@ -86,6 +86,21 @@ describe('what a spreadsheet hands over', () => {
     expect(parse(new Date(2026, 11, 8), SEP_2026)).toBe('DEC 8 2026');
   });
 
+  it('reads a UTC-midnight Date as the day it means, not the evening before', () => {
+    // What a spreadsheet hands over: a sheet date carries no timezone, so it
+    // arrives as midnight UTC. Read with local getters it lands on the
+    // previous evening anywhere west of Greenwich, moving every fixture a day
+    // earlier — a whole schedule off by one, and entirely plausible.
+    expect(parse(new Date(Date.UTC(2027, 0, 6)), SEP_2026)).toBe('JAN 6 2027');
+    expect(parse(new Date(Date.UTC(2026, 11, 8)), SEP_2026)).toBe('DEC 8 2026');
+  });
+
+  it('still reads a Date carrying a real local time as the local day', () => {
+    // `new Date()` in a browser means the local day, not a UTC one.
+    const local = new Date(2026, 11, 8, 16, 30);
+    expect(parse(local, SEP_2026)).toBe('DEC 8 2026');
+  });
+
   it('reads an Excel serial number', () => {
     // 8 December 2026 is 46365 days after Excel's 1899-12-30 epoch.
     const serial = Math.round(

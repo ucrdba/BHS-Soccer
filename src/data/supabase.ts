@@ -1454,7 +1454,22 @@ class SupabaseService {
     const fromDate = (d: Date): string | null =>
       isNaN(d.getTime()) ? null : fromParts(d.getFullYear(), d.getMonth() + 1, d.getDate());
 
-    if (value instanceof Date) return fromDate(value);
+    // A Date from a spreadsheet is midnight UTC on the day meant, because a
+    // sheet date carries no timezone. Reading it with LOCAL getters lands on
+    // the previous evening anywhere west of Greenwich, so every fixture moves
+    // a day earlier — a whole schedule off by one, and entirely plausible.
+    //
+    // A Date that carries a real local time (a browser's `new Date()`) is read
+    // locally, since that one genuinely means the local day.
+    if (value instanceof Date) {
+      if (isNaN(value.getTime())) return null;
+      const isUtcMidnight =
+        value.getUTCHours() === 0 && value.getUTCMinutes() === 0 &&
+        value.getUTCSeconds() === 0 && value.getUTCMilliseconds() === 0;
+      return isUtcMidnight
+        ? fromParts(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
+        : fromDate(value);
+    }
 
     // A date-formatted cell read by SheetJS without cellDates: days since
     // 1899-12-30. A spreadsheet date has no timezone, so it is read back in
