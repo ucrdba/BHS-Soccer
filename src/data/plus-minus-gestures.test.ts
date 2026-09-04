@@ -1113,3 +1113,80 @@ describe('eleven players, whatever the route', () => {
     expect(a.pmOnPitch()).toContain('q11');
   });
 });
+
+describe('clearing a pitch that came from the database', () => {
+  /**
+   * Reported: "clear pitch did not remove all the players, just some."
+   *
+   * Two things could produce that, and both are covered here. Events loaded
+   * from the database carry no `seq`, so ordering fell back to their array
+   * index while events added this session counted from 1 — two different
+   * scales for the same comparison. And each `off` is a separate write, so one
+   * refused in the middle leaves part of the squad on with nothing to say so.
+   */
+  function loaded(events: any[]) {
+    const a = makeApp();
+    a.data.players = Array.from({ length: 11 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    a._pmEvents = events;
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  const fromDb = (n: number, at = 0) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `e${i}`, kind: 'on', playerId: `q${i}`, atSeconds: at, period: 1
+    }));
+
+  it('clears a full pitch loaded with no ordering stamp', async () => {
+    (window as any).confirm = () => true;
+    const a = loaded(fromDb(11));
+    expect(a.pmOnPitch()).toHaveLength(11);
+    await a.pmResetPitch();
+    expect(a.pmOnPitch()).toEqual([]);
+  });
+
+  it('clears when substitutions share the clock second with the clear', async () => {
+    (window as any).confirm = () => true;
+    const a = loaded([
+      ...fromDb(8, 0),
+      { id: 'e8', kind: 'on', playerId: 'q8', atSeconds: 600, period: 1 },
+      { id: 'e9', kind: 'on', playerId: 'q9', atSeconds: 600, period: 1 },
+      { id: 'e10', kind: 'on', playerId: 'q10', atSeconds: 600, period: 1 }
+    ]);
+    a._pmClockBase = 600;
+    await a.pmResetPitch();
+    expect(a.pmOnPitch()).toEqual([]);
+  });
+
+  it('reports anyone left on when a write is refused', async () => {
+    // A silent partial clear leaves players accruing minutes, and the only
+    // sign is chips that did not disappear — easy to read as a slow screen.
+    (window as any).confirm = () => true;
+    const a = loaded(fromDb(3));
+    a._pmMatchId = '00000000-0000-0000-0000-000000000001';
+
+    let calls = 0;
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      // The second write fails, as a dropped signal would.
+      appendStatEvent: async () => (++calls === 2
+        ? { ok: false, error: 'network' }
+        : { ok: true, id: `x${calls}` })
+    };
+
+    await a.pmResetPitch();
+
+    expect(a.pmOnPitch()).toHaveLength(1);
+    expect(a._pmError).toContain('still on the pitch');
+    expect(a._pmError).toContain('P1');
+  });
+
+  it('says nothing when every player came off', async () => {
+    (window as any).confirm = () => true;
+    const a = loaded(fromDb(4));
+    await a.pmResetPitch();
+    expect(a._pmError).toBe('');
+  });
+});

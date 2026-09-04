@@ -502,6 +502,20 @@ Object.assign(BHSSoccerApp.prototype, {
       + `players are sent on again.`)) return;
 
     for (const id of on) await this.pmAppend('off', id);
+
+    // Verify rather than assume. Each `off` is a separate write, so one
+    // refused in the middle would leave part of the squad on the pitch still
+    // accruing minutes — and the only sign would be chips that did not
+    // disappear, which is easy to read as a slow screen.
+    const left = this.pmOnPitch();
+    if (left.length > 0) {
+      const names = left
+        .map(id => (this.data.players || []).find(p => p.id === id))
+        .filter(Boolean).map(p => p.name);
+      this.pmSay(`${left.length} still on the pitch: ${names.join(', ')}. Try again.`);
+      this.renderPlusMinus();
+      return;
+    }
     this.pmSay('');
   },
 
@@ -548,6 +562,14 @@ Object.assign(BHSSoccerApp.prototype, {
       if (opened && opened.ok) {
         this._pmMatchId = opened.id;
         this._pmEvents = (await window.supabaseService.fetchStatEvents(opened.id)) || [];
+        // Stamp an explicit order on what came back. Without it, loaded events
+        // fall back to their ARRAY INDEX for ordering while events added this
+        // session use `seq` counting from 1 — two different scales for the same
+        // comparison, so a new event can sort before an older one that shares
+        // its clock second. Ordering decides who was on the pitch when a goal
+        // went in, so the two must never be mixed.
+        this._pmEvents.forEach((e, i) => { e.seq = i; });
+        this._pmSeq = this._pmEvents.length;
         // Rebuild the clock from the log rather than starting at zero: a
         // statistician reopening after a dead battery must not lose the half.
         this._pmPeriod = window.plusMinus.currentPeriod(this._pmEvents);
