@@ -540,7 +540,7 @@ Object.assign(BHSSoccerApp.prototype, {
               : 'Drag a player onto a position, or tap one then tap a position. Drag a player back to the squad list to take them off.'}
           </p>
         </div>
-        <div>
+        <div class="lineup-side">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <strong style="color:#FFF; font-size:0.86rem;">Squad</strong>
             ${this._lineupLoaded ? '<span class="badge badge-coach" style="font-size:0.62rem;">SAVED LINEUP LOADED</span>' : ''}
