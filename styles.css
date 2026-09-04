@@ -1850,7 +1850,23 @@ canvas { touch-action: none; max-width: 100%; }
 .pm-name { font-size: 0.82rem; white-space: nowrap; }
 .pm-score { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-.pm-table { margin-top: 6px; font-size: 0.82rem; }
+/* Its own scroller, so every heading stays reachable on a narrow screen. A
+   column past the edge with nothing to scroll is a column that cannot be
+   sorted, however sortable the code makes it. */
+.pm-tablewrap {
+  margin-top: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pm-table { font-size: 0.82rem; }
+/* Wide enough that ten columns stay legible; the wrapper scrolls to them. */
+.pm-table { min-width: 620px; }
+/* Headings are tap targets here, not labels. */
+.pm-table th { padding: 10px 8px; }
+.pm-table th.sortable { cursor: pointer; user-select: none; }
+.pm-table th.sortable:hover { color: var(--bhs-cyan-accent); }
+.pm-table th.sorted { color: var(--bhs-cyan-accent); }
 
 @media (max-width: 640px) {
   /* The clock and the two goal buttons are what get pressed in a hurry, so
@@ -1861,5 +1877,11 @@ canvas { touch-action: none; max-width: 100%; }
   .pm-name { max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
   /* Taller on a phone: eleven chips take three rows at this width. */
   .pm-pitch .pm-chips { min-height: 210px; }
-  .pm-table { font-size: 0.74rem; }
+  .pm-table { font-size: 0.74rem; min-width: 560px; }
+  /* The first two columns are what a row is identified by, so they stay put
+     while the figures scroll past them. */
+  .pm-table th:nth-child(-n+2), .pm-table td:nth-child(-n+2) {
+    position: sticky; left: 0; background: var(--bhs-navy-card);
+  }
+  .pm-table th:nth-child(2), .pm-table td:nth-child(2) { left: 40px; }
 }

@@ -355,3 +355,170 @@ describe('the numbers on screen', () => {
     expect(app.pmOnPitch()).toEqual(['p2']);
   });
 });
+
+describe('sorting the sheet', () => {
+  /**
+   * The half-time sheet. Minutes played by default, because the question at
+   * half time is who to change and scanning twenty-five alphabetical rows for
+   * it wastes the interval.
+   *
+   * The tie-break matters more here than anywhere else: the sheet redraws
+   * every second while the clock runs, and rows swapping places under the eye
+   * reads as a fault. Every column falls back to the name so the order is
+   * stable between redraws.
+   */
+  function sheet() {
+    const app = makeApp();
+    app.data.players = [
+      { id: 'p1', name: 'Cesar Alva', recordingNumber: 7 },
+      { id: 'p2', name: 'Tom Budde', recordingNumber: 2 },
+      { id: 'p3', name: 'Alain Renteria', recordingNumber: null }
+    ];
+    const stats = new Map<string, any>([
+      ['p1', { plus: 5, minus: 1, score: 4, goalDiff: 2, secondsPlayed: 300, shots: 3, goals: 1, assists: 0 }],
+      ['p2', { plus: 1, minus: 4, score: -3, goalDiff: -1, secondsPlayed: 900, shots: 0, goals: 0, assists: 2 }],
+      ['p3', { plus: 3, minus: 3, score: 0, goalDiff: 0, secondsPlayed: 600, shots: 1, goals: 0, assists: 1 }]
+    ]);
+    return { app, stats, squad: app.data.players };
+  }
+
+  const order = (app: any, stats: any, squad: any) =>
+    app.pmSortedRows(stats, squad).map((r: any) => r.p.id);
+
+  it('defaults to minutes played, most first', () => {
+    const { app, stats, squad } = sheet();
+    expect(order(app, stats, squad)).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('sorts by score, best first on one click', () => {
+    // Not blind ascending: one click should answer "who is doing well".
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('score');
+    expect(order(app, stats, squad)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('reverses on a second click', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('score');
+    app.setPlusMinusSort('score');
+    expect(order(app, stats, squad)).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('sorts by goal differential', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('gd');
+    expect(order(app, stats, squad)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('sorts by minus, most first — who is giving it away', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('minus');
+    expect(order(app, stats, squad)).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('sorts by name A to Z', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('name');
+    expect(order(app, stats, squad)).toEqual(['p3', 'p1', 'p2']);
+  });
+
+  it('sorts by recording number, lowest first', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('number');
+    expect(order(app, stats, squad).slice(0, 2)).toEqual(['p2', 'p1']);
+  });
+
+  it('sinks a player with no recording number, both ways', () => {
+    // Number(null) is 0 and would otherwise lead the sheet.
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('number');
+    expect(order(app, stats, squad).slice(-1)).toEqual(['p3']);
+    app.setPlusMinusSort('number');
+    expect(order(app, stats, squad).slice(-1)).toEqual(['p3']);
+  });
+
+  it('starts a newly clicked column in its own direction', () => {
+    const { app, stats, squad } = sheet();
+    app.setPlusMinusSort('score');
+    app.setPlusMinusSort('score');      // reversed
+    app.setPlusMinusSort('gd');         // should be highest first again
+    expect(order(app, stats, squad)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('breaks a tie by name, so the order holds between redraws', () => {
+    // The sheet redraws every second while the clock runs. Two players level
+    // on a figure must not swap places each time.
+    const { app, squad } = sheet();
+    const tied = new Map<string, any>([
+      ['p1', { goals: 1, secondsPlayed: 0 }],
+      ['p2', { goals: 1, secondsPlayed: 0 }],
+      ['p3', { goals: 1, secondsPlayed: 0 }]
+    ]);
+    app.setPlusMinusSort('goals');
+    const first = order(app, tied, squad);
+    const second = order(app, tied, squad);
+    expect(first).toEqual(second);
+    expect(first).toEqual(['p3', 'p1', 'p2']);   // by name
+  });
+
+  it('gives every column a heading and a first direction', () => {
+    const cols = makeApp().pmColumns();
+    expect(cols.map((c: any) => c.key)).toEqual([
+      'number', 'name', 'plus', 'minus', 'score', 'gd', 'mins', 'shots', 'goals', 'assists'
+    ]);
+    cols.forEach((c: any) => {
+      expect(typeof c.label).toBe('string');
+      expect(typeof c.desc).toBe('boolean');
+    });
+  });
+});
+
+describe('the sheet on a narrow screen', () => {
+  /**
+   * Ten columns do not fit a phone. Reported from the ground as "player, plus
+   * and minus are not sortable on the phone" — a column past the edge with
+   * nothing to scroll cannot be tapped, however sortable the code makes it.
+   */
+  function render() {
+    const app = makeApp();
+    app.data.players = [{ id: 'p1', name: 'Cesar Alva', recordingNumber: 1 }];
+    (window as any).plusMinus = (window as any).plusMinus;
+    document.body.innerHTML = app.renderPlusMinusTable(
+      new Map([['p1', { plus: 1, minus: 0, score: 1, goalDiff: 0, secondsPlayed: 60, shots: 0, goals: 0, assists: 0 }]]),
+      app.data.players
+    );
+    return app;
+  }
+
+  it('puts the table in its own scroller', () => {
+    render();
+    expect(document.querySelector('.pm-tablewrap')).not.toBeNull();
+    expect(document.querySelector('.pm-tablewrap .pm-table')).not.toBeNull();
+  });
+
+  it('makes every one of the ten headings clickable', () => {
+    // Including Player, Plus and Minus, the three reported as unreachable.
+    render();
+    const heads = Array.from(document.querySelectorAll('.pm-table th.sortable'));
+    expect(heads).toHaveLength(10);
+    heads.forEach(h => expect(h.getAttribute('onclick')).toMatch(/setPlusMinusSort/));
+  });
+
+  it('wires each heading to its own column', () => {
+    render();
+    const keys = Array.from(document.querySelectorAll('.pm-table th.sortable'))
+      .map(h => (h.getAttribute('onclick') || '').match(/setPlusMinusSort\('([a-z]+)'\)/)?.[1]);
+    expect(keys).toEqual([
+      'number', 'name', 'plus', 'minus', 'score', 'gd', 'mins', 'shots', 'goals', 'assists'
+    ]);
+  });
+
+  it('marks the column in force so the arrow is not guesswork', () => {
+    const app = render();
+    app.setPlusMinusSort('plus');
+    document.body.innerHTML = app.renderPlusMinusTable(
+      new Map([['p1', { plus: 1 }]]), app.data.players);
+    const sorted = document.querySelector('.pm-table th.sorted')!;
+    expect(sorted.textContent).toContain('Plus');
+  });
+});

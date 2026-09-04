@@ -372,24 +372,99 @@ Object.assign(BHSSoccerApp.prototype, {
     this.attachPlusMinusGestures();
   },
 
+  /**
+   * How each column of the sheet is read, and which way it sorts first.
+   *
+   * Every figure but the number and the name reads highest-first: at half time
+   * the question is who is doing well and who is not, and one click should
+   * answer it rather than two.
+   */
+  pmColumns() {
+    return [
+      { key: 'number',  label: '#',       desc: false, text: false, get: (p, s) => p.recordingNumber == null ? null : Number(p.recordingNumber) },
+      { key: 'name',    label: 'Player',  desc: false, text: true,  get: (p) => String(p.name || '').toLowerCase() },
+      { key: 'plus',    label: 'Plus',    desc: true,  text: false, get: (p, s) => s.plus || 0 },
+      { key: 'minus',   label: 'Minus',   desc: true,  text: false, get: (p, s) => s.minus || 0 },
+      { key: 'score',   label: 'Score',   desc: true,  text: false, get: (p, s) => s.score || 0 },
+      { key: 'gd',      label: 'GD',      desc: true,  text: false, get: (p, s) => s.goalDiff || 0 },
+      { key: 'mins',    label: 'Mins',    desc: true,  text: false, get: (p, s) => s.secondsPlayed || 0 },
+      { key: 'shots',   label: 'Shots',   desc: true,  text: false, get: (p, s) => s.shots || 0 },
+      { key: 'goals',   label: 'Goals',   desc: true,  text: false, get: (p, s) => s.goals || 0 },
+      { key: 'assists', label: 'Assists', desc: true,  text: false, get: (p, s) => s.assists || 0 }
+    ];
+  },
+
+  /**
+   * Click a heading to sort by it; click it again to reverse.
+   *
+   * Minutes played by default, because at half time the question is who to
+   * change and scanning twenty-five alphabetical rows for it wastes the
+   * interval.
+   */
+  setPlusMinusSort(key) {
+    if ((this._pmSort || 'mins') === key) {
+      this._pmSortReversed = !this._pmSortReversed;
+    } else {
+      this._pmSort = key;
+      this._pmSortReversed = false;
+    }
+    this.renderPlusMinus();
+  },
+
+  /** The sheet's rows, in the order the chosen column asks for. */
+  pmSortedRows(stats, squad) {
+    const key = this._pmSort || 'mins';
+    const cols = this.pmColumns();
+    const col = cols.find(c => c.key === key) || cols.find(c => c.key === 'mins');
+    const flip = (col.desc ? -1 : 1) * (this._pmSortReversed ? -1 : 1);
+
+    return squad
+      .map(p => ({ p, s: stats.get(p.id) || {} }))
+      .sort((a, b) => {
+        const x = col.get(a.p, a.s);
+        const y = col.get(b.p, b.s);
+
+        // A player with no recording number has nothing to compare, so they
+        // sink whichever way the column is pointed rather than leading it.
+        if (x === null || y === null) {
+          if (x === y) return String(a.p.name || '').localeCompare(String(b.p.name || ''));
+          return x === null ? 1 : -1;
+        }
+
+        if (col.text) return flip * String(x).localeCompare(String(y));
+        if (x !== y) return flip * (x - y);
+        // A tie on any figure falls back to the name, so the order is stable
+        // between redraws — the sheet redraws every second while the clock
+        // runs, and rows swapping places under the eye reads as a fault.
+        return String(a.p.name || '').localeCompare(String(b.p.name || ''));
+      });
+  },
+
   /** The sheet: the eight columns asked for, in that order. */
   renderPlusMinusTable(stats, squad) {
     const esc = (v) => String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const rows = squad
-      .map(p => ({ p, s: stats.get(p.id) || {} }))
-      // Most involved first: at half time the question is who to change, and
-      // scanning twenty-five alphabetical rows for it wastes the interval.
-      .sort((a, b) => (b.s.secondsPlayed || 0) - (a.s.secondsPlayed || 0));
+    const rows = this.pmSortedRows(stats, squad);
+    const active = this._pmSort || 'mins';
 
+    const th = (col) => {
+      const on = col.key === active;
+      // The arrow shows the order in force, not merely that a column is sorted.
+      const desc = col.desc !== !!this._pmSortReversed;
+      const arrow = on ? (desc ? ' \u25BC' : ' \u25B2') : '';
+      return `<th class="sortable${col.text ? ' col-text' : ''}${on ? ' sorted' : ''}"
+                  title="Sort by ${esc(col.label)}"
+                  onclick="app.setPlusMinusSort('${col.key}')">${esc(col.label)}${arrow}</th>`;
+    };
+
+    // Ten columns do not fit a phone. Wrapped in its own scroller so every
+    // heading can still be reached and tapped — a column past the edge with
+    // nothing to scroll is a column that cannot be sorted.
     return `
+      <div class="pm-tablewrap">
       <table class="data-table pm-table">
-        <thead><tr>
-          <th>#</th><th class="col-text">Player</th>
-          <th>Plus</th><th>Minus</th><th>Score</th><th>GD</th>
-          <th>Mins</th><th>Shots</th><th>Goals</th><th>Assists</th>
-        </tr></thead>
+        <thead><tr>${this.pmColumns().map(th).join('')}</tr></thead>
         <tbody>
           ${rows.map(({ p, s }) => `
             <tr>
@@ -405,7 +480,8 @@ Object.assign(BHSSoccerApp.prototype, {
               <td>${s.assists || 0}</td>
             </tr>`).join('')}
         </tbody>
-      </table>`;
+      </table>
+      </div>`;
   },
 
   /**
