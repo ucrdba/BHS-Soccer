@@ -67,6 +67,11 @@ beforeEach(() => {
  */
 const kickOff = (a: any) => {
   a._pmEvents.push({ kind: 'clock_start', playerId: null, atSeconds: 0 });
+  // Running, not merely started: plus and minus are refused whenever the
+  // clock is stopped, half time included. Set directly rather than through
+  // pmToggleClock() so _pmClockBase stays where the test put it and pmClock()
+  // remains predictable.
+  a._pmRunningSince = Date.now();
   return a;
 };
 
@@ -349,7 +354,11 @@ describe('undo', () => {
 describe('the numbers on screen', () => {
   it('derives every figure from the events', async () => {
     const app = makeApp();
-    await app.pmAppend('clock_start');
+    // Through the toggle, not pmAppend('clock_start'): the toggle is what
+    // actually starts the clock ticking, and plus and minus are refused while
+    // it is stopped. Appending the event alone leaves the clock at rest,
+    // which is a state the app itself never produces.
+    await app.pmToggleClock();
     await app.pmAppend('on', 'p1');
     await app.pmAppend('plus', 'p1');
     await app.pmAppend('plus', 'p1');
@@ -1468,14 +1477,40 @@ describe("plus and minus before the clock has started", () => {
     expect(a.pmStats().get('p1').plus).toBe(1);
   });
 
-  it("still accepts them while the clock is PAUSED mid-match", async () => {
-    // Half time, or a stoppage. The clock has started, so the events stamp at
-    // a real minute — a coach catching up on something they missed is
-    // legitimate, and refusing it would be stricter than the problem.
+  it("refuses them while the clock is PAUSED mid-match", async () => {
+    // Reported: "I can still increment/decrement players even if the clock is
+    // not running."
+    //
+    // Stopped is stopped. At half time, or in any break in play, an event
+    // stamps at a minute that has already passed and lands against whoever
+    // was on the pitch then. Play is the only time plus and minus mean
+    // anything.
     const a = makeApp();
     await a.pmAppend('on', 'p1');
     await a.pmToggleClock();          // start
     await a.pmToggleClock();          // stop
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(0);
+  });
+
+  it("says the clock is STOPPED rather than telling a coach to start it", async () => {
+    // Different situations to the person reading it: one has never kicked
+    // off, the other is at half time and knows perfectly well they started
+    // the clock an hour ago.
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();
+    await a.pmToggleClock();
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError).toContain('stopped');
+  });
+
+  it("accepts them again once play restarts", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();          // start
+    await a.pmToggleClock();          // half time
+    await a.pmToggleClock();          // second half
     await a.pmAppend('plus', 'p1');
     expect(a.pmStats().get('p1').plus).toBe(1);
   });
@@ -1518,9 +1553,50 @@ describe("plus and minus before the clock has started", () => {
     expect(a._pmError).toBe('');
   });
 
+  it("keeps recording after a reload in the middle of a half", async () => {
+    // The risk this guard introduces: if reopening a match did not restore
+    // the RUNNING state, a coach who refreshed at half-time-plus-one would be
+    // refused for the rest of the match with the clock visibly ticking.
+    //
+    // openPlusMinus rebuilds it from the log via plusMinus.clockRunning(),
+    // which is what makes the stricter rule safe. This asserts that contract
+    // rather than the reload plumbing.
+    const log = [
+      { kind: 'clock_start', playerId: null, atSeconds: 0, seq: 0 },
+      { kind: 'on', playerId: 'p1', atSeconds: 0, seq: 1 },
+      { kind: 'clock_stop', playerId: null, atSeconds: 2400, seq: 2 },
+      { kind: 'clock_start', playerId: null, atSeconds: 2400, seq: 3 }
+    ];
+    expect(plusMinus.clockRunning(log as any)).toBe(true);
+
+    const a = makeApp();
+    a._pmEvents = log.slice();
+    a._pmRunningSince = plusMinus.clockRunning(log as any) ? Date.now() : null;
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(1);
+  });
+
+  it("is refused after a reload during half time", async () => {
+    // The mirror image: the log ends stopped, so the restored clock is
+    // stopped, so recording is refused — the same answer as before reloading.
+    const log = [
+      { kind: 'clock_start', playerId: null, atSeconds: 0, seq: 0 },
+      { kind: 'on', playerId: 'p1', atSeconds: 0, seq: 1 },
+      { kind: 'clock_stop', playerId: null, atSeconds: 2400, seq: 2 }
+    ];
+    expect(plusMinus.clockRunning(log as any)).toBe(false);
+
+    const a = makeApp();
+    a._pmEvents = log.slice();
+    a._pmRunningSince = plusMinus.clockRunning(log as any) ? Date.now() : null;
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(0);
+  });
+
   it("stays refused after a reset that clears the log", async () => {
-    // pmClockEverStarted reads the log rather than the clock base, because a
-    // base of zero means both "not started yet" and "reset back to zero".
+    // The wording of the refusal comes from pmClockEverStarted, which reads
+    // the log rather than the clock base, because a base of zero means both
+    // "not started yet" and "reset back to zero".
     const a = makeApp();
     await a.pmToggleClock();
     a._pmEvents = [];
