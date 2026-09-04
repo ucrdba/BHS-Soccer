@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
+import cssSrc from '../../styles.css?raw';
 // plusminus reuses the lineup's formations rather than defining its own.
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
 import * as plusMinus from './plus-minus';
@@ -1459,7 +1460,7 @@ describe("plus and minus before the clock has started", () => {
     await a.pmAppend('plus', 'p1');
 
     expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
-    expect(a._pmError).toContain('Start the clock');
+    expect(a._pmError).toContain('start the clock to record plus and minus');
   });
 
   it("refuses a minus too", async () => {
@@ -1547,7 +1548,7 @@ describe("plus and minus before the clock has started", () => {
     const a = makeApp();
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
-    expect(a._pmError).toContain('Start the clock');
+    expect(a._pmError).toContain('start the clock to record plus and minus');
     await a.pmToggleClock();
     await a.pmAppend('plus', 'p1');
     expect(a._pmError).toBe('');
@@ -1605,5 +1606,58 @@ describe("plus and minus before the clock has started", () => {
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
     expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+  });
+});
+
+describe("where the refusal appears", () => {
+  /**
+   * Reported: "I still need a message stating please start clock in order to
+   * record plus/minus values."
+   *
+   * The message existed. It was printed at the FOOT of the screen, below the
+   * pitch, below the substitutes, just above the statistics table — several
+   * hundred pixels past the fold on a full-height pitch, which is what this
+   * screen was deliberately made into. A coach taps a chip near the top and
+   * sees nothing happen.
+   *
+   * Same failure as the assign-coach errors: a message nobody can see is the
+   * same as no message.
+   */
+  it("puts the message above the pitch, not below it", () => {
+    const src = pmSrc;
+    const err = src.indexOf('id="pmError"');
+    const pitch = src.indexOf('id="pmPitch"');
+    const bench = src.indexOf('id="pmBench"');
+    expect(err).toBeGreaterThan(-1);
+    expect(err).toBeLessThan(pitch);
+    expect(err).toBeLessThan(bench);
+  });
+
+  it("sits with the clock button, which is the remedy", () => {
+    // Not merely "somewhere higher": the thing the coach must press is right
+    // above it.
+    const src = pmSrc;
+    const bar = src.indexOf('class="pm-bar"');
+    const err = src.indexOf('id="pmError"');
+    const events = src.indexOf('class="pm-events"');
+    expect(bar).toBeLessThan(err);
+    expect(err).toBeLessThan(events);
+  });
+
+  it("names what is being refused, not just the clock", async () => {
+    const a = makeApp();
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError.toLowerCase()).toContain('plus and minus');
+    expect(a._pmError.toLowerCase()).toContain('start the clock');
+  });
+
+  it("takes up no room when there is nothing to say", () => {
+    // An always-present banner under the control bar would push the pitch
+    // down on a phone, which is the screen this is used on.
+    expect(cssSrc).toContain('.pm-error:empty { display: none; }');
+  });
+
+  it("is announced to a screen reader when it changes", () => {
+    expect(pmSrc).toMatch(/id="pmError"[^>]*aria-live="polite"/);
   });
 });

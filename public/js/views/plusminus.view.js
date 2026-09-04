@@ -120,8 +120,8 @@ Object.assign(BHSSoccerApp.prototype, {
     // arrive through this one door.
     if ((kind === 'plus' || kind === 'minus') && !this.pmClockRunning()) {
       this.pmSay(this.pmClockEverStarted()
-        ? 'The clock is stopped — start it before recording plus or minus.'
-        : 'Start the clock first — otherwise this lands at 0:00 and nobody is credited any minutes.');
+        ? 'The clock is stopped. Start it to record plus and minus.'
+        : 'Please start the clock to record plus and minus — before kick-off they stamp at 0:00 and nobody is credited any minutes.');
       this.renderPlusMinus();
       return;
     }
@@ -796,6 +796,14 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
       </div>
 
+      <!-- Directly under the bar, not at the foot of the page.
+           A coach taps a chip near the top of a full-height pitch; a
+           complaint printed below the bench and the substitutes is several
+           hundred pixels past the fold, so it reads as nothing having
+           happened at all. It also sits beside the clock button, which is
+           the remedy for the message it most often carries. -->
+      <p id="pmError" class="pm-error" role="status" aria-live="polite">${esc(this._pmError || '')}</p>
+
       <div class="pm-events">
         ${evBtn('shot', 'SHOT')}${evBtn('goal', 'GOAL')}${evBtn('assist', 'ASSIST')}
         <span class="pm-armed-hint">${armed ? 'Now tap the player' : 'Tap an event, then a player'}</span>
@@ -836,8 +844,6 @@ Object.assign(BHSSoccerApp.prototype, {
             || '<span class="text-muted" style="font-size:0.8rem;">Everyone is on.</span>'}
         </div>
       </div>
-
-      <p id="pmError" class="text-danger" style="font-size:0.8rem; min-height:1em;">${esc(this._pmError || '')}</p>
 
       ${this.renderPlusMinusTable(stats, squad)}`;
 
