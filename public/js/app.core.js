@@ -685,6 +685,8 @@ class BHSSoccerApp {
 
   switchView(viewName) {
     this.currentView = viewName;
+    // A drawer left open over the page it just navigated to reads as a bug.
+    if (this.closeNavMenu) this.closeNavMenu();
     document.querySelectorAll('.nav-item').forEach(el => {
       if (el.getAttribute('data-view') === viewName) {
         el.classList.add('active');

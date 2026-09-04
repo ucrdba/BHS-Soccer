@@ -82,6 +82,22 @@
   align-items: center;
 }
 
+/* The phone menu button. Hidden above 640px, where the bar itself is fine. */
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 8px 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.nav-toggle:hover,
+.nav-toggle:focus-visible { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+
 .nav-item {
   color: var(--text-muted);
   text-decoration: none;
@@ -1549,17 +1565,40 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .container { padding: 16px 12px; }
   .navbar { padding: 10px 12px; }
 
-  /* The nav is a horizontal strip that would otherwise wrap into a wall. Let
-     it scroll sideways on its own rather than pushing the page around. */
+  /* A drawer, not a scrolling strip. The strip hid its own scrollbar, so the
+     items past the edge existed with nothing on screen to say so. */
+  .nav-toggle { display: block; }
+
   .nav-links {
-    gap: 6px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--bhs-navy-card);
+    border-bottom: 1px solid var(--bhs-navy-border);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    padding: 4px 0;
+    max-height: 70vh;
+    overflow-y: auto;
   }
-  .nav-links::-webkit-scrollbar { display: none; }
-  .nav-item { font-size: 0.85rem; padding: 8px 10px; white-space: nowrap; }
+  .nav-links.open { display: flex; }
+
+  .nav-item {
+    font-size: 0.95rem;
+    padding: 13px 16px;
+    border-radius: 0;
+    white-space: nowrap;
+  }
+  .nav-item + .nav-item { border-top: 1px solid var(--bhs-navy-border); }
+
   .nav-brand img { height: 34px; }
+  /* The drawer is positioned against the bar, so the bar has to be the
+     containing block. */
+  .navbar { position: sticky; }
 
   /* ── Layouts that assume width ───────────────────────────────────────────
      Each of these is a fixed or multi-column grid with no fallback. */

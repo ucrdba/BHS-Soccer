@@ -388,3 +388,59 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 } else {
   document.addEventListener('DOMContentLoaded', initApp);
 }
+
+/* ---------------------------------------------------------------------------
+   The phone menu.
+
+   Under 640px the nav is a drawer rather than a bar. It used to be a strip
+   that scrolled sideways with the scrollbar hidden, which is the worst of both
+   worlds: the items are there, and nothing on screen says so.
+
+   Bound through the prototype rather than a listener on the element, because
+   the navbar is static markup in index.html and the app is what the inline
+   handlers reach.
+   --------------------------------------------------------------------------- */
+
+Object.assign(BHSSoccerApp.prototype, {
+
+  toggleNavMenu() {
+    const list = document.getElementById('navLinks');
+    if (!list) return;
+    this.setNavMenuOpen(!list.classList.contains('open'));
+  },
+
+  /**
+   * aria-expanded is kept in step with the class, not as decoration: the
+   * button says nothing about its state otherwise, and a screen reader would
+   * announce a closed menu as open.
+   */
+  setNavMenuOpen(open) {
+    const list = document.getElementById('navLinks');
+    const btn = document.getElementById('navToggle');
+    if (list) list.classList.toggle('open', !!open);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+
+  closeNavMenu() { this.setNavMenuOpen(false); }
+
+});
+
+/**
+ * Close the drawer on the way out.
+ *
+ * Escape because that is what a dismissible layer answers to, and a tap
+ * outside because a menu that can only be closed by the button it was opened
+ * with traps a coach who opened it by accident. Bound once, on the document,
+ * so no redraw can lose it.
+ */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && window.app && app.closeNavMenu) app.closeNavMenu();
+});
+
+document.addEventListener('click', (e) => {
+  const list = document.getElementById('navLinks');
+  if (!list || !list.classList.contains('open')) return;
+  // Ignore the button itself, or its own click would close what it just opened.
+  if (e.target.closest('#navToggle') || e.target.closest('#navLinks')) return;
+  if (window.app && app.closeNavMenu) app.closeNavMenu();
+});

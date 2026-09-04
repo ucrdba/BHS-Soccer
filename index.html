@@ -32,7 +32,13 @@
       </div>
     </div>
 
-    <ul class="nav-links">
+    <!-- Only shown under 640px. The bar it replaces used to scroll sideways
+         with the scrollbar hidden, so items existed with nothing to say so. -->
+    <button id="navToggle" class="nav-toggle" type="button"
+            aria-label="Menu" aria-expanded="false" aria-controls="navLinks"
+            onclick="app.toggleNavMenu()">&#9776;</button>
+
+    <ul class="nav-links" id="navLinks">
       <li class="nav-item active" data-view="home" onclick="app.switchView('home')">⚽ Home</li>
       <li class="nav-item" data-view="roster" onclick="app.switchView('roster')">👥 Roster &amp; Bios</li>
       <li class="nav-item" data-view="schedule" onclick="app.switchView('schedule')">📅 Schedule &amp; Results</li>
