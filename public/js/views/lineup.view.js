@@ -561,11 +561,19 @@ Object.assign(BHSSoccerApp.prototype, {
     if (err) err.textContent = this._lineupError || '';
   },
 
-  /** "K. Corona" — a full name does not fit in a slot on a pitch. */
+  /**
+   * "Kevin C." — a full name does not fit in a slot on a pitch.
+   *
+   * First name in full with the surname reduced to an initial, not the other
+   * way round: a coach calls across a pitch by first name, and two players
+   * sharing a surname are the common case in a school squad while two sharing
+   * a first name AND a surname initial is rare.
+   */
   lineupShortName(p) {
-    const parts = String(p.name || '').trim().split(/\s+/);
-    if (parts.length < 2) return parts[0] || '';
-    return parts[0].charAt(0) + '. ' + parts[parts.length - 1];
+    const parts = String(p.name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0];
+    return parts[0] + ' ' + parts[parts.length - 1].charAt(0) + '.';
   },
 
   /**

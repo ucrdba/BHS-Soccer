@@ -377,9 +377,10 @@ describe('sorting the sheet', () => {
   function sheet() {
     const app = makeApp();
     app.data.players = [
-      { id: 'p1', name: 'Cesar Alva', recordingNumber: 7 },
-      { id: 'p2', name: 'Tom Budde', recordingNumber: 2 },
-      { id: 'p3', name: 'Alain Renteria', recordingNumber: null }
+      // Uniform numbers, since that is what this screen shows.
+      { id: 'p1', name: 'Cesar Alva', number: 7, recordingNumber: 1 },
+      { id: 'p2', name: 'Tom Budde', number: 2, recordingNumber: 9 },
+      { id: 'p3', name: 'Alain Renteria', number: null, recordingNumber: 4 }
     ];
     const stats = new Map<string, any>([
       ['p1', { plus: 5, minus: 1, score: 4, goalDiff: 2, secondsPlayed: 300, shots: 3, goals: 1, assists: 0 }],
@@ -429,13 +430,16 @@ describe('sorting the sheet', () => {
     expect(order(app, stats, squad)).toEqual(['p3', 'p1', 'p2']);
   });
 
-  it('sorts by recording number, lowest first', () => {
+  it('sorts by UNIFORM number, lowest first', () => {
+    // This screen is read against players wearing shirts, so the number on
+    // the sheet has to be the number on the back — not the recording number,
+    // which is for paper score sheets.
     const { app, stats, squad } = sheet();
     app.setPlusMinusSort('number');
     expect(order(app, stats, squad).slice(0, 2)).toEqual(['p2', 'p1']);
   });
 
-  it('sinks a player with no recording number, both ways', () => {
+  it('sinks a player with no uniform number, both ways', () => {
     // Number(null) is 0 and would otherwise lead the sheet.
     const { app, stats, squad } = sheet();
     app.setPlusMinusSort('number');
@@ -1188,5 +1192,49 @@ describe('clearing a pitch that came from the database', () => {
     const a = loaded(fromDb(4));
     await a.pmResetPitch();
     expect(a._pmError).toBe('');
+  });
+});
+
+describe('which number is shown', () => {
+  /**
+   * The plus/minus screen and the lineup show the UNIFORM number, because both
+   * are read against players on a pitch wearing shirts — the number on the
+   * chip has to be the number on the back.
+   *
+   * The recording number is a different thing: it is what a player writes on a
+   * paper score sheet, and it belongs on the session grid.
+   */
+  function render() {
+    const a = makeApp();
+    a.data.players = [
+      { id: 'p1', name: 'Kevin Corona', number: 30, recordingNumber: 7 },
+      { id: 'p2', name: 'JP Davila', number: null, recordingNumber: 8 }
+    ];
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    document.body.innerHTML = a.renderPlusMinusTable(
+      new Map([['p1', {}], ['p2', {}]]), a.data.players);
+    return a;
+  }
+
+  it('shows the uniform number in the sheet', () => {
+    render();
+    const cells = Array.from(document.querySelectorAll('tbody tr'))
+      .map(r => r.children[0].textContent!.trim());
+    expect(cells).toContain('30');
+  });
+
+  it('does not show the recording number', () => {
+    render();
+    const cells = Array.from(document.querySelectorAll('tbody tr'))
+      .map(r => r.children[0].textContent!.trim());
+    expect(cells).not.toContain('7');
+  });
+
+  it('shows a dash for a player with no uniform number', () => {
+    render();
+    const cells = Array.from(document.querySelectorAll('tbody tr'))
+      .map(r => r.children[0].textContent!.trim());
+    expect(cells).toContain('—');
   });
 });

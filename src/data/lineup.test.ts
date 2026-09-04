@@ -295,12 +295,24 @@ describe('the rows that get saved', () => {
 });
 
 describe('what the card prints', () => {
-  it('shortens a name to fit a slot on the pitch', () => {
-    expect(makeApp().lineupShortName({ name: 'Kevin Corona' })).toBe('K. Corona');
+  it('shortens a name to the first name and a surname initial', () => {
+    // A coach calls across a pitch by first name. Two players sharing a
+    // surname is the common case in a school squad; two sharing a first name
+    // AND a surname initial is rare.
+    expect(makeApp().lineupShortName({ name: 'Kevin Corona' })).toBe('Kevin C.');
   });
 
   it('copes with a single-word name', () => {
     expect(makeApp().lineupShortName({ name: 'Ronaldinho' })).toBe('Ronaldinho');
+  });
+
+  it('uses the LAST word as the surname, not the second', () => {
+    expect(makeApp().lineupShortName({ name: 'Juan Carlos Marcias' })).toBe('Juan M.');
+  });
+
+  it('returns nothing for a nameless player rather than a stray full stop', () => {
+    expect(makeApp().lineupShortName({ name: '' })).toBe('');
+    expect(makeApp().lineupShortName({})).toBe('');
   });
 
   it('reduces every grade shape the roster actually holds to a year', () => {

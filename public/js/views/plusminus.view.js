@@ -30,6 +30,11 @@
  * over the event log, so this file only ever appends events and draws the
  * result — see src/data/plus-minus.ts for why that matters.
  *
+ * Numbers shown here are UNIFORM numbers, not recording numbers. This screen
+ * is read against players on a pitch wearing shirts, so the number on the
+ * chip has to be the number on the back. The recording number is for paper
+ * score sheets and belongs on the session grid, not here.
+ *
  * Classic script — no imports. Extends the prototype from app.core.js.
  *
  * Uses lineupFormations()/lineupSlots() from lineup.view.js for the shape
@@ -629,7 +634,7 @@ Object.assign(BHSSoccerApp.prototype, {
         <button type="button" class="pm-chip${isOn ? ' on' : ''}${place ? ' placed' : ''}"
                 data-player-id="${esc(p.id)}"${at}
                 title="${esc(p.name)} — tap +1, hold or two fingers −1, drag to move or substitute">
-          <span class="pm-num">${p.recordingNumber != null ? esc(p.recordingNumber) : (p.number != null ? esc(p.number) : '—')}</span>
+          <span class="pm-num">${p.number != null ? esc(p.number) : '—'}</span>
           <span class="pm-name">${esc(this.lineupShortName ? this.lineupShortName(p) : p.name)}</span>
           <span class="pm-score">${(s.score || 0) > 0 ? '+' : ''}${s.score || 0}</span>
         </button>`;
@@ -720,7 +725,7 @@ Object.assign(BHSSoccerApp.prototype, {
    */
   pmColumns() {
     return [
-      { key: 'number',  label: '#',       desc: false, text: false, get: (p, s) => p.recordingNumber == null ? null : Number(p.recordingNumber) },
+      { key: 'number',  label: '#',       desc: false, text: false, get: (p, s) => p.number == null ? null : Number(p.number) },
       { key: 'name',    label: 'Player',  desc: false, text: true,  get: (p) => String(p.name || '').toLowerCase() },
       { key: 'plus',    label: 'Plus',    desc: true,  text: false, get: (p, s) => s.plus || 0 },
       { key: 'minus',   label: 'Minus',   desc: true,  text: false, get: (p, s) => s.minus || 0 },
@@ -807,7 +812,7 @@ Object.assign(BHSSoccerApp.prototype, {
         <tbody>
           ${rows.map(({ p, s }) => `
             <tr>
-              <td>${p.recordingNumber != null ? esc(p.recordingNumber) : '—'}</td>
+              <td>${p.number != null ? esc(p.number) : '—'}</td>
               <td class="col-text">${esc(p.name)}</td>
               <td>${s.plus || 0}</td>
               <td>${s.minus || 0}</td>
@@ -1037,7 +1042,7 @@ Object.assign(BHSSoccerApp.prototype, {
           ${squad.map(p => {
             const s = stats.get(p.id) || {};
             return `<tr>
-              <td class="l">${p.recordingNumber != null ? esc(p.recordingNumber) : ''}</td>
+              <td class="l">${p.number != null ? esc(p.number) : ''}</td>
               <td class="l">${esc(p.name)}</td>
               <td>${s.plus || 0}</td><td>${s.minus || 0}</td>
               <td>${(s.score || 0) > 0 ? '+' : ''}${s.score || 0}</td>
