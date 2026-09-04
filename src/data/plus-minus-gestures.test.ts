@@ -57,6 +57,23 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
+/**
+ * Kick off, so plus and minus are accepted.
+ *
+ * They are refused before the clock has ever started: recorded then, they
+ * stamp at 0:00 and every player is credited zero minutes. Seeded as an event
+ * rather than through pmToggleClock() so the clock stays stopped and these
+ * tests keep full control of pmClock().
+ */
+const kickOff = (a: any) => {
+  a._pmEvents.push({ kind: 'clock_start', playerId: null, atSeconds: 0 });
+  return a;
+};
+
+/** Event kinds, ignoring the seeded kick-off. */
+const kindsAfterKickOff = (a: any) =>
+  a._pmEvents.filter((e: any) => e.kind !== 'clock_start').map((e: any) => e.kind);
+
 describe('tapping a player on the pitch', () => {
   const app = () => makeApp();
 
@@ -227,10 +244,10 @@ describe('eleven on the pitch', () => {
 
 describe('recording through the screen', () => {
   it('appends a plus for a player on the pitch', async () => {
-    const app = makeApp();
+    const app = kickOff(makeApp());
     await app.pmAppend('on', 'p1');
     await app.pmTapPlayer('p1', { fingers: 1 });
-    expect(app._pmEvents.map((e: any) => e.kind)).toEqual(['on', 'plus']);
+    expect(kindsAfterKickOff(app)).toEqual(['on', 'plus']);
   });
 
   it('appends nothing for a substitute', async () => {
@@ -241,10 +258,10 @@ describe('recording through the screen', () => {
 
   it('stamps events with the match clock, not wall time', async () => {
     // Playing time and goal differential are both computed against this.
-    const app = makeApp();
+    const app = kickOff(makeApp());
     app._pmClockBase = 615;
     await app.pmAppend('plus', 'p1');
-    expect(app._pmEvents[0].atSeconds).toBe(615);
+    expect(app._pmEvents.find((e: any) => e.kind === 'plus').atSeconds).toBe(615);
   });
 
   it('does not advance the clock while it is stopped', () => {
@@ -298,11 +315,11 @@ describe('the clock button', () => {
 
 describe('undo', () => {
   it('removes the most recent event', async () => {
-    const app = makeApp();
+    const app = kickOff(makeApp());
     await app.pmAppend('on', 'p1');
     await app.pmAppend('plus', 'p1');
     await app.pmUndo();
-    expect(app._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+    expect(kindsAfterKickOff(app)).toEqual(['on']);
   });
 
   it('puts the clock back when a start is undone', async () => {
@@ -686,7 +703,7 @@ describe('dropping one player onto another', () => {
   it("keeps each player's own statistics", async () => {
     // The reported symptom. The one going off keeps what they earned; the one
     // coming on starts from their own record, not the other's.
-    const a = app();
+    const a = kickOff(app());
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
     await a.pmAppend('plus', 'p1');
@@ -948,7 +965,7 @@ describe('clearing the pitch', () => {
   it('keeps what every player earned', async () => {
     // The whole reason it is an event and not a deletion.
     (window as any).confirm = () => true;
-    const a = app();
+    const a = kickOff(app());
     await a.pmAppend('on', 'p1');
     await a.pmAppend('plus', 'p1');
     await a.pmAppend('goal_for');
@@ -1413,5 +1430,104 @@ describe('resetting the clock', () => {
     const a = app();
     await a.pmResetClock();
     expect(asked).toBe(0);
+  });
+});
+
+describe("plus and minus before the clock has started", () => {
+  /**
+   * A coach sets the pitch up, the whistle goes, and the clock is still
+   * sitting at 0:00 because nobody pressed start. Taps record happily: the
+   * counters go up, the sheet looks right, and every player is credited zero
+   * minutes for the whole match — because minutes are derived from
+   * substitutions measured against the clock, and the clock never moved.
+   *
+   * Nothing at the time says so. The first plus is exactly when a coach would
+   * notice a forgotten clock, so that is where to say it.
+   */
+  it("refuses a plus and says why", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('plus', 'p1');
+
+    expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+    expect(a._pmError).toContain('Start the clock');
+  });
+
+  it("refuses a minus too", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('minus', 'p1');
+    expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+  });
+
+  it("accepts them once the clock has started", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(1);
+  });
+
+  it("still accepts them while the clock is PAUSED mid-match", async () => {
+    // Half time, or a stoppage. The clock has started, so the events stamp at
+    // a real minute — a coach catching up on something they missed is
+    // legitimate, and refusing it would be stricter than the problem.
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmToggleClock();          // start
+    await a.pmToggleClock();          // stop
+    await a.pmAppend('plus', 'p1');
+    expect(a.pmStats().get('p1').plus).toBe(1);
+  });
+
+  it("does not block getting players onto the pitch", async () => {
+    // Setting the shape up before kick-off is the normal way to start, and
+    // being on the pitch is not clock-dependent.
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('on', 'p2');
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+  });
+
+  it("does not block the clock itself", async () => {
+    // The obvious way to deadlock this guard would be to refuse the very
+    // event that lifts it.
+    const a = makeApp();
+    await a.pmToggleClock();
+    expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['clock_start']);
+  });
+
+  it("refuses whichever gesture the tap resolved to", async () => {
+    // The guard sits in pmAppend rather than the tap handler, so the tap, the
+    // long press, the two-finger press and the right click are all covered by
+    // one check instead of four that can drift apart.
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmTapPlayer('p1', { fingers: 1 });
+    await a.pmTapPlayer('p1', { fingers: 2 });
+    expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
+  });
+
+  it("clears the complaint once the clock starts", async () => {
+    const a = makeApp();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError).toContain('Start the clock');
+    await a.pmToggleClock();
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmError).toBe('');
+  });
+
+  it("stays refused after a reset that clears the log", async () => {
+    // pmClockEverStarted reads the log rather than the clock base, because a
+    // base of zero means both "not started yet" and "reset back to zero".
+    const a = makeApp();
+    await a.pmToggleClock();
+    a._pmEvents = [];
+    a._pmClockBase = 0;
+    a._pmRunningSince = null;
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('plus', 'p1');
+    expect(a._pmEvents.map((e: any) => e.kind)).toEqual(['on']);
   });
 });

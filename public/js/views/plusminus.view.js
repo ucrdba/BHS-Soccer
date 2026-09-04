@@ -74,7 +74,37 @@ Object.assign(BHSSoccerApp.prototype, {
    * and said so — silently keeping it would make the screen disagree with what
    * a reload would show.
    */
+  /**
+   * Has this match's clock ever been started?
+   *
+   * Read from the event log rather than from _pmClockBase, because the base
+   * is zero both before kick-off AND straight after a reset — the log is the
+   * only thing that distinguishes "not started yet" from "started, and back
+   * at zero".
+   */
+  pmClockEverStarted() {
+    return (this._pmEvents || []).some(e => e.kind === 'clock_start');
+  },
+
   async pmAppend(kind, playerId) {
+    // Plus and minus before kick-off are stamped at 0:00, and every player is
+    // credited zero minutes for the whole match, because minutes are derived
+    // from substitutions measured against the clock. Nothing at the time says
+    // so: the counters go up, the sheet looks right, and the minutes column
+    // is quietly worthless afterwards.
+    //
+    // The first plus of a match is exactly when a coach would notice a
+    // forgotten clock, so that is where to say it. Refused here rather than
+    // in the tap handler, alongside the eleven-player limit and for the same
+    // reason: it is a fact about the match, not about one gesture, and the
+    // tap, the long press, the two-finger press and the right click all
+    // arrive through this one door.
+    if ((kind === 'plus' || kind === 'minus') && !this.pmClockEverStarted()) {
+      this.pmSay('Start the clock first — otherwise this lands at 0:00 and nobody is credited any minutes.');
+      this.renderPlusMinus();
+      return;
+    }
+
     // The limit lives HERE as well as on the drag, because it is a fact about
     // the match rather than about one gesture: a twelfth player is wrong
     // however they got on. The minutes and the goal differential of everyone
@@ -89,6 +119,12 @@ Object.assign(BHSSoccerApp.prototype, {
         return;
       }
     }
+
+    // Past every guard, so whatever the last one complained about has been
+    // dealt with. Without this the "start the clock" line stays on screen
+    // after the coach has started it and recorded successfully, which reads
+    // as the refusal still standing.
+    this.pmSay('');
 
     const at = this.pmClock();
     const event = {

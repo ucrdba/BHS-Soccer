@@ -75,7 +75,7 @@ const chip = (id: string) => document.querySelector(`[data-player-id="${id}"]`) 
  * without the `on` events made every gesture correctly resolve to nothing,
  * which looked exactly like the bug under test.
  */
-const SEEDED = 2;
+const SEEDED = 3;   // clock_start + both players on
 const kinds = () =>
   app._pmEvents.slice(SEEDED).map((e: any) => `${e.kind}:${e.playerId ?? ''}`);
 
@@ -114,6 +114,10 @@ beforeEach(() => {
 
   app = makeApp();
   app._pmEvents = [
+    // The clock is running: plus and minus are refused before kick-off, so a
+    // gesture test that never started it would be testing that guard rather
+    // than the gesture.
+    { kind: 'clock_start', playerId: null, atSeconds: 0 },
     { kind: 'on', playerId: 'p1', atSeconds: 0 },
     { kind: 'on', playerId: 'p2', atSeconds: 0 }
   ];
