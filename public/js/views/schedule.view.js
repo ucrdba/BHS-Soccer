@@ -52,6 +52,12 @@ Object.assign(BHSSoccerApp.prototype, {
           </div>
         </div>
 
+        <div class="schedule-head">
+          <div class="sched-label" style="min-width:120px;">Date</div>
+          <div class="sched-label" style="flex:1; min-width:150px;">Opponent</div>
+          <div class="sched-label" style="flex:1; min-width:130px;">Location</div>
+        </div>
+
         <div class="schedule-list" style="display:flex; flex-direction:column; gap:12px;">
           ${(this.data.schedule || []).filter(m => !m.is_deleted && !m.isDeleted).map(m => `
             <div class="schedule-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px 18px; border-radius: 10px;">
@@ -59,13 +65,15 @@ Object.assign(BHSSoccerApp.prototype, {
                 <strong style="color:var(--bhs-gold-accent); font-size:1rem; display:block;">${this.displayMatchDate(m.date)}</strong>
                 <div class="time text-muted" style="font-size:0.82rem;">⏱️ ${m.time}</div>
               </div>
-              <div class="game-matchup" style="flex:1; min-width:180px;">
+              <div class="game-matchup" style="flex:1; min-width:150px;">
                 <div>
                   <div class="opponent-name" style="font-weight:700; color:#FFF; font-size:1.05rem;">${m.opponent}</div>
-                  ${m.location
-                    ? `<div class="location-tag text-muted" style="font-size:0.82rem;">📍 ${m.location}</div>`
-                    : ''}
                 </div>
+              </div>
+              <div class="game-venue" style="flex:1; min-width:130px;">
+                ${m.location
+                  ? `<div class="location-tag text-muted" style="font-size:0.9rem;">📍 ${m.location}</div>`
+                  : `<div class="text-muted" style="font-size:0.9rem;" title="No location recorded for this fixture">&mdash;</div>`}
               </div>
               <div>
                 ${m.isHome === null || m.isHome === undefined

@@ -295,3 +295,60 @@ describe("the opponent line", () => {
     expect(scheduleSrc).toContain("delete the match vs");
   });
 });
+
+describe("the column titles", () => {
+  /**
+   * A fixture card is four values in a row with no headings: a date, a name, a
+   * venue, a badge. The name and the venue are both bare text, so which is
+   * which is guesswork on a fixture where the venue IS an opponent name —
+   * now the common case, since a blank Location falls back to the opponent.
+   *
+   * ONE header row above the list, not a label on every card. Its cells carry
+   * the card's own widths so each title sits over the column it names.
+   */
+  const fixture = { id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                    opponent: "Redlands", location: "Cougar Stadium", isHome: true };
+
+  const twoFixtures = () => {
+    const app = makeApp([fixture, { ...fixture, id: "m2", opponent: "Yucaipa" }]);
+    document.body.innerHTML = app.renderScheduleView();
+    return document.body.innerHTML;
+  };
+
+  it("titles Date, Opponent and Location", () => {
+    const html = card(fixture);
+    expect(html).toContain(">Date<");
+    expect(html).toContain(">Opponent<");
+    expect(html).toContain(">Location<");
+  });
+
+  it("prints each title ONCE, however many fixtures there are", () => {
+    // The point of the change: titles at the top, not repeated down the list.
+    const html = twoFixtures();
+    expect(html).toContain("Yucaipa");
+    for (const title of [">Date<", ">Opponent<", ">Location<"]) {
+      expect(html.split(title).length - 1).toBe(1);
+    }
+  });
+
+  it("puts them above the fixtures, not inside one", () => {
+    const html = card(fixture);
+    expect(html.indexOf("schedule-head")).toBeGreaterThan(-1);
+    expect(html.indexOf("schedule-head")).toBeLessThan(html.indexOf("schedule-card"));
+  });
+
+  it("still shows the location column when a fixture has none", () => {
+    // The cell holds an em-dash rather than collapsing, so the column below
+    // "Location" keeps its width and the row stays aligned.
+    const html = card({ ...fixture, location: "" });
+    expect(html).toContain(">Location<");
+    expect(html).not.toContain("📍");
+  });
+
+  it("leaves the header's layout to the stylesheet", () => {
+    // An inline display:flex would outrank the media query that hides this row
+    // where the card stacks, and the titles would sit over nothing on a phone.
+    expect(scheduleSrc).toContain('<div class="schedule-head">');
+    expect(scheduleSrc).not.toMatch(/schedule-head"[^>]*style=/);
+  });
+});

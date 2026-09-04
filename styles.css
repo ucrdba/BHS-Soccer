@@ -472,6 +472,27 @@
   transition: all 0.2s ease;
 }
 
+/* Column titles for the fixture list — one header row above the cards,
+ * whose cells mirror the card's own widths so the titles sit over what they
+ * name. */
+/* An inline display:flex here would beat the media query that hides this row
+ * on a phone — inline styles outrank a stylesheet rule whatever its media
+ * condition — so the layout lives here rather than on the element. */
+.schedule-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding: 0 18px 6px;
+}
+
+.sched-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .schedule-card:hover {
   border-color: var(--bhs-blue-electric);
   background: rgba(17, 34, 64, 0.9);
@@ -1604,6 +1625,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
      Each of these is a fixed or multi-column grid with no fallback. */
   .matrix-grid { grid-template-columns: 1fr; gap: 16px; }
   .player-stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+  /* The card's cells stack here, so a header row above them would no longer
+     sit over anything. Each value is already distinguishable by its own
+     treatment: gold date, white opponent, pinned location. */
+  .schedule-head { display: none; }
 
   /* 120px + 180px + 140px of fixed columns is 440px before the opponent name
      gets a pixel, so this one scrolled sideways on every phone made. */
