@@ -14,7 +14,7 @@
  */
 
 /// <reference types="vite/client" />
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
@@ -381,5 +381,206 @@ describe("the column titles", () => {
     // where the card stacks, and the titles would sit over nothing on a phone.
     expect(scheduleSrc).toContain('<div class="schedule-head">');
     expect(scheduleSrc).not.toMatch(/schedule-head"[^>]*style=/);
+  });
+});
+
+describe("who may change the schedule", () => {
+  /**
+   * Reported: a guest saw Edit and Delete on every fixture.
+   *
+   * Nothing was ever at risk — the schedule_write policy in
+   * supabase_migration_auth.sql refuses a write unless
+   * current_profile_role() is coach or admin, so a guest who called
+   * app.deleteMatch() from a console got a refusal from Postgres. The defect
+   * was showing buttons that could only fail.
+   *
+   * isCoach() is true for coach AND admin, and only while the profile is
+   * active, so it is exactly "admins and coaches".
+   */
+  const fixture = { id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                    opponent: "Redlands", location: "Cougar Stadium", isHome: true };
+
+  const asRole = (role: string, status = "active") => {
+    (globalThis as any).auth = {
+      getRole: () => role,
+      getCurrentUser: () => ({ id: "u1", role, status }),
+      isCoach: () => (role === "coach" || role === "admin") && status === "active",
+      isAdmin: () => role === "admin" && status === "active",
+      isLoggedIn: () => role !== "guest",
+      canAccessRatings: () => true,
+      subscribe: () => {}
+    };
+    return card(fixture);
+  };
+
+  const WRITE_CONTROLS = ["Edit", "Delete", "Add New Match", "Lineup", "Plus/Minus"];
+
+  // asRole replaces the shared global, so put a coach back afterwards rather
+  // than leaving the next describe to inherit whatever role ran last.
+  //
+  // Rebuilt rather than snapshotted: a const captured out here evaluates when
+  // the describe is DEFINED, which is before beforeAll has installed auth --
+  // so it would restore undefined and every later block would fail on
+  // auth.isCoach() of undefined.
+  afterEach(() => { asRole("coach"); });
+
+  it("shows a guest none of the controls that write", () => {
+    const html = asRole("guest");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("still shows a guest the fixture itself", () => {
+    // Read stays public — a guest is here to see when the next match is.
+    const html = asRole("guest");
+    expect(html).toContain("Redlands");
+    expect(html).toContain("DEC 8 2026");
+    expect(html).toContain("HOME");
+  });
+
+  it("shows a player none of them either", () => {
+    // A player is signed in, which is not the same as being able to edit.
+    const html = asRole("player");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("shows a coach all of them", () => {
+    const html = asRole("coach");
+    for (const control of WRITE_CONTROLS) expect(html).toContain(control);
+  });
+
+  it("shows an admin all of them", () => {
+    // "Admins and coaches" — isCoach() covers both, so admin must not fall
+    // through the gap.
+    const html = asRole("admin");
+    for (const control of WRITE_CONTROLS) expect(html).toContain(control);
+  });
+
+  it("shows a coach awaiting approval none of them", () => {
+    // Signup lands pending. Until a coach or admin approves the profile the
+    // role is claimed, not granted — and RLS reads status too.
+    const html = asRole("coach", "pending");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("gates every write control on the one guard", () => {
+    // Not five separate checks that can drift apart: the previous version had
+    // Lineup and Plus/Minus gated while Edit and Delete were not, and a dead
+    // `const isCoachOrAdmin = true` sitting above them.
+    expect(scheduleSrc).toContain("const canManage = window.auth.isCoach();");
+    expect(scheduleSrc).not.toContain("isCoachOrAdmin");
+    const body = scheduleSrc.slice(scheduleSrc.indexOf("renderScheduleView"),
+                                   scheduleSrc.indexOf("formatIsoToDisplayDate"));
+    expect(body.match(/canManage \?/g) || []).toHaveLength(2);
+  });
+});
+
+describe("directions to an away fixture", () => {
+  /**
+   * The AWAY badge becomes a link to turn-by-turn directions — but only when
+   * a coach has stated an address.
+   *
+   * That condition is the whole feature. `location` on an away fixture is
+   * usually just the opponent's name (the blank-Location fallback), and this
+   * very schedule contains both "Redlands" and "Redlands East Valley".
+   * "Redlands" as a map query lands in the middle of a city of 70,000. A
+   * link to the wrong town is worse than no link, so nothing but a stated
+   * address earns one.
+   */
+  const away = (over: any = {}) => card({
+    id: "m1", date: "DEC 8 2026", time: "4:00 PM", opponent: "Redlands",
+    location: "Redlands", isHome: false, ...over
+  });
+
+  const ADDRESS = "1200 E Colton Ave, Redlands, CA 92374";
+
+  it("links the AWAY badge when an address was recorded", () => {
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain("google.com/maps/dir/");
+    expect(html).toContain(encodeURIComponent(ADDRESS));
+  });
+
+  it("does NOT link when no address was recorded", () => {
+    const html = away({ venueAddress: null });
+    expect(html).toContain("AWAY");
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("does not fall back to the location text", () => {
+    // The whole point: "Redlands" is a city, not a soccer field. Pointing a
+    // map at it sends a parent downtown.
+    const html = away({ location: "Redlands", venueAddress: null });
+    expect(html).not.toContain("maps");
+  });
+
+  it("treats an address of only spaces as no address", () => {
+    expect(away({ venueAddress: "   " })).not.toContain("google.com/maps");
+  });
+
+  it("never links a home fixture, whatever address it carries", () => {
+    // A coach knows their own ground, and is_home is the field that decides.
+    const html = card({ id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                        opponent: "Yucaipa", location: "Cougar Stadium",
+                        isHome: true, venueAddress: ADDRESS });
+    expect(html).toContain("HOME");
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("does not link a fixture whose side was never recorded", () => {
+    // null is "not stated". Offering directions would assert it is away.
+    const html = away({ isHome: null, venueAddress: ADDRESS });
+    expect(html).not.toContain("google.com/maps");
+  });
+
+  it("opens in a new tab without handing over the opener", () => {
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it("survives an address containing an ampersand and an apostrophe", () => {
+    // "O'Brien & Sons Field" is the shape that breaks a naive template: the
+    // bare & starts an entity, and the address lands in BOTH an href and a
+    // title attribute, which need different escaping from each other.
+    const ADDR = "O'Brien & Sons Field, Banning CA";
+    const html = away({ venueAddress: ADDR });
+
+    // The href carries it percent-encoded, so the map receives it intact.
+    expect(html).toContain(encodeURIComponent(ADDR));
+
+    // The title carries it HTML-escaped: an entity, never a bare ampersand.
+    const title = (html.match(/title="Directions to ([^"]*)"/) || [])[1];
+    expect(title).toBeDefined();
+    expect(title).toContain("&amp;");
+    expect(title).not.toMatch(/&(?!amp;|#|lt;|gt;|quot;)/);
+  });
+
+  it("asks for directions, not just a pin", () => {
+    // /dir/ with a destination routes from wherever the reader is standing,
+    // which is what a parent leaving the house needs. /search/ would only
+    // show the place.
+    //
+    // The & reads as &amp; because the URL sits in an href — correct HTML,
+    // which the browser decodes back to & before navigating.
+    const html = away({ venueAddress: ADDRESS });
+    expect(html).toContain("/maps/dir/?api=1&amp;destination=");
+    const href = (html.match(/href="([^"]*)"/) || [])[1];
+    expect(href!.replace(/&amp;/g, "&")).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(ADDRESS));
+  });
+});
+
+describe("the address round trip", () => {
+  it("is written only when the caller supplied it", () => {
+    // An older sheet with no Address column must not null out addresses
+    // typed in the app — the bug that cleared 25 JV uniform numbers.
+    expect(adminSrc).toContain("r.Address !== undefined");
+  });
+
+  it("is exported so an edited sheet can be re-imported", () => {
+    expect(adminSrc).toContain("Address: m.venueAddress || ''");
+  });
+
+  it("appears in the schedule template", () => {
+    expect(adminSrc).toMatch(/Address:'optional/);
   });
 });

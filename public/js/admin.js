@@ -2029,7 +2029,7 @@ Object.assign(BHSSoccerApp.prototype, {
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'schedule') {
             fileName = '4_Schedule_Results.xlsx'; sheetName = 'Schedule';
-            const rows = (this.data.schedule || []).map(m => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Date: m.date, DOW: window.supabaseService.scheduleDayOfWeek(m.date) || '', Time: m.time, Opponent: m.opponent, Location: m.location, Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
+            const rows = (this.data.schedule || []).map(m => ({ Team: (this.data.teams || []).find(t => t.id === this.activeTeamId)?.name || '', Date: m.date, DOW: window.supabaseService.scheduleDayOfWeek(m.date) || '', Time: m.time, Opponent: m.opponent, Location: m.location, Address: m.venueAddress || '', Home: m.isHome ? 'Home' : 'Away', Status: m.status, Score: m.score || '', IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE' }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'drills') {
             fileName = '5_Master_Drills_Library.xlsx'; sheetName = 'MasterDrills';
@@ -2136,7 +2136,7 @@ Object.assign(BHSSoccerApp.prototype, {
     if (type === 'schedule' || type === 'all') {
       const rows = (this.data.schedule || []).map(m => ({
         Date: m.date, DOW: window.supabaseService.scheduleDayOfWeek(m.date) || '', Time: m.time, Opponent: m.opponent,
-        Location: m.location, Home: m.isHome ? 'Home' : 'Away',
+        Location: m.location, Address: m.venueAddress || '', Home: m.isHome ? 'Home' : 'Away',
         Status: m.status, Score: m.score || '',
         IsDeleted: m.is_deleted || m.isDeleted ? 'TRUE' : 'FALSE'
       }));
@@ -2262,6 +2262,7 @@ Object.assign(BHSSoccerApp.prototype, {
         Date:'8-Dec | 09/Dec | Dec 8 2026 | 12/8/2026 | 2026-12-08',
         DOW:'derived from the date - not imported',
         Time:'', Opponent:'', Location:'blank = the opponent is used',
+        Address:'optional — street address; makes AWAY a directions link',
         Home:'Home or Away', Status:'UPCOMING or COMPLETED', Score:'', IsDeleted:'FALSE'
       }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
@@ -2868,10 +2869,13 @@ Object.assign(BHSSoccerApp.prototype, {
               // stadium — which is what "Home - Cougar Stadium" on every away
               // fixture was.
               location: opt(r.Location) ?? opt(r.Opponent),
-              // The Home column decides. Failing that, a Location written as
-              // "Home - ..." or "Away - ..." says the same thing, which is how
-              // the exported sheet writes it — so an export edited and
-              // re-imported keeps its home and away without a Home column.
+              // Left undefined when the sheet has no Address column, so an
+              // older schedule sheet cannot wipe addresses typed in the app.
+              // Present-but-empty DOES clear one, which is how a coach
+              // removes an address that turned out wrong.
+              ...(r.Address !== undefined
+                ? { venueAddress: toStr(r.Address).trim() || null }
+                : {}),
               // The Home column decides: that is the column that exists to
               // answer this, and it wins over everything else.
               //

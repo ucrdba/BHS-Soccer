@@ -508,6 +508,7 @@ class BHSSoccerApp {
           kickoffTime: s.kickoff_time || null,
           opponent: s.opponent,
           location: s.location,
+          venueAddress: s.venue_address || null,
           status: s.status,
           isHome: s.is_home,
           score: s.score,

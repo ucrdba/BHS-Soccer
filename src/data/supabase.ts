@@ -901,6 +901,11 @@ class SupabaseService {
       match_time: match.time || match.match_time,
       location: match.location,
       is_home: match.isHome,
+      // Only when the caller supplied it. A sheet with no Address column
+      // leaves venueAddress undefined, and sending an explicit null there
+      // would wipe addresses typed in the app -- the exact bug that cleared
+      // 25 JV uniform numbers when an import lacked a Number column.
+      ...(match.venueAddress !== undefined ? { venue_address: match.venueAddress || null } : {}),
       status: match.status,
       score: match.score || null,
       result: match.result || null,
