@@ -1946,3 +1946,67 @@ canvas { touch-action: none; max-width: 100%; }
   #plusMinusModal .pm-name { font-size: 0.9rem; max-width: 110px; }
   #plusMinusModal .pm-pitch .pm-chips { min-height: 38vh; }
 }
+
+/* ---------------------------------------------------------------------------
+   Plus / minus: the pitch drawn like the lineup one.
+
+   Same visual language as the lineup board — markings, players over them,
+   bench underneath, controls above — so the two screens read as the same
+   place rather than two different apps.
+   --------------------------------------------------------------------------- */
+
+#plusMinusModal .pm-pitch {
+  position: relative;
+  padding: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  background:
+    /* the halfway line */
+    linear-gradient(0deg, rgba(255,255,255,0.28) 0 2px, transparent 2px 100%) 0 50%/100% 2px no-repeat,
+    repeating-linear-gradient(0deg, #14532d 0 26px, #166534 26px 52px);
+  overflow: hidden;
+}
+
+/* The centre circle and the box. pointer-events:none is load-bearing, not
+   decoration: a pseudo-element is inserted as the LAST child, so without it
+   these paint over the chips and swallow every tap that lands on them — the
+   exact bug that made the lineup keeper unselectable. */
+#plusMinusModal .pm-pitch::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 118px; height: 118px; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.28); border-radius: 50%;
+  pointer-events: none;
+}
+#plusMinusModal .pm-pitch::after {
+  content: ''; position: absolute; left: 26%; right: 26%; bottom: 0; height: 54px;
+  border: 2px solid rgba(255, 255, 255, 0.28); border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  pointer-events: none;
+}
+
+/* Above the markings, so a chip is never hidden behind one. */
+#plusMinusModal .pm-pitch .pm-chips {
+  position: relative;
+  z-index: 1;
+  justify-content: center;
+  gap: 8px;
+}
+
+#plusMinusModal .pm-empty {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.86rem;
+  align-self: center;
+  margin: auto;
+}
+
+/* The label sits above its own box rather than inside it, so the pitch is
+   pitch all the way to its edge. */
+#plusMinusModal .pm-pitch-label { margin: 10px 0 4px; }
+#plusMinusModal .pm-pitch-label:first-of-type { margin-top: 0; }
+
+#plusMinusModal .pm-bench {
+  border: 1px solid var(--bhs-navy-border);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 10px;
+}

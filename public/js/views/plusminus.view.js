@@ -346,19 +346,23 @@ Object.assign(BHSSoccerApp.prototype, {
         <span class="pm-armed-hint">${armed ? 'Now tap the player' : 'Tap an event, then a player'}</span>
       </div>
 
+      <div class="pm-pitch-label">
+        ON THE PITCH &middot; ${on.length} / ${this.pmMaxOnPitch()}
+        <span class="pm-hint">tap +1 &middot; hold or two fingers &minus;1 &middot; drag to sub</span>
+      </div>
+
+      <!-- A drawn pitch rather than a green box, so the tracking screen reads
+           the same way as the lineup one: markings, then players on top of
+           them, then the bench underneath. -->
       <div class="pm-pitch" id="pmPitch">
-        <div class="pm-pitch-label">
-          ON THE PITCH &middot; ${on.length} / ${this.pmMaxOnPitch()}
-          <span class="pm-hint">tap +1 &middot; hold or two fingers &minus;1 &middot; drag to sub</span>
-        </div>
         <div class="pm-chips">
           ${on.map(id => byId.get(id)).filter(Boolean).map(p => chip(p, true)).join('')
-            || '<span class="text-muted" style="font-size:0.8rem;">Drag players here to start.</span>'}
+            || '<span class="pm-empty">Drag players onto the pitch to start.</span>'}
         </div>
       </div>
 
+      <div class="pm-pitch-label">SUBS &middot; ${squad.length - on.length}</div>
       <div class="pm-bench" id="pmBench">
-        <div class="pm-pitch-label">SUBS</div>
         <div class="pm-chips">
           ${squad.filter(p => !on.includes(p.id)).map(p => chip(p, false)).join('')
             || '<span class="text-muted" style="font-size:0.8rem;">Everyone is on.</span>'}
