@@ -481,6 +481,7 @@ Object.assign(BHSSoccerApp.prototype, {
             ${sessionTh('name', 'Player')}
             <th>${valueLabel}</th>
             <th>Attendance</th>
+            <th title="Remove this player's result from the session"></th>
           </tr>
         </thead>
         <tbody>
@@ -523,6 +524,11 @@ Object.assign(BHSSoccerApp.prototype, {
               <option value="excused"${att === 'excused' ? ' selected' : ''}>Excused</option>
               <option value="unexcused"${att === 'unexcused' ? ' selected' : ''}>No-show</option>
             </select>
+          </td>
+          <td>
+            <button type="button" class="session-clear" id="sessionClear_${p.id}"
+                    title="Remove ${p.name}'s result — counts for nothing either way"
+                    onclick="app.clearSessionEntry('${p.id}','${measure}')">&times;</button>
           </td>
         </tr>`; }).join('')}
         </tbody>
@@ -744,6 +750,31 @@ Object.assign(BHSSoccerApp.prototype, {
       att.value = typed ? 'present' : this.defaultSessionAttendance(measure);
     }
     // The banded exercises also show what the time earns as it is typed.
+    if (measure === 'time_bands') this.showBandEarned(playerId);
+  },
+
+  /**
+   * Take one player's result out of a session.
+   *
+   * Sets them EXCUSED, which is the state that means "this did not happen for
+   * them": an excused row appears in neither the earned nor the available
+   * column, so removing a mistaken entry costs the player nothing. Marking
+   * them no-show instead would score 0 of the weight — a penalty for the
+   * coach's typo.
+   *
+   * Not a confirmation: it is one click to undo by typing the value again, and
+   * nothing leaves the screen until the session is saved.
+   */
+  clearSessionEntry(playerId, measure) {
+    const val = document.getElementById('sessionValue_' + playerId);
+    if (val) val.value = '';
+    const out = document.getElementById('sessionOutcome_' + playerId);
+    if (out) out.value = '';
+    const att = document.getElementById('sessionAttend_' + playerId);
+    if (att) att.value = 'excused';
+
+    // The earned figure beside a banded row would otherwise still show what
+    // the deleted time was worth.
     if (measure === 'time_bands') this.showBandEarned(playerId);
   },
 

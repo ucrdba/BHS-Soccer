@@ -644,6 +644,25 @@
   max-width: 260px;
 }
 
+/* Removing one player's result. Quiet until reached for — it sits beside
+   twenty-five rows of data entry and must not compete with them — but a full
+   target, because it is used mid-flow on a phone. */
+.session-clear {
+  background: none;
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 5px 9px;
+}
+.session-clear:hover,
+.session-clear:focus-visible {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
 /* The row jumped to by the Find box. Fades out on its own, because the
    highlight answers "where did it go" and then stops being useful. */
 .session-row { transition: background-color 0.4s ease; }

@@ -177,3 +177,75 @@ describe('every measure is accounted for', () => {
     expect(app.defaultSessionAttendance('something_new')).toBe('present');
   });
 });
+
+describe("removing one player's result", () => {
+  /**
+   * Correcting a mistake in a session without deleting the whole session.
+   *
+   * The removed row is marked EXCUSED, which is the state meaning "this did
+   * not happen for them": excused appears in neither the earned nor the
+   * available column, so a mistaken entry costs the player nothing. Marking
+   * them no-show instead would score 0 of the weight — a penalty for the
+   * coach's typo, which is the opposite of a correction.
+   */
+  function grid(measure: string) {
+    const app = makeApp(measure);
+    document.body.innerHTML = '<table>' + app.renderSessionRows() + '</table>';
+    return app;
+  }
+  const val = (id: string) => (document.getElementById('sessionValue_' + id) as HTMLInputElement);
+  const att = (id: string) => (document.getElementById('sessionAttend_' + id) as HTMLSelectElement);
+
+  it('clears the value', () => {
+    const app = grid('time_bands');
+    val('p1').value = '4:15';
+    app.clearSessionEntry('p1', 'time_bands');
+    expect(val('p1').value).toBe('');
+  });
+
+  it('marks them excused, so the removal costs them nothing', () => {
+    // Not no-show: that scores 0 of the weight and would penalise a player for
+    // a coach's typo.
+    const app = grid('time_bands');
+    val('p1').value = '4:15';
+    app.clearSessionEntry('p1', 'time_bands');
+    expect(att('p1').value).toBe('excused');
+  });
+
+  it('leaves every other player alone', () => {
+    const app = grid('time_bands');
+    val('p1').value = '4:15';
+    val('p2').value = '4:20';
+    app.clearSessionEntry('p1', 'time_bands');
+    expect(val('p2').value).toBe('4:20');
+    expect(att('p2').value).not.toBe('excused');
+  });
+
+  it('clears the result on a win/draw/loss exercise too', () => {
+    const app = grid('win_loss');
+    (document.getElementById('sessionOutcome_p1') as HTMLSelectElement).value = 'win';
+    app.clearSessionEntry('p1', 'win_loss');
+    expect((document.getElementById('sessionOutcome_p1') as HTMLSelectElement).value).toBe('');
+    expect(att('p1').value).toBe('excused');
+  });
+
+  it('is undone by simply typing the value again', () => {
+    // Which is why it does not ask for confirmation.
+    const app = grid('time_bands');
+    val('p1').value = '4:15';
+    app.clearSessionEntry('p1', 'time_bands');
+    val('p1').value = '4:15';
+    app.onSessionValueInput('p1', 'time_bands');
+    expect(att('p1').value).toBe('present');
+  });
+
+  it('gives every row a remove button', () => {
+    grid('time_bands');
+    expect(document.querySelectorAll('.session-clear')).toHaveLength(2);
+  });
+
+  it('does not throw for a player who is not on screen', () => {
+    const app = grid('time_bands');
+    expect(() => app.clearSessionEntry('nobody', 'time_bands')).not.toThrow();
+  });
+});
