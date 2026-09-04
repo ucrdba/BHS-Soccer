@@ -517,6 +517,22 @@
     </div>
   </div>
 
+  <!-- Plus/minus live tracking. Used one-handed on a touchline while the
+       match is running, which is why the gestures are a tap and two fingers
+       rather than anything that needs a second look. -->
+  <div id="plusMinusModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 1100px;">
+      <div class="modal-header">
+        <h3>&#177; PLUS / MINUS</h3>
+        <button class="close-btn" onclick="app.closePlusMinus()">&times;</button>
+      </div>
+      <div id="plusMinusBody"></div>
+      <button class="btn btn-gold" style="width:100%; margin-top:10px;" onclick="app.printPlusMinus()">
+        &#128424; Print half-time / full-time sheet
+      </button>
+    </div>
+  </div>
+
   <!-- Player progress. Not the one-sheet card the squad report is: this is a
        document you read through, and a full squad runs to several pages. -->
   <div id="progressReportModal" class="modal-overlay">
@@ -1515,6 +1531,7 @@
   <script src="./js/views/roundrobin.view.js"></script>
   <script src="./js/views/report.view.js"></script>
   <script src="./js/views/progress.view.js"></script>
+  <script src="./js/views/plusminus.view.js"></script>
   <script src="./js/views/recording-numbers.view.js"></script>
   <script src="./js/views/lineup.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>

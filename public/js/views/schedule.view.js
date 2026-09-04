@@ -49,7 +49,10 @@ Object.assign(BHSSoccerApp.prototype, {
               <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 ${window.auth.isCoach() ? `<button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
                         title="Set the XI for this fixture and print the card"
-                        onclick="app.openLineupModal('${m.id}')">⚽ Lineup</button>` : ''}
+                        onclick="app.openLineupModal('${m.id}')">⚽ Lineup</button>
+                <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
+                        title="Track plus/minus live during this match"
+                        onclick="app.openPlusMinus('${m.id}')">± Plus/Minus</button>` : ''}
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="app.openEditMatchModal('${m.id}')">✏️ Edit</button>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger); border-color:rgba(239, 68, 68, 0.4);" onclick="app.deleteMatch('${m.id}')">🗑️ Delete</button>
               </div>

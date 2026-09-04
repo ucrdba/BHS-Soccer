@@ -1746,6 +1746,108 @@ class SupabaseService {
   }
 
   /**
+   * Find or start the tracking session for a fixture.
+   *
+   * Reopening a match must return the SAME row: a statistician whose phone
+   * died mid-half needs the events they already recorded, not a clean sheet.
+   * The partial unique index on (team_id, match_id) is what guarantees one.
+   */
+  async openStatMatch(
+    teamId: string, schoolId: string, matchId: string | null, label?: string
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!schoolId) return { ok: false, error: 'No organization for that team.' };
+
+    let q = this.client!
+      .from('stat_matches').select('id').eq('team_id', teamId).eq('is_deleted', false);
+    q = matchId && this.isUuid(matchId) ? q.eq('match_id', matchId) : q.is('match_id', null);
+
+    const { data: found, error: findErr } = await q.maybeSingle();
+    if (findErr) { console.warn('Supabase openStatMatch notice:', findErr.message); return { ok: false, error: findErr.message }; }
+    if (found?.id) return { ok: true, id: found.id };
+
+    const { data, error } = await this.client!
+      .from('stat_matches')
+      .insert([{
+        team_id: teamId, school_id: schoolId,
+        match_id: matchId && this.isUuid(matchId) ? matchId : null,
+        label: label || null, is_deleted: false
+      }])
+      .select();
+    if (error) { console.warn('Supabase openStatMatch insert notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || !data[0]) {
+      return { ok: false, error: 'The database refused that. You must coach this team.' };
+    }
+    return { ok: true, id: data[0].id };
+  }
+
+  /** Every event of a tracked match, oldest first. */
+  async fetchStatEvents(statMatchId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !statMatchId || !this.isUuid(statMatchId)) return null;
+    const { data, error } = await this.client!
+      .from('stat_events')
+      .select('id, kind, player_id, at_seconds, period, created_at')
+      .eq('match_id', statMatchId)
+      .eq('is_deleted', false)
+      .order('created_at');
+    if (error) { console.warn('Supabase fetchStatEvents notice:', error.message); return null; }
+    return (data || []).map(r => ({
+      id: r.id, kind: r.kind, playerId: r.player_id,
+      atSeconds: r.at_seconds, period: r.period, createdAt: r.created_at
+    }));
+  }
+
+  /**
+   * Append one event.
+   *
+   * Returns the stored id so the caller can undo exactly this event rather
+   * than "the most recent one", which is not the same thing once two devices
+   * are recording the same match.
+   */
+  async appendStatEvent(
+    statMatchId: string,
+    event: { kind: string; playerId?: string | null; atSeconds: number; period?: number }
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!statMatchId || !this.isUuid(statMatchId)) return { ok: false, error: 'No match is being tracked.' };
+
+    const { data, error } = await this.client!
+      .from('stat_events')
+      .insert([{
+        match_id: statMatchId,
+        kind: event.kind,
+        player_id: event.playerId || null,
+        at_seconds: Math.max(0, Math.round(Number(event.atSeconds) || 0)),
+        period: event.period || 1,
+        is_deleted: false
+      }])
+      .select();
+
+    if (error) { console.warn('Supabase appendStatEvent notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || !data[0]) {
+      return { ok: false, error: 'The database refused that event. You must coach this team.' };
+    }
+    return { ok: true, id: data[0].id };
+  }
+
+  /**
+   * Undo one event.
+   *
+   * Soft-deleted rather than removed, so a mis-tap and its correction are both
+   * still in the record — which is the point of an append-only log.
+   */
+  async undoStatEvent(eventId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!eventId || !this.isUuid(eventId)) return { ok: false, error: 'Nothing to undo.' };
+    const { data, error } = await this.client!
+      .from('stat_events').update({ is_deleted: true }).eq('id', eventId).select();
+    if (error) { console.warn('Supabase undoStatEvent notice:', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) return { ok: false, error: 'The database refused that undo.' };
+    return { ok: true };
+  }
+
+  /**
    * Every recorded session result for a team, with the date it happened.
    *
    * One query rather than one per session: a season is a few dozen sessions,

@@ -1,5 +1,6 @@
 // src/main.ts
 import { supabaseService } from './data/supabase';
+import * as plusMinus from './data/plus-minus';
 import { buildInfo, formatBuildStamp, buildStampTitle } from './build-info';
 import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
@@ -74,6 +75,16 @@ window.authReady = supabaseService.completeEmailLink()
 
 window.can = can;
 
+
+/**
+ * The plus/minus replay engine, for the classic scripts.
+ *
+ * It lives in a module because it is pure logic worth testing directly, and
+ * public/js/ cannot import — so it is published the same way the database
+ * client is. Every statistic on the tracking screen is derived through this;
+ * nothing recomputes it independently.
+ */
+(window as any).plusMinus = plusMinus;
 
 /**
  * Show which build is serving this page, in the footer.

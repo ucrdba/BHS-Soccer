@@ -117,6 +117,10 @@ declare global {
     fetchLineup(teamId: string, matchId?: string | null): Promise<Record<string, any> | null>;
     fetchTeamLineups(teamId: string): Promise<Record<string, any>[] | null>;
     fetchTeamSessionHistory(teamId: string): Promise<Record<string, any>[] | null>;
+    openStatMatch(teamId: string, schoolId: string, matchId: string | null, label?: string): Promise<{ ok: boolean; error?: string; id?: string }>;
+    fetchStatEvents(statMatchId: string): Promise<Record<string, any>[] | null>;
+    appendStatEvent(statMatchId: string, event: { kind: string; playerId?: string | null; atSeconds: number; period?: number }): Promise<{ ok: boolean; error?: string; id?: string }>;
+    undoStatEvent(eventId: string): Promise<{ ok: boolean; error?: string }>;
     saveLineup(teamId: string, schoolId: string, matchId: string | null, formation: string, players: Record<string, any>[], notes?: string | null): Promise<{ ok: boolean; error?: string; id?: string }>;
     searchPlayersByName(query: string): Promise<Record<string, any>[] | null>;
     // Paper Matrix sheets carry a recording number rather than a name,
@@ -166,6 +170,8 @@ declare global {
     // Third-party UMD globals, loaded via CDN <script> tags in index.html.
     XLSX?: any;
     JSZip?: any;
+    /** The plus/minus replay engine, published for public/js/. */
+    plusMinus?: any;
   }
 
 }

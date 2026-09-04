@@ -1747,3 +1747,99 @@ canvas { touch-action: none; max-width: 100%; }
    that carries the answer. */
 #progressReportBody .trend-better { color: var(--bhs-cyan-accent); }
 #progressReportBody .trend-worse { color: var(--bhs-gold-accent); }
+
+/* ---------------------------------------------------------------------------
+   Plus / minus live tracking.
+
+   Used one-handed on a touchline while a match runs. Every target is thumb
+   sized, nothing important is small, and the numbers are tabular so a column
+   can be read down without the digits shifting.
+   --------------------------------------------------------------------------- */
+
+.pm-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: space-between; margin-bottom: 10px;
+}
+
+.pm-clock {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 108px; min-height: 56px; padding: 6px 14px;
+  background: var(--bhs-navy-card); border: 2px solid var(--bhs-navy-border);
+  border-radius: 10px; color: #FFF; cursor: pointer; font: inherit;
+}
+.pm-clock.running { border-color: var(--bhs-cyan-accent); }
+.pm-time { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.pm-clocklabel { font-size: 0.66rem; text-transform: uppercase; color: var(--text-muted); }
+
+.pm-score-box { display: flex; align-items: center; gap: 10px; }
+.pm-scoreline { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #FFF; }
+
+.pm-goal {
+  min-height: 48px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;
+  border: 2px solid var(--bhs-navy-border); background: none; color: var(--text-main);
+}
+.pm-goal.us:hover, .pm-goal.us:focus-visible { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.pm-goal.them:hover, .pm-goal.them:focus-visible { border-color: var(--color-danger); color: var(--color-danger); }
+
+.pm-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pm-small { padding: 8px 12px; font-size: 0.76rem; min-height: 44px; }
+
+.pm-events { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+
+.pm-event {
+  min-height: 48px; min-width: 88px; padding: 8px 16px;
+  border: 2px solid var(--bhs-navy-border); border-radius: 8px;
+  background: none; color: var(--text-main); font: inherit;
+  font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+}
+/* An armed event is unmistakable: the next tap goes somewhere different from
+   where it would have gone a second ago, and that has to be obvious at a
+   glance while looking at the pitch rather than the phone. */
+.pm-event.armed {
+  background: var(--bhs-gold-accent); color: var(--text-dark);
+  border-color: var(--bhs-gold-accent);
+}
+.pm-armed-hint { font-size: 0.76rem; color: var(--text-muted); }
+
+.pm-pitch, .pm-bench {
+  border: 1px solid var(--bhs-navy-border); border-radius: 10px;
+  padding: 8px; margin-bottom: 10px;
+}
+.pm-pitch { background: repeating-linear-gradient(0deg, #14532d 0 14px, #166534 14px 28px); }
+.pm-bench { background: rgba(0, 0, 0, 0.25); }
+
+.pm-pitch-label {
+  font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7); margin-bottom: 6px;
+}
+
+.pm-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 52px; }
+
+.pm-chip {
+  display: flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 6px 10px;
+  border: 2px solid var(--bhs-navy-border); border-radius: 8px;
+  background: rgba(10, 20, 40, 0.85); color: #FFF; font: inherit; cursor: pointer;
+  /* Or the browser claims the gesture for scrolling and the drag never starts,
+     and a two-finger press pinch-zooms the page instead of counting a minus. */
+  touch-action: none;
+}
+.pm-chip.on { border-color: var(--bhs-cyan-accent); }
+.pm-chip.dragging { opacity: 0.5; }
+
+.pm-num { font-weight: 700; color: var(--bhs-gold-accent); font-variant-numeric: tabular-nums; }
+.pm-name { font-size: 0.82rem; white-space: nowrap; }
+.pm-score { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.pm-table { margin-top: 6px; font-size: 0.82rem; }
+
+@media (max-width: 640px) {
+  /* The clock and the two goal buttons are what get pressed in a hurry, so
+     they keep their size; everything else gives way around them. */
+  .pm-bar { gap: 8px; }
+  .pm-score-box { order: -1; width: 100%; justify-content: space-between; }
+  .pm-event { min-width: 0; flex: 1; padding: 8px 6px; font-size: 0.78rem; }
+  .pm-name { max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
+  .pm-table { font-size: 0.74rem; }
+}
