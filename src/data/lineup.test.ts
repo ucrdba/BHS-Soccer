@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
+import cssSrc from '../../styles.css?raw';
 
 let ctor: any;
 
@@ -832,5 +833,66 @@ describe('applying one lineup to every fixture', () => {
 
     await app.applyLineupToAllFixtures();
     expect(document.getElementById('lineupError')!.textContent).toContain('failed');
+  });
+});
+
+describe("how much of the squad the list shows", () => {
+  /**
+   * Reported: "there is more room to list more students instead of scrolling
+   * so much."
+   *
+   * The pitch renders at a 2:3 ratio in a 604px column inside a 980px modal,
+   * so it stands about 906px tall. The squad list beside it was capped at
+   * 52vh — around 500px — which left roughly 400px of dead space next to the
+   * pitch while the list scrolled inside its own box: about 13 rows of a
+   * 26-player squad.
+   *
+   * jsdom does no layout, so these read the stylesheet. That is the right
+   * level anyway: what broke was a declaration, not a computed pixel.
+   */
+  const css = cssSrc;
+
+  const rule = (selector: string) => {
+    const i = css.indexOf(selector + ' {');
+    if (i === -1) return '';
+    return css.slice(i, css.indexOf('}', i));
+  };
+
+  it("no longer caps the list at a fraction of the viewport", () => {
+    // The cap is what created the dead space; the row height is set by the
+    // pitch beside it, which is the whole point.
+    expect(rule('.lineup-squad')).not.toContain('52vh');
+  });
+
+  it("lets the list grow into the row the pitch defines", () => {
+    expect(rule('.lineup-squad')).toMatch(/flex:\s*1 1 auto/);
+  });
+
+  it("still scrolls once the squad outgrows even that", () => {
+    // Filling the row is not the same as showing everyone: a 40-player squad
+    // must still scroll rather than stretch the modal.
+    expect(rule('.lineup-squad')).toContain('overflow-y: auto');
+  });
+
+  it("allows both the column and the list to shrink below their content", () => {
+    // The load-bearing pair. A flex item defaults to min-height:auto, which
+    // refuses to shrink below its content — so without these the list pushes
+    // the column taller instead of scrolling inside it, and the modal grows
+    // to the length of the whole squad.
+    expect(rule('.lineup-side')).toContain('min-height: 0');
+    expect(rule('.lineup-squad')).toContain('min-height: 0');
+    expect(rule('.lineup-side')).toContain('flex-direction: column');
+  });
+
+  it("keeps a cap on a phone, where nothing sits beside it", () => {
+    // Stacked, the list has no pitch to take its height from. Uncapped it
+    // would run the full length of the squad and bury the pitch above it.
+    const mobile = css.slice(css.lastIndexOf('.lineup-squad'));
+    expect(mobile).toContain('40vh');
+  });
+
+  it("gives the side column a class to hang the layout on", () => {
+    // It was a bare <div>, which no rule could target.
+    expect(lineupSrc).toContain('class="lineup-side"');
   });
 });
