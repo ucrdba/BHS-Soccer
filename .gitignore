@@ -119,6 +119,17 @@ scratch/
 # Useful locally, not something the repo should carry.
 Resouces/CSV/dummyData/
 
+# Real roster data — these carry the actual squad's names, and most of the
+# players are minors. The blank templates beside them are tracked on purpose;
+# what is excluded here is the filled-in kind. Note FR-SO-BHS_Player_Template
+# is named like a template but holds a real Fr/So roster, which is exactly why
+# it is listed by name rather than trusting the naming convention.
+Resouces/CSV/Jr Varsity.xlsx
+Resouces/CSV/Recording Numbers.xlsx
+Resouces/CSV/FR-SO-BHS_Player_Template.xlsx
+Resouces/CSV/varsity_roster_export.csv
+Resouces/CSV/*_roster_export.csv
+
 # Local reference material and scratch assets — source documents for the daily
 # thoughts and quiz content, ad-hoc account-admin notes, and a stray image.
 # The app reads none of them; the content that ships lives in Postgres.
