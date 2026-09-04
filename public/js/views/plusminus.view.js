@@ -383,16 +383,46 @@ Object.assign(BHSSoccerApp.prototype, {
     body.dataset.pmBound = '1';
 
     let drag = null;
-    let multiTouch = false;
+    // Set when a gesture has already been recorded, so the pointer events that
+    // follow the same finger-down do not record it a second time.
+    let handled = false;
 
-    // Touch tells us how many fingers landed; pointer events do not, and the
-    // count is what separates plus from minus.
+    /**
+     * Two fingers is a minus, and it fires HERE — the moment the second finger
+     * lands, against the player under the first.
+     *
+     * The first version only remembered "two fingers happened" and left the
+     * decision to the next pointerup. Two fingers therefore did nothing at the
+     * time and turned the NEXT single tap into a minus — against whichever
+     * player was touched next, which is not even the same player.
+     *
+     * Pointer events do not report how many fingers are down, which is why
+     * this is a touch listener; elementFromPoint rather than e.target because
+     * the second finger may land on a different element from the first, and
+     * the first is the one that identifies the player being marked.
+     */
     body.addEventListener('touchstart', (e) => {
-      if (e.touches && e.touches.length >= 2 && e.target.closest('.pm-chip')) {
-        multiTouch = true;
-        e.preventDefault();
-      }
+      if (!e.touches || e.touches.length < 2) return;
+      const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      const chip = el && el.closest ? el.closest('.pm-chip') : null;
+      if (!chip) return;
+
+      // Or the browser pinch-zooms the page instead of counting a minus.
+      e.preventDefault();
+      handled = true;
+
+      // A drag may have begun on the first finger. Abandon it: two fingers is
+      // a minus, not a substitution.
+      if (drag) { drag.chip.classList.remove('dragging'); drag = null; }
+
+      this.pmTapPlayer(chip.dataset.playerId, { fingers: 2 });
     }, { passive: false });
+
+    // Only once every finger has lifted, or the second finger coming up would
+    // re-arm the tap path while the first is still down.
+    body.addEventListener('touchend', (e) => {
+      if (!e.touches || e.touches.length === 0) handled = false;
+    });
 
     // The minus gesture on a desktop. Without suppressing the menu, a
     // right-click opens the browser's context menu over the pitch.
@@ -428,6 +458,10 @@ Object.assign(BHSSoccerApp.prototype, {
       d.chip.classList.remove('dragging');
       try { d.chip.releasePointerCapture(e.pointerId); } catch (_) {}
 
+      // The two-finger minus already fired. Without this the finger coming up
+      // would add a plus on top of it.
+      if (handled) return;
+
       if (d.moved) {
         const under = document.elementFromPoint(e.clientX, e.clientY);
         const toPitch = !!(under && under.closest && under.closest('#pmPitch'));
@@ -436,15 +470,13 @@ Object.assign(BHSSoccerApp.prototype, {
         return;
       }
 
-      const fingers = multiTouch ? 2 : 1;
-      multiTouch = false;
-      this.pmTapPlayer(d.playerId, { fingers });
+      this.pmTapPlayer(d.playerId, { fingers: 1 });
     };
 
     body.addEventListener('pointerup', finish);
     body.addEventListener('pointercancel', () => {
       if (drag) drag.chip.classList.remove('dragging');
-      drag = null; multiTouch = false;
+      drag = null;
     });
   },
 
