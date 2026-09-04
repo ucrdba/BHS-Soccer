@@ -172,3 +172,105 @@ describe('reading home or away from the sheet', () => {
     expect(readHome({ Location: 'Cougar Stadium' })).toBeUndefined();
   });
 });
+
+describe('what fills the venue', () => {
+  /**
+   * The rule the coach set: the Home column says home or away. The Location
+   * says WHERE — and when it is blank the opponent stands in, because the
+   * opponent is something the sheet actually states.
+   *
+   * That is the difference from what this replaced: "Home - Cougar Stadium" on
+   * every fixture was invented, and contradicted the badge beside it. An
+   * opponent name is never invented.
+   */
+  const opt = (v) => (v === undefined || v === null || String(v).trim() === '' ? undefined : v);
+  const venue = (row) => opt(row.Location) ?? opt(row.Opponent);
+
+  it('uses the venue the coach wrote', () => {
+    expect(venue({ Location: 'Cougar Stadium', Opponent: 'Redlands' })).toBe('Cougar Stadium');
+  });
+
+  it('falls back to the opponent when the venue is blank', () => {
+    expect(venue({ Location: '', Opponent: 'Redlands' })).toBe('Redlands');
+  });
+
+  it('falls back when the column is missing entirely', () => {
+    expect(venue({ Opponent: 'Redlands' })).toBe('Redlands');
+  });
+
+  it('treats a cell of spaces as blank', () => {
+    expect(venue({ Location: '   ', Opponent: 'Redlands' })).toBe('Redlands');
+  });
+
+  it('gives nothing when neither is stated', () => {
+    // A fixture with no opponent is not imported at all, so this is the
+    // boundary rather than a case that reaches a card.
+    expect(venue({})).toBeUndefined();
+  });
+});
+
+describe('home or away, once the opponent can fill the venue', () => {
+  /**
+   * The Home column decides. The Location fallback reads what the COACH wrote,
+   * never the opponent standing in for a blank one — an opponent name says
+   * nothing about which ground the fixture is played on, and reading it as a
+   * venue prefix would start guessing again.
+   */
+  const opt = (v) => (v === undefined || v === null || String(v).trim() === '' ? undefined : v);
+  const readHome = (row) => {
+    const h = opt(row.Home);
+    if (h !== undefined) return String(h).trim().toLowerCase() !== 'away';
+    const written = String(opt(row.Location) ?? '').trim().toLowerCase();
+    if (written.startsWith('home')) return true;
+    if (written.startsWith('away')) return false;
+    return undefined;
+  };
+
+  it('takes home and away from the Home column', () => {
+    expect(readHome({ Home: 'Home', Opponent: 'Redlands' })).toBe(true);
+    expect(readHome({ Home: 'Away', Opponent: 'Redlands' })).toBe(false);
+  });
+
+  it('still reads an exported venue when there is no Home column', () => {
+    expect(readHome({ Location: 'Away - Redlands HS' })).toBe(false);
+  });
+
+  it('does not read the opponent as a venue prefix', () => {
+    // "Homestead High" starts with "Home" and is an OPPONENT, not a venue.
+    // Reading the resolved venue rather than the written one would call an
+    // away fixture at Homestead a home game.
+    expect(readHome({ Location: '', Opponent: 'Homestead High' })).toBeUndefined();
+  });
+
+  it('leaves it unstated when nothing says', () => {
+    expect(readHome({ Opponent: 'Redlands' })).toBeUndefined();
+  });
+});
+
+describe('the mapping admin.js actually ships', () => {
+  /**
+   * The five cases above exercise the RULE. These two read the shipped source,
+   * because the rule lives inside a 200-line import routine that cannot be
+   * called in isolation — so without these, the rule could be right and the
+   * importer could still do something else entirely.
+   */
+
+  /** The schedule row mapping, from `date:` to the end of that object. */
+  const mapping = (() => {
+    const i = adminSrc.indexOf('date: window.supabaseService.parseScheduleDate');
+    return adminSrc.slice(i, adminSrc.indexOf('};', i));
+  })();
+
+  it('falls the venue back to the opponent', () => {
+    expect(mapping).toContain('location: opt(r.Location) ?? opt(r.Opponent)');
+  });
+
+  it('reads home and away from the written Location, not the resolved venue', () => {
+    // The isHome fallback must look at r.Location. If it were refactored to
+    // read the resolved venue, an away fixture against "Homestead High" would
+    // import as a home game.
+    const isHome = mapping.slice(mapping.indexOf('isHome:'));
+    expect(isHome).toContain("String(opt(r.Location) ?? '')");
+    expect(isHome).not.toContain('opt(r.Opponent)');
+  });
+});
