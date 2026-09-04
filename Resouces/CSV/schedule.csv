@@ -1,6 +1,0 @@
-id,school_id,match_date,match_time,opponent,location,status,is_home,score,result,created_at,is_deleted
-2843f7b5-4b29-4cdb-ad50-6c326103accc,7ebbe980-b87e-421f-a11f-788ca2519504,"AUG 18, 2026",5:00 PM,Citrus Valley Blackhawks,"Away - Redlands, CA",UPCOMING,false,,,2026-08-06 21:57:36.054420 +00:00,false
-693174f4-2a35-4c50-9bd7-5a7fbcfee600,7ebbe980-b87e-421f-a11f-788ca2519504,"JUL 28, 2026",FINAL,Redlands East Valley,Home - Cougar Stadium,COMPLETED,true,3 - 1,WIN,2026-08-06 21:57:36.108724 +00:00,false
-f3d59ea7-edb4-4e24-9907-f35ccc91fdc0,7ebbe980-b87e-421f-a11f-788ca2519504,"JUL 22, 2026",FINAL,Palm Springs Indians,Away - Palm Springs,COMPLETED,false,2 - 0,WIN,2026-08-06 21:57:36.145482 +00:00,false
-4e2c3ade-4b67-459f-8f9f-bd7287bdc86e,7ebbe980-b87e-421f-a11f-788ca2519504,"AUG 26, 2026",6:00 PM,Rev ,Home - Cougar Stadium,UPCOMING,true,,,2026-08-06 22:35:09.374578 +00:00,false
-b686e830-6e49-4466-b9ae-94ed21f021fe,7ebbe980-b87e-421f-a11f-788ca2519504,"AUG 7, 2026",6:30 PM,Yucaipa Thunderbirds,Home - Cougar Stadium,UPCOMING,true,,,2026-08-06 21:57:36.013989 +00:00,false

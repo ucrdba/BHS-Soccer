@@ -115,20 +115,21 @@ sitemap.xml.gz
 .gemini/
 scratch/
 
-# Throwaway test fixtures — invented names, seeded accounts with known passwords.
-# Useful locally, not something the repo should carry.
-Resouces/CSV/dummyData/
-
-# Real roster data — these carry the actual squad's names, and most of the
-# players are minors. The blank templates beside them are tracked on purpose;
-# what is excluded here is the filled-in kind. Note FR-SO-BHS_Player_Template
-# is named like a template but holds a real Fr/So roster, which is exactly why
-# it is listed by name rather than trusting the naming convention.
-Resouces/CSV/Jr Varsity.xlsx
-Resouces/CSV/Recording Numbers.xlsx
-Resouces/CSV/FR-SO-BHS_Player_Template.xlsx
-Resouces/CSV/varsity_roster_export.csv
-Resouces/CSV/*_roster_export.csv
+# Local working data — the whole directory, not a list of files.
+#
+# It holds rosters, exports, import templates and reference downloads. The
+# rosters carry the actual squad's names and most of those players are minors,
+# and the reference downloads are large third-party files that are stale the
+# moment they land. Nothing in the codebase reads any of it: the app's data
+# lives in Postgres, and the shapes these files mirror are defined by the
+# import/export code in public/js/admin.js.
+#
+# Excluding the directory rather than naming files was a deliberate change of
+# approach. Naming them meant every new spreadsheet a coach dropped here was
+# untracked-and-visible until someone judged it, and a file called
+# FR-SO-BHS_Player_Template turned out to hold a real roster — so the naming
+# convention was not a safe filter. Default to out.
+Resouces/CSV/
 
 # Local reference material and scratch assets — source documents for the daily
 # thoughts and quiz content, ad-hoc account-admin notes, and a stray image.
@@ -137,16 +138,7 @@ Resouces/CSV/*_roster_export.csv
 # The account-admin files are working notes rather than runnable SQL, and they
 # name real people by email address. That is the reason they stay out: git
 # history is permanent, and a repo is a poor place to keep a coach's address.
-#
-# pubschls.xlsx is the California Department of Education's public school
-# directory (https://www.cde.ca.gov/ds/si/ds/pubschls.asp) — ~9 MB of third-
-# party data, re-downloadable in one request, and stale the moment it lands.
-# It was the source for the away-venue addresses, and those are already
-# captured where they matter: in the database, and in the script under
-# Resouces/SQL/ that put them there. Carrying the whole directory in git
-# would add a large binary that nothing reads.
 Resouces/Thoughts4TheDay/
-Resouces/CSV/pubschls.xlsx
 Resouces/SQL/resetPassword.sql
 Resouces/SQL/removeUser.sql
 assets/soccerPlayer.png

@@ -1,6 +1,0 @@
-id,school_id,name,email,role,status,team_level,player_id,avatar_url,created_at,is_deleted
-7ee8125b-e4c4-462e-8adf-544231e21568,7ebbe980-b87e-421f-a11f-788ca2519504,Coach Bob,headcoach@beaumont.edu,coach,active,Boys Varsity Staff,,assets/bhs_cougars_logo.png,2026-08-07 01:49:54.227795 +00:00,false
-6b868f4c-3a42-4a88-8bf0-e7541ff533bf,7ebbe980-b87e-421f-a11f-788ca2519504,Alex Rivera (#10),arivera@beaumont.edu,player,active,Boys Varsity Player,,assets/bhs_cougars_logo.png,2026-08-07 01:49:54.284434 +00:00,false
-91a73ccc-c9ce-4d1c-8092-19960426a2ce,7ebbe980-b87e-421f-a11f-788ca2519504,Admin Sam (Athletic Dir.),admin@bhs-sports.org,admin,active,All Teams Staff,,assets/bhs_cougars_logo.png,2026-08-07 01:49:54.328697 +00:00,false
-b72c3408-ea0c-4926-b130-84f70bee44c3,7ebbe980-b87e-421f-a11f-788ca2519504,Public Visitor,guest@cougars-fan.com,guest,active,Fan / Public,,assets/bhs_cougars_logo.png,2026-08-07 01:49:54.372213 +00:00,false
-f9a568e5-3b28-4f77-a6d7-f959f3216bad,7ebbe980-b87e-421f-a11f-788ca2519504,"Bob Ayers, Goalie Coach",ucrdba@gmail.com,coach,pending_verification,Boys Varsity Staff,,assets/bhs_cougars_logo.png,2026-08-09 23:13:19.520400 +00:00,false
