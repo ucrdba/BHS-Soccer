@@ -6,6 +6,35 @@
 
 Object.assign(BHSSoccerApp.prototype, {
 
+  /**
+   * A fixture date, as text, whatever is actually stored.
+   *
+   * A date-typed cell in a spreadsheet is a NUMBER underneath — days since
+   * 1899-12-30 — so a row that reached the database before the importer
+   * understood that holds "46365" rather than a date. Rendering it raw shows a
+   * five-digit number where a date belongs, and the fixture looks corrupted
+   * even though the day is recoverable.
+   *
+   * Everything is put through the same reader the importer uses, so display
+   * and import can never disagree about what a stored value means. Anything
+   * unreadable is shown as written rather than blanked: a coach can correct
+   * what they can see.
+   */
+  displayMatchDate(value) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw) return '';
+    const normal = window.supabaseService?.parseScheduleDate
+      ? window.supabaseService.parseScheduleDate(raw)
+      : null;
+    if (!normal) return raw;
+
+    // "DEC 8 2026" with the day of the week, which is what the schedule is
+    // read for — a coach checks which day a fixture falls on far more often
+    // than the date itself.
+    const dow = window.supabaseService.scheduleDayOfWeek(normal);
+    return dow ? `${normal} (${dow})` : normal;
+  },
+
   renderScheduleView() {
     const label = this.activeTeamLabel();
     const isCoachOrAdmin = true; // Always enable schedule management
@@ -27,7 +56,7 @@ Object.assign(BHSSoccerApp.prototype, {
           ${(this.data.schedule || []).filter(m => !m.is_deleted && !m.isDeleted).map(m => `
             <div class="schedule-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px 18px; border-radius: 10px;">
               <div class="game-date" style="min-width:120px;">
-                <strong style="color:var(--bhs-gold-accent); font-size:1rem; display:block;">${m.date}</strong>
+                <strong style="color:var(--bhs-gold-accent); font-size:1rem; display:block;">${this.displayMatchDate(m.date)}</strong>
                 <div class="time text-muted" style="font-size:0.82rem;">⏱️ ${m.time}</div>
               </div>
               <div class="game-matchup" style="flex:1; min-width:180px;">
@@ -253,7 +282,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     this.showConfirmModal({
       title: '🗑️ DELETE MATCH',
-      message: `Are you sure you want to delete the match vs "${match.opponent}" on ${match.date}?`,
+      message: `Are you sure you want to delete the match vs "${match.opponent}" on ${this.displayMatchDate(match.date)}?`,
       confirmText: '🗑️ Delete Match',
       confirmClass: 'btn-danger',
       onConfirm: async () => {

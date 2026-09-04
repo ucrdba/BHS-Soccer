@@ -238,3 +238,32 @@ describe('deriving the day of the week', () => {
     expect(dow('')).toBeNull();
   });
 });
+
+describe('a serial that arrived as text', () => {
+  /**
+   * The case that prompted this: the Date column really was a date type, but
+   * once through a CSV or a text database column it is a bare number. Rendered
+   * raw it shows five digits where a date belongs, and the fixture looks
+   * corrupted even though the day is recoverable.
+   */
+  const serial = String(Math.round(
+    (Date.UTC(2026, 11, 8) - Date.UTC(1899, 11, 30)) / 86400000));
+
+  it('reads a five-digit string as a spreadsheet date', () => {
+    expect(parse(serial, SEP_2026)).toBe('DEC 8 2026');
+  });
+
+  it('agrees with the same value as a number', () => {
+    expect(parse(serial, SEP_2026)).toBe(parse(Number(serial), SEP_2026));
+  });
+
+  it('does not mistake a bare year for one', () => {
+    // A year is four digits, a serial is five. "2026" alone is not a date.
+    expect(parse('2026', SEP_2026)).toBeNull();
+  });
+
+  it('does not mistake a small number for one', () => {
+    expect(parse('7', SEP_2026)).toBeNull();
+    expect(parse('812', SEP_2026)).toBeNull();
+  });
+});

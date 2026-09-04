@@ -347,7 +347,8 @@ Object.assign(BHSSoccerApp.prototype, {
     if (!row.match_id) return 'Default lineup';
     const m = (this.data.schedule || []).find(x => x.id === row.match_id);
     if (!m) return 'A past fixture';
-    return `${m.opponent || 'Opponent'} — ${m.date || ''}`.trim();
+    const when = this.displayMatchDate ? this.displayMatchDate(m.date) : (m.date || '');
+    return `${m.opponent || 'Opponent'} — ${when}`.trim();
   },
 
   /** The lineups worth offering as a starting point: every one but this one. */
@@ -829,7 +830,9 @@ Object.assign(BHSSoccerApp.prototype, {
       <div class="head">
         <h1>${esc(label.org || '')} ${esc(label.team || '')}</h1>
         <div class="meta">
-          ${match ? esc(match.opponent) + ' &middot; ' + esc(match.date) + '<br />' : ''}
+          ${match ? esc(match.opponent) + ' &middot; '
+              + esc(this.displayMatchDate ? this.displayMatchDate(match.date) : match.date)
+              + '<br />' : ''}
           ${esc(formation)} &middot; ${new Date().toLocaleDateString()}
         </div>
       </div>

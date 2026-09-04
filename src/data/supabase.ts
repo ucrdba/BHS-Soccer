@@ -1487,6 +1487,18 @@ class SupabaseService {
       return i === -1 ? 0 : i + 1;
     };
 
+    // A spreadsheet serial that reached storage as TEXT — which is how it
+    // arrives once a date-typed cell has been through a CSV or a database
+    // column. Exactly five digits: that is 1927 to 2173, and no date written
+    // any other way is five digits with nothing else. A bare year is four, so
+    // it cannot be caught here.
+    if (/^\d{5}$/.test(raw)) {
+      const d = new Date(Date.UTC(1899, 11, 30) + Number(raw) * 86400000);
+      if (!isNaN(d.getTime())) {
+        return fromParts(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+      }
+    }
+
     // 2026-12-08
     let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
     if (m) return fromParts(Number(m[1]), Number(m[2]), Number(m[3]));
