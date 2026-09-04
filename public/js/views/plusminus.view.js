@@ -393,6 +393,72 @@ Object.assign(BHSSoccerApp.prototype, {
     await this.pmAppend(drop.kind, playerId);
   },
 
+  // ── Starting from the lineup ─────────────────────────────────────────────
+
+  /**
+   * Which starters a saved lineup puts on the pitch, and where.
+   *
+   * Pure, so the rules can be tested without a database: what counts as a
+   * starter, where they stand, and how many are taken.
+   *
+   * x/y is preferred when the lineup has it — the coach may have nudged a
+   * player off their slot — and the formation's own slot position is the
+   * fallback, so a lineup saved before positions were stored still lays out
+   * correctly rather than piling everyone at the origin.
+   */
+  pmStartersFromLineup(lineup) {
+    if (!lineup) return [];
+    const slots = this.lineupSlots(lineup.formation || '4-4-2');
+    const bySlot = new Map(slots.map(s => [s.slot, s]));
+
+    return (lineup.players || [])
+      .filter(r => r && r.player_id && r.role !== 'bench')
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .slice(0, this.pmMaxOnPitch())
+      .map(r => {
+        const fallback = bySlot.get(r.slot);
+        const x = r.x != null ? Number(r.x) : (fallback ? fallback.x : 50);
+        const y = r.y != null ? Number(r.y) : (fallback ? fallback.y : 50);
+        return { playerId: r.player_id, ...this.pmClampPosition(x, y) };
+      });
+  },
+
+  /**
+   * Put the saved lineup on the pitch.
+   *
+   * Only for a match nobody has started: the check is whether ANY player has
+   * ever been sent on, not who is on now — a match where everyone was
+   * substituted off is finished, not empty, and repopulating it would put
+   * eleven players back on at full time.
+   *
+   * The fixture's own lineup wins over the default one, because a coach who
+   * set a lineup for this match meant it for this match.
+   */
+  async pmSeedFromLineup() {
+    if ((this._pmEvents || []).some(e => e.kind === 'on')) return false;
+    if (!window.supabaseService?.isConfigured() || !this.activeTeamId) return false;
+
+    const lineup =
+      (await window.supabaseService.fetchLineup(this.activeTeamId, this._pmMatchFixture))
+      || (this._pmMatchFixture
+            ? await window.supabaseService.fetchLineup(this.activeTeamId, null)
+            : null);
+
+    const starters = this.pmStartersFromLineup(lineup);
+    if (starters.length === 0) return false;
+
+    this._pmFormation = (lineup && lineup.formation) || this._pmFormation || '';
+    // Positions first, so each player is drawn where they belong the moment
+    // they appear rather than jumping there afterwards.
+    if (!this._pmPos) this._pmPos = {};
+    starters.forEach(p => { this._pmPos[p.playerId] = { x: p.x, y: p.y }; });
+    this.pmSavePositions();
+
+    for (const p of starters) await this.pmAppend('on', p.playerId);
+    return true;
+  },
+
   // ── Opening ──────────────────────────────────────────────────────────────
 
   async openPlusMinus(matchId) {
@@ -427,6 +493,10 @@ Object.assign(BHSSoccerApp.prototype, {
     // Re-read now the match id is known: the storage key depends on it, and
     // the first read used the fixture id or nothing.
     this.pmLoadPositions();
+
+    // A match nobody has started begins from the coach's lineup, so the
+    // statistician is not arranging eleven players at kickoff.
+    await this.pmSeedFromLineup();
 
     this.renderPlusMinus();
     const modal = document.getElementById('plusMinusModal');

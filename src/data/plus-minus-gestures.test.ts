@@ -738,3 +738,181 @@ describe('dropping one player onto another', () => {
     expect(a.pmOnPitch()).toHaveLength(2);
   });
 });
+
+describe('starting from the saved lineup', () => {
+  /**
+   * A statistician should not be arranging eleven players at kickoff. The
+   * coach already set a lineup, so the pitch starts from it.
+   *
+   * The guard that matters: only for a match nobody has started. "Started"
+   * means any player has EVER been sent on, not who is on now — a match where
+   * everyone was substituted off is finished, not empty, and repopulating it
+   * would put eleven players back on at full time.
+   */
+  function app() {
+    const a = makeApp();
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  const lineup = (over: any = {}) => ({
+    formation: '4-4-2',
+    players: [
+      { player_id: 'p1', role: 'starter', slot: 'GK', x: 50, y: 10, sort_order: 0 },
+      { player_id: 'p2', role: 'starter', slot: 'LB', x: 15, y: 25, sort_order: 1 },
+      { player_id: 'p3', role: 'bench', slot: null, x: null, y: null, sort_order: 100 }
+    ],
+    ...over
+  });
+
+  it('takes the starters', () => {
+    expect(app().pmStartersFromLineup(lineup()).map((p: any) => p.playerId))
+      .toEqual(['p1', 'p2']);
+  });
+
+  it('leaves the bench off the pitch', () => {
+    expect(app().pmStartersFromLineup(lineup()).map((p: any) => p.playerId))
+      .not.toContain('p3');
+  });
+
+  it('puts each one where the lineup had them', () => {
+    const [gk] = app().pmStartersFromLineup(lineup());
+    expect(gk).toEqual({ playerId: 'p1', x: 50, y: 10 });
+  });
+
+  it('falls back to the formation slot when the lineup has no coordinates', () => {
+    // A lineup saved before positions were stored must still lay out, rather
+    // than piling everyone at the origin.
+    const a = app();
+    const out = a.pmStartersFromLineup(lineup({
+      players: [{ player_id: 'p1', role: 'starter', slot: 'LB', x: null, y: null, sort_order: 0 }]
+    }));
+    const lb = a.lineupSlots('4-4-2').find((s: any) => s.slot === 'LB');
+    expect(out[0]).toEqual({ playerId: 'p1', x: lb.x, y: lb.y });
+  });
+
+  it('keeps the formation order', () => {
+    const out = app().pmStartersFromLineup(lineup({
+      players: [
+        { player_id: 'p2', role: 'starter', slot: 'LB', sort_order: 5 },
+        { player_id: 'p1', role: 'starter', slot: 'GK', sort_order: 1 }
+      ]
+    }));
+    expect(out.map((p: any) => p.playerId)).toEqual(['p1', 'p2']);
+  });
+
+  it('never takes more than the pitch holds', () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({
+      player_id: `q${i}`, role: 'starter', slot: 'GK', sort_order: i
+    }));
+    expect(app().pmStartersFromLineup(lineup({ players: many }))).toHaveLength(11);
+  });
+
+  it('copes with no lineup at all', () => {
+    expect(app().pmStartersFromLineup(null)).toEqual([]);
+    expect(app().pmStartersFromLineup({ players: [] })).toEqual([]);
+  });
+
+  it('keeps every starter inside the pitch', () => {
+    const out = app().pmStartersFromLineup(lineup({
+      players: [{ player_id: 'p1', role: 'starter', slot: 'GK', x: -20, y: 300, sort_order: 0 }]
+    }));
+    expect(out[0].x).toBeGreaterThanOrEqual(8);
+    expect(out[0].y).toBeLessThanOrEqual(92);
+  });
+});
+
+describe('seeding a match from the lineup', () => {
+  function app(events: any[] = []) {
+    const a = makeApp();
+    a._pmEvents = events;
+    a._pmPos = {};
+    a._pmMatchFixture = 'm1';
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  const withLineup = (fixture: any, fallback: any = null) => {
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchLineup: async (_t: string, matchId: string | null) =>
+        matchId ? fixture : fallback,
+      appendStatEvent: async () => ({ ok: true, id: 'e1' })
+    };
+  };
+
+  const L = {
+    formation: '4-4-2',
+    players: [
+      { player_id: 'p1', role: 'starter', slot: 'GK', x: 50, y: 10, sort_order: 0 },
+      { player_id: 'p2', role: 'starter', slot: 'LB', x: 15, y: 25, sort_order: 1 }
+    ]
+  };
+
+  it('sends the lineup onto the pitch', async () => {
+    const a = app();
+    withLineup(L);
+    await a.pmSeedFromLineup();
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+  });
+
+  it('places them where the lineup had them', async () => {
+    const a = app();
+    withLineup(L);
+    await a.pmSeedFromLineup();
+    expect(a._pmPos.p1).toEqual({ x: 50, y: 10 });
+  });
+
+  it("adopts the lineup's formation", async () => {
+    const a = app();
+    withLineup({ ...L, formation: '4-3-3' });
+    await a.pmSeedFromLineup();
+    expect(a._pmFormation).toBe('4-3-3');
+  });
+
+  it('does nothing for a match already under way', async () => {
+    // Anyone ever sent on means this match has started.
+    const a = app([{ kind: 'on', playerId: 'p9', atSeconds: 0 }]);
+    withLineup(L);
+    expect(await a.pmSeedFromLineup()).toBe(false);
+    expect(a.pmOnPitch()).toEqual(['p9']);
+  });
+
+  it('does nothing for a FINISHED match, where everyone came off', async () => {
+    // The pitch is empty but the match is over. Repopulating it would put
+    // eleven players back on at full time.
+    const a = app([
+      { kind: 'on', playerId: 'p9', atSeconds: 0 },
+      { kind: 'off', playerId: 'p9', atSeconds: 2700 }
+    ]);
+    withLineup(L);
+    expect(await a.pmSeedFromLineup()).toBe(false);
+    expect(a.pmOnPitch()).toEqual([]);
+  });
+
+  it("prefers this fixture's lineup over the default one", async () => {
+    const a = app();
+    withLineup(L, { formation: '3-5-2', players: [
+      { player_id: 'zz', role: 'starter', slot: 'GK', x: 50, y: 10, sort_order: 0 }
+    ] });
+    await a.pmSeedFromLineup();
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+  });
+
+  it('falls back to the default lineup when the fixture has none', async () => {
+    const a = app();
+    withLineup(null, L);
+    await a.pmSeedFromLineup();
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+  });
+
+  it('does nothing when there is no lineup anywhere', async () => {
+    const a = app();
+    withLineup(null, null);
+    expect(await a.pmSeedFromLineup()).toBe(false);
+    expect(a.pmOnPitch()).toEqual([]);
+  });
+});
