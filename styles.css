@@ -483,7 +483,9 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: 12px;
-  padding: 0 18px 6px;
+  /* 19px, not 18px: the card pads 18px inside a 1px border, so its first
+   * column starts one pixel further in than its own padding suggests. */
+  padding: 0 19px 6px;
 }
 
 .sched-label {

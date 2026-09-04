@@ -38,6 +38,17 @@ Object.assign(BHSSoccerApp.prototype, {
   renderScheduleView() {
     const label = this.activeTeamLabel();
     const isCoachOrAdmin = true; // Always enable schedule management
+
+    // The header row and the cards are separate flex containers, so a title
+    // only sits over its column if BOTH use the same track widths. Fixed
+    // widths rather than flex:1 — the cards carry a badge, a status and two
+    // buttons that the header does not, so anything that grows to fill the
+    // remainder grows by a different amount in each and the titles drift off
+    // their columns.
+    const col = { date: '150px', opponent: '170px', location: '190px' };
+    // Shrink allowed as a last resort, so a phone narrower than one track
+    // does not scroll sideways; the cards wrap before it ever comes to that.
+    const track = w => `flex:0 1 ${w}; min-width:0;`;
     return `
       <div class="container">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
@@ -53,24 +64,24 @@ Object.assign(BHSSoccerApp.prototype, {
         </div>
 
         <div class="schedule-head">
-          <div class="sched-label" style="min-width:120px;">Date</div>
-          <div class="sched-label" style="flex:1; min-width:150px;">Opponent</div>
-          <div class="sched-label" style="flex:1; min-width:130px;">Location</div>
+          <div class="sched-label" style="${track(col.date)}">Date</div>
+          <div class="sched-label" style="${track(col.opponent)}">Opponent</div>
+          <div class="sched-label" style="${track(col.location)}">Location</div>
         </div>
 
         <div class="schedule-list" style="display:flex; flex-direction:column; gap:12px;">
           ${(this.data.schedule || []).filter(m => !m.is_deleted && !m.isDeleted).map(m => `
-            <div class="schedule-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px 18px; border-radius: 10px;">
-              <div class="game-date" style="min-width:120px;">
+            <div class="schedule-card" style="display:flex; justify-content:flex-start; align-items:center; flex-wrap:wrap; gap:12px; background: rgba(0,0,0,0.25); border: 1px solid var(--bhs-navy-border); padding: 14px 18px; border-radius: 10px;">
+              <div class="game-date" style="${track(col.date)}">
                 <strong style="color:var(--bhs-gold-accent); font-size:1rem; display:block;">${this.displayMatchDate(m.date)}</strong>
                 <div class="time text-muted" style="font-size:0.82rem;">⏱️ ${m.time}</div>
               </div>
-              <div class="game-matchup" style="flex:1; min-width:150px;">
+              <div class="game-matchup" style="${track(col.opponent)}">
                 <div>
                   <div class="opponent-name" style="font-weight:700; color:#FFF; font-size:1.05rem;">${m.opponent}</div>
                 </div>
               </div>
-              <div class="game-venue" style="flex:1; min-width:130px;">
+              <div class="game-venue" style="${track(col.location)}">
                 ${m.location
                   ? `<div class="location-tag text-muted" style="font-size:0.9rem;">📍 ${m.location}</div>`
                   : `<div class="text-muted" style="font-size:0.9rem;" title="No location recorded for this fixture">&mdash;</div>`}
@@ -87,7 +98,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <div class="result-badge result-upcoming" style="background:rgba(0,71,171,0.2); color:var(--bhs-cyan-accent); border:1px solid var(--bhs-blue-electric); padding:4px 10px; border-radius:6px; font-weight:700; font-size:0.85rem;">UPCOMING</div>
                 `}
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-left:auto;">
                 ${window.auth.isCoach() ? `<button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
                         title="Set the XI for this fixture and print the card"
                         onclick="app.openLineupModal('${m.id}')">⚽ Lineup</button>

@@ -345,6 +345,37 @@ describe("the column titles", () => {
     expect(html).not.toContain("📍");
   });
 
+  it("puts each title on the same track as the column it names", () => {
+    // The bug this fixes: the header had two flex:1 cells absorbing all the
+    // spare width, while the card's same cells were squeezed by a badge, a
+    // status and two buttons the header does not carry. Both grew by
+    // different amounts, and "Location" landed well right of the pin icon.
+    //
+    // jsdom does no layout, so this compares the tracks rather than pixels —
+    // which is the real invariant anyway: same flex-basis, same column.
+    const html = card(fixture);
+    const styles = (cls: string) =>
+      (html.match(new RegExp(`class="${cls}"[^>]*style="([^"]*)"`)) || [])[1] || '';
+
+    const head = html.slice(html.indexOf('schedule-head'), html.indexOf('schedule-list'));
+    const titles = [...head.matchAll(/style="([^"]*)"[^>]*>(Date|Opponent|Location)</g)]
+      .map(m => [m[2], m[1]] as const);
+    expect(titles.map(t => t[0])).toEqual(['Date', 'Opponent', 'Location']);
+
+    const cells = { Date: 'game-date', Opponent: 'game-matchup', Location: 'game-venue' };
+    for (const [name, titleStyle] of titles) {
+      expect(titleStyle).toMatch(/flex:0 1 \d+px/);
+      expect(styles(cells[name as keyof typeof cells])).toBe(titleStyle);
+    }
+  });
+
+  it("does not let anything spread the card's columns apart", () => {
+    // space-between distributes the slack BETWEEN every cell, so the three
+    // titled columns would each start further right than the header's.
+    expect(scheduleSrc).not.toMatch(/schedule-card[^>]*justify-content:space-between/);
+    expect(scheduleSrc).toMatch(/schedule-card[^>]*justify-content:flex-start/);
+  });
+
   it("leaves the header's layout to the stylesheet", () => {
     // An inline display:flex would outrank the media query that hides this row
     // where the card stacks, and the titles would sit over nothing on a phone.
