@@ -1644,3 +1644,67 @@ canvas { touch-action: none; max-width: 100%; }
   user-select: all;
   margin-top: 2px;
 }
+
+/* ---------------------------------------------------------------------------
+   Player progress.
+
+   A line that RISES is improvement, whichever exercise it is — the y axis is
+   inverted for a timed one, so a coach scanning twenty charts never has to
+   remember which way each reads. That inversion happens in progressPoints();
+   nothing here can express it.
+   --------------------------------------------------------------------------- */
+
+#progressReportBody .progress-player {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bhs-navy-border);
+}
+
+#progressReportBody .progress-player h3 {
+  font-size: 0.92rem;
+  color: #FFF;
+  margin: 0 0 6px 0;
+}
+
+#progressReportBody .progress-num {
+  color: var(--bhs-gold-accent);
+  font-weight: 700;
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+#progressReportBody .progress-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+#progressReportBody .progress-block { width: 300px; max-width: 100%; }
+
+#progressReportBody .progress-title {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.progress-chart {
+  width: 100%;
+  height: 96px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 6px;
+}
+
+#progressReportBody .progress-summary {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Direction is named in the text as well as coloured: colour alone would say
+   nothing to a coach who cannot distinguish these two, and this is the line
+   that carries the answer. */
+#progressReportBody .trend-better { color: var(--bhs-cyan-accent); }
+#progressReportBody .trend-worse { color: var(--bhs-gold-accent); }

@@ -436,6 +436,8 @@ Object.assign(BHSSoccerApp.prototype, {
               <button class="btn btn-secondary" onclick="app.openWeightsModal()">⚖️ Exercise weights</button>
               <button class="btn btn-secondary" onclick="app.openSquadReport()"
                       title="Every exercise, printable for the locker room">📄 Squad report</button>
+              <button class="btn btn-secondary" onclick="app.openProgressReport()"
+                      title="Each player's results over time — is anyone improving">📈 Progress</button>
             </div>` : ''}
         </div>
 

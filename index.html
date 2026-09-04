@@ -511,6 +511,26 @@
     </div>
   </div>
 
+  <!-- Player progress. Not the one-sheet card the squad report is: this is a
+       document you read through, and a full squad runs to several pages. -->
+  <div id="progressReportModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3>&#128200; PLAYER PROGRESS</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin:0 0 10px 0;">
+        Each player's result at every session. A line that RISES is improvement, whichever
+        exercise it is &mdash; a faster time sits higher, so you never have to remember which
+        way a chart reads.
+      </p>
+      <div id="progressReportBody" style="max-height:60vh; overflow-y:auto; padding-right:4px;"></div>
+      <button class="btn btn-gold" style="width:100%; margin-top:12px;" onclick="app.printProgressReport()">
+        &#128424; Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
   <!-- Squad performance report -->
   <div id="squadReportModal" class="modal-overlay">
     <div class="modal-window" style="max-width: 860px;">
@@ -1488,6 +1508,7 @@
   <script src="./js/views/thoughts.view.js"></script>
   <script src="./js/views/roundrobin.view.js"></script>
   <script src="./js/views/report.view.js"></script>
+  <script src="./js/views/progress.view.js"></script>
   <script src="./js/views/recording-numbers.view.js"></script>
   <script src="./js/views/lineup.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>

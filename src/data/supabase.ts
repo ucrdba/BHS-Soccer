@@ -1745,6 +1745,50 @@ class SupabaseService {
     return data;
   }
 
+  /**
+   * Every recorded session result for a team, with the date it happened.
+   *
+   * One query rather than one per session: a season is a few dozen sessions,
+   * and fetching them in a loop is the difference between a report that opens
+   * and one a coach gives up on.
+   *
+   * Joined through matrix_sessions because the date lives there —
+   * matrix_session_results holds only the value and who it belongs to.
+   * Soft-deleted sessions are excluded, so a session deleted as a mistake
+   * stops appearing in the trend as well as in the standings.
+   */
+  async fetchTeamSessionHistory(teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+
+    const { data, error } = await this.client!
+      .from('matrix_sessions')
+      .select('id, occurred_on, drill_id, matrix_session_results(player_id, attendance, raw_value, outcome)')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false)
+      .order('occurred_on');
+
+    if (error) { console.warn('Supabase fetchTeamSessionHistory notice:', error.message); return null; }
+
+    // Flattened here rather than in the view: the nested shape is an artefact
+    // of how PostgREST returns an embedded table, not something the rest of
+    // the app should have to know about.
+    const out: Record<string, any>[] = [];
+    (data || []).forEach(sess => {
+      (sess.matrix_session_results || []).forEach((r: any) => {
+        out.push({
+          sessionId: sess.id,
+          occurredOn: sess.occurred_on,
+          drillId: sess.drill_id,
+          playerId: r.player_id,
+          attendance: r.attendance,
+          rawValue: r.raw_value,
+          outcome: r.outcome
+        });
+      });
+    });
+    return out;
+  }
+
   async fetchMatrixSessionResults(sessionId: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured() || !sessionId) return null;
     const { data, error } = await this.client!
