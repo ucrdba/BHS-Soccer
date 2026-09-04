@@ -137,33 +137,84 @@ describe('an armed event', () => {
 
 describe('dragging a player', () => {
   const app = () => makeApp();
+  const drop = (over: any) => app().pmResolveDrop({
+    playerId: 'p1', wasOn: false, overPitch: false, overBench: false, onCount: 0, ...over
+  });
 
   it('onto the pitch sends them on', () => {
-    expect(app().pmResolveDrop({ playerId: 'p1', wasOn: false, overPitch: true, overBench: false }))
-      .toEqual({ kind: 'on' });
+    expect(drop({ overPitch: true })).toEqual({ kind: 'on' });
   });
 
   it('onto the bench takes them off', () => {
-    expect(app().pmResolveDrop({ playerId: 'p1', wasOn: true, overPitch: false, overBench: true }))
-      .toEqual({ kind: 'off' });
+    expect(drop({ wasOn: true, overBench: true })).toEqual({ kind: 'off' });
   });
 
   it('back where they started does nothing', () => {
     // How a drag gets cancelled.
-    expect(app().pmResolveDrop({ playerId: 'p1', wasOn: true, overPitch: true, overBench: false }))
-      .toEqual({ kind: null });
-    expect(app().pmResolveDrop({ playerId: 'p1', wasOn: false, overPitch: false, overBench: true }))
-      .toEqual({ kind: null });
+    expect(drop({ wasOn: true, overPitch: true, onCount: 1 })).toEqual({ kind: null });
+    expect(drop({ overBench: true })).toEqual({ kind: null });
   });
 
   it('onto neither does nothing', () => {
-    expect(app().pmResolveDrop({ playerId: 'p1', wasOn: true, overPitch: false, overBench: false }))
-      .toEqual({ kind: null });
+    expect(drop({ wasOn: true, onCount: 1 })).toEqual({ kind: null });
   });
 
   it('with nobody in hand does nothing', () => {
-    expect(app().pmResolveDrop({ playerId: null, wasOn: false, overPitch: true, overBench: false }))
-      .toEqual({ kind: null });
+    expect(drop({ playerId: null, overPitch: true })).toEqual({ kind: null });
+  });
+});
+
+describe('eleven on the pitch', () => {
+  /**
+   * A twelfth player is not a mistake anyone spots at the time. The minutes
+   * and the goal differential are simply wrong afterwards, for everybody, and
+   * nothing on the screen ever said so.
+   */
+  const app = () => makeApp();
+  const drop = (over: any) => app().pmResolveDrop({
+    playerId: 'p1', wasOn: false, overPitch: true, overBench: false, onCount: 0, ...over
+  });
+
+  it('allows the eleventh', () => {
+    expect(drop({ onCount: 10 })).toEqual({ kind: 'on' });
+  });
+
+  it('refuses the twelfth', () => {
+    expect(drop({ onCount: 11 }).kind).toBeNull();
+  });
+
+  it('says why, rather than just doing nothing', () => {
+    // A drag that silently fails reads as a broken drop target.
+    expect(drop({ onCount: 11 }).reason).toBe('full');
+  });
+
+  it('still lets a player come OFF a full pitch', () => {
+    expect(app().pmResolveDrop({
+      playerId: 'p1', wasOn: true, overPitch: false, overBench: true, onCount: 11
+    })).toEqual({ kind: 'off' });
+  });
+
+  it('records nothing when the pitch is full', async () => {
+    const a = makeApp();
+    a.data.players = Array.from({ length: 13 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    for (let i = 0; i < 11; i++) await a.pmAppend('on', `q${i}`);
+    await a.pmMovePlayer('q11', true);
+    expect(a.pmOnPitch()).toHaveLength(11);
+    expect(a._pmError).toContain('11 players are already on');
+  });
+
+  it('lets the swap through once someone comes off', async () => {
+    const a = makeApp();
+    a.data.players = Array.from({ length: 13 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    for (let i = 0; i < 11; i++) await a.pmAppend('on', `q${i}`);
+    await a.pmMovePlayer('q0', false);
+    await a.pmMovePlayer('q11', true);
+    expect(a.pmOnPitch()).toHaveLength(11);
+    expect(a.pmOnPitch()).toContain('q11');
+  });
+
+  it('has a limit that is one line to change', () => {
+    expect(makeApp().pmMaxOnPitch()).toBe(11);
   });
 });
 

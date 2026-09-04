@@ -7,13 +7,18 @@
  *
  * The gestures, and why each is what it is:
  *
- *   ONE TAP on a player on the pitch      → plus
- *   TWO FINGERS (or right-click)          → minus
- *   DRAG a player between pitch and bench → substitution
+ *   ONE TAP on a player on the pitch                → plus
+ *   TWO FINGERS, LONG PRESS, or right-click         → minus
+ *   DRAG a player between pitch and bench           → substitution
  *
- * Two fingers rather than a long press, because a long press competes with the
- * drag for the same half second and the two would fight. Right-click is the
- * desktop equivalent, with the context menu suppressed.
+ * Three ways to say minus because two fingers do not always fit on a chip,
+ * and the match does not wait for a second attempt. Right-click is the desktop
+ * equivalent, with the context menu suppressed.
+ *
+ * The long press does compete with the drag — that is why it was left out at
+ * first — so it is cancelled the moment the finger moves past the drag
+ * threshold. A press that stays put is a minus; a press that travels is a
+ * substitution; neither can be both.
  *
  * Shots, goals and assists are EVENT FIRST: press the event, then the player.
  * The event buttons are big fixed targets that can be hit without looking,
@@ -193,19 +198,48 @@ Object.assign(BHSSoccerApp.prototype, {
    *
    * Dropping a player where they already are is how a drag gets cancelled.
    */
-  pmResolveDrop({ playerId, wasOn, overPitch, overBench }) {
+  /**
+   * How many may be on the pitch at once.
+   *
+   * Eleven, and a method rather than a literal so a small-sided fixture is one
+   * line away rather than a search through the file.
+   */
+  pmMaxOnPitch() { return 11; },
+
+  pmResolveDrop({ playerId, wasOn, overPitch, overBench, onCount }) {
     if (!playerId) return { kind: null };
-    if (overPitch && !wasOn) return { kind: 'on' };
+
+    if (overPitch && !wasOn) {
+      // A twelfth player on the pitch is not a mistake anyone spots at the
+      // time: the minutes and the goal differential are simply wrong
+      // afterwards, for everybody. Refused, and said so.
+      if ((onCount || 0) >= this.pmMaxOnPitch()) {
+        return { kind: null, reason: 'full' };
+      }
+      return { kind: 'on' };
+    }
+
     if (overBench && wasOn) return { kind: 'off' };
     return { kind: null };
   },
 
   async pmMovePlayer(playerId, toPitch) {
-    const wasOn = this.pmOnPitch().includes(playerId);
+    const on = this.pmOnPitch();
     const drop = this.pmResolveDrop({
-      playerId, wasOn, overPitch: toPitch, overBench: !toPitch
+      playerId,
+      wasOn: on.includes(playerId),
+      overPitch: toPitch,
+      overBench: !toPitch,
+      onCount: on.length
     });
+
+    if (drop.reason === 'full') {
+      this.pmSay(`${this.pmMaxOnPitch()} players are already on. Take one off first.`);
+      this.renderPlusMinus();
+      return;
+    }
     if (!drop.kind) return;
+    this.pmSay('');
     await this.pmAppend(drop.kind, playerId);
   },
 
@@ -313,7 +347,10 @@ Object.assign(BHSSoccerApp.prototype, {
       </div>
 
       <div class="pm-pitch" id="pmPitch">
-        <div class="pm-pitch-label">ON THE PITCH &middot; ${on.length}</div>
+        <div class="pm-pitch-label">
+          ON THE PITCH &middot; ${on.length} / ${this.pmMaxOnPitch()}
+          <span class="pm-hint">tap +1 &middot; hold or two fingers &minus;1 &middot; drag to sub</span>
+        </div>
         <div class="pm-chips">
           ${on.map(id => byId.get(id)).filter(Boolean).map(p => chip(p, true)).join('')
             || '<span class="text-muted" style="font-size:0.8rem;">Drag players here to start.</span>'}
@@ -412,8 +449,10 @@ Object.assign(BHSSoccerApp.prototype, {
       handled = true;
 
       // A drag may have begun on the first finger. Abandon it: two fingers is
-      // a minus, not a substitution.
+      // a minus, not a substitution. The long-press timer goes with it, or the
+      // same gesture would count two minuses.
       if (drag) { drag.chip.classList.remove('dragging'); drag = null; }
+      if (typeof cancelPress === 'function') cancelPress();
 
       this.pmTapPlayer(chip.dataset.playerId, { fingers: 2 });
     }, { passive: false });
@@ -433,6 +472,20 @@ Object.assign(BHSSoccerApp.prototype, {
       this.pmTapPlayer(chip.dataset.playerId, { rightClick: true });
     });
 
+    /**
+     * A press held still is a minus.
+     *
+     * 500ms: long enough that a normal tap never reaches it, short enough that
+     * it does not feel like waiting. Cancelled by any movement past the drag
+     * threshold, which is what keeps it from fighting the substitution
+     * gesture — a press that travels is a drag, a press that stays is a minus.
+     */
+    const LONG_PRESS_MS = 500;
+    let pressTimer = null;
+    const cancelPress = () => {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    };
+
     body.addEventListener('pointerdown', (e) => {
       const chip = e.target.closest('.pm-chip');
       if (!chip) return;
@@ -442,6 +495,17 @@ Object.assign(BHSSoccerApp.prototype, {
         x: e.clientX, y: e.clientY, moved: false
       };
       try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+
+      cancelPress();
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        if (!drag || drag.moved || handled) return;
+        handled = true;
+        drag.chip.classList.remove('dragging');
+        chip.classList.add('pm-pressed');
+        setTimeout(() => chip.classList.remove('pm-pressed'), 250);
+        this.pmTapPlayer(chip.dataset.playerId, { fingers: 2 });
+      }, LONG_PRESS_MS);
     });
 
     body.addEventListener('pointermove', (e) => {
@@ -449,10 +513,13 @@ Object.assign(BHSSoccerApp.prototype, {
       if (Math.abs(e.clientX - drag.x) > 8 || Math.abs(e.clientY - drag.y) > 8) {
         drag.moved = true;
         drag.chip.classList.add('dragging');
+        // Moving means this is a substitution, not a minus.
+        cancelPress();
       }
     });
 
     const finish = (e) => {
+      cancelPress();
       if (!drag) return;
       const d = drag; drag = null;
       d.chip.classList.remove('dragging');
@@ -475,6 +542,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
     body.addEventListener('pointerup', finish);
     body.addEventListener('pointercancel', () => {
+      cancelPress();
       if (drag) drag.chip.classList.remove('dragging');
       drag = null;
     });

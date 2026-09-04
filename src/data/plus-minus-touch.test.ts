@@ -13,7 +13,7 @@
  */
 
 /// <reference types="vite/client" />
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
@@ -210,5 +210,102 @@ describe('the suppression flag', () => {
     chip('p1').dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 10, clientY: 10 }));
     await Promise.resolve();
     expect(kinds()).toEqual(['minus:p1']);
+  });
+});
+
+describe('a long press', () => {
+  /**
+   * A third way to say minus, because two fingers do not always fit on a chip
+   * and the match does not wait for a second attempt.
+   *
+   * It competes with the drag for the same gesture — which is why it was left
+   * out at first — so what these pin down is the boundary: a press that stays
+   * put is a minus, a press that travels is a substitution, and neither is
+   * ever both.
+   */
+  const down = (id: string, x = 10, y = 10) =>
+    chip(id).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: x, clientY: y }));
+  const move = (id: string, x: number, y: number) =>
+    chip(id).dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: x, clientY: y }));
+  const up = (id: string, x = 10, y = 10) =>
+    chip(id).dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: x, clientY: y }));
+
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('records a minus when held still', async () => {
+    down('p1');
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    expect(kinds()).toEqual(['minus:p1']);
+  });
+
+  it('does not fire before it has been held long enough', async () => {
+    down('p1');
+    vi.advanceTimersByTime(300);
+    await Promise.resolve();
+    expect(kinds()).toEqual([]);
+  });
+
+  it('is a plus, not a minus, when released quickly', async () => {
+    down('p1');
+    vi.advanceTimersByTime(100);
+    up('p1');
+    await Promise.resolve();
+    expect(kinds()).toEqual(['plus:p1']);
+  });
+
+  it('does not also count a plus when the finger lifts', async () => {
+    down('p1');
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    up('p1');
+    await Promise.resolve();
+    expect(kinds()).toEqual(['minus:p1']);
+  });
+
+  it('is cancelled by movement, because that is a drag', async () => {
+    // The reason a long press was avoided at first. A press that travels must
+    // be a substitution and nothing else.
+    down('p1');
+    move('p1', 80, 80);
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    expect(kinds()).toEqual([]);
+  });
+
+  it('lets the drag complete after the press was cancelled', async () => {
+    down('p1');
+    move('p1', 80, 80);
+    vi.advanceTimersByTime(600);
+    elementAt = document.getElementById('pmBench');
+    up('p1', 80, 80);
+    await Promise.resolve();
+    expect(kinds()).toEqual(['off:p1']);
+  });
+
+  it('does not fire after the finger has already lifted', async () => {
+    // The timer outlives the gesture unless it is cleared.
+    down('p1');
+    up('p1');
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    expect(kinds()).toEqual(['plus:p1']);
+  });
+
+  it('counts one minus, not two, when two fingers land during a press', async () => {
+    down('p1');
+    vi.advanceTimersByTime(200);
+    touchStart(2);
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    expect(kinds()).toEqual(['minus:p1']);
+  });
+
+  it('records against the player being held, not another', async () => {
+    down('p2');
+    vi.advanceTimersByTime(600);
+    await Promise.resolve();
+    expect(kinds()).toEqual(['minus:p2']);
   });
 });

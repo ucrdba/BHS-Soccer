@@ -1812,9 +1812,27 @@ canvas { touch-action: none; max-width: 100%; }
 .pm-pitch-label {
   font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase;
   color: rgba(255, 255, 255, 0.7); margin-bottom: 6px;
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+/* The gestures, written where they are used. Three ways to say minus is two
+   more than anyone remembers unprompted. */
+.pm-hint { text-transform: none; letter-spacing: 0; opacity: 0.75; }
+
+/* Confirms a long press landed. Without it the only feedback is a number
+   changing somewhere else on the screen, which is not where you are looking. */
+.pm-chip.pm-pressed {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.25);
 }
 
-.pm-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 52px; }
+.pm-chips { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+
+/* Room for eleven chips without the pitch feeling like a slot. Two rows on a
+   phone, one or two on a desktop, and it grows rather than scrolling — a
+   substitution is a drag TO somewhere, and a scrolling drop target moves under
+   the finger. */
+.pm-pitch .pm-chips { min-height: 172px; }
+.pm-bench .pm-chips { min-height: 60px; }
 
 .pm-chip {
   display: flex; align-items: center; gap: 6px;
@@ -1841,5 +1859,7 @@ canvas { touch-action: none; max-width: 100%; }
   .pm-score-box { order: -1; width: 100%; justify-content: space-between; }
   .pm-event { min-width: 0; flex: 1; padding: 8px 6px; font-size: 0.78rem; }
   .pm-name { max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
+  /* Taller on a phone: eleven chips take three rows at this width. */
+  .pm-pitch .pm-chips { min-height: 210px; }
   .pm-table { font-size: 0.74rem; }
 }
