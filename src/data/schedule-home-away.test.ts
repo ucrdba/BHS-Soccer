@@ -14,7 +14,7 @@
  */
 
 /// <reference types="vite/client" />
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
@@ -381,5 +381,91 @@ describe("the column titles", () => {
     // where the card stacks, and the titles would sit over nothing on a phone.
     expect(scheduleSrc).toContain('<div class="schedule-head">');
     expect(scheduleSrc).not.toMatch(/schedule-head"[^>]*style=/);
+  });
+});
+
+describe("who may change the schedule", () => {
+  /**
+   * Reported: a guest saw Edit and Delete on every fixture.
+   *
+   * Nothing was ever at risk — the schedule_write policy in
+   * supabase_migration_auth.sql refuses a write unless
+   * current_profile_role() is coach or admin, so a guest who called
+   * app.deleteMatch() from a console got a refusal from Postgres. The defect
+   * was showing buttons that could only fail.
+   *
+   * isCoach() is true for coach AND admin, and only while the profile is
+   * active, so it is exactly "admins and coaches".
+   */
+  const fixture = { id: "m1", date: "DEC 8 2026", time: "4:00 PM",
+                    opponent: "Redlands", location: "Cougar Stadium", isHome: true };
+
+  const asRole = (role: string, status = "active") => {
+    (globalThis as any).auth = {
+      getRole: () => role,
+      getCurrentUser: () => ({ id: "u1", role, status }),
+      isCoach: () => (role === "coach" || role === "admin") && status === "active",
+      isAdmin: () => role === "admin" && status === "active",
+      isLoggedIn: () => role !== "guest",
+      canAccessRatings: () => true,
+      subscribe: () => {}
+    };
+    return card(fixture);
+  };
+
+  const WRITE_CONTROLS = ["Edit", "Delete", "Add New Match", "Lineup", "Plus/Minus"];
+
+  // asRole replaces the shared global, so put the coach back afterwards
+  // rather than leaving the next test to inherit whatever ran last.
+  const coachAgain = (globalThis as any).auth;
+  afterEach(() => { (globalThis as any).auth = coachAgain; });
+
+  it("shows a guest none of the controls that write", () => {
+    const html = asRole("guest");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("still shows a guest the fixture itself", () => {
+    // Read stays public — a guest is here to see when the next match is.
+    const html = asRole("guest");
+    expect(html).toContain("Redlands");
+    expect(html).toContain("DEC 8 2026");
+    expect(html).toContain("HOME");
+  });
+
+  it("shows a player none of them either", () => {
+    // A player is signed in, which is not the same as being able to edit.
+    const html = asRole("player");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("shows a coach all of them", () => {
+    const html = asRole("coach");
+    for (const control of WRITE_CONTROLS) expect(html).toContain(control);
+  });
+
+  it("shows an admin all of them", () => {
+    // "Admins and coaches" — isCoach() covers both, so admin must not fall
+    // through the gap.
+    const html = asRole("admin");
+    for (const control of WRITE_CONTROLS) expect(html).toContain(control);
+  });
+
+  it("shows a coach awaiting approval none of them", () => {
+    // Signup lands pending. Until a coach or admin approves the profile the
+    // role is claimed, not granted — and RLS reads status too.
+    const html = asRole("coach", "pending");
+    for (const control of WRITE_CONTROLS) expect(html).not.toContain(control);
+  });
+
+  it("gates every write control on the one guard", () => {
+    // Not five separate checks that can drift apart: the previous version had
+    // Lineup and Plus/Minus gated while Edit and Delete were not, and a dead
+    // `const isCoachOrAdmin = true` sitting above them.
+    expect(scheduleSrc).toContain("const canManage = window.auth.isCoach();");
+    expect(scheduleSrc).not.toContain("isCoachOrAdmin");
+    const body = scheduleSrc.slice(scheduleSrc.indexOf("renderScheduleView"),
+                                   scheduleSrc.indexOf("formatIsoToDisplayDate"));
+    expect(body.match(/canManage \?/g) || []).toHaveLength(2);
   });
 });

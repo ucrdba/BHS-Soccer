@@ -37,7 +37,16 @@ Object.assign(BHSSoccerApp.prototype, {
 
   renderScheduleView() {
     const label = this.activeTeamLabel();
-    const isCoachOrAdmin = true; // Always enable schedule management
+    // Every control that writes to the schedule is gated on this. isCoach()
+    // is true for coach AND admin, and only while the profile is active, so
+    // it is the whole of "admins and coaches".
+    //
+    // These are affordances, not enforcement: the schedule_write RLS policy
+    // in supabase_migration_auth.sql already refuses a write from anyone
+    // else, so a guest who calls app.deleteMatch() from a console gets a
+    // refusal from Postgres. What this fixes is a guest being SHOWN buttons
+    // that cannot work.
+    const canManage = window.auth.isCoach();
 
     // The header row and the cards are separate flex containers, so a title
     // only sits over its column if BOTH use the same track widths. Fixed
@@ -56,11 +65,11 @@ Object.assign(BHSSoccerApp.prototype, {
             <h2 class="section-title">SCHEDULE &amp; GAME RESULTS</h2>
             <p class="text-muted">${label.org}${label.team ? " &mdash; " + label.team : ""} Season Fixtures &amp; Match Results</p>
           </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${canManage ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-gold" onclick="app.openAddMatchModal()" style="font-weight:700;">➕ Add New Match</button>
-            ${window.auth.isCoach() ? `<button class="btn btn-secondary" onclick="app.openLineupModal(null)"
-                    title="A default shape for this squad, not tied to a fixture">⚽ Default lineup</button>` : ''}
-          </div>
+            <button class="btn btn-secondary" onclick="app.openLineupModal(null)"
+                    title="A default shape for this squad, not tied to a fixture">⚽ Default lineup</button>
+          </div>` : ''}
         </div>
 
         <div class="schedule-head">
@@ -98,16 +107,16 @@ Object.assign(BHSSoccerApp.prototype, {
                   <div class="result-badge result-upcoming" style="background:rgba(0,71,171,0.2); color:var(--bhs-cyan-accent); border:1px solid var(--bhs-blue-electric); padding:4px 10px; border-radius:6px; font-weight:700; font-size:0.85rem;">UPCOMING</div>
                 `}
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-left:auto;">
-                ${window.auth.isCoach() ? `<button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
+              ${canManage ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-left:auto;">
+                <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
                         title="Set the XI for this fixture and print the card"
                         onclick="app.openLineupModal('${m.id}')">⚽ Lineup</button>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;"
                         title="Track plus/minus live during this match"
-                        onclick="app.openPlusMinus('${m.id}')">± Plus/Minus</button>` : ''}
+                        onclick="app.openPlusMinus('${m.id}')">± Plus/Minus</button>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="app.openEditMatchModal('${m.id}')">✏️ Edit</button>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; background:rgba(239, 68, 68, 0.2); color:var(--color-danger); border-color:rgba(239, 68, 68, 0.4);" onclick="app.deleteMatch('${m.id}')">🗑️ Delete</button>
-              </div>
+              </div>` : ''}
             </div>
           `).join('')}
         </div>
