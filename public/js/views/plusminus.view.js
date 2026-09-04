@@ -70,6 +70,21 @@ Object.assign(BHSSoccerApp.prototype, {
    * a reload would show.
    */
   async pmAppend(kind, playerId) {
+    // The limit lives HERE as well as on the drag, because it is a fact about
+    // the match rather than about one gesture: a twelfth player is wrong
+    // however they got on. The minutes and the goal differential of everyone
+    // on the pitch are quietly wrong afterwards, and nothing at the time says
+    // so — which is exactly the class of bug worth refusing at the source.
+    if (kind === 'on') {
+      const on = this.pmOnPitch();
+      if (on.includes(playerId)) return;                  // already on
+      if (on.length >= this.pmMaxOnPitch()) {
+        this.pmSay(`${this.pmMaxOnPitch()} players are already on. Take one off first.`);
+        this.renderPlusMinus();
+        return;
+      }
+    }
+
     const at = this.pmClock();
     const event = {
       kind, playerId: playerId || null, atSeconds: at,
@@ -435,8 +450,10 @@ Object.assign(BHSSoccerApp.prototype, {
    * The fixture's own lineup wins over the default one, because a coach who
    * set a lineup for this match meant it for this match.
    */
-  async pmSeedFromLineup() {
-    if ((this._pmEvents || []).some(e => e.kind === 'on')) return false;
+  async pmSeedFromLineup(force) {
+    // Opening a match must not repopulate one that has already been played;
+    // the coach asking for it explicitly is a different thing.
+    if (!force && (this._pmEvents || []).some(e => e.kind === 'on')) return false;
     if (!window.supabaseService?.isConfigured() || !this.activeTeamId) return false;
 
     const lineup =
@@ -445,7 +462,12 @@ Object.assign(BHSSoccerApp.prototype, {
             ? await window.supabaseService.fetchLineup(this.activeTeamId, null)
             : null);
 
-    const starters = this.pmStartersFromLineup(lineup);
+    // Anyone already on keeps their place and their minutes: loading the
+    // lineup over a part-filled pitch tops it up rather than starting again.
+    const already = this.pmOnPitch();
+    const starters = this.pmStartersFromLineup(lineup)
+      .filter(p => !already.includes(p.playerId))
+      .slice(0, Math.max(0, this.pmMaxOnPitch() - already.length));
     if (starters.length === 0) return false;
 
     this._pmFormation = (lineup && lineup.formation) || this._pmFormation || '';
@@ -457,6 +479,52 @@ Object.assign(BHSSoccerApp.prototype, {
 
     for (const p of starters) await this.pmAppend('on', p.playerId);
     return true;
+  },
+
+  /**
+   * Take everyone off the pitch.
+   *
+   * Recorded as `off` events at the current clock rather than deleting
+   * anything: the log is append-only, and everything earned up to this point —
+   * plus, minus, goal differential, minutes played — stays exactly as it was.
+   * Clearing the pitch is something that HAPPENED, not something that unhappens.
+   *
+   * Confirmed, because it stops every player's minutes at once and the button
+   * sits beside the clock.
+   */
+  async pmResetPitch() {
+    const on = this.pmOnPitch();
+    if (on.length === 0) { this.pmSay('Nobody is on the pitch.'); return; }
+
+    if (!window.confirm(
+      `Take all ${on.length} player${on.length === 1 ? '' : 's'} off the pitch?\n\n`
+      + `Everything recorded so far is kept — minutes simply stop counting until `
+      + `players are sent on again.`)) return;
+
+    for (const id of on) await this.pmAppend('off', id);
+    this.pmSay('');
+  },
+
+  /**
+   * Put the saved lineup on, on demand.
+   *
+   * The automatic version refuses a match that has already started, which is
+   * right for opening one — but after clearing the pitch a coach explicitly
+   * wants it back, and that is what this is for. Same source, same positions,
+   * without the guard.
+   */
+  async pmLoadLineup() {
+    const on = this.pmOnPitch();
+    if (on.length > 0 && !window.confirm(
+      `${on.length} player${on.length === 1 ? ' is' : 's are'} already on the pitch.\n\n`
+      + `Load the saved lineup as well? Only players who are not already on will `
+      + `be added, up to ${this.pmMaxOnPitch()}.`)) return;
+
+    const added = await this.pmSeedFromLineup(true);
+    if (!added) {
+      this.pmSay('No saved lineup for this team yet. Set one on the Schedule first.');
+      this.renderPlusMinus();
+    }
   },
 
   // ── Opening ──────────────────────────────────────────────────────────────
@@ -566,6 +634,10 @@ Object.assign(BHSSoccerApp.prototype, {
           <span class="text-muted">Period ${this._pmPeriod || 1}</span>
           <button type="button" class="btn btn-secondary pm-small" onclick="app.pmEndPeriod()">End period</button>
           <button type="button" class="btn btn-secondary pm-small" onclick="app.pmUndo()">&#8630; Undo</button>
+          <button type="button" class="btn btn-secondary pm-small" title="Put the saved lineup on the pitch"
+                  onclick="app.pmLoadLineup()">Load lineup</button>
+          <button type="button" class="btn btn-secondary pm-small" title="Take everyone off the pitch"
+                  onclick="app.pmResetPitch()">Clear pitch</button>
         </div>
       </div>
 

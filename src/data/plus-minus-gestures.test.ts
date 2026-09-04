@@ -916,3 +916,200 @@ describe('seeding a match from the lineup', () => {
     expect(a.pmOnPitch()).toEqual([]);
   });
 });
+
+describe('clearing the pitch', () => {
+  /**
+   * Recorded as `off` events at the current clock rather than deleting
+   * anything. The log is append-only, so everything earned up to that point —
+   * plus, minus, goal differential, minutes — stays exactly as it was.
+   * Clearing the pitch is something that HAPPENED, not something that unhappens.
+   */
+  function app() {
+    const a = makeApp();
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('takes everyone off', async () => {
+    (window as any).confirm = () => true;
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('on', 'p2');
+    await a.pmResetPitch();
+    expect(a.pmOnPitch()).toEqual([]);
+  });
+
+  it('keeps what every player earned', async () => {
+    // The whole reason it is an event and not a deletion.
+    (window as any).confirm = () => true;
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmAppend('plus', 'p1');
+    await a.pmAppend('goal_for');
+    await a.pmResetPitch();
+
+    const s = a.pmStats().get('p1');
+    expect(s.plus).toBe(1);
+    expect(s.goalDiff).toBe(1);
+  });
+
+  it('stops minutes counting', async () => {
+    (window as any).confirm = () => true;
+    const a = app();
+    await a.pmAppend('clock_start');
+    await a.pmAppend('on', 'p1');
+    a._pmClockBase = 600;
+    await a.pmResetPitch();
+    a._pmClockBase = 1200;
+
+    // Ten minutes on, then off: the next ten do not count.
+    expect(a.pmStats().get('p1').secondsPlayed).toBe(600);
+  });
+
+  it('asks first, since it stops every player at once', async () => {
+    (window as any).confirm = () => false;
+    const a = app();
+    await a.pmAppend('on', 'p1');
+    await a.pmResetPitch();
+    expect(a.pmOnPitch()).toEqual(['p1']);
+  });
+
+  it('says so when the pitch is already empty', async () => {
+    const a = app();
+    await a.pmResetPitch();
+    expect(a._pmError).toContain('Nobody is on');
+  });
+});
+
+describe('loading the lineup on demand', () => {
+  function app(events: any[] = []) {
+    const a = makeApp();
+    a._pmEvents = events;
+    a._pmPos = {};
+    a._pmMatchFixture = 'm1';
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  const L = {
+    formation: '4-4-2',
+    players: [
+      { player_id: 'p1', role: 'starter', slot: 'GK', x: 50, y: 10, sort_order: 0 },
+      { player_id: 'p2', role: 'starter', slot: 'LB', x: 15, y: 25, sort_order: 1 }
+    ]
+  };
+
+  const withLineup = (l: any) => {
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchLineup: async () => l,
+      appendStatEvent: async () => ({ ok: true, id: 'e1' })
+    };
+  };
+
+  it('loads it even though the match has already started', async () => {
+    // The automatic version refuses this, which is right for opening a match
+    // and wrong once a coach has cleared the pitch and asked for it back.
+    const a = app([
+      { kind: 'on', playerId: 'p9', atSeconds: 0 },
+      { kind: 'off', playerId: 'p9', atSeconds: 100 }
+    ]);
+    withLineup(L);
+    (window as any).confirm = () => true;
+
+    await a.pmLoadLineup();
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+  });
+
+  it('leaves a player who is already on exactly where they are', async () => {
+    // Topping up a part-filled pitch must not restart anybody's minutes.
+    const a = app();
+    withLineup(L);
+    (window as any).confirm = () => true;
+    await a.pmAppend('on', 'p1');
+    const before = a._pmEvents.length;
+
+    await a.pmLoadLineup();
+
+    expect(a.pmOnPitch()).toEqual(['p1', 'p2']);
+    expect(a._pmEvents).toHaveLength(before + 1);      // only p2 was added
+  });
+
+  it('never takes the pitch past eleven', async () => {
+    const a = app();
+    a.data.players = Array.from({ length: 15 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    withLineup({ formation: '4-4-2', players: Array.from({ length: 11 }, (_, i) => ({
+      player_id: `z${i}`, role: 'starter', slot: 'GK', x: 50, y: 10, sort_order: i
+    })) });
+    (window as any).confirm = () => true;
+    for (let i = 0; i < 9; i++) await a.pmAppend('on', `q${i}`);
+
+    await a.pmLoadLineup();
+    expect(a.pmOnPitch()).toHaveLength(11);
+  });
+
+  it('says so when there is no lineup to load', async () => {
+    const a = app();
+    withLineup(null);
+    await a.pmLoadLineup();
+    expect(a._pmError).toContain('No saved lineup');
+  });
+
+  it('does nothing when the coach declines', async () => {
+    const a = app();
+    withLineup(L);
+    (window as any).confirm = () => false;
+    await a.pmAppend('on', 'p9');
+    await a.pmLoadLineup();
+    expect(a.pmOnPitch()).toEqual(['p9']);
+  });
+});
+
+describe('eleven players, whatever the route', () => {
+  /**
+   * The limit is a fact about the match, not about one gesture. A twelfth
+   * player is wrong however they got on — every player's minutes and goal
+   * differential are quietly wrong afterwards, and nothing at the time says so.
+   */
+  function app() {
+    const a = makeApp();
+    a.data.players = Array.from({ length: 15 }, (_, i) => ({ id: `q${i}`, name: `P${i}` }));
+    a._pmPos = {};
+    a.pmSavePositions = () => {};
+    a.renderPlusMinus = () => {};
+    return a;
+  }
+
+  it('refuses a twelfth even when sent on directly', async () => {
+    const a = app();
+    for (let i = 0; i < 12; i++) await a.pmAppend('on', `q${i}`);
+    expect(a.pmOnPitch()).toHaveLength(11);
+  });
+
+  it('says why', async () => {
+    const a = app();
+    for (let i = 0; i < 12; i++) await a.pmAppend('on', `q${i}`);
+    expect(a._pmError).toContain('11 players are already on');
+  });
+
+  it('ignores sending a player on who is already on', async () => {
+    // Otherwise a duplicate `on` restarts their clock and inflates minutes.
+    const a = app();
+    await a.pmAppend('on', 'q0');
+    const before = a._pmEvents.length;
+    await a.pmAppend('on', 'q0');
+    expect(a._pmEvents).toHaveLength(before);
+  });
+
+  it('lets an eleventh on after somebody comes off', async () => {
+    const a = app();
+    for (let i = 0; i < 11; i++) await a.pmAppend('on', `q${i}`);
+    await a.pmAppend('off', 'q0');
+    await a.pmAppend('on', 'q11');
+    expect(a.pmOnPitch()).toHaveLength(11);
+    expect(a.pmOnPitch()).toContain('q11');
+  });
+});
