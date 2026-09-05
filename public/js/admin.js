@@ -256,7 +256,6 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
-                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="matrix">⚔️ Matrix Competition Logs</option>
@@ -299,6 +298,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results (games)</option>
+                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="coaches">👔 Coaching Staff</option>

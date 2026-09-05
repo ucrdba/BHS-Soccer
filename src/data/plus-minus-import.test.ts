@@ -383,7 +383,36 @@ describe('the admin.js side of the import', () => {
     expect(tmpl).not.toMatch(/GoalDiff|Differential/);
   });
 
-  it('is reachable from both dropdowns', () => {
-    expect(adminSrc.match(/value="plusminus"/g) || []).toHaveLength(2);
+  /**
+   * Reported: "no file dialog comes up when I try to Plus/Minus Stats. Also
+   * there is no template for Plus/Minus Stats."
+   *
+   * Both symptoms, one cause. The option was added by matching the text of
+   * the neighbouring Schedule option — which reads "Schedule & Results" in
+   * two of the three dropdowns and "Schedule & Results (games)" in the third.
+   * So it landed in Export, where nothing handles it and the workbook would
+   * have no sheets, and never reached Template at all.
+   *
+   * The first version of this test counted two occurrences of the option and
+   * passed, because two is what a wrong pair also comes to. Counting is not
+   * checking: these name the dropdown.
+   */
+  const dropdown = (id: string) => {
+    const i = adminSrc.indexOf(`id="${id}"`);
+    return adminSrc.slice(i, adminSrc.indexOf('</select>', i));
+  };
+
+  it('offers the template, which is where it was missing', () => {
+    expect(dropdown('templateTarget')).toContain('value="plusminus"');
+  });
+
+  it('offers the import, which is what opens the file dialog', () => {
+    expect(dropdown('importTarget')).toContain('value="plusminus"');
+  });
+
+  it('does NOT offer an export that does nothing', () => {
+    // There is no export branch for it, so choosing it would build a workbook
+    // with no sheets. An option that silently fails is worse than one absent.
+    expect(dropdown('exportTarget')).not.toContain('value="plusminus"');
   });
 });
