@@ -16,6 +16,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { isPublishableAnonKey } from './anon-key';
+import { resolveCredential } from './credentials';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -34,9 +35,14 @@ function readStoredCredential(key: string): string | null {
 }
 
 function getSupabaseUrl(): string {
-  return (window as any).ENV_SUPABASE_URL
-    || readStoredCredential('bhs_supabase_url')
-    || 'https://arsigevpgpbqluqbnhjr.supabase.co';
+  return resolveCredential(
+    {
+      runtime: (window as any).ENV_SUPABASE_URL,
+      build: import.meta.env.VITE_SUPABASE_URL,
+      stored: readStoredCredential('bhs_supabase_url')
+    },
+    'https://arsigevpgpbqluqbnhjr.supabase.co'
+  );
 }
 
 // The anon key is designed to be publishable — it ships in every Supabase
@@ -45,9 +51,14 @@ function getSupabaseUrl(): string {
 // disconnected when no credentials are configured. Value copied verbatim
 // from the original getSupabaseAnonKey() in the now-deleted supabaseClient.js.
 function getSupabaseAnonKey(): string {
-  return (window as any).ENV_SUPABASE_ANON_KEY
-    || readStoredCredential('bhs_supabase_anon_key')
-    || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw';
+  return resolveCredential(
+    {
+      runtime: (window as any).ENV_SUPABASE_ANON_KEY,
+      build: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      stored: readStoredCredential('bhs_supabase_anon_key')
+    },
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw'
+  );
 }
 
 let supabaseClient: SupabaseClient | null = null;
