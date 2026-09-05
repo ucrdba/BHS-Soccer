@@ -83,24 +83,15 @@ Object.assign(BHSSoccerApp.prototype, {
    * missing) always sort last regardless of direction — a squad list led by a
    * run of #0 cards reads as broken data rather than as a roster.
    */
+  // Roster ordering lives in src/domain/roster.ts.
   comparePlayers(a, b, by) {
-    if (by === 'name') {
-      return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-    }
-    const na = parseInt(a.number, 10) || 0;
-    const nb = parseInt(b.number, 10) || 0;
-    if (!na !== !nb) return na ? -1 : 1;   // exactly one is unnumbered — it goes last
-    if (na !== nb) return na - nb;
-    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    return window.rosterDomain.comparePlayers(a, b, by);
   },
 
   /** Live players in the currently selected order. Defaults to jersey number. */
   sortedPlayers() {
-    const by = this.rosterSort === 'name' ? 'name' : 'number';
-    return (this.data.players || [])
-      .filter(p => !p.is_deleted && !p.isDeleted)
-      .slice()
-      .sort((a, b) => this.comparePlayers(a, b, by));
+    return window.rosterDomain.sortedPlayers(
+      this.data.players || [], this.rosterSort === 'name' ? 'name' : 'number');
   },
 
   /**

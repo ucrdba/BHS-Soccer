@@ -89,85 +89,15 @@ class BHSSoccerApp {
    *
    * Returns the records to persist, plus counts for the status line.
    */
+  // The import merge rule lives in src/domain/upsert.ts. It still mutates the
+  // collection it is given and returns a summary, exactly as it did here.
   upsertByKey(collection, incoming, keyOf, defaults) {
-    const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
-    const blank = (v) => v == null || (typeof v === 'string' && v.trim() === '');
-    const isPlainObject = (v) =>
-      v != null && typeof v === 'object' && !Array.isArray(v);
-    const keyFor = (rec) => {
-      const k = keyOf(rec);
-      return Array.isArray(k) ? k.map(norm).join('|') : norm(k);
-    };
-    const applyDefaults = (row) => {
-      if (defaults) {
-        for (const [prop, v] of Object.entries(defaults)) {
-          if (row[prop] === undefined) {
-            // Clone plain-object/array defaults so every inserted row gets its
-            // own copy — otherwise every record inserted in one import shares
-            // the same object reference, and one in-place edit silently
-            // changes several records at once.
-            row[prop] = (v != null && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
-          }
-        }
-      }
-      return row;
-    };
-
-    const index = new Map();
-    collection.forEach((existing, i) => {
-      const k = keyFor(existing);
-      if (k && k.replace(/\|/g, '')) index.set(k, i);
-    });
-
-    const toPersist = [];
-    let updated = 0, inserted = 0;
-
-    for (const row of incoming) {
-      const k = keyFor(row);
-      if (!k || !k.replace(/\|/g, '')) {
-        // Blank key: can't match an existing record, and must not be indexed —
-        // indexing it would make every later blank-key row merge into this one.
-        applyDefaults(row);
-        collection.push(row);
-        toPersist.push(row);
-        inserted++;
-        continue;
-      }
-      const idx = index.get(k);
-      if (idx === undefined) {
-        applyDefaults(row);
-        collection.push(row);
-        index.set(k, collection.length - 1);
-        toPersist.push(row);
-        inserted++;
-        continue;
-      }
-      const target = collection[idx];
-      for (const [prop, v] of Object.entries(row)) {
-        if (prop === 'id' || blank(v)) continue;   // never let an import rewrite the id
-        if (isPlainObject(v) && isPlainObject(target[prop])) {
-          // Merge one level deep so stored keys the sheet doesn't mention
-          // (e.g. seasonStats.games) survive instead of being wiped by a
-          // wholesale replacement.
-          const merged = { ...target[prop] };
-          for (const [k, mv] of Object.entries(v)) {
-            if (!blank(mv)) merged[k] = mv;
-          }
-          target[prop] = merged;
-        } else {
-          target[prop] = v;
-        }
-      }
-      toPersist.push(target);
-      updated++;
-    }
-
-    return { toPersist, updated, inserted };
+    return window.upsertDomain.upsertByKey(collection, incoming, keyOf, defaults);
   }
 
   /** Records identified by a single name column: players, coaches, drills, profiles. */
   upsertByName(collection, incoming, defaults) {
-    return this.upsertByKey(collection, incoming, (r) => (r ? r.name : ''), defaults);
+    return window.upsertDomain.upsertByName(collection, incoming, defaults);
   }
 
   /**
@@ -175,7 +105,7 @@ class BHSSoccerApp {
    * can meet the same opponent home and away.
    */
   upsertByDateTime(collection, incoming, defaults) {
-    return this.upsertByKey(collection, incoming, (r) => (r ? [r.date, r.time] : ['', '']), defaults);
+    return window.upsertDomain.upsertByDateTime(collection, incoming, defaults);
   }
 
   /**
@@ -209,14 +139,8 @@ class BHSSoccerApp {
    * visitor mid-load never sees an empty heading.
    */
   activeTeamLabel() {
-    const t = (this.data.teams || []).find(x => x.id === this.activeTeamId);
-    const fallbackOrg = this.data.school?.name || 'Beaumont High School';
-    if (!t) return { org: fallbackOrg, team: '', season: '' };
-    return {
-      org: t.school_name || fallbackOrg,
-      team: t.name || '',
-      season: t.season || ''
-    };
+    return window.upsertDomain.activeTeamLabel(
+      this.data.teams || [], this.data.school, this.activeTeamId);
   }
 
   /**

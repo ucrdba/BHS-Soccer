@@ -26,6 +26,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 // Vite's ?raw suffix hands us the file's text at build time, so this needs no
 // filesystem access and no @types/node in a tsconfig that does not include it.
 import appCoreSource from '../../public/js/app.core.js?raw';
+import { installDomainGlobals } from '../domain/test-globals';
 
 interface UpsertResult<T> {
   toPersist: T[];
@@ -41,6 +42,9 @@ interface ImportHelpers {
 let app: ImportHelpers;
 
 beforeAll(() => {
+  // upsertByKey now delegates to src/domain/upsert.ts through window.
+  installDomainGlobals();
+
   let src = appCoreSource;
   if (src.charCodeAt(0) === 0xfeff) src = src.slice(1); // strip BOM
 

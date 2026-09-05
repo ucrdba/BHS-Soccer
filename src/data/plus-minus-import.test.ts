@@ -17,6 +17,7 @@ import {
 import { replay, onPitch } from './plus-minus';
 import adminSrc from '../../public/js/admin.js?raw';
 import appCoreSrc from '../../public/js/app.core.js?raw';
+import { installDomainGlobals } from '../domain/test-globals';
 
 const HS = DEFAULT_FULL_MATCH_MINUTES;
 
@@ -662,6 +663,7 @@ describe('reading a column out of a spreadsheet row', () => {
   let app: any;
   beforeAll(() => {
     const w = globalThis as any;
+  installDomainGlobals();
     w.window = w;
     w.auth = { isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
                canAccessRatings: () => true, subscribe: () => {},

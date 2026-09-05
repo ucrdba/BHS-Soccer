@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
+import { installDomainGlobals } from '../domain/test-globals';
 
 interface DrillApp {
   data: Record<string, any>;
@@ -54,6 +55,7 @@ beforeEach(() => {
     </div>`;
 
   const w = globalThis as any;
+  installDomainGlobals();
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},

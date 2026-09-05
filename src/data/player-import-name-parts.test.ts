@@ -20,6 +20,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
+import { installDomainGlobals } from '../domain/test-globals';
 import { supabaseService } from './supabase';
 
 let ctor: any;
@@ -73,6 +74,7 @@ beforeEach(() => {
   identityWrites = [];
   document.body.innerHTML = `<div id="importStatus"></div>`;
   (globalThis as any).window = globalThis as any;
+  installDomainGlobals();
   (window as any).auth = { isCoach: () => true, isAdmin: () => true };
   (window as any).supabaseService = {
     isConfigured: () => true,

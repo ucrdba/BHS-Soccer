@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { supabaseService } from './supabase';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
+import { installDomainGlobals } from '../domain/test-globals';
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
@@ -132,6 +133,7 @@ describe('importing daily thoughts is team-scoped', () => {
     document.body.innerHTML = '<div id="importStatus"></div>';
 
     const w = globalThis as any;
+  installDomainGlobals();
     w.auth = {
       isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
       canAccessRatings: () => true, subscribe: () => {},

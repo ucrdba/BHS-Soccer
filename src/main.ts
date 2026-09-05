@@ -18,6 +18,9 @@ import * as seasonDomain from './domain/season';
 import * as progressDomain from './domain/progress';
 import * as reportDomain from './domain/report';
 import * as recordingNumbersDomain from './domain/recording-numbers';
+import * as rosterDomain from './domain/roster';
+import * as csvDomain from './domain/csv';
+import * as upsertDomain from './domain/upsert';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -134,6 +137,11 @@ window.can = can;
 (window as any).progressDomain = progressDomain;
 (window as any).reportDomain = reportDomain;
 (window as any).recordingNumbersDomain = recordingNumbersDomain;
+
+/** Shared helpers: roster ordering, CSV reading, and the import merge rule. */
+(window as any).rosterDomain = rosterDomain;
+(window as any).csvDomain = csvDomain;
+(window as any).upsertDomain = upsertDomain;
 
 /**
  * Show which build is serving this page, in the footer.
