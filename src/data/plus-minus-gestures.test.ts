@@ -1951,3 +1951,89 @@ describe('no two players may sit on top of each other', () => {
     expect(cssSrc).toContain(`.pm-chip.placed { max-width: ${CHIP_W}%;`);
   });
 });
+
+describe('positions left over from an older layout', () => {
+  /**
+   * Reported: "When I first load the plus-minus it should use the Shape that
+   * it got from the lineup. Currently they are all bunched up."
+   *
+   * The seeding path was right the whole time — a saved 4-4-2 lays out as a
+   * proper 4-4-2. What was wrong was that it never ran. Positions are
+   * percentages of the pitch, so they only mean anything under the layout
+   * that produced them, and they were stored with nothing to say which one
+   * that was. Every position from before the formation respread sat in the
+   * browser, was restored on open, and no amount of fixing the layout could
+   * reach it. The screen looked exactly as broken as before the fix.
+   */
+  const key = 'bhs_pm_pos_test';
+
+  const withStorage = (raw: string | null) => {
+    const a = makeApp();
+    a.pmPosKey = () => key;
+    if (raw === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, raw);
+    return a;
+  };
+
+  it('discards an unstamped blob, which is the cramped layout', () => {
+    // Version 1 was a bare map with no way to tell which layout it came from.
+    const a = withStorage(JSON.stringify({ p1: { x: 50, y: 10 }, p2: { x: 50, y: 18 } }));
+    a.pmLoadPositions();
+    expect(a._pmPos).toEqual({});
+  });
+
+  it('discards a blob from an older version', () => {
+    const a = withStorage(JSON.stringify({ v: 1, pos: { p1: { x: 50, y: 10 } } }));
+    a.pmLoadPositions();
+    expect(a._pmPos).toEqual({});
+  });
+
+  it('keeps positions written by the current layout', () => {
+    // A coach who arranged their shape must not lose it on every reload.
+    const a = makeApp();
+    a.pmPosKey = () => key;
+    a._pmPos = { p1: { x: 33, y: 44 } };
+    a.pmSavePositions();
+
+    const b = makeApp();
+    b.pmPosKey = () => key;
+    b.pmLoadPositions();
+    expect(b._pmPos).toEqual({ p1: { x: 33, y: 44 } });
+  });
+
+  it('stamps what it writes, so the next change can find it', () => {
+    const a = makeApp();
+    a.pmPosKey = () => key;
+    a._pmPos = { p1: { x: 33, y: 44 } };
+    a.pmSavePositions();
+    expect(JSON.parse(localStorage.getItem(key)!).v).toBe(a.pmPosVersion());
+  });
+
+  it('survives nonsense in storage', () => {
+    const a = withStorage('not json at all');
+    a.pmLoadPositions();
+    expect(a._pmPos).toEqual({});
+  });
+
+  it('leaves the pitch free to be laid out from the lineup', async () => {
+    // The point of discarding: with nothing stored, seeding puts the coach's
+    // saved shape on the pitch instead of stale coordinates.
+    const a = withStorage(JSON.stringify({ p1: { x: 50, y: 10 } }));
+    a.pmLoadPositions();
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchLineup: async () => ({
+        formation: '4-4-2',
+        players: a.lineupSlots('4-4-2').map((sl: any, i: number) => ({
+          player_id: `q${i}`, role: 'starter', slot: sl.slot, x: sl.x, y: sl.y, sort_order: i
+        }))
+      })
+    };
+    await a.pmSeedFromLineup();
+
+    const pts: any[] = Object.values(a._pmPos);
+    expect(pts).toHaveLength(11);
+    const distinct = new Set(pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`));
+    expect(distinct.size).toBe(11);              // a shape, not a pile
+  });
+});

@@ -359,17 +359,43 @@ Object.assign(BHSSoccerApp.prototype, {
    */
   pmPosKey() { return 'bhs_pm_pos_' + (this._pmMatchId || this._pmMatchFixture || 'default'); },
 
+  /**
+   * Which layout the stored positions belong to.
+   *
+   * Positions are percentages of the pitch, so they only mean anything under
+   * the layout that produced them. When the formation spread changed — the
+   * keeper was sitting on top of the centre backs — every position already in
+   * a coach's browser stayed as it was, was restored on open, and no amount
+   * of fixing the layout could reach it. The screen looked exactly as broken
+   * as before the fix.
+   *
+   * Raise this whenever the meaning of a stored position changes. Anything
+   * stamped with an older number is dropped, and the pitch is laid out again
+   * from the lineup, which is where the shape should come from anyway.
+   */
+  pmPosVersion() { return 2; },
+
   pmLoadPositions() {
     this._pmPos = {};
     try {
       const raw = localStorage.getItem(this.pmPosKey());
-      if (raw) this._pmPos = JSON.parse(raw) || {};
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      // Version 1 was a bare map of ids to coordinates, with nothing to say
+      // which layout it came from. Its positions are the cramped ones, so an
+      // unstamped blob is discarded rather than trusted.
+      if (parsed && parsed.v === this.pmPosVersion() && parsed.pos) {
+        this._pmPos = parsed.pos || {};
+      }
     } catch (e) { /* private mode, or nonsense in storage; an empty pitch is fine */ }
   },
 
   pmSavePositions() {
-    try { localStorage.setItem(this.pmPosKey(), JSON.stringify(this._pmPos || {})); }
-    catch (e) { /* storage blocked; positions last as long as the screen does */ }
+    try {
+      localStorage.setItem(this.pmPosKey(), JSON.stringify({
+        v: this.pmPosVersion(), pos: this._pmPos || {}
+      }));
+    } catch (e) { /* storage blocked; positions last as long as the screen does */ }
   },
 
   /**
