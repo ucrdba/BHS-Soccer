@@ -2457,8 +2457,14 @@ Object.assign(BHSSoccerApp.prototype, {
    */
   pickColumn(row, aliases) {
     const norm = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    // BOTH sides are normalised. Only the row's key used to be, so an alias
+    // list written the way the column is spelled in the sheet — ['Opponent']
+    // rather than ['opponent'] — matched nothing and every row silently lost
+    // that column. Nothing about the signature said which form was expected,
+    // and the first caller to guess wrong lost an entire import.
+    const wanted = (aliases || []).map(norm);
     for (const key of Object.keys(row || {})) {
-      if (aliases.indexOf(norm(key)) !== -1) {
+      if (wanted.indexOf(norm(key)) !== -1) {
         const v = row[key];
         if (v !== undefined && v !== null && String(v).trim() !== '') return v;
       }

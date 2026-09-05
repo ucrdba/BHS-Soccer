@@ -9,13 +9,14 @@
  */
 
 /// <reference types="vite/client" />
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   groupRows, goalTimes, orderBuilt, buildMatch, buildImport, resolveRowDates,
   DEFAULT_FULL_MATCH_MINUTES, type ImportRow, type FixtureRef
 } from './plus-minus-import';
 import { replay } from './plus-minus';
 import adminSrc from '../../public/js/admin.js?raw';
+import appCoreSrc from '../../public/js/app.core.js?raw';
 
 const HS = DEFAULT_FULL_MATCH_MINUTES;
 
@@ -640,5 +641,82 @@ describe('matching a sheet to the schedule', () => {
     ], FIXTURES);
     expect(rows).toHaveLength(1);
     expect(warnings).toHaveLength(1);
+  });
+});
+
+describe('reading a column out of a spreadsheet row', () => {
+  /**
+   * Reported: "Imported 0 records. 96 rows had no Opponent and were skipped."
+   * The sheet had an Opponent column in the third position.
+   *
+   * pickColumn normalised the ROW's key to lowercase and then looked it up in
+   * the alias list as given. So an alias list written the way the column is
+   * actually spelled — ['Opponent'] — matched nothing, and every row lost
+   * every column. Nothing in the signature said which form was expected, and
+   * the first caller to guess wrong lost a whole import.
+   *
+   * These run the real function rather than reading the source, because the
+   * previous two rounds of source-scanning tests passed while the feature was
+   * broken. Both sides are normalised now.
+   */
+  let app: any;
+  beforeAll(() => {
+    const w = globalThis as any;
+    w.window = w;
+    w.auth = { isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
+               canAccessRatings: () => true, subscribe: () => {},
+               getCurrentUser: () => ({ id: 'u1', role: 'admin', status: 'active' }),
+               getRole: () => 'admin' };
+    w.can = () => true;
+    const strip = (x: string) => (x.charCodeAt(0) === 0xfeff ? x.slice(1) : x);
+    const Ctor = new Function(
+      [appCoreSrc, adminSrc].map(strip).join('\n;\n') + '\nreturn BHSSoccerApp;')();
+    app = Object.create(Ctor.prototype);
+  });
+
+  it('finds a column named exactly as the alias is written', () => {
+    expect(app.pickColumn({ Opponent: 'Sultana' }, ['Opponent'])).toBe('Sultana');
+  });
+
+  it('finds it whatever case either side uses', () => {
+    expect(app.pickColumn({ opponent: 'Sultana' }, ['Opponent'])).toBe('Sultana');
+    expect(app.pickColumn({ OPPONENT: 'Sultana' }, ['opponent'])).toBe('Sultana');
+  });
+
+  it('ignores spaces and punctuation in a heading', () => {
+    expect(app.pickColumn({ 'Recording Number': 7 }, ['RecordingNumber'])).toBe(7);
+    expect(app.pickColumn({ 'Goals-For': 2 }, ['GoalsFor'])).toBe(2);
+  });
+
+  it('skips a blank cell and keeps looking', () => {
+    expect(app.pickColumn({ Opponent: '   ', Versus: 'Sultana' }, ['Opponent', 'Versus']))
+      .toBe('Sultana');
+  });
+
+  it('gives nothing when no alias is present', () => {
+    expect(app.pickColumn({ Team: 'Varsity' }, ['Opponent'])).toBeUndefined();
+  });
+
+  it('reads every column the plus/minus sheet actually ships', () => {
+    // The whole header row from the template, in the spelling the sheet uses.
+    const sheetRow = {
+      Team: '', Date: '12/8/2026', Opponent: 'Sultana',
+      GoalsFor: 1, GoalsAgainst: 1, RecordingNumber: 1,
+      Minutes: 60, Plus: 15, Minus: '', Shots: 1, Goals: 0, Assists: 1
+    };
+    expect(app.pickColumn(sheetRow, ['Date', 'MatchDate'])).toBe('12/8/2026');
+    expect(app.pickColumn(sheetRow, ['Opponent', 'Versus', 'Vs'])).toBe('Sultana');
+    expect(app.pickColumn(sheetRow, ['GoalsFor', 'For', 'ScoreFor'])).toBe(1);
+    expect(app.pickColumn(sheetRow, ['GoalsAgainst', 'Against', 'ScoreAgainst'])).toBe(1);
+    expect(app.pickColumn(sheetRow, ['RecordingNumber', 'Recording', 'RecordingId', 'Number'])).toBe(1);
+    expect(app.pickColumn(sheetRow, ['Minutes', 'Mins', 'MinutesPlayed'])).toBe(60);
+    expect(app.pickColumn(sheetRow, ['Plus', '+'])).toBe(15);
+    expect(app.pickColumn(sheetRow, ['Shots', 'Shot'])).toBe(1);
+    expect(app.pickColumn(sheetRow, ['Assists', 'Assist'])).toBe(1);
+  });
+
+  it('treats an empty Minus cell as absent, which reads as zero', () => {
+    // The sheet that was reported leaves Minus blank throughout.
+    expect(app.pickColumn({ Minus: '' }, ['Minus', '-'])).toBeUndefined();
   });
 });
