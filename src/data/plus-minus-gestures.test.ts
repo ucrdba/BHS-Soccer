@@ -1715,3 +1715,102 @@ describe('opening a match that has already been played', () => {
     expect(a.pmOnPitch()).toContain('p1');
   });
 });
+
+describe('players must not overlap on the pitch', () => {
+  /**
+   * Reported: "some of the players overlap each other. It makes it hard to
+   * select them."
+   *
+   * The default layout put up to six chips in a row, giving each 12.7% of the
+   * pitch width to sit in. A chip carries a number and a name and is far
+   * wider than that, so they collided every time — and tapping the right
+   * player is the one thing this screen has to get right.
+   *
+   * The column count and the CSS width cap are two halves of one decision, so
+   * these check them against each other rather than checking either alone.
+   */
+  const CAP_DESKTOP = 18;   // #plusMinusModal .pm-chip.placed { max-width }
+  const CAP_PHONE   = 25;
+
+  const widthAt = (w: number) => {
+    (globalThis as any).window.innerWidth = w;
+    return { perRow: makeApp().pmPerRow(), cap: w < 700 ? CAP_PHONE : CAP_DESKTOP };
+  };
+
+  it('never puts two chips closer than a chip is wide', () => {
+    for (const w of [360, 700, 1024, 1600]) {
+      const { perRow, cap } = widthAt(w);
+      const app = makeApp();
+      const spacing = 80 / perRow;
+      expect(spacing).toBeGreaterThan(cap);       // a gap, not a touch
+      void app;
+    }
+  });
+
+  it('spaces a full pitch of eleven so no two share a point', () => {
+    (globalThis as any).window.innerWidth = 1024;
+    const app = makeApp();
+    const seen = Array.from({ length: 11 }, (_, i) => app.pmPositionFor(`p${i}`, i, 11));
+    const key = (p: any) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+    expect(new Set(seen.map(key)).size).toBe(11);
+  });
+
+  it('keeps neighbours in a row a full chip apart', () => {
+    (globalThis as any).window.innerWidth = 1024;
+    const app = makeApp();
+    const a = app.pmPositionFor('p0', 0, 11);
+    const b = app.pmPositionFor('p1', 1, 11);
+    expect(b.x - a.x).toBeGreaterThan(CAP_DESKTOP);
+  });
+
+  it('keeps rows further apart than a chip is tall', () => {
+    (globalThis as any).window.innerWidth = 1024;
+    const app = makeApp();
+    const first = app.pmPositionFor('p0', 0, 11);
+    const second = app.pmPositionFor('p4', 4, 11);
+    expect(Math.abs(first.y - second.y)).toBeGreaterThanOrEqual(15);
+  });
+
+  it('uses fewer columns on a phone, where the pitch is narrow', () => {
+    // Four unreadable chips across a 360px pitch is worse than three
+    // readable ones.
+    expect(widthAt(360).perRow).toBe(3);
+    expect(widthAt(1024).perRow).toBe(4);
+  });
+
+  it('keeps an over-full pitch on the grass', () => {
+    // An imported sheet can still put more than eleven on. They must stay
+    // inside the pitch rather than spilling off the top.
+    (globalThis as any).window.innerWidth = 1024;
+    const app = makeApp();
+    for (let i = 0; i < 18; i++) {
+      const p = app.pmPositionFor(`p${i}`, i, 18);
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(100);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('keeps the stylesheet cap in step with the column count', () => {
+    // The two halves of one decision, in two files. Read the real CSS rather
+    // than trusting the constants above to still match it.
+    const rule = (sel: string) => {
+      const i = cssSrc.indexOf(sel);
+      return i === -1 ? '' : cssSrc.slice(i, cssSrc.indexOf('}', i));
+    };
+    expect(rule('#plusMinusModal .pm-chip.placed {'))
+      .toContain(`max-width: ${CAP_DESKTOP}%`);
+    // The phone cap lives in the 640px block, where several rules share this
+    // selector — so match the rule that sets a width, not the last one that
+    // happens to mention the class.
+    expect(cssSrc).toContain(`.pm-chip.placed { max-width: ${CAP_PHONE}%;`);
+  });
+
+  it('leaves a player where they were dragged', () => {
+    // The grid is only a default; a coach arranging their shape must keep it.
+    const app = makeApp();
+    app._pmPos = { p1: { x: 33, y: 44 } };
+    expect(app.pmPositionFor('p1', 0, 11)).toEqual({ x: 33, y: 44 });
+  });
+});

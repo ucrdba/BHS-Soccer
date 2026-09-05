@@ -422,15 +422,34 @@ Object.assign(BHSSoccerApp.prototype, {
    * squad piled on the centre spot is unusable, and the coach reaches for the
    * formation button the moment they see it.
    */
+  /**
+   * How many chips fit across the pitch without touching.
+   *
+   * A chip carries a number and a name, so it is wide — well over a tenth of
+   * the pitch. Six per row gave each one 12.7% of the width to sit in, and
+   * they overlapped every time, which made a player hard to tap in the one
+   * situation where tapping the right player matters.
+   *
+   * The count is what governs it: the CSS caps a placed chip's width to the
+   * same share, so the two cannot drift apart and the chips cannot collide
+   * whatever the pitch is doing.
+   */
+  pmPerRow() {
+    const w = (typeof window !== 'undefined' && window.innerWidth) || 1024;
+    return w < 700 ? 3 : 4;
+  },
+
   pmPositionFor(playerId, index, total) {
     const pos = (this._pmPos || {})[playerId];
     if (pos) return pos;
-    const perRow = Math.min(6, Math.max(3, Math.ceil(total / 2)));
+    const perRow = this.pmPerRow();
     const row = Math.floor(index / perRow);
     const col = index % perRow;
+    // Rows are spaced by more than a chip is tall, and the grid starts high
+    // enough that four rows of an over-full pitch still land on the grass.
     return this.pmClampPosition(
-      12 + (col + 0.5) * (76 / perRow),
-      70 - row * 22
+      10 + (col + 0.5) * (80 / perRow),
+      78 - row * 18
     );
   },
 

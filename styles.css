@@ -2131,7 +2131,22 @@ canvas { touch-action: none; max-width: 100%; }
 #plusMinusModal .pm-pitch {
   /* A fixed proportion, because positions are percentages: without it the
      shape stretches as the sheet below grows and every player drifts. */
-  min-height: 46vh;
+  min-height: 62vh;
+}
+
+/* A placed chip may not be wider than the column it sits in, or chips
+ * overlap and a player becomes hard to tap — which is the one thing this
+ * screen has to get right. 80% of the pitch is shared between four columns,
+ * so 20% is the column; 18% leaves a gap between neighbours.
+ *
+ * Tied to pmPerRow() in plusminus.view.js: change one and change the other,
+ * or the chips collide again. */
+#plusMinusModal .pm-chip.placed {
+  max-width: 18%;
+  overflow: hidden;
+}
+#plusMinusModal .pm-chip.placed .pm-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 #plusMinusModal .pm-chip.placed {
@@ -2156,7 +2171,10 @@ canvas { touch-action: none; max-width: 100%; }
 }
 
 @media (max-width: 640px) {
-  #plusMinusModal .pm-pitch { min-height: 52vh; }
+  #plusMinusModal .pm-pitch { min-height: 58vh; }
+  /* Three columns on a phone, so a chip gets a readable share of a narrow
+     pitch rather than four unreadable ones. Matches pmPerRow(). */
+  #plusMinusModal .pm-chip.placed { max-width: 25%; }
   /* Smaller once placed: eleven chips share the pitch rather than a row. */
   #plusMinusModal .pm-chip.placed { min-height: 46px; padding: 4px 8px; gap: 5px; }
   #plusMinusModal .pm-chip.placed .pm-name { max-width: 66px; font-size: 0.76rem; }
