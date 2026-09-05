@@ -256,6 +256,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
+                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="matrix">⚔️ Matrix Competition Logs</option>
@@ -321,6 +322,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
+                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="matrix">⚔️ Matrix Competition Logs</option>
@@ -2267,6 +2269,26 @@ Object.assign(BHSSoccerApp.prototype, {
       }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schedule');
       XLSX.writeFile(wb, 'BHS_Schedule_Template.xlsx');
+    } else if (type === 'plusminus') {
+      // One row per player per match. GoalsFor and GoalsAgainst belong to the
+      // MATCH, so they repeat on every row of it and only the first is read —
+      // a stray edit further down cannot double the score.
+      //
+      // There is deliberately no goal-differential column. It is not a figure
+      // a player has, it is a consequence of who was on the pitch when a goal
+      // went in, so the importer works it out from the score above.
+      const headers = [{
+        Team:'blank = current team',
+        Date:'must match a fixture on the schedule',
+        Opponent:'must match that fixture',
+        GoalsFor:'the match score - repeat on every row',
+        GoalsAgainst:'the match score - repeat on every row',
+        RecordingNumber:'the player, by their squad recording number',
+        Minutes:'minutes played in this match',
+        Plus:'0', Minus:'0', Shots:'0', Goals:'0', Assists:'0'
+      }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'PlusMinus');
+      XLSX.writeFile(wb, 'BHS_PlusMinus_Template.xlsx');
     } else if (type === 'drills') {
       const headers = [{ Name:'', Category:'General', CoachNotes:'', IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'MasterDrills');
@@ -2807,6 +2829,66 @@ Object.assign(BHSSoccerApp.prototype, {
                 if (memRes && memRes.error) warnings.push(`${p.name}: ${memRes.error}`);
                 return false;
               });
+            }
+          } else if (activeTarget === 'plusminus') {
+            // Plus/minus stores no totals: every figure is replayed from an
+            // append-only log. So the sheet is turned back INTO a log, and the
+            // round trip through the real replay engine is what guarantees the
+            // report shows the numbers that were typed.
+            const team = (this.data.teams || []).find(t => String(t.id) === String(this.activeTeamId));
+            if (!team) { warnings.push('No active team, so there is nowhere to put these matches.'); continue; }
+
+            // Recording numbers, which is how a coach identifies a player on
+            // paper. An unmatched number is reported, never guessed at: one
+            // landing on the wrong player would put a student's match on
+            // another student's record.
+            const byRecording = new Map();
+            (this.data.players || []).forEach(pl => {
+              if (pl.recordingNumber != null) byRecording.set(Number(pl.recordingNumber), pl.id);
+            });
+
+            const parsed = rows.map(r => ({
+              date: toStr(this.pickColumn(r, ['Date', 'MatchDate'])),
+              opponent: toStr(this.pickColumn(r, ['Opponent', 'Versus', 'Vs'])),
+              goalsFor: optI(this.pickColumn(r, ['GoalsFor', 'For', 'ScoreFor'])) || 0,
+              goalsAgainst: optI(this.pickColumn(r, ['GoalsAgainst', 'Against', 'ScoreAgainst'])) || 0,
+              recordingNumber: optI(this.pickColumn(r, ['RecordingNumber', 'Recording', 'RecordingId', 'Number'])) || 0,
+              minutes: optI(this.pickColumn(r, ['Minutes', 'Mins', 'MinutesPlayed'])) || 0,
+              plus: optI(this.pickColumn(r, ['Plus', '+'])) || 0,
+              minus: optI(this.pickColumn(r, ['Minus', '-'])) || 0,
+              shots: optI(this.pickColumn(r, ['Shots', 'Shot'])) || 0,
+              goals: optI(this.pickColumn(r, ['Goals', 'Goal'])) || 0,
+              assists: optI(this.pickColumn(r, ['Assists', 'Assist'])) || 0
+            })).filter(r => r.date && r.opponent);
+
+            const full = (this.seasonFullMatchMinutes && this.seasonFullMatchMinutes())
+              || window.plusMinusImport.DEFAULT_FULL_MATCH_MINUTES;
+            const built = window.plusMinusImport.buildImport(
+              parsed, n => byRecording.get(Number(n)) || null, full);
+
+            const unknown = new Set();
+            for (const m of built) {
+              m.unknownNumbers.forEach(n => unknown.add(n));
+
+              // Tie the session to the fixture so the season report can order
+              // it by date. A sheet naming a fixture that is not on the
+              // schedule still imports, as a labelled loose session, rather
+              // than being dropped silently.
+              const fixture = (this.data.schedule || []).find(f =>
+                String(f.date || '').trim().toUpperCase() === m.date.trim().toUpperCase() &&
+                String(f.opponent || '').trim().toUpperCase() === m.opponent.trim().toUpperCase());
+
+              const res = await window.supabaseService.importStatMatch(
+                this.activeTeamId, team.school_id,
+                fixture ? fixture.id : null,
+                fixture ? 'IMPORTED' : `IMPORTED ${m.date} v ${m.opponent}`,
+                m.events);
+
+              if (res && res.ok) { totalInserted++; totalCount++; }
+              else { totalRejected++; totalCount++; warnings.push(`${m.date} v ${m.opponent}: ${(res && res.error) || 'refused'}`); }
+            }
+            if (unknown.size) {
+              warnings.push(`No player carries recording number ${[...unknown].sort((a,b)=>a-b).join(', ')} — those rows were skipped.`);
             }
           } else if (activeTarget === 'schedule') {
             if (!this.activeTeamId) {

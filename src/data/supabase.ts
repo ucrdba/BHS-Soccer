@@ -1944,6 +1944,63 @@ class SupabaseService {
   }
 
   /**
+   * Replace one tracked session with an imported one.
+   *
+   * Replace, not append: importing the same sheet twice must not double every
+   * figure. The existing session for that fixture is soft-deleted first, so
+   * the partial unique index lets a fresh one take its place and the old
+   * events stay recoverable rather than being destroyed by a re-import.
+   *
+   * Events go in as one insert. A season is a few thousand rows across a
+   * dozen matches; a request each would take minutes and fail halfway.
+   */
+  async importStatMatch(
+    teamId: string, schoolId: string, matchId: string | null,
+    label: string, events: Array<{ kind: string; playerId: string | null; atSeconds: number; period: number }>
+  ): Promise<{ ok: boolean; error?: string; id?: string; events?: number }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    if (!schoolId) return { ok: false, error: 'No organization for that team.' };
+
+    // Clear whatever was there for this fixture. A refusal here is an RLS
+    // refusal and must stop the import rather than let it append onto rows
+    // it could not see.
+    let del = this.client!
+      .from('stat_matches').update({ is_deleted: true })
+      .eq('team_id', teamId).eq('is_deleted', false);
+    del = matchId && this.isUuid(matchId) ? del.eq('match_id', matchId) : del.is('match_id', null);
+    const { error: delErr } = await del;
+    if (delErr) { console.warn('Supabase importStatMatch clear notice:', delErr.message); return { ok: false, error: delErr.message }; }
+
+    const { data: made, error: insErr } = await this.client!
+      .from('stat_matches')
+      .insert([{
+        team_id: teamId, school_id: schoolId,
+        match_id: matchId && this.isUuid(matchId) ? matchId : null,
+        label: label || 'IMPORTED', is_deleted: false
+      }])
+      .select();
+    if (insErr) { console.warn('Supabase importStatMatch notice:', insErr.message); return { ok: false, error: insErr.message }; }
+    if (!made || !made[0]) {
+      return { ok: false, error: 'The database refused that. You must coach this team.' };
+    }
+    const id = made[0].id;
+
+    if (events.length === 0) return { ok: true, id, events: 0 };
+
+    const { data: rows, error: evErr } = await this.client!
+      .from('stat_events')
+      .insert(events.map(e => ({
+        match_id: id, player_id: e.playerId, kind: e.kind,
+        at_seconds: e.atSeconds, period: e.period, is_deleted: false
+      })))
+      .select('id');
+    if (evErr) { console.warn('Supabase importStatMatch events notice:', evErr.message); return { ok: false, error: evErr.message }; }
+
+    return { ok: true, id, events: (rows || []).length };
+  }
+
+  /**
    * Every tracked session for a team, with the fixture it belongs to.
    *
    * One query for the sessions and one for all their events, rather than a
