@@ -17,6 +17,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
 import indexHtml from '../../index.html?raw';
+import * as matrixSessionDomain from '../domain/matrix-session';
 
 let ctor: any;
 
@@ -45,6 +46,7 @@ const btn = () => document.getElementById('sessionWidthBtn') as HTMLElement;
 beforeEach(() => {
   modalDom();
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).matrixSessionDomain = matrixSessionDomain;
   try { localStorage.clear(); } catch (e) { /* ignore */ }
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });

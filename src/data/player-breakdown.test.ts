@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
+import * as matrixSessionDomain from '../domain/matrix-session';
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
@@ -37,6 +38,7 @@ beforeEach(() => {
   ];
 
   const w = globalThis as any;
+  (globalThis as any).matrixSessionDomain = matrixSessionDomain;
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},

@@ -641,19 +641,10 @@ Object.assign(BHSSoccerApp.prototype, {
    * sort them above the squad, and a run of blanks at the top of a data-entry
    * grid reads as broken data whichever direction was asked for.
    */
+  // Lives in src/domain/matrix-session.ts; reaches this classic script
+  // through window. See the Vue migration design, Phase 0.
   compareSessionPlayers(a, b, by, reversed) {
-    const flip = reversed ? -1 : 1;
-
-    if (by === 'name') {
-      return flip * String(a.name || '').localeCompare(String(b.name || ''));
-    }
-
-    const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
-    const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
-    const ga = Number.isFinite(na), gb = Number.isFinite(nb);
-    if (ga !== gb) return ga ? -1 : 1;
-    if (ga && na !== nb) return flip * (na - nb);
-    return flip * String(a.name || '').localeCompare(String(b.name || ''));
+    return window.matrixSessionDomain.compareSessionPlayers(a, b, by, reversed);
   },
 
   /**
@@ -729,7 +720,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * the exceptions are few.
    */
   defaultSessionAttendance(measure) {
-    return measure === 'time_low' || measure === 'time_bands' ? 'unexcused' : 'present';
+    return window.matrixSessionDomain.defaultSessionAttendance(measure);
   },
 
   /**
@@ -989,8 +980,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * seconds want very different formatting.
    */
   isTimedExercise(row) {
-    const drill = (this.data.drillsBank || []).find(d => d.id === row.drill_id);
-    return !!drill && (drill.measure === 'time_low' || drill.measure === 'time_bands');
+    return window.matrixSessionDomain.isTimedExercise(row, this.data.drillsBank || []);
   },
 
   /** What the player actually did, phrased for the exercise they did it in. */

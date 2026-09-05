@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
+import * as matrixSessionDomain from '../domain/matrix-session';
 import { supabaseService } from './supabase';
 
 let ctor: any;
@@ -43,6 +44,7 @@ function makeApp(): any {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).matrixSessionDomain = matrixSessionDomain;
   (window as any).supabaseService = {
     formatSecondsAsTime: (v: any) => supabaseService.formatSecondsAsTime(v)
   };

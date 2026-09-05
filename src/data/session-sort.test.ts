@@ -16,6 +16,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import sessionSrc from '../../public/js/views/matrix-session.view.js?raw';
+import * as matrixSessionDomain from '../domain/matrix-session';
 
 let ctor: any;
 
@@ -52,6 +53,7 @@ function rendered(app: any): string[] {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).matrixSessionDomain = matrixSessionDomain;
   document.body.innerHTML = '';
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
