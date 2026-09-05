@@ -56,6 +56,8 @@ invited in.
 production and demo, forever — and the two will drift the first time one is
 forgotten. There is no way around this while SQL is applied by hand, and it is
 the price of the isolation rather than an oversight.
+The version number on the home page can be compared to see they are in sync
+
 
 ## The demo build
 
@@ -145,6 +147,54 @@ The template itself is seeded once by the Playwright scripts, dumped to
 deliberately change. A reviewable file in the repo rather than whatever state
 a browser run happened to leave.
 
+## Keeping it free, and bounded
+
+The demo project stays on Supabase's **free tier, with no billing attached**.
+Not as a cost preference but as a hard stop: anyone on the internet can create
+an account here, and a project that cannot be billed cannot be made expensive.
+Abuse degrades the demo instead of generating an invoice. Nothing about this
+design may assume a paid feature.
+
+That makes the free tier's limits the real constraint, so the design has to
+stay inside them deliberately rather than by luck.
+
+### A cap on live visitors
+
+At most **N** visitor organizations may exist at once, where N is a setting
+rather than a constant in the code:
+
+- It lives in a `demo_settings` row in the demo database, so it can be changed
+  without a rebuild or a deploy. A number that requires a deploy to change is
+  a number nobody adjusts at the moment it matters.
+- Signup counts the live, unexpired visitor organizations first. At the cap it
+  refuses, and says something true and useful:
+
+  ```
+  The demo is full at the moment — it holds N programs at a time and
+  they clear after 48 hours. Please try again a little later.
+  ```
+
+- The refusal happens in the database, not only in the page. A cap enforced
+  only by the UI is not a cap, and this one exists to stop a script.
+
+**N is a starting guess, deliberately low.** Ten is enough for a handful of
+coaches evaluating at once and small enough that nothing approaches a free-tier
+limit. It is a setting precisely because the right number is unknown until
+somebody actually shares the link.
+
+The two bounds work together: the 48-hour expiry limits how long anything
+lives, and the cap limits how much exists at once. Either alone leaves a hole
+— expiry without a cap allows a thousand signups in an hour, and a cap without
+expiry fills permanently and then refuses everyone.
+
+### What else the free tier forces
+
+- **No scheduled jobs inside Supabase.** Expiry runs from a GitHub Action.
+- **No email.** Nothing on the demo sends any, which the synthetic
+  `@demo.invalid` addresses already guarantee.
+- **Storage stays small.** Diagrams and photos are the only things that could
+  grow; a visitor copy clones references rather than files.
+
 ## The tool
 
 **Playwright**, Chromium only.
@@ -231,6 +281,7 @@ src/demo.ts                        the demo flag, auto sign-in, the warning
 Resouces/SQL/demo/
   demo_schema.sql                  every migration, concatenated, for a fresh project
   demo_auth_open.sql               DEMO ONLY: no confirmation, auto-approve
+  demo_settings.sql                the cap on live visitors, and its default
   demo_seed.sql                    the template every visitor is cloned from
   demo_expire.sql                  deletes organizations older than 48 hours
 .github/workflows/demo-expire.yml  the scheduled expiry job
@@ -244,10 +295,10 @@ likeliest thing to go wrong. Mitigated only by `demo_schema.sql` being
 regenerated from the migration files rather than maintained by hand.
 
 **Anyone can create an account on the demo.** That is the point, and it is
-also an open door: a stranger can fill the demo project with whatever they
-like. Bounded by the 48-hour expiry and by the project holding nothing real,
-but the demo project should never be given a paid tier where abuse costs
-money.
+also an open door. Bounded three ways: the 48-hour expiry, the cap on live
+visitor organizations, and a free-tier project with no billing attached, so
+abuse degrades the demo rather than generating a bill. None of the three is
+sufficient alone.
 
 **Auto-approval is a demo-only migration.** If it were ever applied to
 production it would make every signup an instant coach. It must be named so
