@@ -12,6 +12,7 @@ import * as scheduleDomain from './domain/schedule';
 import * as matrixDomain from './domain/matrix';
 import * as matrixSessionDomain from './domain/matrix-session';
 import * as lineupDomain from './domain/lineup';
+import * as plusMinusCourt from './domain/plus-minus-court';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -115,6 +116,12 @@ window.can = can;
 
 /** Formation geometry, squad partitioning and the drag-and-drop rules. */
 (window as any).lineupDomain = lineupDomain;
+
+/**
+ * The plus/minus pitch: positions, gestures and the sheet's ordering.
+ * Distinct from `plusMinus` above, which replays the event log.
+ */
+(window as any).plusMinusCourt = plusMinusCourt;
 
 /**
  * Show which build is serving this page, in the footer.

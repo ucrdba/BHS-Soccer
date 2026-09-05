@@ -50,10 +50,11 @@ Object.assign(BHSSoccerApp.prototype, {
   // ── State ────────────────────────────────────────────────────────────────
 
   /** Seconds on the match clock right now, including the running part. */
+  // The pitch, its positions and the gesture rules live in
+  // src/domain/plus-minus-court.ts and reach this classic script through
+  // window. Distinct from window.plusMinus, which replays the event log.
   pmClock() {
-    const base = this._pmClockBase || 0;
-    if (!this._pmRunningSince) return base;
-    return base + Math.floor((Date.now() - this._pmRunningSince) / 1000);
+    return window.plusMinusCourt.pmClock(this._pmClockBase || 0, this._pmRunningSince || null);
   },
 
   /** Statistics as they stand, ticked forward to this instant. */
@@ -85,7 +86,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * anything.
    */
   pmClockRunning() {
-    return !!this._pmRunningSince;
+    return window.plusMinusCourt.pmClockRunning(this._pmRunningSince || null);
   },
 
   /**
@@ -98,7 +99,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * distinguishes "not started yet" from "started, and back at zero".
    */
   pmClockEverStarted() {
-    return (this._pmEvents || []).some(e => e.kind === 'clock_start');
+    return window.plusMinusCourt.pmClockEverStarted(this._pmEvents || []);
   },
 
   async pmAppend(kind, playerId) {
@@ -320,13 +321,8 @@ Object.assign(BHSSoccerApp.prototype, {
    * gesture produces which event is the part worth protecting, and browser
    * pointer behaviour is not.
    */
-  pmResolveTap({ armed, fingers, rightClick, onPitch }) {
-    if (armed) return { kind: armed, disarm: true };
-    // Two fingers, or the mouse's second button, is the minus gesture.
-    if (fingers >= 2 || rightClick) return onPitch ? { kind: 'minus' } : { kind: null };
-    // A plain tap only counts for someone actually on the pitch: a bench
-    // player cannot have made a good play.
-    return onPitch ? { kind: 'plus' } : { kind: null };
+  pmResolveTap(ctx) {
+    return window.plusMinusCourt.pmResolveTap(ctx);
   },
 
   async pmTapPlayer(playerId, opts) {
@@ -357,7 +353,9 @@ Object.assign(BHSSoccerApp.prototype, {
    * tracking the same match arranges its own pitch, and reusing the coach's
    * saved lineup here would let a statistician's drag overwrite the team sheet.
    */
-  pmPosKey() { return 'bhs_pm_pos_' + (this._pmMatchId || this._pmMatchFixture || 'default'); },
+  pmPosKey() {
+    return window.plusMinusCourt.pmPosKey(this._pmMatchId || null, this._pmMatchFixture || null);
+  },
 
   /**
    * Which layout the stored positions belong to.
@@ -373,7 +371,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * stamped with an older number is dropped, and the pitch is laid out again
    * from the lineup, which is where the shape should come from anyway.
    */
-  pmPosVersion() { return 2; },
+  pmPosVersion() { return window.plusMinusCourt.pmPosVersion(); },
 
   pmLoadPositions() {
     this._pmPos = {};
@@ -406,8 +404,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * tapped.
    */
   pmClampPosition(x, y) {
-    const clamp = (v) => Math.max(8, Math.min(92, Number(v) || 0));
-    return { x: clamp(x), y: clamp(y) };
+    return window.plusMinusCourt.pmClampPosition(x, y);
   },
 
   pmSetPosition(playerId, x, y) {
@@ -466,8 +463,8 @@ Object.assign(BHSSoccerApp.prototype, {
    * whatever the pitch is doing.
    */
   pmPerRow() {
-    const w = (typeof window !== 'undefined' && window.innerWidth) || 1024;
-    return w < 700 ? 3 : 4;
+    return window.plusMinusCourt.pmPerRow(
+      (typeof window !== 'undefined' && window.innerWidth) || 1024);
   },
 
   /**
@@ -488,50 +485,13 @@ Object.assign(BHSSoccerApp.prototype, {
    * is as hard to tap as one underneath somebody else.
    */
   pmSpreadSlot(slot) {
-    const x = 50 + (Number(slot.x) - 50) * 1.35;
-
-    // The keeper is placed rather than scaled. A uniform stretch cannot save
-    // it: 3-5-2 puts a centre back directly in front of the keeper, eight
-    // percent away and on the same x, and no expansion that still fits on a
-    // pitch turns eight percent into a chip's height. So the keeper goes to
-    // the goal line and the outfield starts above it.
-    // Everything is bounded to 8..92 by pmClampPosition, so that band is what
-    // there is to work with: the keeper takes its floor and the outfield is
-    // mapped above it.
-    //
-    // The outfield starts at 26 rather than immediately above the keeper. In
-    // 3-5-2 a centre back stands directly in front of the keeper on the same
-    // x, so their vertical gap is the ONLY thing keeping them apart, and it
-    // is measured as a percentage of a pitch whose height follows the
-    // viewport. Thirteen percent is comfortable on a tall window and about
-    // four pixels on a short one, which is where the overlap came back.
-    //
-    // The ceiling is 90, not 86: 4-4-1-1 stands a striker at 90 directly
-    // above a second forward at 72, and capping both at 86 squashed them
-    // together. The keeper's gap and the strikers' gap compete for the same
-    // vertical budget, so 25..92 is what satisfies each with room to spare.
-    const raw = Number(slot.y);
-    const y = raw < 15
-      ? 8
-      : 25 + ((Math.min(raw, 90) - 18) / 72) * 67;
-    return {
-      x: Math.max(9, Math.min(91, x)),
-      y: Math.max(8, Math.min(92, y))
-    };
+    return window.plusMinusCourt.pmSpreadSlot(slot);
   },
 
   pmPositionFor(playerId, index, total) {
-    const pos = (this._pmPos || {})[playerId];
-    if (pos) return pos;
-    const perRow = this.pmPerRow();
-    const row = Math.floor(index / perRow);
-    const col = index % perRow;
-    // Rows are spaced by more than a chip is tall, and the grid starts high
-    // enough that four rows of an over-full pitch still land on the grass.
-    return this.pmClampPosition(
-      10 + (col + 0.5) * (80 / perRow),
-      78 - row * 18
-    );
+    return window.plusMinusCourt.pmPositionFor(
+      this._pmPos || {}, playerId, index, total,
+      (typeof window !== 'undefined' && window.innerWidth) || 1024);
   },
 
   // ── Substitutions ────────────────────────────────────────────────────────
@@ -547,41 +507,10 @@ Object.assign(BHSSoccerApp.prototype, {
    * Eleven, and a method rather than a literal so a small-sided fixture is one
    * line away rather than a search through the file.
    */
-  pmMaxOnPitch() { return 11; },
+  pmMaxOnPitch() { return window.plusMinusCourt.pmMaxOnPitch(); },
 
-  pmResolveDrop({ playerId, wasOn, overPitch, overBench, onCount, overPlayerId }) {
-    if (!playerId) return { kind: null };
-
-    // Dropped onto somebody else. This is the case that was silently wrong:
-    // the incoming player was simply placed at the same coordinates, so two
-    // chips stacked and the newer drew over the older. It looked exactly like
-    // the field player's statistics had become the substitute's.
-    if (overPlayerId && overPlayerId !== playerId) {
-      // A substitute onto a player on the pitch is a SUBSTITUTION: that is
-      // what dropping one on the other means to anyone doing it.
-      if (!wasOn) return { kind: 'sub', outId: overPlayerId };
-      // Two players already on simply exchange places.
-      return { kind: 'swap', otherId: overPlayerId };
-    }
-
-    if (overPitch && !wasOn) {
-      // A twelfth player on the pitch is not a mistake anyone spots at the
-      // time: the minutes and the goal differential are simply wrong
-      // afterwards, for everybody. Refused, and said so.
-      if ((onCount || 0) >= this.pmMaxOnPitch()) {
-        return { kind: null, reason: 'full' };
-      }
-      return { kind: 'on' };
-    }
-
-    // Already on, dropped somewhere else on the pitch: that is a reposition,
-    // not a substitution. It appends NO event — where a player stands is not
-    // a statistic, and recording it would put noise in the log that undo would
-    // then have to step back through.
-    if (overPitch && wasOn) return { kind: 'move' };
-
-    if (overBench && wasOn) return { kind: 'off' };
-    return { kind: null };
+  pmResolveDrop(ctx) {
+    return window.plusMinusCourt.pmResolveDrop(ctx);
   },
 
   async pmMovePlayer(playerId, toPitch, at, overPlayerId) {
@@ -651,27 +580,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * correctly rather than piling everyone at the origin.
    */
   pmStartersFromLineup(lineup) {
-    if (!lineup) return [];
-    const slots = this.lineupSlots(lineup.formation || '4-4-2');
-    const bySlot = new Map(slots.map(s => [s.slot, s]));
-
-    return (lineup.players || [])
-      .filter(r => r && r.player_id && r.role !== 'bench')
-      .slice()
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .slice(0, this.pmMaxOnPitch())
-      .map(r => {
-        // A position the coach dragged on the LINEUP screen is in that
-        // screen's coordinates, so it is respread here just like a slot is.
-        // Only the shape is adjusted; who stands where is theirs.
-        const fallback = bySlot.get(r.slot);
-        const raw = {
-          x: r.x != null ? Number(r.x) : (fallback ? fallback.x : 50),
-          y: r.y != null ? Number(r.y) : (fallback ? fallback.y : 50)
-        };
-        const p = this.pmSpreadSlot(raw);
-        return { playerId: r.player_id, ...this.pmClampPosition(p.x, p.y) };
-      });
+    return window.plusMinusCourt.pmStartersFromLineup(lineup);
   },
 
   /**
@@ -964,18 +873,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * answer it rather than two.
    */
   pmColumns() {
-    return [
-      { key: 'number',  label: '#',       desc: false, text: false, get: (p, s) => p.number == null ? null : Number(p.number) },
-      { key: 'name',    label: 'Player',  desc: false, text: true,  get: (p) => String(p.name || '').toLowerCase() },
-      { key: 'plus',    label: 'Plus',    desc: true,  text: false, get: (p, s) => s.plus || 0 },
-      { key: 'minus',   label: 'Minus',   desc: true,  text: false, get: (p, s) => s.minus || 0 },
-      { key: 'score',   label: 'Score',   desc: true,  text: false, get: (p, s) => s.score || 0 },
-      { key: 'gd',      label: 'GD',      desc: true,  text: false, get: (p, s) => s.goalDiff || 0 },
-      { key: 'mins',    label: 'Mins',    desc: true,  text: false, get: (p, s) => s.secondsPlayed || 0 },
-      { key: 'shots',   label: 'Shots',   desc: true,  text: false, get: (p, s) => s.shots || 0 },
-      { key: 'goals',   label: 'Goals',   desc: true,  text: false, get: (p, s) => s.goals || 0 },
-      { key: 'assists', label: 'Assists', desc: true,  text: false, get: (p, s) => s.assists || 0 }
-    ];
+    return window.plusMinusCourt.pmColumns();
   },
 
   /**
@@ -997,31 +895,8 @@ Object.assign(BHSSoccerApp.prototype, {
 
   /** The sheet's rows, in the order the chosen column asks for. */
   pmSortedRows(stats, squad) {
-    const key = this._pmSort || 'mins';
-    const cols = this.pmColumns();
-    const col = cols.find(c => c.key === key) || cols.find(c => c.key === 'mins');
-    const flip = (col.desc ? -1 : 1) * (this._pmSortReversed ? -1 : 1);
-
-    return squad
-      .map(p => ({ p, s: stats.get(p.id) || {} }))
-      .sort((a, b) => {
-        const x = col.get(a.p, a.s);
-        const y = col.get(b.p, b.s);
-
-        // A player with no recording number has nothing to compare, so they
-        // sink whichever way the column is pointed rather than leading it.
-        if (x === null || y === null) {
-          if (x === y) return String(a.p.name || '').localeCompare(String(b.p.name || ''));
-          return x === null ? 1 : -1;
-        }
-
-        if (col.text) return flip * String(x).localeCompare(String(y));
-        if (x !== y) return flip * (x - y);
-        // A tie on any figure falls back to the name, so the order is stable
-        // between redraws — the sheet redraws every second while the clock
-        // runs, and rows swapping places under the eye reads as a fault.
-        return String(a.p.name || '').localeCompare(String(b.p.name || ''));
-      });
+    return window.plusMinusCourt.pmSortedRows(
+      stats, squad, this._pmSort || 'mins', !!this._pmSortReversed);
   },
 
   /** The sheet: the eight columns asked for, in that order. */

@@ -19,6 +19,7 @@ import appCoreSrc from '../../public/js/app.core.js?raw';
 import pmSrc from '../../public/js/views/plusminus.view.js?raw';
 // plusminus reuses the lineup's formations rather than defining its own.
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
+import * as plusMinusCourt from '../domain/plus-minus-court';
 import * as plusMinus from './plus-minus';
 
 let ctor: any;
@@ -102,6 +103,7 @@ function tap(id: string) {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).plusMinusCourt = plusMinusCourt;
   (window as any).plusMinus = plusMinus;
   (window as any).supabaseService = { isConfigured: () => false };
   vi.spyOn(console, 'warn').mockImplementation(() => {});

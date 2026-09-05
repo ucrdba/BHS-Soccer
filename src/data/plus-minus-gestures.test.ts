@@ -21,6 +21,7 @@ import pmSrc from '../../public/js/views/plusminus.view.js?raw';
 import cssSrc from '../../styles.css?raw';
 // plusminus reuses the lineup's formations rather than defining its own.
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
+import * as plusMinusCourt from '../domain/plus-minus-court';
 import * as lineupDomain from '../domain/lineup';
 import * as plusMinus from './plus-minus';
 
@@ -68,6 +69,7 @@ const onPmPitch = (x: number, y: number) => {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).plusMinusCourt = plusMinusCourt;
   (globalThis as any).lineupDomain = lineupDomain;
   (window as any).plusMinus = plusMinus;
   (window as any).supabaseService = { isConfigured: () => false };
