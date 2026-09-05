@@ -6,6 +6,61 @@
 
 Object.assign(BHSSoccerApp.prototype, {
 
+  /**
+   * The strip across the top of every page.
+   *
+   * It sat in index.html as hand-written markup naming a fixture that did not
+   * exist, and it could not have been right for long: nothing there reads the
+   * schedule, so it would have announced the same match all season.
+   *
+   * It lives outside #mainAppContainer, so switching views does not redraw it
+   * — renderCurrentView() calls this instead.
+   */
+  renderTopBanner() {
+    const badge = document.getElementById('topBannerBadge');
+    const line = document.getElementById('topBannerNext');
+    if (!line) return;
+
+    const esc = (v) => String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const next = this.getNextMatch ? this.getNextMatch() : null;
+    if (!next) {
+      // The reason matters: an empty schedule and a finished season read very
+      // differently to a parent looking at the top of the page.
+      const state = this.scheduleState ? this.scheduleState() : 'empty';
+      const words = {
+        empty: 'No fixtures on the schedule yet',
+        complete: 'Season complete',
+        stale: 'No upcoming fixtures'
+      };
+      if (badge) { badge.textContent = 'SCHEDULE'; badge.className = 'badge badge-role'; }
+      line.textContent = words[state] || words.empty;
+      return;
+    }
+
+    const label = this.activeTeamLabel ? this.activeTeamLabel() : null;
+    // The organization's own name, never a hardcoded one: a club coach's
+    // banner must say their club.
+    const us = label && label.org
+      ? `${label.org}${label.team ? ' ' + label.team : ''}`
+      : 'Our team';
+
+    // "DEC 8" rather than the full stored string: the banner is one line, and
+    // the year is rarely what a reader needs at the top of a page.
+    const shown = this.displayMatchDate ? this.displayMatchDate(next.date) : String(next.date || '');
+    const short = String(shown).replace(/\s*\(.*\)\s*$/, '').replace(/\s+\d{4}$/, '');
+    const when = [short, next.time].filter(Boolean).join(', ');
+    const where = next.isHome === true ? 'vs' : next.isHome === false ? 'away to' : 'vs';
+
+    if (badge) { badge.textContent = 'NEXT MATCH'; badge.className = 'badge badge-win'; }
+    // No "Next Match:" prefix — the badge immediately to the left already
+    // says it, and saying it twice in one line reads as a mistake.
+    line.innerHTML = `<strong>${esc(us)} ${where} ${esc(next.opponent)}</strong>`
+      + (when ? ` (${esc(when)})` : '');
+  },
+
+
   renderHomeView() {
     // --- Compute season stats from completed schedule entries ---
     const completed = this.data.schedule.filter(m => m.status === 'COMPLETED' && m.score);

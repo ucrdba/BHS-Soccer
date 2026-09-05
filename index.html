@@ -14,8 +14,11 @@
   <!-- Top Notification & Ticker Bar -->
   <div class="top-banner">
     <div class="banner-left">
-      <span class="badge badge-win">GAME DAY</span>
-      <span>Next Match: <strong>BHS Cougars vs Yucaipa Thunderbirds</strong> (Aug 12, 6:30 PM)</span>
+      <!-- Filled in by renderTopBanner() from the schedule. It used to be
+           written here by hand, so it announced a fixture that did not exist
+           and never changed all season. -->
+      <span class="badge badge-win" id="topBannerBadge">GAME DAY</span>
+      <span id="topBannerNext">Loading the schedule&hellip;</span>
     </div>
     <div class="banner-right">
       <span class="text-muted" style="font-size: 0.8rem;">Citrus Belt League • Beaumont, CA</span>

@@ -808,6 +808,11 @@ class BHSSoccerApp {
     const switcherMount = document.getElementById('teamSwitcherMount');
     if (switcherMount) switcherMount.innerHTML = this.renderTeamSwitcher();
 
+    // The top strip lives outside #mainAppContainer, so nothing above redraws
+    // it. Refreshed here because the next fixture changes with the active
+    // team, and because it is the first thing on the page.
+    if (this.renderTopBanner) this.renderTopBanner();
+
     this.attachDynamicListeners();
   }
 }
