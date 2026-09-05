@@ -163,4 +163,5 @@ The Supabase SQL editor may run as a role that is a **member** of `postgres` wit
 
 - Views return HTML **strings** built from template literals with inline `style="..."`; shared design tokens are CSS custom properties in `index.css` (`--bhs-cyan-accent`, `--text-muted`, …), with component styles in `styles.css`.
 - `tsconfig.json` is deliberately loose (`strict: false`, `noImplicitAny: false`) so the ported JS type-checks without a rewrite. Don't tighten it as a side effect of another change.
+- **`typescript` is pinned to 5.x on purpose — do not upgrade it to 7.** TypeScript 7 is the native Go rewrite and exports only `.` and `./unstable/*`; `vue-tsc` resolves `typescript/lib/tsc`, which that layout does not have, so it dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` and cannot run at all. Without it nothing type-checks a `.vue` file's script block or its templates. The upgrade is deferred until `vue-tsc` supports TypeScript 7, not abandoned.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `refactor:`).

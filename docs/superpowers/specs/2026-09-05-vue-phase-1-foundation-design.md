@@ -21,15 +21,15 @@ The Vue application shell, and the Home view through it end to end. One screen, 
 
 **Pinia for shared state, not a bespoke store.** Three things outlive a route change and are read by unrelated components: the signed-in profile, the active team, and the loaded collections. `src/data/store.ts` and `src/data/cache.ts` already exist and keep their jobs; Pinia is the layer components subscribe to.
 
-**~~`vue-tsc` replaces `tsc` for typechecking.~~ Superseded during implementation — see below.**
+**`vue-tsc` replaces `tsc`, and TypeScript is pinned back to 5.x to allow it.**
 
-**`tsc` stays, and `.vue` files are not type-checked.** This project is on **TypeScript 7.0.2**, the native Go rewrite, whose package exports are `.` and `./unstable/*`. `vue-tsc` 3.3.11 — the current release — resolves `typescript/lib/tsc`, which no longer exists, and dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` before checking anything. **`vue-tsc` cannot run against TypeScript 7 at all.**
+The project was on **TypeScript 7.0.2**, the native Go rewrite, whose package exports are `.` and `./unstable/*` only. `vue-tsc` 3.3.11 resolves `typescript/lib/tsc`, which does not exist in that layout, and dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` before checking a single file. **`vue-tsc` cannot run against TypeScript 7 at all.**
 
-So `npm run typecheck` remains `tsc --noEmit`. With the `declare module '*.vue'` shim in `src/vite-env.d.ts`, TypeScript resolves component imports as `DefineComponent<{}, {}, any>` and checks every `.ts` file exactly as before.
+That forced a choice between TypeScript 7's speed and having components type-checked at all, and the type checking won. `typescript` is now `5.9.3`, `npm run typecheck` and `npm run build` both run `vue-tsc --noEmit`, and the upgrade to 7 is **deferred, not cancelled** — it happens once `vue-tsc` supports it.
 
-What this costs is real and should not be glossed: **type errors inside an SFC's `<script setup>` block, and every template expression, go unchecked.** What still catches mistakes is `@vitejs/plugin-vue` compiling each component during `npm run build` — which fails on syntax errors and unresolvable imports but not on type errors — and the component tests.
+*What this buys, verified rather than assumed:* a component with `const n: number = 'not a number'` in its `<script setup>` and `n.toUpperCase()` in its template produces two errors, `TS2322` and `TS2339`. Both halves of a single-file component are checked.
 
-*The alternative, deliberately not taken:* downgrading to TypeScript 5.x so `vue-tsc` runs. It would restore template checking, but the project chose TS 7 on purpose and it is substantially faster; trading that away as a side effect of adding Vue is not a call to make inside a phase whose subject is something else. Revisit when `vue-tsc` supports TS 7, or raise it as its own decision.
+*Why it was worth a downgrade:* without `vue-tsc`, nothing checks an SFC's script block or its templates. `tsc` cannot see inside a `.vue` file, and the `declare module '*.vue'` shim only makes the import resolve. The build would still catch syntax errors and unresolvable imports, and component tests would still catch behaviour — but every type error between those two would be caught by nothing, across every component in six remaining phases.
 
 **Component tests use `@vue/test-utils` with the existing Vitest and jsdom.** No new runner. The domain modules keep their direct-import tests, and components get mount-and-assert tests, so the two kinds of coverage stay distinct.
 
@@ -47,7 +47,7 @@ What this costs is real and should not be glossed: **type errors inside an SFC's
 
 | Piece | Detail |
 | --- | --- |
-| Toolchain | `vue`, `vue-router`, `pinia`, `@vitejs/plugin-vue`, `@vue/test-utils`, `@pinia/testing` |
+| Toolchain | `vue`, `vue-router`, `pinia`, `@vitejs/plugin-vue`, `vue-tsc`, `@vue/test-utils`, `@pinia/testing`; `typescript` pinned to 5.x |
 | Entry | `app.html` → `src/vue-main.ts` → `src/App.vue` |
 | Router | Seven routes, `/` through `/help`, with the three guarded ones gated |
 | Shell | Header, the nav (bar on desktop, drawer under 640px), footer with the build stamp |
@@ -83,7 +83,7 @@ A guest who reaches one is redirected Home, exactly as the legacy app does. Thes
 ## Verification
 
 - `npm test` passes, never below the 1,924 tests Phase 0 ended with.
-- `npm run typecheck` — still `tsc --noEmit` — passes over `src/`. Components are not type-checked; see the decision above.
+- `npm run typecheck` — `vue-tsc --noEmit` — passes over `src/`, single-file components included.
 - `npm run build` passes and emits **both** `index.html` and `app.html`.
 - `powershell -File check_syntax.ps1` passes over all 22 classic scripts.
 - `npm run dev` serves the legacy app at `/` unchanged, and the Vue app at `/app.html`.
@@ -92,7 +92,7 @@ A guest who reaches one is redirected Home, exactly as the legacy app does. Thes
 
 ## Risks
 
-**Components are type-unchecked.** `vue-tsc` cannot run against TypeScript 7, so nothing verifies an SFC's script block or its template. The build catches syntax errors and unresolvable imports; component tests catch behaviour. Type errors in between are caught by neither, which raises the value of the component tests correspondingly — they are the only check on a component's internals.
+**TypeScript is held at 5.x on purpose.** Do not upgrade it to 7 as tidying: vue-tsc cannot run against 7, and the upgrade waits on vue-tsc supporting it. A pinned version here is a decision, not staleness.
 **Two entry points means two apps to keep working.** Until cutover, a change to `src/main.ts` affects the legacy app and a change to `src/vue-main.ts` affects the new one. They share `src/domain/`, `src/data/` and `src/auth.ts`, so a change there affects both — and only `npm run build` plus the full suite proves it.
 
 **Vercel serves `index.html` at the root.** The deployed site keeps showing the legacy app throughout the migration, with the Vue app reachable at `/app.html`. That is the intent, and it means nothing user-facing changes until Phase 7 swaps them.
