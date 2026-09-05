@@ -388,6 +388,7 @@ class BHSSoccerApp {
           name: s.name,
           mascot: s.mascot,
           city: s.city,
+          league: s.league || null,
           kind: s.kind || 'school',
           colors: s.colors || { primary: '#0047AB', secondary: '#FFD700' },
           record: s.record || { wins: 0, losses: 0, draws: 0 }

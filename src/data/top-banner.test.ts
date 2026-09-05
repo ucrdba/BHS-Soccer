@@ -49,7 +49,13 @@ function makeApp(schedule: any[] = []): any {
   const app = Object.create(ctor.prototype);
   app.data = {
     schedule, players: [], drillsBank: [],
-    teams: [{ id: 't1', school_id: 's1', name: 'Varsity', school_name: 'Beaumont' }]
+    teams: [{ id: 't1', school_id: 's1', name: 'Varsity', school_name: 'Beaumont' }],
+    schools: [
+      { id: 's1', code: 'bhs', name: 'Beaumont High School', kind: 'school',
+        city: 'Beaumont, CA', league: 'Citrus Belt League' },
+      { id: 's2', code: 'lfc', name: 'Legends FC', kind: 'club',
+        city: null, league: null }
+    ]
   };
   app.activeTeamId = 't1';
   app.activeTeamLabel = () => ({ org: 'Beaumont', team: 'Varsity', season: '2026' });
@@ -58,11 +64,13 @@ function makeApp(schedule: any[] = []): any {
 
 const mount = () => {
   document.body.innerHTML =
-    '<span id="topBannerBadge"></span><span id="topBannerNext"></span>';
+    '<span id="topBannerBadge"></span><span id="topBannerNext"></span>'
+    + '<span id="topBannerOrg"></span>';
 };
 
 const banner = () => document.getElementById('topBannerNext')!.innerHTML;
 const badge = () => document.getElementById('topBannerBadge')!.textContent;
+const org = () => document.getElementById('topBannerOrg')!.textContent;
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
@@ -200,5 +208,72 @@ describe('escaping', () => {
     ]).renderTopBanner();
     expect(banner()).not.toContain('<img');
     expect(banner()).toContain('&lt;img');
+  });
+});
+
+describe('the right-hand side of the banner', () => {
+  /**
+   * "Citrus Belt League • Beaumont, CA" was written into index.html, so every
+   * club on this site saw a school's competition and a town they do not play
+   * in. This database already holds four organizations, two of them clubs.
+   */
+  const fixture = [
+    { id: 'm1', date: soon(3), time: '4:00 PM', opponent: 'Sultana', status: 'UPCOMING' }
+  ];
+
+  it("shows the organization's own league and city", () => {
+    makeApp(fixture).renderTopBanner();
+    expect(org()).toBe('Citrus Belt League • Beaumont, CA');
+  });
+
+  it('follows the active team to its own organization', () => {
+    // A club team must show the club, not whichever organization happens to
+    // be first in the list.
+    const app = makeApp(fixture);
+    app.data.teams = [{ id: 't1', school_id: 's2', name: 'U16 Boys' }];
+    app.data.schools[1] = { ...app.data.schools[1], city: 'Redlands, CA', league: 'SoCal Developmental' };
+    app.renderTopBanner();
+    expect(org()).toBe('SoCal Developmental • Redlands, CA');
+    expect(org()).not.toContain('Citrus Belt');
+  });
+
+  it('shows the city alone when no league is named', () => {
+    // A club arranging friendlies plays in no competition. It must not show a
+    // stray separator with nothing on one side of it.
+    const app = makeApp(fixture);
+    app.data.schools[0] = { ...app.data.schools[0], league: null };
+    app.renderTopBanner();
+    expect(org()).toBe('Beaumont, CA');
+  });
+
+  it('shows the league alone when no city is set', () => {
+    const app = makeApp(fixture);
+    app.data.schools[0] = { ...app.data.schools[0], city: null };
+    app.renderTopBanner();
+    expect(org()).toBe('Citrus Belt League');
+  });
+
+  it('shows nothing rather than a bare separator', () => {
+    const app = makeApp(fixture);
+    app.data.schools[0] = { ...app.data.schools[0], city: null, league: null };
+    app.renderTopBanner();
+    expect(org()).toBe('');
+  });
+
+  it('ignores whitespace masquerading as a value', () => {
+    const app = makeApp(fixture);
+    app.data.schools[0] = { ...app.data.schools[0], league: '   ' };
+    app.renderTopBanner();
+    expect(org()).toBe('Beaumont, CA');
+  });
+
+  it('is not hardcoded in the page any more', () => {
+    expect(indexHtml).not.toContain('Citrus Belt League • Beaumont, CA');
+    expect(indexHtml).toContain('id="topBannerOrg"');
+  });
+
+  it('offers a place to set the league', () => {
+    // Nowhere to type it means it can only ever be whatever a migration set.
+    expect(indexHtml).toContain('id="schoolFormLeague"');
   });
 });

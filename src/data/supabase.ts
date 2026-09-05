@@ -3115,6 +3115,9 @@ class SupabaseService {
       name: school.name || 'Beaumont High School',
       mascot: school.mascot || 'Cougars',
       city: school.city || 'Beaumont, CA',
+      // Only when supplied. An organization that has not named a league keeps
+      // its null rather than being handed Beaumont's.
+      ...(school.league !== undefined ? { league: school.league || null } : {}),
       colors: school.colors || { primary: '#0047AB', secondary: '#FFD700' },
       record: school.record || { wins: 0, losses: 0, draws: 0 }
     };

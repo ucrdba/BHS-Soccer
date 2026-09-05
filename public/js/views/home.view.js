@@ -16,13 +16,46 @@ Object.assign(BHSSoccerApp.prototype, {
    * It lives outside #mainAppContainer, so switching views does not redraw it
    * — renderCurrentView() calls this instead.
    */
+  /**
+   * The organization the active team belongs to.
+   *
+   * By id from the team rather than by a code: this database holds four
+   * organizations, two of them clubs, and resolving by a literal like 'bhs'
+   * is how a club ends up showing a school's details.
+   */
+  activeSchool() {
+    const teams = this.data.teams || [];
+    const team = teams.find(t => String(t.id) === String(this.activeTeamId));
+    const schools = this.data.schools || [];
+    if (team && team.school_id) {
+      const byId = schools.find(s => String(s.id) === String(team.school_id));
+      if (byId) return byId;
+    }
+    return schools[0] || null;
+  },
+
   renderTopBanner() {
     const badge = document.getElementById('topBannerBadge');
     const line = document.getElementById('topBannerNext');
-    if (!line) return;
+    const org = document.getElementById('topBannerOrg');
 
     const esc = (v) => String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // The right-hand side: where this organization plays, and where it is.
+    // Both were written into index.html by hand, so a club saw Beaumont's
+    // league and Beaumont's town.
+    if (org) {
+      const school = this.activeSchool ? this.activeSchool() : null;
+      // Only the parts that exist, joined by the separator. A club with no
+      // named competition shows its city alone rather than a stray bullet.
+      org.textContent = [school && school.league, school && school.city]
+        .map(v => String(v || '').trim())
+        .filter(Boolean)
+        .join(' • ');
+    }
+
+    if (!line) return;
 
     const next = this.getNextMatch ? this.getNextMatch() : null;
     if (!next) {

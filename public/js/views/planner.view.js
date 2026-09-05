@@ -634,6 +634,8 @@ Object.assign(BHSSoccerApp.prototype, {
       document.getElementById('schoolFormName').value = '';
       document.getElementById('schoolFormMascot').value = '';
       document.getElementById('schoolFormCity').value = '';
+      const blankLeague = document.getElementById('schoolFormLeague');
+      if (blankLeague) blankLeague.value = '';
       document.getElementById('schoolFormPrimaryColor').value = '#0047AB';
       document.getElementById('schoolFormSecondaryColor').value = '#FFD700';
       document.getElementById('schoolFormWins').value = 0;
@@ -653,6 +655,8 @@ Object.assign(BHSSoccerApp.prototype, {
     document.getElementById('schoolFormName').value = s.name || '';
     document.getElementById('schoolFormMascot').value = s.mascot || '';
     document.getElementById('schoolFormCity').value = s.city || '';
+    const leagueEl = document.getElementById('schoolFormLeague');
+    if (leagueEl) leagueEl.value = s.league || '';
     document.getElementById('schoolFormPrimaryColor').value = s.colors?.primary || '#0047AB';
     document.getElementById('schoolFormSecondaryColor').value = s.colors?.secondary || '#FFD700';
     document.getElementById('schoolFormWins').value = s.record?.wins ?? 0;
@@ -700,6 +704,7 @@ Object.assign(BHSSoccerApp.prototype, {
       const name = (document.getElementById('schoolFormName')?.value || '').trim();
       const mascot = (document.getElementById('schoolFormMascot')?.value || '').trim();
       const city = (document.getElementById('schoolFormCity')?.value || '').trim();
+      const league = (document.getElementById('schoolFormLeague')?.value || '').trim();
       const primaryColor = document.getElementById('schoolFormPrimaryColor')?.value || '#0047AB';
       const secondaryColor = document.getElementById('schoolFormSecondaryColor')?.value || '#FFD700';
       const wins = parseInt(document.getElementById('schoolFormWins')?.value || 0, 10);
@@ -721,6 +726,9 @@ Object.assign(BHSSoccerApp.prototype, {
         name,
         mascot,
         city,
+        // Empty means the organization plays no named competition, which the
+        // banner handles by showing only the city.
+        league: league || null,
         colors: { primary: primaryColor, secondary: secondaryColor },
         record: { wins, losses, draws }
       };
