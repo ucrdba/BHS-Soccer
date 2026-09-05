@@ -14,15 +14,15 @@ A single-page web app for the Beaumont High School (CA) Cougars soccer program: 
 npm run dev        # vite dev server, opens browser
 npm run build      # tsc (typecheck) + vite build -> dist/
 npm run typecheck  # tsc --noEmit over src/ only
-npm test           # vitest — 80 tests, config in vitest.config.mts
+npm test           # vitest — 1,924 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
-powershell -File check_syntax.ps1   # node --check every public/js/*.js file
+powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
 ```
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (80 tests).
+- `npm test` — Vitest unit tests (1,924 tests across 93 files).
 - `npm run typecheck` — `tsc --noEmit` over `src/` **only**; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -41,11 +41,47 @@ The same application exists three times, and only one of them actually runs:
 
 Consequences worth respecting:
 
-- `src/` is not a complete port of the UI. Still JS-only: `public/js/views/planner.view.js` (2.3k+ lines — planner, print/PDF, drills library, daily thoughts, quiz, coaches view, school profile forms), and `public/js/admin.js` (admin panel, diagnostics, import/export). `auth.js` and `supabaseClient.js` are **deleted** — real auth is `src/auth.ts`, the client is `src/data/supabase.ts`.
+- `src/` is not a complete port of the UI. The 22 files under `public/js/` still own every screen: as well as `views/planner.view.js` (2.3k+ lines — planner, print/PDF, drills library, daily thoughts, quiz, coaches view, school profile forms) and `admin.js` (admin panel, diagnostics, import/export), there are `views/` files for `lineup`, `plusminus`, `matrix-session`, `season`, `report`, `progress`, `roundrobin`, `recording-numbers`, `thoughts`, `help`, `teamswitcher`, `home`, `roster`, `schedule`, `matrix` and `coaches`. `auth.js` and `supabaseClient.js` are **deleted** — real auth is `src/auth.ts`, the client is `src/data/supabase.ts`.
 - `src/app.core.ts` ends with a **"Pending migration"** `export interface BHSSoccerApp` block declaring the still-JS methods so the TS side type-checks on its own. Delete a line from it when that method lands as a real `src/` module. Same idea in `src/globals.d.ts`, which ambient-declares `window.supabaseService`'s shape and the CDN UMD globals `XLSX` / `JSZip`.
 - `src/app.core.ts`, `src/data.ts`, and `src/utils.ts` are dormant — not part of the module graph `src/main.ts` builds, and not referenced by `index.html`. They still carry the pre-migration seed logic (`DEFAULT_BHS_DATA`, the localStorage read/write cycle) that `public/js/app.core.js` already had stripped out. They must be ported to match the live behavior before anything wires them into the module graph in Phase 2 — do not activate them as-is.
 - `npm run build` **works**: `tsc` typechecks `src/`, then Vite bundles `src/main.ts` and copies `public/` (including `public/js/`) into `dist/` via `publicDir`. `npm run build` is the only check that exercises real module resolution, and is mandatory before merging any change that touches imports.
 - The root `*.ps1` scripts (`split_app.ps1`, `patch_commas.ps1`, `fix_boundary.ps1`, `find_methods.ps1`) are one-off tooling from the `app.js` → `js/` split. They are not part of the build, and re-running them would overwrite hand-edits.
+
+## `src/domain/` — the extracted logic
+
+Thirteen framework-free modules holding logic that used to live on the
+`BHSSoccerApp` prototype: `schedule`, `matrix`, `matrix-session`, `lineup`,
+`plus-minus-court`, `round-robin`, `season`, `progress`, `report`,
+`recording-numbers`, `roster`, `csv` and `upsert`.
+
+They are **side-effect free** — no DOM, no `localStorage`, no Supabase, no
+`this` — which is the whole point: they can be tested without booting the app,
+and Phase 1 of the Vue migration can import them directly.
+
+`public/js/` cannot import, so `src/main.ts` publishes each as a `window`
+namespace (`window.scheduleDomain`, `window.matrixDomain`, …) and the
+corresponding prototype method is a one-line delegation. This is the same
+mechanism `window.plusMinus` already used for the plus/minus replay engine.
+Adding a module means adding both the import and the `window` assignment in
+`main.ts`; only `npm run build` catches a missed one.
+
+Two things follow from that:
+
+- **Tests for domain modules import them directly** — no `?raw`, no
+  `new Function`, no hand-built `window`. New tests should be written this way.
+- **Legacy tests that evaluate a shimmed classic script need the namespaces.**
+  `src/domain/test-globals.ts` exports `installDomainGlobals()`, which puts all
+  thirteen on the global object in one call. Use it rather than importing and
+  assigning each one.
+
+`src/data/plus-minus.ts` (event replay) and `src/data/season-stats.ts` predate
+this directory and stay where they are; `domain/plus-minus-court.ts` is
+deliberately separate from the replay engine — one is the pitch, the other is
+the arithmetic.
+
+Not everything moved. Methods that mutate app state and re-render, touch
+`localStorage`, or build HTML stayed in their views, and the commit messages on
+the `refactor:` commits record which and why.
 
 ## Runtime architecture
 
