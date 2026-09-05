@@ -255,5 +255,15 @@ export function buildImport(
 ): BuiltMatch[] {
   return [...groupRows(rows).values()]
     .filter(group => group.length > 0)
-    .map(group => buildMatch(group, playerIdFor, fullMatchMinutes));
+    // A row needs a real recording number to name a player. Without one there
+    // is nothing to import, and the row is almost always the template's own
+    // hint line — which otherwise builds a match called "must match a fixture
+    // on the schedule" and puts it in the season report.
+    .map(group => group.filter(r => Number(r.recordingNumber) > 0))
+    .filter(group => group.length > 0)
+    .map(group => buildMatch(group, playerIdFor, fullMatchMinutes))
+    // Every number in the group was one nobody carries, so the session would
+    // hold a clock and no players. The unknown numbers are still reported by
+    // the caller; an empty session is not worth creating.
+    .filter(m => m.events.some(e => e.kind === 'on'));
 }

@@ -2859,7 +2859,11 @@ Object.assign(BHSSoccerApp.prototype, {
               shots: optI(this.pickColumn(r, ['Shots', 'Shot'])) || 0,
               goals: optI(this.pickColumn(r, ['Goals', 'Goal'])) || 0,
               assists: optI(this.pickColumn(r, ['Assists', 'Assist'])) || 0
-            })).filter(r => r.date && r.opponent);
+            // A recording number is what names the player, so a row without
+            // one imports nothing. It also drops the template's own hint row,
+            // whose Date and Opponent cells hold instructions rather than a
+            // fixture.
+            })).filter(r => r.date && r.opponent && r.recordingNumber > 0);
 
             const full = (this.seasonFullMatchMinutes && this.seasonFullMatchMinutes())
               || window.plusMinusImport.DEFAULT_FULL_MATCH_MINUTES;
