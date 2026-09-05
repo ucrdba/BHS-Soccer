@@ -31,10 +31,11 @@ were not.
 And a third thing, which arrived last and reshaped the rest:
 
 **Prospective coaches need somewhere to try the product.** A playground they
-can open, use as a coach, break, and come back to tomorrow to find fresh.
+can open, make an account on in seconds, fill with their own team, break, and
+come back to later the same day with their work still there.
 
 The three connect: seeding the app and testing it are the same clicks, and the
-seeded result is what the playground is reset to.
+seeded result is the template every visitor's playground is copied from.
 
 ## The playground changes where data lives
 
@@ -62,57 +63,87 @@ The same code as production. It differs in exactly two ways, both from
 build-time environment variables, so neither can leak into the real site:
 
 1. **It points at the demo Supabase project.**
-2. **It signs in automatically** as a shared demo coach.
+2. **It enables demo mode** — self-serve accounts, the warning, and the
+   expiry notice.
 
-### Why auto sign-in rather than no auth at all
+### Visitors make their own account
 
-A visitor sees no login screen either way. But RLS is enforced by Postgres
-against a real JWT, so a faked client-side session would render the coach UI
-and then have **every write silently refused** — the worst possible outcome
-for a playground whose entire purpose is playing.
+A prospective coach picks a username and a password and is a coach
+immediately. No email confirmation, no waiting for an admin to approve them,
+no shared login.
 
-Auto sign-in uses the ordinary sign-in path with credentials baked into the
-demo build, so authentication behaves exactly as it does in production and the
-divergence shrinks to one bootstrap call.
+**"Without authentication" means without the friction, not without a
+session.** The demo project runs ordinary Supabase Auth. What differs is that
+email confirmation is off and a trigger marks every new profile
+`role = 'coach'`, `status = 'active'` on creation. Production keeps its
+pending-approval flow untouched — the difference is a migration applied to the
+demo project only, not a branch in the app.
 
-Publishing that password in a public bundle is acceptable **here and only
-here**: the project holds nothing but invented data and is wiped nightly. It
-must never be the pattern for anything else.
+This matters because RLS is enforced by Postgres against a real JWT. A faked
+client-side session would render the coach UI and then have **every write
+silently refused**, which is the worst possible outcome for a playground whose
+entire point is playing. A real account makes every write behave exactly as it
+does in production.
+
+It also removes something the earlier draft had to apologise for: no shared
+password is baked into a public bundle, because there is no shared account.
+
+**A username is not an email address.** Supabase Auth requires one, so a
+chosen username is stored as `<username>@demo.invalid`. It can never receive
+mail, which is correct — nothing on the demo should ever send any. The visitor
+never sees the synthetic address; they sign back in with the username they
+chose.
+
+### Each visitor gets their own copy
+
+On signup, the template organization is cloned: a new organization owned by
+that visitor, with its own teams, players, fixtures and results copied from
+the template. They can rename, delete, re-import and generally wreck anything
+without another visitor noticing, and without touching the template.
+
+This is what makes the playground usable by two people at once, and it is why
+the reset deletes accounts rather than wiping the database.
 
 ### The warning
 
-The demo carries a persistent notice, not dismissible, in the banner strip at
-the top of every page:
+A persistent notice, not dismissible, in the banner strip on every page:
 
 ```
-DEMO SITE — everything here is made up, and all data is
-recreated nightly. Change anything you like.
+DEMO SITE — everything here is made up. Your data is deleted
+48 hours after you create your account. Change anything you like.
 ```
 
-Three jobs, and it needs all three. It stops a visitor mistaking the site for
-their real program. It tells them the players and results are fictional. And
-it invites them to break things, which is the point of a playground and is not
-obvious without being said.
+Four jobs, and it needs all four. It stops a visitor mistaking the site for
+their real program. It says the players and results are fictional. It states
+the expiry, in hours, before they invest an evening in it. And it invites them
+to break things, which is the point of a playground and is not obvious unless
+said.
 
 Rendered from the same demo flag as the rest, so it cannot appear on
 production and cannot be missing from the demo.
 
 ## Resetting the playground
 
-**Nightly, from a snapshot — not by driving the browser.**
+**Expiry, not a nightly wipe.**
 
-Driving the UI nightly would be slow and flaky, and a reset that fails
-silently leaves the playground in whatever state the last visitor left it. So:
+Wiping everything on a schedule would delete a visitor's work in the middle of
+their evaluation, which is the opposite of what was asked for. Instead:
 
-1. The Playwright scripts seed the demo project once, through the real UI.
-2. That state is dumped to `Resouces/SQL/demo_seed.sql`, which lives in the
-   repo and can be read and reviewed.
-3. A scheduled GitHub Action truncates the demo project's tables and restores
-   that file. Deterministic, seconds rather than minutes, and re-runnable on
-   demand when somebody leaves the playground in a mess.
+- Each visitor organization carries the moment it was created.
+- A scheduled job deletes organizations **older than 48 hours**, and the
+  accounts that own them.
+- The **template organization is never touched**, and is what each new signup
+  is cloned from.
 
-The snapshot is regenerated deliberately, when the demo data should change —
-not on every run, or the playground would drift with it.
+48 hours because a coach who tries this in the evening comes back after school
+the next day, which is when they actually have time. Twenty-four would delete
+their work exactly then, and that reads as the product losing data rather than
+as a demo expiring.
+
+The template itself is seeded once by the Playwright scripts, dumped to
+`Resouces/SQL/demo_seed.sql`, and restored only when the demo data should
+deliberately change. A reviewable file in the repo rather than whatever state
+a browser run happened to leave.
 
 ## The tool
 
@@ -197,10 +228,12 @@ e2e/
   data.ts                          the invented squad, fixtures, results
   auth|roster|schedule|lineup|session|plusminus|season|import|layout .spec.ts
 src/demo.ts                        the demo flag, auto sign-in, the warning
-Resouces/SQL/
+Resouces/SQL/demo/
   demo_schema.sql                  every migration, concatenated, for a fresh project
-  demo_seed.sql                    the snapshot the nightly reset restores
-.github/workflows/demo-reset.yml   the nightly job
+  demo_auth_open.sql               DEMO ONLY: no confirmation, auto-approve
+  demo_seed.sql                    the template every visitor is cloned from
+  demo_expire.sql                  deletes organizations older than 48 hours
+.github/workflows/demo-expire.yml  the scheduled expiry job
 .env.example                       variable names, no values
 ```
 
@@ -210,8 +243,16 @@ Resouces/SQL/
 likeliest thing to go wrong. Mitigated only by `demo_schema.sql` being
 regenerated from the migration files rather than maintained by hand.
 
-**A password in a public bundle.** Safe only because that project holds
-nothing real. Worth a comment at the point it appears so nobody copies it.
+**Anyone can create an account on the demo.** That is the point, and it is
+also an open door: a stranger can fill the demo project with whatever they
+like. Bounded by the 48-hour expiry and by the project holding nothing real,
+but the demo project should never be given a paid tier where abuse costs
+money.
+
+**Auto-approval is a demo-only migration.** If it were ever applied to
+production it would make every signup an instant coach. It must be named so
+that mistake is hard to make, and must never appear in supabase/migrations/,
+which is production's directory.
 
 **Install size and runtime.** Playwright downloads roughly 150 MB of browser.
 The suite drives a real browser against a live database: minutes, not seconds.
@@ -228,9 +269,10 @@ rather than on timing.
 The coach runs one command and gets a populated site to look at, without
 typing anything.
 
-A prospective coach opens a link, is a coach immediately, can break whatever
-they like, and finds it fresh tomorrow — never once touching a real student's
-record.
+A prospective coach opens a link, picks a username and a password, and is
+running their own copy of a program within a minute — no confirmation email,
+no waiting to be approved. They can break anything, come back after school the
+next day and find their work, and never once touch a real student's record.
 
 The bugs in the table at the top would have been caught before the coach saw
 them, with the honest exception of "the bold headings make GD hard to read",
