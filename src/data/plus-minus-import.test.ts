@@ -11,8 +11,8 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
 import {
-  groupRows, goalTimes, orderBuilt, buildMatch, buildImport,
-  DEFAULT_FULL_MATCH_MINUTES, type ImportRow
+  groupRows, goalTimes, orderBuilt, buildMatch, buildImport, resolveRowDates,
+  DEFAULT_FULL_MATCH_MINUTES, type ImportRow, type FixtureRef
 } from './plus-minus-import';
 import { replay } from './plus-minus';
 import adminSrc from '../../public/js/admin.js?raw';
@@ -410,6 +410,24 @@ describe('the admin.js side of the import', () => {
     expect(dropdown('importTarget')).toContain('value="plusminus"');
   });
 
+  it('reads dates through the same reader as the schedule importer', () => {
+    // "12/8/2026" in the sheet against "DEC 8 2026" in the database. Compared
+    // as text they never match, and every fixture imports as a loose session.
+    expect(branch).toContain('parseScheduleDate');
+  });
+
+  it('resolves the sheet against the schedule before building', () => {
+    expect(branch).toContain('resolveRowDates');
+    expect(branch).toContain('resolved.rows');
+  });
+
+  it('reports every reason a row was dropped', () => {
+    // A sheet that imports nothing must explain itself; silence reads as the
+    // feature being broken rather than the sheet needing a column.
+    expect(branch).toContain('resolved.warnings');
+    expect(branch).toMatch(/Nothing in that sheet could be imported/);
+  });
+
   it('does NOT offer an export that does nothing', () => {
     // There is no export branch for it, so choosing it would build a workbook
     // with no sheets. An option that silently fails is worse than one absent.
@@ -534,5 +552,93 @@ describe('numbers a spreadsheet formula produces', () => {
     const { built, stats } = roundTrip([row({ recordingNumber: 1, minutes: HS, plus: 60 })]);
     expect(stats.get('p1')!.plus).toBe(60);
     expect(built.events.filter(e => e.kind === 'plus')).toHaveLength(60);
+  });
+});
+
+describe('matching a sheet to the schedule', () => {
+  /**
+   * Reported with a real sheet whose dates read "12/8/2026" while the
+   * schedule holds "DEC 8 2026". The rows built fine — 32 events for the
+   * Sultana match — but the fixture lookup compared the two spellings
+   * directly, found nothing, and every match imported as a loose session that
+   * sorts to the bottom of the season report.
+   *
+   * The schedule importer already reads "12/8/2026", "8-Dec" and "DEC 8 2026"
+   * as the same day. Two importers in one app disagreeing about what a date
+   * looks like is the actual defect.
+   */
+  const FIXTURES: FixtureRef[] = [
+    { id: 'f1', date: 'DEC 8 2026',  opponent: 'Sultana' },
+    { id: 'f2', date: 'DEC 11 2026', opponent: 'El Toro' },
+    { id: 'f3', date: 'JAN 8 2027',  opponent: 'Redlands' },
+    { id: 'f4', date: 'JAN 27 2027', opponent: 'Redlands' }   // home and away
+  ];
+
+  it('keeps a row that already names a date', () => {
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: 'DEC 8 2026', opponent: 'Sultana', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toHaveLength(1);
+    expect(warnings).toEqual([]);
+  });
+
+  it('fills a missing date when the opponent leaves no doubt', () => {
+    // A coach writing by hand names the opponent and knows which match they
+    // mean; typing the date twice is what a spreadsheet exists to avoid.
+    const { rows } = resolveRowDates(
+      [row({ date: '', opponent: 'Sultana', recordingNumber: 1 })], FIXTURES);
+    expect(rows[0].date).toBe('DEC 8 2026');
+  });
+
+  it('refuses to guess when the team plays that opponent twice', () => {
+    // Home and away against Redlands is the ordinary case. Attaching figures
+    // to the wrong night silently is worse than skipping the rows.
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: '', opponent: 'Redlands', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings.join(' ')).toContain('more than once');
+    expect(warnings.join(' ')).toContain('Redlands');
+  });
+
+  it('says so when no fixture matches the opponent at all', () => {
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: '', opponent: 'Nowhere High', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings.join(' ')).toContain('Nowhere High');
+  });
+
+  it('counts the rows it dropped for a missing recording number', () => {
+    const { warnings } = resolveRowDates([
+      row({ opponent: 'Sultana', recordingNumber: 0 }),
+      row({ opponent: 'Sultana', recordingNumber: 0 })
+    ], FIXTURES);
+    expect(warnings.join(' ')).toContain('2 rows');
+    expect(warnings.join(' ')).toContain('RecordingNumber');
+  });
+
+  it('counts the rows it dropped for a missing opponent', () => {
+    const { warnings } = resolveRowDates([row({ opponent: '', recordingNumber: 1 })], FIXTURES);
+    expect(warnings.join(' ')).toContain('Opponent');
+  });
+
+  it('never drops a row without saying why', () => {
+    // The failure this replaced: a sheet imported nothing and gave no reason,
+    // which reads as the feature being broken rather than the sheet.
+    const { rows, warnings } = resolveRowDates([
+      row({ opponent: '', recordingNumber: 1 }),
+      row({ opponent: 'Sultana', recordingNumber: 0 }),
+      row({ date: '', opponent: 'Redlands', recordingNumber: 1 }),
+      row({ date: '', opponent: 'Nowhere High', recordingNumber: 1 })
+    ], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings).toHaveLength(4);
+  });
+
+  it('passes the good rows through alongside the complaints', () => {
+    const { rows, warnings } = resolveRowDates([
+      row({ date: '', opponent: 'Sultana', recordingNumber: 1 }),
+      row({ opponent: '', recordingNumber: 2 })
+    ], FIXTURES);
+    expect(rows).toHaveLength(1);
+    expect(warnings).toHaveLength(1);
   });
 });

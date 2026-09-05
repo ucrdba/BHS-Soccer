@@ -84,6 +84,78 @@ const num = (v: any): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** A fixture as the schedule holds it, for resolving a sheet against. */
+export interface FixtureRef {
+  id: string;
+  date: string;
+  opponent: string;
+}
+
+export interface ResolveResult {
+  rows: ImportRow[];
+  /** Reasons rows were dropped, in the words a coach needs to hear. */
+  warnings: string[];
+}
+
+/**
+ * Fill in a missing date from the opponent, and say what could not be filled.
+ *
+ * A sheet written by hand often names only the opponent — the coach knows
+ * which match they mean, and typing the date twice is the sort of thing a
+ * spreadsheet exists to avoid. When exactly one fixture on the schedule is
+ * against that opponent there is no ambiguity, so the date is taken from it.
+ *
+ * Where there IS ambiguity the row is dropped and said so. Two fixtures
+ * against Redlands is the ordinary case in a league that plays home and away,
+ * and guessing which one a figure belongs to would silently attach a match to
+ * the wrong night.
+ *
+ * Every drop produces a warning. A sheet that imports nothing must say why:
+ * "0 rows imported" with no reason is the failure this replaced.
+ */
+export function resolveRowDates(rows: ImportRow[], fixtures: FixtureRef[]): ResolveResult {
+  const norm = (v: any) => String(v ?? '').trim().toUpperCase();
+  const byOpponent = new Map<string, FixtureRef[]>();
+  for (const f of fixtures || []) {
+    const k = norm(f.opponent);
+    if (!byOpponent.has(k)) byOpponent.set(k, []);
+    byOpponent.get(k)!.push(f);
+  }
+
+  const out: ImportRow[] = [];
+  const noOpponent: number[] = [];
+  const noNumber: number[] = [];
+  const unmatched = new Set<string>();
+  const ambiguous = new Set<string>();
+
+  (rows || []).forEach((r, i) => {
+    const line = i + 2;                       // as the spreadsheet numbers it
+    if (!norm(r.opponent)) { noOpponent.push(line); return; }
+    if (!(Number(r.recordingNumber) > 0)) { noNumber.push(line); return; }
+
+    if (norm(r.date)) { out.push(r); return; }
+
+    const candidates = byOpponent.get(norm(r.opponent)) || [];
+    if (candidates.length === 1) { out.push({ ...r, date: candidates[0].date }); return; }
+    if (candidates.length === 0) { unmatched.add(String(r.opponent).trim()); return; }
+    ambiguous.add(String(r.opponent).trim());
+  });
+
+  const warnings: string[] = [];
+  if (noOpponent.length) {
+    warnings.push(`${noOpponent.length} row${noOpponent.length === 1 ? '' : 's'} had no Opponent and were skipped.`);
+  }
+  if (noNumber.length) {
+    warnings.push(`${noNumber.length} row${noNumber.length === 1 ? '' : 's'} had no RecordingNumber and were skipped.`);
+  }
+  unmatched.forEach(o => warnings.push(
+    `No fixture on this team's schedule is against "${o}", and the sheet gave no Date, so those rows were skipped.`));
+  ambiguous.forEach(o => warnings.push(
+    `This team plays "${o}" more than once, so a Date column is needed to say which match. Those rows were skipped.`));
+
+  return { rows: out, warnings };
+}
+
 /**
  * Group rows into matches, keyed on the fixture they name.
  *
