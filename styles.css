@@ -893,6 +893,48 @@ body.lineup-dragging .lineup-slot:not(.filled) { border-color: var(--bhs-gold-ac
   font-weight: 600;
 }
 
+/* The season plus/minus report. */
+.season-block {
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.season-block-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.season-trend { font-size: 0.75rem; font-weight: 700; }
+.season-trend-up   { color: var(--color-success); }
+.season-trend-down { color: var(--color-danger); }
+.season-trend-flat,
+.season-trend-none { color: var(--text-muted); }
+
+/* Side by side while there is room, stacked on a phone. Charts keep their
+   aspect through the SVG viewBox, so they simply get narrower. */
+.season-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.season-charts figure { margin: 0; }
+.season-charts figcaption {
+  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 2px;
+}
+.season-chart { width: 100%; height: auto; display: block; }
+
+.season-num {
+  color: var(--bhs-gold-accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+/* Rates line up as a column of decimals, so they can be compared by eye. */
+.season-table .season-rate { font-variant-numeric: tabular-nums; text-align: right; }
+
 .rank-pill {
   width: 32px;
   height: 32px;

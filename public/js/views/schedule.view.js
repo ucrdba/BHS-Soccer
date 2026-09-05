@@ -94,6 +94,8 @@ Object.assign(BHSSoccerApp.prototype, {
             <button class="btn btn-gold" onclick="app.openAddMatchModal()" style="font-weight:700;">➕ Add New Match</button>
             <button class="btn btn-secondary" onclick="app.openLineupModal(null)"
                     title="A default shape for this squad, not tied to a fixture">⚽ Default lineup</button>
+            <button class="btn btn-secondary" onclick="app.openSeasonReport()"
+                    title="Plus/minus added up across every tracked match, per player">📈 Season +/&minus;</button>
           </div>` : ''}
         </div>
 
