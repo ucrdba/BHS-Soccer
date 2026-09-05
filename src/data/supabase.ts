@@ -15,6 +15,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { isPublishableAnonKey } from './anon-key';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function initSupabaseClient(): void {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
 
-  if (url && url.includes('.supabase.co') && key && key.startsWith('eyJ')) {
+  if (url && url.includes('.supabase.co') && isPublishableAnonKey(key)) {
     try {
       supabaseClient = createClient(url, key, {
         auth: {
@@ -81,7 +82,7 @@ function initSupabaseClient(): void {
     }
   } else {
     supabaseClient = null;
-    console.log('📦 Operating in Local Database Mode (LocalStorage active). Provide valid Supabase Anon Key (starts with eyJ...) to enable Cloud DB.');
+    console.log('📦 Operating in Local Database Mode (LocalStorage active). Provide a valid Supabase publishable key (sb_publishable_... or a legacy eyJ... anon key) to enable Cloud DB.');
   }
 }
 
@@ -99,6 +100,13 @@ class SupabaseService {
 
   isConfigured(): boolean {
     return this.client !== null;
+  }
+
+  // Exposed so `public/js/admin.js` — a classic script that cannot import —
+  // validates a pasted key by the same rule the client itself applies.
+  // Duplicating the prefix test there is how the two drift.
+  isValidAnonKeyFormat(key: string): boolean {
+    return isPublishableAnonKey(key);
   }
 
   setCredentials(url: string, key: string): boolean {
@@ -389,7 +397,7 @@ class SupabaseService {
 
   async testProfileInsert(): Promise<any> {
     if (!this.isConfigured()) {
-      return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase Anon Key (starts with eyJ...) is entered.' };
+      return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase publishable key (sb_publishable_... or a legacy eyJ... anon key) is entered.' };
     }
 
     const testEmail = `test_profile_${Date.now().toString().slice(-4)}@bhs.org`;
@@ -426,7 +434,7 @@ class SupabaseService {
     if (!this.isConfigured()) {
       return {
         success: false,
-        summaryText: '❌ Supabase Database Client is NOT connected.\n\nReason: Missing or invalid Supabase Anon Key.\n\nFix: Open Admin Center -> Enter your Supabase Anon Key (starts with "eyJ...") and click "Save Credentials".',
+        summaryText: '❌ Supabase Database Client is NOT connected.\n\nReason: Missing or invalid Supabase publishable key.\n\nFix: Open Admin Center -> Enter your project\'s publishable key ("sb_publishable_..." or a legacy "eyJ..." anon key) and click "Save Credentials".',
         tableResults: []
       };
     }

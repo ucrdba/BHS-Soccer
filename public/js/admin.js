@@ -378,8 +378,8 @@ Object.assign(BHSSoccerApp.prototype, {
                 <input type="text" id="supabaseUrlInput" class="form-control" style="font-size:0.8rem;" value="${localStorage.getItem('bhs_supabase_url') || 'https://arsigevpgpbqluqbnhjr.supabase.co'}" placeholder="https://xyz.supabase.co" />
               </div>
               <div class="form-group" style="margin-bottom: 10px;">
-                <label style="font-size:0.75rem;">Supabase Anon Key (JWT starting with eyJ...)</label>
-                <input type="password" id="supabaseKeyInput" class="form-control" style="font-size:0.8rem;" value="${localStorage.getItem('bhs_supabase_anon_key') || ''}" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+                <label style="font-size:0.75rem;">Supabase Publishable Key (sb_publishable_... or a legacy eyJ... anon key)</label>
+                <input type="password" id="supabaseKeyInput" class="form-control" style="font-size:0.8rem;" value="${localStorage.getItem('bhs_supabase_anon_key') || ''}" placeholder="sb_publishable_..." />
               </div>
               <button class="btn btn-gold" style="width:100%; font-size:0.8rem; padding: 6px;" onclick="app.saveSupabaseCredentials(document.getElementById('supabaseUrlInput').value, document.getElementById('supabaseKeyInput').value)">💾 Save Credentials &amp; Connect</button>
             </div>
@@ -390,8 +390,10 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   saveSupabaseCredentials(url, key) {
-    if (!key || !key.startsWith('eyJ')) {
-      alert('⚠️ Please enter a valid Supabase Anon Key (starts with "eyJ..."). You can copy it from your Supabase Dashboard -> Project Settings -> API.');
+    // Same rule the client applies (src/data/anon-key.ts), reached through the
+    // service because this file is a classic script and cannot import it.
+    if (!window.supabaseService.isValidAnonKeyFormat(key)) {
+      alert('⚠️ Please enter a valid Supabase publishable key — "sb_publishable_..." on a current project, or a legacy "eyJ..." anon key. You can copy it from your Supabase Dashboard -> Project Settings -> API Keys.');
       return;
     }
     const ok = window.supabaseService.setCredentials(url, key);
@@ -405,7 +407,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   async pushAllLocalDataToSupabase() {
     if (!window.supabaseService || !window.supabaseService.isConfigured()) {
-      this.showAlertModal('Supabase Disconnected', '⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this sync.');
+      this.showAlertModal('Supabase Disconnected', '⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase publishable key ("sb_publishable_..." or a legacy "eyJ..." anon key) in the Admin Center, click "Save Credentials", then run this sync.');
       return;
     }
 
@@ -573,7 +575,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   async runLiveDatabaseTest() {
     if (!window.supabaseService || !window.supabaseService.isConfigured()) {
-      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this test.');
+      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase publishable key ("sb_publishable_..." or a legacy "eyJ..." anon key) in the Admin Center, click "Save Credentials", then run this test.');
       return;
     }
 
@@ -672,7 +674,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   async testProfilesTableInsert() {
     if (!window.supabaseService || !window.supabaseService.isConfigured()) {
-      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase Anon Key (starts with "eyJ...") in the Admin Center, click "Save Credentials", then run this test.');
+      alert('⚠️ Supabase Cloud Database is not connected.\n\nPlease enter your Supabase publishable key ("sb_publishable_..." or a legacy "eyJ..." anon key) in the Admin Center, click "Save Credentials", then run this test.');
       return;
     }
 
