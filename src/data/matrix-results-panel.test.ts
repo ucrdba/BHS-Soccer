@@ -27,6 +27,7 @@ import matrixSessionSrc from '../../public/js/views/matrix-session.view.js?raw';
 import plannerSrc from '../../public/js/views/planner.view.js?raw';
 import coachesSrc from '../../public/js/views/coaches.view.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
+import * as matrixDomain from '../domain/matrix';
 
 interface MatrixApp {
   data: Record<string, any>;
@@ -45,6 +46,7 @@ beforeAll(() => {
   const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
   const w = globalThis as any;
+  (globalThis as any).matrixDomain = matrixDomain;
   w.auth = {
     isCoach: () => isCoach, isAdmin: () => false, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},

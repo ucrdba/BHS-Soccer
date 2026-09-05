@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import matrixSrc from '../../public/js/views/matrix.view.js?raw';
+import * as matrixDomain from '../domain/matrix';
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
@@ -14,6 +15,7 @@ let app: MatrixApp;
 
 beforeEach(() => {
   const w = globalThis as any;
+  (globalThis as any).matrixDomain = matrixDomain;
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},

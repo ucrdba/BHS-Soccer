@@ -6,124 +6,29 @@
 
 Object.assign(BHSSoccerApp.prototype, {
 
-  /**
-   * The leaderboard for ONE exercise.
-   *
-   * The overall board answers "who is ahead". This answers "who has the most
-   * small-sided wins" and "who is best at Coopers", which are different
-   * questions with different natural answers.
-   *
-   * `best` is each player's PEAK, and which direction that means depends on the
-   * measure: the highest count for a counted exercise, the FASTEST time for a
-   * timed one. Taking the maximum for a timed drill would call a player's worst
-   * run their best and put the slowest of them on top.
-   *
-   * Points are totalled across every attempt rather than taken from the best
-   * one, so this column still agrees with the overall board.
-   */
+  // The board maths lives in src/domain/matrix.ts and reaches this classic
+  // script through window, the same way the plus/minus replay engine does.
+  // See docs/superpowers/specs/2026-09-05-vue-migration-design.md.
+
+  /** The data the matrix domain functions need, from app state. */
+  _matrixCtx() {
+    return {
+      points: this._exercisePoints || [],
+      players: this.data.players || [],
+      drillsBank: this.data.drillsBank || []
+    };
+  },
+
   exerciseLeaderboard(drillId, sortBy, reversed) {
-    const rows = (this._exercisePoints || []).filter(r => r.drill_id === drillId);
-    if (rows.length === 0) return [];
-
-    const drill = (this.data.drillsBank || []).find(d => d.id === drillId);
-    const measure = (drill && drill.measure) || 'count_high';
-    const timed = measure === 'time_low' || measure === 'time_bands';
-    const byId = new Map((this.data.players || []).map(p => [p.id, p]));
-
-    const acc = {};
-    rows.forEach(r => {
-      const a = acc[r.player_id] = acc[r.player_id] || {
-        playerId: r.player_id,
-        wins: 0, draws: 0, losses: 0,
-        earned: 0, available: 0, attempts: 0,
-        best: null, timed
-      };
-
-      a.wins += Number(r.w) || 0;
-      a.draws += Number(r.dr) || 0;
-      a.losses += Number(r.ls) || 0;
-      a.earned += Number(r.earned) || 0;
-      a.available += Number(r.available) || 0;
-
-      // A row with no value is an absence or a session never filled in: it
-      // counts against the points, but it is not an attempt and cannot be a
-      // personal best.
-      if (r.raw_value === null || r.raw_value === undefined) return;
-      a.attempts += 1;
-      const v = Number(r.raw_value);
-      if (a.best === null) a.best = v;
-      else a.best = timed ? Math.min(a.best, v) : Math.max(a.best, v);
-    });
-
-    const out = Object.values(acc).map(a => {
-      const p = byId.get(a.playerId);
-      return {
-        ...a,
-        name: (p && p.name) || 'Former squad member',
-        recordingNumber: p ? p.recordingNumber : null,
-        share: a.available ? (100 * a.earned) / a.available : 0
-      };
-    });
-
-    return out.sort((x, y) => this.compareExerciseRows(x, y, sortBy, timed, reversed));
+    return window.matrixDomain.exerciseLeaderboard(this._matrixCtx(), drillId, sortBy, reversed);
   },
 
-  /**
-   * Order two rows of a single-exercise board.
-   *
-   * Points first by default -- the board's own currency, and the only figure
-   * that means the same thing for every measure. A player with no figure at all
-   * sorts last whichever column is chosen, so a column of blanks never leads.
-   */
   compareExerciseRows(x, y, sortBy, timed, reversed) {
-    const by = sortBy || 'earned';
-    // Reversing flips the comparison of VALUES only. Rows with nothing to
-    // compare keep sinking either way -- a column of blanks must never lead
-    // the board just because it was clicked twice.
-    const flip = reversed ? -1 : 1;
-
-    if (by === 'best') {
-      if (x.best === null || y.best === null) {
-        if (x.best === y.best) return 0;
-        return x.best === null ? 1 : -1;
-      }
-      // Fastest first for a timed exercise; highest first for a counted one.
-      return flip * (timed ? x.best - y.best : y.best - x.best);
-    }
-
-    if (by === 'wins') {
-      if (y.wins !== x.wins) return flip * (y.wins - x.wins);
-      return flip * (y.earned - x.earned);
-    }
-
-    if (by === 'name') {
-      return flip * String(x.name || '').localeCompare(String(y.name || ''));
-    }
-
-    if (by === 'number') {
-      const nx = x.recordingNumber == null ? NaN : Number(x.recordingNumber);
-      const ny = y.recordingNumber == null ? NaN : Number(y.recordingNumber);
-      const gx = Number.isFinite(nx), gy = Number.isFinite(ny);
-      if (gx !== gy) return gx ? -1 : 1;          // unnumbered always last
-      if (gx && nx !== ny) return flip * (nx - ny);
-      return flip * String(x.name || '').localeCompare(String(y.name || ''));
-    }
-
-    // Default: points earned, with the best figure breaking a tie rather than
-    // leaving two equal players in whatever order they happened to arrive.
-    if (y.earned !== x.earned) return flip * (y.earned - x.earned);
-    if (x.best !== null && y.best !== null && x.best !== y.best) {
-      return flip * (timed ? x.best - y.best : y.best - x.best);
-    }
-    return String(x.name || '').localeCompare(String(y.name || ''));
+    return window.matrixDomain.compareExerciseRows(x, y, sortBy, timed, reversed);
   },
 
-  /** Exercises that actually have results, for the picker. */
   exercisesWithResults() {
-    const ids = new Set((this._exercisePoints || []).map(r => r.drill_id).filter(Boolean));
-    return (this.data.drillsBank || [])
-      .filter(d => ids.has(d.id) && !d.is_deleted && !d.isDeleted)
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    return window.matrixDomain.exercisesWithResults(this._matrixCtx());
   },
 
   /** How a player's best figure reads for this exercise. */
@@ -142,130 +47,39 @@ Object.assign(BHSSoccerApp.prototype, {
     this.renderCurrentView();
   },
 
-  /**
-   * The overall board's rows, already ordered.
-   *
-   * Lifted out of the template so the ordering can be tested and so the header
-   * can sort it. Rank stays the default, because that is the board's own
-   * answer to "who is ahead"; the other columns answer different questions.
-   *
-   * Per-key defaults rather than an object-level fallback: matrixStats is
-   * populated by left-joining standings onto the roster, so a player with no
-   * results has no matrixStats at all, and one with partial standings can be
-   * missing a single key while holding the rest.
-   */
   matrixBoardRows() {
-    const players = (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
-    // Hoisted: computing this per row would rescan every player for every row.
-    const leaderPts = Math.max(0, ...players.map(x => Number(x.matrixStats?.earned || 0)));
-
-    const rows = players.map(p => {
-      const ms = p.matrixStats || {};
-      const earned = Number(ms.earned || 0);
-      return {
-        playerId: p.id,
-        name: p.name,
-        recordingNumber: p.recordingNumber,
-        wins: ms.wins || 0, draws: ms.draws || 0, losses: ms.losses || 0,
-        games: ms.games || 0, exercises: ms.exercises || 0,
-        earned,
-        available: Number(ms.available || 0),
-        share: (ms.share === undefined ? null : ms.share),
-        rank: ms.rank || 999,
-        // The bar tracks POINTS against the leader, because points are what
-        // the table is ordered by by default. A bar drawn from share would
-        // disagree with the ordering sitting beside it.
-        barPct: leaderPts > 0 ? Math.round((earned / leaderPts) * 100) : 0
-      };
-    });
-
-    const by = this._boardSort || 'rank';
-    const reversed = !!this._boardSortReversed;
-    return rows.sort((x, y) => this.compareBoardRows(x, y, by, reversed));
+    return window.matrixDomain.matrixBoardRows(
+      this.data.players || [], this._boardSort || 'rank', !!this._boardSortReversed);
   },
 
-  /**
-   * Order two rows of the overall board.
-   *
-   * A player who has taken part in nothing is not last on merit and not first
-   * when reversed -- there is nothing to compare. They sink either way, so a
-   * block of empty rows never leads the board.
-   */
   compareBoardRows(x, y, by, reversed) {
-    const flip = reversed ? -1 : 1;
-    const unranked = (r) => r.exercises === 0;
-
-    if (by !== 'name') {
-      if (unranked(x) !== unranked(y)) return unranked(x) ? 1 : -1;
-    }
-
-    if (by === 'name') {
-      return flip * String(x.name || '').localeCompare(String(y.name || ''));
-    }
-
-    if (by === 'earned') {
-      if (x.earned !== y.earned) return flip * (y.earned - x.earned);
-      return String(x.name || '').localeCompare(String(y.name || ''));
-    }
-
-    if (by === 'share') {
-      // Share is null until a player has taken part in something.
-      if (x.share === null || y.share === null) {
-        if (x.share === y.share) return 0;
-        return x.share === null ? 1 : -1;
-      }
-      if (x.share !== y.share) return flip * (y.share - x.share);
-      return String(x.name || '').localeCompare(String(y.name || ''));
-    }
-
-    // Default: the board's own rank, best first.
-    if (x.rank !== y.rank) return flip * (x.rank - y.rank);
-    return String(x.name || '').localeCompare(String(y.name || ''));
+    return window.matrixDomain.compareBoardRows(x, y, by, reversed);
   },
 
-  /** Which way a board column reads on its first click. */
   boardSortDescends(by) {
-    return by === 'earned' || by === 'share';
+    return window.matrixDomain.boardSortDescends(by);
   },
 
+  // The decision moves to the domain module; the assignment and the redraw
+  // stay here, because they are what makes this a view method.
   setBoardSort(by) {
-    if (this._boardSort === by) {
-      this._boardSortReversed = !this._boardSortReversed;
-    } else {
-      this._boardSort = by;
-      this._boardSortReversed = false;
-    }
+    const next = window.matrixDomain.nextSortState(
+      { by: this._boardSort, reversed: !!this._boardSortReversed }, by);
+    this._boardSort = next.by;
+    this._boardSortReversed = next.reversed;
     this.renderCurrentView();
   },
 
-  /**
-   * Click a column to sort by it; click the same one again to reverse.
-   *
-   * There was no direction at all before: every click re-applied the same
-   * fixed order, so the board sorted one way and the arrow in the header
-   * implied a second way that did not exist.
-   */
   setExerciseSort(by) {
-    if (this._exerciseSort === by) {
-      this._exerciseSortReversed = !this._exerciseSortReversed;
-    } else {
-      this._exerciseSort = by;
-      this._exerciseSortReversed = false;
-    }
+    const next = window.matrixDomain.nextSortState(
+      { by: this._exerciseSort, reversed: !!this._exerciseSortReversed }, by);
+    this._exerciseSort = next.by;
+    this._exerciseSortReversed = next.reversed;
     this.renderCurrentView();
   },
 
-  /**
-   * Which way a column reads on its FIRST click.
-   *
-   * Points and wins read highest-first, a time reads fastest-first, and a name
-   * or number reads lowest-first. Knowing this is what lets the header arrow
-   * show the order actually in force rather than just "sorted".
-   */
   exerciseSortDescends(by, timed) {
-    if (by === 'name' || by === 'number') return false;
-    if (by === 'best') return !timed;
-    return true;                        // earned, wins
+    return window.matrixDomain.exerciseSortDescends(by, timed);
   },
 
   async loadExercisePoints() {

@@ -9,6 +9,7 @@ import { can, setRoles, type RoleRow } from './auth/permissions';
 import { backupLegacyBlob } from './data/cache';
 import { resolveActiveTeam } from './data/team-scope';
 import * as scheduleDomain from './domain/schedule';
+import * as matrixDomain from './domain/matrix';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -103,6 +104,9 @@ window.can = can;
  * docs/superpowers/specs/2026-09-05-vue-migration-design.md.
  */
 (window as any).scheduleDomain = scheduleDomain;
+
+/** The Competitive Matrix boards and their comparators. */
+(window as any).matrixDomain = matrixDomain;
 
 /**
  * Show which build is serving this page, in the footer.

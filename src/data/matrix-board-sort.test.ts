@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import matrixSrc from '../../public/js/views/matrix.view.js?raw';
+import * as matrixDomain from '../domain/matrix';
 
 let ctor: any;
 
@@ -47,6 +48,7 @@ const order = (app: any) => app.matrixBoardRows().map((r: any) => r.playerId);
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).matrixDomain = matrixDomain;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
