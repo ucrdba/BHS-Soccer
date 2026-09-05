@@ -2,6 +2,7 @@
 import { supabaseService } from './data/supabase';
 import * as plusMinus from './data/plus-minus';
 import * as seasonStats from './data/season-stats';
+import * as plusMinusImport from './data/plus-minus-import';
 import { buildInfo, formatBuildStamp, buildStampTitle } from './build-info';
 import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
@@ -89,6 +90,8 @@ window.can = can;
 // The season report is a classic script, so its maths reaches it the same way
 // the per-match replay engine does.
 (window as any).seasonStats = seasonStats;
+// admin.js turns an imported sheet back into an event log through this.
+(window as any).plusMinusImport = plusMinusImport;
 
 /**
  * Show which build is serving this page, in the footer.
