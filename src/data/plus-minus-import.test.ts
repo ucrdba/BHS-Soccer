@@ -11,8 +11,8 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
 import {
-  groupRows, goalTimes, orderBuilt, buildMatch, buildImport,
-  DEFAULT_FULL_MATCH_MINUTES, type ImportRow
+  groupRows, goalTimes, orderBuilt, buildMatch, buildImport, resolveRowDates,
+  DEFAULT_FULL_MATCH_MINUTES, type ImportRow, type FixtureRef
 } from './plus-minus-import';
 import { replay } from './plus-minus';
 import adminSrc from '../../public/js/admin.js?raw';
@@ -383,7 +383,262 @@ describe('the admin.js side of the import', () => {
     expect(tmpl).not.toMatch(/GoalDiff|Differential/);
   });
 
-  it('is reachable from both dropdowns', () => {
-    expect(adminSrc.match(/value="plusminus"/g) || []).toHaveLength(2);
+  /**
+   * Reported: "no file dialog comes up when I try to Plus/Minus Stats. Also
+   * there is no template for Plus/Minus Stats."
+   *
+   * Both symptoms, one cause. The option was added by matching the text of
+   * the neighbouring Schedule option — which reads "Schedule & Results" in
+   * two of the three dropdowns and "Schedule & Results (games)" in the third.
+   * So it landed in Export, where nothing handles it and the workbook would
+   * have no sheets, and never reached Template at all.
+   *
+   * The first version of this test counted two occurrences of the option and
+   * passed, because two is what a wrong pair also comes to. Counting is not
+   * checking: these name the dropdown.
+   */
+  const dropdown = (id: string) => {
+    const i = adminSrc.indexOf(`id="${id}"`);
+    return adminSrc.slice(i, adminSrc.indexOf('</select>', i));
+  };
+
+  it('offers the template, which is where it was missing', () => {
+    expect(dropdown('templateTarget')).toContain('value="plusminus"');
+  });
+
+  it('offers the import, which is what opens the file dialog', () => {
+    expect(dropdown('importTarget')).toContain('value="plusminus"');
+  });
+
+  it('reads dates through the same reader as the schedule importer', () => {
+    // "12/8/2026" in the sheet against "DEC 8 2026" in the database. Compared
+    // as text they never match, and every fixture imports as a loose session.
+    expect(branch).toContain('parseScheduleDate');
+  });
+
+  it('resolves the sheet against the schedule before building', () => {
+    expect(branch).toContain('resolveRowDates');
+    expect(branch).toContain('resolved.rows');
+  });
+
+  it('reports every reason a row was dropped', () => {
+    // A sheet that imports nothing must explain itself; silence reads as the
+    // feature being broken rather than the sheet needing a column.
+    expect(branch).toContain('resolved.warnings');
+    expect(branch).toMatch(/Nothing in that sheet could be imported/);
+  });
+
+  it('does NOT offer an export that does nothing', () => {
+    // There is no export branch for it, so choosing it would build a workbook
+    // with no sheets. An option that silently fails is worse than one absent.
+    expect(dropdown('exportTarget')).not.toContain('value="plusminus"');
+  });
+});
+
+describe('junk the sheet arrives with', () => {
+  /**
+   * The template ships a hint row as its first line of data — "must match a
+   * fixture on the schedule" in the Date cell, and so on — so a coach can see
+   * what each column wants. Filled in beneath and imported, that row used to
+   * build a real match named after its own instructions and put it in the
+   * season report.
+   */
+  const hintRow = {
+    date: 'must match a fixture on the schedule',
+    opponent: 'must match that fixture',
+    goalsFor: 0, goalsAgainst: 0,
+    recordingNumber: 0, minutes: 0,
+    plus: 0, minus: 0, shots: 0, goals: 0, assists: 0
+  } as ImportRow;
+
+  it('does not build a match out of the template hint row', () => {
+    expect(buildImport([hintRow], byNumber, HS)).toEqual([]);
+  });
+
+  it('still imports the real rows sitting under it', () => {
+    const built = buildImport([
+      hintRow,
+      row({ recordingNumber: 1, minutes: HS, plus: 3 })
+    ], byNumber, HS);
+    expect(built).toHaveLength(1);
+    expect(replay(built[0].events as any).get('p1')!.plus).toBe(3);
+  });
+
+  it('skips a row with no recording number', () => {
+    // Nothing names the player, so there is nothing to record against anyone.
+    const built = buildImport([
+      row({ recordingNumber: 0, minutes: HS, plus: 9 }),
+      row({ recordingNumber: 1, minutes: HS, plus: 3 })
+    ], byNumber, HS);
+    expect(replay(built[0].events as any).get('p1')!.plus).toBe(3);
+    expect(built[0].events.filter(e => e.kind === 'plus')).toHaveLength(3);
+  });
+
+  it('does not report a blank recording number as an unknown player', () => {
+    // A blank cell is a row nobody filled in, not a typo naming a player who
+    // does not exist. Reporting "no player carries recording number 0" would
+    // send a coach hunting for a mistake in a row that simply has no data.
+    const built = buildImport([
+      row({ recordingNumber: 1, plus: 2 }),
+      row({ recordingNumber: 0, plus: 9 })
+    ], byNumber, HS);
+    expect(built).toHaveLength(1);
+    expect(built[0].unknownNumbers).toEqual([]);
+  });
+
+  it('creates no session when every number is one nobody carries', () => {
+    // A clock and no players is not a match. The unknown numbers are still
+    // reported to the coach by the caller.
+    expect(buildImport([
+      row({ recordingNumber: 98 }), row({ recordingNumber: 99 })
+    ], byNumber, HS)).toEqual([]);
+  });
+
+  it('keeps a match where only some numbers are unknown', () => {
+    const built = buildImport([
+      row({ recordingNumber: 1, plus: 2 }),
+      row({ recordingNumber: 99, plus: 5 })
+    ], byNumber, HS);
+    expect(built).toHaveLength(1);
+    expect(built[0].unknownNumbers).toEqual([99]);
+    expect(replay(built[0].events as any).get('p1')!.plus).toBe(2);
+  });
+});
+
+describe('numbers a spreadsheet formula produces', () => {
+  /**
+   * A coach generating test data with RAND() gets decimals, occasional
+   * negatives and the odd absurd value. None of it should produce a log that
+   * replays to something other than what the sheet says, or a match the live
+   * screen could not have produced.
+   */
+  it('takes a decimal minute count without losing the player', () => {
+    const { stats } = roundTrip([row({ recordingNumber: 1, minutes: 37.6 as any })]);
+    expect(stats.get('p1')!.secondsPlayed).toBeGreaterThan(30 * 60);
+    expect(stats.get('p1')!.secondsPlayed).toBeLessThanOrEqual(38 * 60);
+  });
+
+  it('ignores a negative count rather than subtracting', () => {
+    // A formula that dips below zero must not remove events that were never
+    // there. Nothing is recorded, and nothing breaks.
+    const { stats } = roundTrip([row({ recordingNumber: 1, minutes: 40, plus: -3 as any })]);
+    expect(stats.get('p1')!.plus).toBe(0);
+  });
+
+  it('treats a blank cell as zero, not as a broken row', () => {
+    const { stats } = roundTrip([
+      row({ recordingNumber: 1, minutes: 40, plus: undefined, minus: undefined })
+    ]);
+    expect(stats.get('p1')!.plus).toBe(0);
+    expect(stats.get('p1')!.secondsPlayed).toBe(40 * 60);
+  });
+
+  it('survives text where a number was expected', () => {
+    // A formula returning #DIV/0! or an empty string reaches here as text.
+    const { stats } = roundTrip([
+      row({ recordingNumber: 1, minutes: 40, plus: '#DIV/0!' as any })
+    ]);
+    expect(stats.get('p1')!.plus).toBe(0);
+  });
+
+  it('clamps minutes longer than the match', () => {
+    const { stats } = roundTrip([row({ recordingNumber: 1, minutes: 400 })]);
+    expect(stats.get('p1')!.secondsPlayed).toBe(HS * 60);
+  });
+
+  it('keeps a large plus count honest rather than dropping it', () => {
+    // One event per unit, so a big number is a big log. It still replays to
+    // exactly what was written down.
+    const { built, stats } = roundTrip([row({ recordingNumber: 1, minutes: HS, plus: 60 })]);
+    expect(stats.get('p1')!.plus).toBe(60);
+    expect(built.events.filter(e => e.kind === 'plus')).toHaveLength(60);
+  });
+});
+
+describe('matching a sheet to the schedule', () => {
+  /**
+   * Reported with a real sheet whose dates read "12/8/2026" while the
+   * schedule holds "DEC 8 2026". The rows built fine — 32 events for the
+   * Sultana match — but the fixture lookup compared the two spellings
+   * directly, found nothing, and every match imported as a loose session that
+   * sorts to the bottom of the season report.
+   *
+   * The schedule importer already reads "12/8/2026", "8-Dec" and "DEC 8 2026"
+   * as the same day. Two importers in one app disagreeing about what a date
+   * looks like is the actual defect.
+   */
+  const FIXTURES: FixtureRef[] = [
+    { id: 'f1', date: 'DEC 8 2026',  opponent: 'Sultana' },
+    { id: 'f2', date: 'DEC 11 2026', opponent: 'El Toro' },
+    { id: 'f3', date: 'JAN 8 2027',  opponent: 'Redlands' },
+    { id: 'f4', date: 'JAN 27 2027', opponent: 'Redlands' }   // home and away
+  ];
+
+  it('keeps a row that already names a date', () => {
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: 'DEC 8 2026', opponent: 'Sultana', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toHaveLength(1);
+    expect(warnings).toEqual([]);
+  });
+
+  it('fills a missing date when the opponent leaves no doubt', () => {
+    // A coach writing by hand names the opponent and knows which match they
+    // mean; typing the date twice is what a spreadsheet exists to avoid.
+    const { rows } = resolveRowDates(
+      [row({ date: '', opponent: 'Sultana', recordingNumber: 1 })], FIXTURES);
+    expect(rows[0].date).toBe('DEC 8 2026');
+  });
+
+  it('refuses to guess when the team plays that opponent twice', () => {
+    // Home and away against Redlands is the ordinary case. Attaching figures
+    // to the wrong night silently is worse than skipping the rows.
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: '', opponent: 'Redlands', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings.join(' ')).toContain('more than once');
+    expect(warnings.join(' ')).toContain('Redlands');
+  });
+
+  it('says so when no fixture matches the opponent at all', () => {
+    const { rows, warnings } = resolveRowDates(
+      [row({ date: '', opponent: 'Nowhere High', recordingNumber: 1 })], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings.join(' ')).toContain('Nowhere High');
+  });
+
+  it('counts the rows it dropped for a missing recording number', () => {
+    const { warnings } = resolveRowDates([
+      row({ opponent: 'Sultana', recordingNumber: 0 }),
+      row({ opponent: 'Sultana', recordingNumber: 0 })
+    ], FIXTURES);
+    expect(warnings.join(' ')).toContain('2 rows');
+    expect(warnings.join(' ')).toContain('RecordingNumber');
+  });
+
+  it('counts the rows it dropped for a missing opponent', () => {
+    const { warnings } = resolveRowDates([row({ opponent: '', recordingNumber: 1 })], FIXTURES);
+    expect(warnings.join(' ')).toContain('Opponent');
+  });
+
+  it('never drops a row without saying why', () => {
+    // The failure this replaced: a sheet imported nothing and gave no reason,
+    // which reads as the feature being broken rather than the sheet.
+    const { rows, warnings } = resolveRowDates([
+      row({ opponent: '', recordingNumber: 1 }),
+      row({ opponent: 'Sultana', recordingNumber: 0 }),
+      row({ date: '', opponent: 'Redlands', recordingNumber: 1 }),
+      row({ date: '', opponent: 'Nowhere High', recordingNumber: 1 })
+    ], FIXTURES);
+    expect(rows).toEqual([]);
+    expect(warnings).toHaveLength(4);
+  });
+
+  it('passes the good rows through alongside the complaints', () => {
+    const { rows, warnings } = resolveRowDates([
+      row({ date: '', opponent: 'Sultana', recordingNumber: 1 }),
+      row({ opponent: '', recordingNumber: 2 })
+    ], FIXTURES);
+    expect(rows).toHaveLength(1);
+    expect(warnings).toHaveLength(1);
   });
 });

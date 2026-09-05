@@ -256,7 +256,6 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results</option>
-                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="matrix">⚔️ Matrix Competition Logs</option>
@@ -299,6 +298,7 @@ Object.assign(BHSSoccerApp.prototype, {
                   <option value="profiles">👤 User Profiles &amp; Roles</option>
                   <option value="players">👥 Players / Roster</option>
                   <option value="schedule">📅 Schedule &amp; Results (games)</option>
+                  <option value="plusminus">± Plus/Minus Match Stats</option>
                   <option value="drills">📚 Master Drills Library</option>
                   <option value="plan">📋 Practice Plans</option>
                   <option value="coaches">👔 Coaching Staff</option>
@@ -2848,7 +2848,14 @@ Object.assign(BHSSoccerApp.prototype, {
             });
 
             const parsed = rows.map(r => ({
-              date: toStr(this.pickColumn(r, ['Date', 'MatchDate'])),
+              // Through the same reader the schedule importer uses, so "12/8/2026",
+              // "8-Dec" and "DEC 8 2026" all mean the same day in both sheets.
+              // Without this the fixture lookup below compares "12/8/2026" against
+              // the stored "DEC 8 2026", never matches, and every match imports as
+              // a loose session that sorts to the bottom of the season report.
+              date: (window.supabaseService.parseScheduleDate
+                     && window.supabaseService.parseScheduleDate(this.pickColumn(r, ['Date', 'MatchDate'])))
+                    || toStr(this.pickColumn(r, ['Date', 'MatchDate'])),
               opponent: toStr(this.pickColumn(r, ['Opponent', 'Versus', 'Vs'])),
               goalsFor: optI(this.pickColumn(r, ['GoalsFor', 'For', 'ScoreFor'])) || 0,
               goalsAgainst: optI(this.pickColumn(r, ['GoalsAgainst', 'Against', 'ScoreAgainst'])) || 0,
@@ -2859,12 +2866,26 @@ Object.assign(BHSSoccerApp.prototype, {
               shots: optI(this.pickColumn(r, ['Shots', 'Shot'])) || 0,
               goals: optI(this.pickColumn(r, ['Goals', 'Goal'])) || 0,
               assists: optI(this.pickColumn(r, ['Assists', 'Assist'])) || 0
-            })).filter(r => r.date && r.opponent);
+            }));
+
+            // Fill a missing Date from the Opponent where the schedule leaves
+            // no doubt, and say why anything was dropped. A sheet that imports
+            // nothing has to explain itself; silence reads as the feature
+            // being broken.
+            const resolved = window.plusMinusImport.resolveRowDates(
+              parsed,
+              (this.data.schedule || [])
+                .filter(f => !f.is_deleted && !f.isDeleted)
+                .map(f => ({ id: f.id, date: f.date, opponent: f.opponent })));
+            resolved.warnings.forEach(w => warnings.push(w));
 
             const full = (this.seasonFullMatchMinutes && this.seasonFullMatchMinutes())
               || window.plusMinusImport.DEFAULT_FULL_MATCH_MINUTES;
             const built = window.plusMinusImport.buildImport(
-              parsed, n => byRecording.get(Number(n)) || null, full);
+              resolved.rows, n => byRecording.get(Number(n)) || null, full);
+            if (built.length === 0 && resolved.warnings.length === 0) {
+              warnings.push('Nothing in that sheet could be imported. Check it has Date, Opponent, RecordingNumber and Minutes columns.');
+            }
 
             const unknown = new Set();
             for (const m of built) {
