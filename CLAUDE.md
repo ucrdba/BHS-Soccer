@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A single-page web app for the Beaumont High School (CA) Cougars soccer program: public roster/schedule hub plus a coach-only command center (Anson Dorrance "Competitive Matrix" player ranking, practice planner, canvas tactical diagrammer, XLSX import/export). No framework — plain classes rendering HTML template strings into `#mainAppContainer`. Backend is Supabase (Postgres + Auth + RLS), which is the source of truth: `loadData()` returns empty collections, `saveData()` is a no-op, and `syncFromSupabase()` populates app state from Postgres on boot. When Supabase is not configured, the app runs with empty data rather than falling back to localStorage.
+A single-page web app for high-school and club soccer programs — Beaumont High School (CA) is the first organization, not the only one: public roster/schedule hub plus a coach-only command center (Anson Dorrance "Competitive Matrix" player ranking, practice planner, canvas tactical diagrammer, XLSX import/export).
+
+**It is mid-migration to Vue.** The app that ships is still the framework-free one — plain classes rendering HTML template strings into `#mainAppContainer` — and a Vue rebuild is being built alongside it. See "Two apps, two entry points" below, and `docs/superpowers/specs/2026-09-05-vue-migration-design.md` for the strategy and its phases. Backend is Supabase (Postgres + Auth + RLS), which is the source of truth: `loadData()` returns empty collections, `saveData()` is a no-op, and `syncFromSupabase()` populates app state from Postgres on boot. When Supabase is not configured, the app runs with empty data rather than falling back to localStorage.
 
 `walkthrough.md` and `implementation_plan.md` are the original product spec and verification notes. They are still broadly accurate about *features*, but predate the refactors below — do not trust them for file layout.
 
@@ -12,9 +14,9 @@ A single-page web app for the Beaumont High School (CA) Cougars soccer program: 
 
 ```bash
 npm run dev        # vite dev server, opens browser
-npm run build      # tsc (typecheck) + vite build -> dist/
-npm run typecheck  # tsc --noEmit over src/ only
-npm test           # vitest — 1,924 tests, config in vitest.config.mts
+npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
+npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
+npm test           # vitest — 1,994 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -22,37 +24,53 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (1,924 tests across 93 files).
-- `npm run typecheck` — `tsc --noEmit` over `src/` **only**; it does not see `public/js/`.
+- `npm test` — Vitest unit tests (1,994 tests across 100 files), including Vue component tests.
+- `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
 
 `npm run dev` serves the app correctly — do not serve the repo root statically. `index.html` loads `./src/main.ts` as an ES module (no browser executes a `.ts` file directly), and everything under `./js/*` resolves only through Vite's `publicDir` mapping to `public/js/`. Use `npm run dev` to run the app locally.
 
-## The three parallel copies of the app — read this first
+## Two apps, two entry points — read this first
 
-The same application exists three times, and only one of them actually runs:
+There are **two HTML entry points**, and `npm run build` emits both:
+
+| Entry | App |
+| --- | --- |
+| `index.html` | The **legacy** app, and the one Vercel serves at the root. Loads `src/main.ts` plus 22 classic scripts from `./js/*`. |
+| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. |
+
+They never share a document. Cutover is Phase 7 of the migration, when `app.html` becomes `index.html` and the legacy files are deleted.
 
 | Location | Status |
 | --- | --- |
-| `app.js` (6.3k lines) | Legacy monolith. **Dead** — not referenced by `index.html`. Kept only as the source the split scripts cut from. |
-| `public/js/*.js`, `public/js/views/*.js` | **What the browser actually loads**, via Vite's `publicDir` (referenced from `index.html` as `./js/*`). |
-| `src/*.ts`, `src/views/*.ts` | Real Supabase Auth, RBAC, and the Supabase client are here (`src/auth.ts`, `src/data/supabase.ts`). `src/main.ts` is the module entry point `index.html` loads (`<script type="module" src="./src/main.ts">`); it installs `window.auth`, `window.authReady`, `window.can`, and `window.supabaseService`. |
+| `app.js` (6.3k lines) | Legacy monolith. **Dead** — not referenced by anything. Kept only as the source the split scripts cut from. |
+| `public/js/*.js`, `public/js/views/*.js` | **What the legacy app loads**, via Vite's `publicDir` (referenced from `index.html` as `./js/*`). |
+| `src/domain/*.ts` | Framework-free logic, shared by both apps. See its own section below. |
+| `src/data/`, `src/auth.ts`, `src/auth/permissions.ts` | Supabase client, real Supabase Auth and RBAC. Shared by both apps. |
+| `src/main.ts` | The **legacy** entry. Installs `window.auth`, `window.authReady`, `window.can`, `window.supabaseService` and the domain namespaces the classic scripts read. |
+| `src/vue-main.ts`, `src/App.vue`, `src/views/*.vue`, `src/components/`, `src/stores/`, `src/router/` | The **Vue** app. Imports the shared modules directly; publishes no globals. |
+
+Because `src/domain/`, `src/data/` and `src/auth.ts` are shared, a change there affects **both** apps — and only `npm run build` plus the full suite proves it.
+
+**Owed at cutover:** `createWebHistory` needs the server to serve `app.html` for unknown paths. Vite's dev server does this; Vercel does not, and no rewrite is configured yet because nothing points at `/app.html`. Until Phase 7 adds one, a direct visit to `/roster` on the deployed site 404s.
 
 Consequences worth respecting:
 
 - `src/` is not a complete port of the UI. The 22 files under `public/js/` still own every screen: as well as `views/planner.view.js` (2.3k+ lines — planner, print/PDF, drills library, daily thoughts, quiz, coaches view, school profile forms) and `admin.js` (admin panel, diagnostics, import/export), there are `views/` files for `lineup`, `plusminus`, `matrix-session`, `season`, `report`, `progress`, `roundrobin`, `recording-numbers`, `thoughts`, `help`, `teamswitcher`, `home`, `roster`, `schedule`, `matrix` and `coaches`. `auth.js` and `supabaseClient.js` are **deleted** — real auth is `src/auth.ts`, the client is `src/data/supabase.ts`.
 - `src/app.core.ts` ends with a **"Pending migration"** `export interface BHSSoccerApp` block declaring the still-JS methods so the TS side type-checks on its own. Delete a line from it when that method lands as a real `src/` module. Same idea in `src/globals.d.ts`, which ambient-declares `window.supabaseService`'s shape and the CDN UMD globals `XLSX` / `JSZip`.
 - `src/app.core.ts`, `src/data.ts`, and `src/utils.ts` are dormant — not part of the module graph `src/main.ts` builds, and not referenced by `index.html`. They still carry the pre-migration seed logic (`DEFAULT_BHS_DATA`, the localStorage read/write cycle) that `public/js/app.core.js` already had stripped out. They must be ported to match the live behavior before anything wires them into the module graph in Phase 2 — do not activate them as-is.
-- `npm run build` **works**: `tsc` typechecks `src/`, then Vite bundles `src/main.ts` and copies `public/` (including `public/js/`) into `dist/` via `publicDir`. `npm run build` is the only check that exercises real module resolution, and is mandatory before merging any change that touches imports.
+- `npm run build` **works**: `vue-tsc` typechecks `src/`, then Vite bundles both entry points and copies `public/` (including `public/js/`) into `dist/` via `publicDir`. `npm run build` is the only check that exercises real module resolution, and is mandatory before merging any change that touches imports.
 - The root `*.ps1` scripts (`split_app.ps1`, `patch_commas.ps1`, `fix_boundary.ps1`, `find_methods.ps1`) are one-off tooling from the `app.js` → `js/` split. They are not part of the build, and re-running them would overwrite hand-edits.
 
 ## `src/domain/` — the extracted logic
 
-Thirteen framework-free modules holding logic that used to live on the
+Sixteen framework-free modules holding logic that used to live on the
 `BHSSoccerApp` prototype: `schedule`, `matrix`, `matrix-session`, `lineup`,
 `plus-minus-court`, `round-robin`, `season`, `progress`, `report`,
-`recording-numbers`, `roster`, `csv` and `upsert`.
+`recording-numbers`, `roster`, `csv` and `upsert`, plus three the Vue rebuild's
+first screen needed: `season-record`, `schedule-row` (the schedule table's
+snake_case read mapping) and `theme` (an organization's branding).
 
 They are **side-effect free** — no DOM, no `localStorage`, no Supabase, no
 `this` — which is the whole point: they can be tested without booting the app,
@@ -70,8 +88,8 @@ Two things follow from that:
 - **Tests for domain modules import them directly** — no `?raw`, no
   `new Function`, no hand-built `window`. New tests should be written this way.
 - **Legacy tests that evaluate a shimmed classic script need the namespaces.**
-  `src/domain/test-globals.ts` exports `installDomainGlobals()`, which puts all
-  thirteen on the global object in one call. Use it rather than importing and
+  `src/domain/test-globals.ts` exports `installDomainGlobals()`, which puts them
+  all on the global object in one call. Use it rather than importing and
   assigning each one.
 
 `src/data/plus-minus.ts` (event replay) and `src/data/season-stats.ts` predate
