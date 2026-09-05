@@ -22,9 +22,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * against a 4:30 standard scores something and is still not match-fit.
    */
   reportStandardSeconds(drillId) {
-    const bands = (this._reportBands || {})[drillId] || [];
-    if (!bands.length) return null;
-    return Math.min(...bands.map(b => Number(b.max_seconds)));
+    return window.reportDomain.reportStandardSeconds(this._reportBands || {}, drillId);
   },
 
   /**

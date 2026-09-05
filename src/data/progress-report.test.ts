@@ -21,6 +21,8 @@ import appCoreSrc from '../../public/js/app.core.js?raw';
 import matrixSrc from '../../public/js/views/matrix.view.js?raw';
 import reportSrc from '../../public/js/views/report.view.js?raw';
 import progressSrc from '../../public/js/views/progress.view.js?raw';
+import * as reportDomain from '../domain/report';
+import * as progressDomain from '../domain/progress';
 import { supabaseService } from './supabase';
 
 let ctor: any;
@@ -62,6 +64,8 @@ function makeApp(history: any[]): any {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).reportDomain = reportDomain;
+  (globalThis as any).progressDomain = progressDomain;
   (window as any).supabaseService = {
     isConfigured: () => true,
     formatSecondsAsTime: (v: any) => supabaseService.formatSecondsAsTime(v)

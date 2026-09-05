@@ -44,9 +44,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   /** Escape for HTML text and double-quoted attributes. */
   seasonEsc(v) {
-    return String(v == null ? '' : v)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return window.seasonDomain.seasonEsc(v);
   },
 
   /**
@@ -58,9 +56,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * is a fallback and not a claim about the sport.
    */
   seasonFullMatchMinutes() {
-    const team = (this.data.teams || []).find(t => String(t.id) === String(this.activeTeamId));
-    const stated = team && Number(team.match_minutes);
-    return stated && stated > 0 ? stated : window.seasonStats.DEFAULT_FULL_MATCH_MINUTES;
+    return window.seasonDomain.seasonFullMatchMinutes(this.data.teams || [], this.activeTeamId);
   },
 
   /**
@@ -201,18 +197,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * no rate, which is different from a rate of zero.
    */
   seasonColumns() {
-    return [
-      { key: 'player',  label: 'Player',  desc: false, text: true,
-        get: (t, name) => String(name || '').toLowerCase() },
-      { key: 'apps',    label: 'Apps',    desc: true,  get: t => t.appearances || 0 },
-      { key: 'mins',    label: 'Mins',    desc: true,  get: t => t.minutes || 0 },
-      { key: 'plus',    label: '+',       desc: true,  get: t => t.plus || 0 },
-      { key: 'minus',   label: '&minus;', desc: true,  get: t => t.minus || 0 },
-      { key: 'net',     label: 'Net',     desc: true,  get: t => t.score || 0 },
-      { key: 'gd',      label: 'GD',      desc: true,  get: t => t.goalDiff || 0 },
-      { key: 'netrate', label: 'Net',     desc: true,  get: t => t.scorePerMatch },
-      { key: 'gdrate',  label: 'GD',      desc: true,  get: t => t.goalDiffPerMatch }
-    ];
+    return window.seasonDomain.seasonColumns();
   },
 
   /**

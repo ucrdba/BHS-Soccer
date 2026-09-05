@@ -13,6 +13,11 @@ import * as matrixDomain from './domain/matrix';
 import * as matrixSessionDomain from './domain/matrix-session';
 import * as lineupDomain from './domain/lineup';
 import * as plusMinusCourt from './domain/plus-minus-court';
+import * as roundRobinDomain from './domain/round-robin';
+import * as seasonDomain from './domain/season';
+import * as progressDomain from './domain/progress';
+import * as reportDomain from './domain/report';
+import * as recordingNumbersDomain from './domain/recording-numbers';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -122,6 +127,13 @@ window.can = can;
  * Distinct from `plusMinus` above, which replays the event log.
  */
 (window as any).plusMinusCourt = plusMinusCourt;
+
+/** The reports group: round robin, season, progress, squad report, numbering. */
+(window as any).roundRobinDomain = roundRobinDomain;
+(window as any).seasonDomain = seasonDomain;
+(window as any).progressDomain = progressDomain;
+(window as any).reportDomain = reportDomain;
+(window as any).recordingNumbersDomain = recordingNumbersDomain;
 
 /**
  * Show which build is serving this page, in the footer.

@@ -22,7 +22,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
   /** Lower is better for a time; higher is better for anything counted. */
   progressLowerIsBetter(measure) {
-    return measure === 'time_low' || measure === 'time_bands';
+    return window.progressDomain.progressLowerIsBetter(measure);
   },
 
   /**
@@ -33,13 +33,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * player who missed a week look like they collapsed.
    */
   progressSeries(playerId, drillId) {
-    return (this._sessionHistory || [])
-      .filter(r => r.playerId === playerId
-        && r.drillId === drillId
-        && r.attendance === 'present'
-        && r.rawValue !== null && r.rawValue !== undefined && Number.isFinite(Number(r.rawValue)))
-      .map(r => ({ on: r.occurredOn, value: Number(r.rawValue) }))
-      .sort((a, b) => String(a.on).localeCompare(String(b.on)));
+    return window.progressDomain.progressSeries(this._sessionHistory || [], playerId, drillId);
   },
 
   /**
@@ -49,17 +43,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * an arrow next to it would assert something the data does not say.
    */
   progressTrend(series, lowerIsBetter) {
-    if (!series || series.length < 2) return null;
-    const first = series[0].value;
-    const last = series[series.length - 1].value;
-    if (first === last) return { direction: 'level', delta: 0, first, last };
-
-    const improved = lowerIsBetter ? last < first : last > first;
-    return {
-      direction: improved ? 'better' : 'worse',
-      delta: Math.abs(last - first),
-      first, last
-    };
+    return window.progressDomain.progressTrend(series, lowerIsBetter);
   },
 
   /** Format a value the way its exercise is read. */

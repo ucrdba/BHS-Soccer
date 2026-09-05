@@ -25,6 +25,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import adminSrc from '../../public/js/admin.js?raw';
 import recNumSrc from '../../public/js/views/recording-numbers.view.js?raw';
+import * as recordingNumbersDomain from '../domain/recording-numbers';
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
@@ -32,6 +33,7 @@ let ctor: any;
 
 beforeAll(() => {
   const w = globalThis as any;
+  (globalThis as any).recordingNumbersDomain = recordingNumbersDomain;
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},

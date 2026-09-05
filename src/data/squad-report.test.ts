@@ -19,6 +19,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import matrixSrc from '../../public/js/views/matrix.view.js?raw';
 import reportSrc from '../../public/js/views/report.view.js?raw';
+import * as reportDomain from '../domain/report';
 import * as matrixDomain from '../domain/matrix';
 import { supabaseService } from './supabase';
 
@@ -68,6 +69,7 @@ function makeApp(points: any[]): any {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).reportDomain = reportDomain;
   (globalThis as any).matrixDomain = matrixDomain;
   (window as any).supabaseService = {
     isConfigured: () => true,

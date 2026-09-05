@@ -21,29 +21,14 @@ Object.assign(BHSSoccerApp.prototype, {
    * A player without one shows as (—) rather than being hidden: the sheet
    * cannot identify them, and that is worth noticing before it is printed.
    */
+  // The schedule and its formatting live in src/domain/round-robin.ts.
   roundRobinLabel(p) {
-    if (!p) return '';
-    const parts = String(p.name || '').trim().split(/\s+/);
-    const first = p.firstName || parts[0] || '';
-    const last = p.lastName || parts.slice(1).join(' ') || '';
-    const initial = last ? `${last.trim().charAt(0).toUpperCase()}.` : '';
-    const num = p.recordingNumber != null ? p.recordingNumber : '—';
-    return `(${num}) ${[first, initial].filter(Boolean).join(' ')}`.trim();
+    return window.roundRobinDomain.roundRobinLabel(p);
   },
 
   /** The squad a tournament is drawn from, in recording-number order. */
   roundRobinPlayers() {
-    return (this.data.players || [])
-      .filter(p => !p.is_deleted && !p.isDeleted)
-      .slice()
-      .sort((a, b) => {
-        const na = a.recordingNumber == null ? NaN : Number(a.recordingNumber);
-        const nb = b.recordingNumber == null ? NaN : Number(b.recordingNumber);
-        const ga = Number.isFinite(na), gb = Number.isFinite(nb);
-        if (ga !== gb) return ga ? -1 : 1;
-        if (ga && na !== nb) return na - nb;
-        return String(a.name || '').localeCompare(String(b.name || ''));
-      });
+    return window.roundRobinDomain.roundRobinPlayers(this.data.players || []);
   },
 
   /**
@@ -54,16 +39,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * schedule looking unplayed.
    */
   roundRobinPlayed() {
-    const byPair = {};
-    (this.data.matrixLogs || [])
-      .filter(l => !l.is_deleted && !l.isDeleted)
-      .forEach(l => {
-        const a = l.player_a_id || l.playerAId;
-        const b = l.player_b_id || l.playerBId;
-        if (!a || !b) return;
-        byPair[[a, b].sort().join('|')] = { a, b, outcome: l.outcome };
-      });
-    return byPair;
+    return window.roundRobinDomain.roundRobinPlayed(this.data.matrixLogs || []);
   },
 
   /**
@@ -74,57 +50,13 @@ Object.assign(BHSSoccerApp.prototype, {
    * seat that rotates, so nobody sits out more than once.
    */
   buildRoundRobin() {
-    const players = this.roundRobinPlayers();
-    if (players.length < 2) return [];
-
-    // The bye seat is a null in the rotation; a match against it is a bye.
-    const seats = players.slice();
-    if (seats.length % 2 === 1) seats.push(null);
-
-    const half = seats.length / 2;
-    const played = this.roundRobinPlayed();
-    const rounds = [];
-
-    // A fixed head, and a ring that rotates beneath it.
-    let ring = seats.slice(1);
-
-    for (let r = 0; r < seats.length - 1; r++) {
-      const order = [seats[0]].concat(ring);
-      const matches = [];
-
-      for (let i = 0; i < half; i++) {
-        const a = order[i];
-        const b = order[order.length - 1 - i];
-        if (!a && !b) continue;
-
-        if (!a || !b) {
-          matches.push({ a: a || b, b: null, bye: true });
-          continue;
-        }
-
-        const hit = played[[a.id, b.id].sort().join('|')];
-        matches.push({
-          a, b, bye: false,
-          played: !!hit,
-          result: hit ? this.roundRobinResultText(a, b, hit) : ''
-        });
-      }
-
-      rounds.push({ round: r + 1, matches });
-      ring = [ring[ring.length - 1]].concat(ring.slice(0, -1));
-    }
-
-    return rounds;
+    return window.roundRobinDomain.buildRoundRobin(
+      this.data.players || [], this.data.matrixLogs || []);
   },
 
   /** "Cesar A. won" / "Drew", from the stored outcome. */
   roundRobinResultText(a, b, hit) {
-    if (!hit || !hit.outcome) return '';
-    if (hit.outcome === 'draw') return 'Draw';
-    // outcome names which of the LOGGED pair won, which may be either of ours.
-    const winnerId = hit.outcome === 'a' ? hit.a : hit.b;
-    const winner = winnerId === a.id ? a : b;
-    return `${this.roundRobinLabel(winner)} won`;
+    return window.roundRobinDomain.roundRobinResultText(a, b, hit);
   },
 
   /**
@@ -135,25 +67,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * opening it later.
    */
   roundRobinCsv() {
-    const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-    const head = ['Round', 'Match', 'PlayerA', 'PlayerAName', 'PlayerB', 'PlayerBName', 'Result'];
-    const lines = [head.join(',')];
-
-    this.buildRoundRobin().forEach(r => {
-      r.matches.forEach((m, i) => {
-        lines.push([
-          r.round,
-          i + 1,
-          esc(this.roundRobinLabel(m.a)),
-          esc(m.a ? m.a.name : ''),
-          esc(m.bye ? 'BYE' : this.roundRobinLabel(m.b)),
-          esc(m.b ? m.b.name : ''),
-          esc(m.result || '')
-        ].join(','));
-      });
-    });
-
-    return lines.join('\n') + '\n';
+    return window.roundRobinDomain.roundRobinCsv(this.buildRoundRobin());
   },
 
   /** Download the schedule as a CSV file. */

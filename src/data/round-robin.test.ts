@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import rrSrc from '../../public/js/views/roundrobin.view.js?raw';
+import * as roundRobinDomain from '../domain/round-robin';
 
 let ctor: any;
 
@@ -43,6 +44,7 @@ function makeApp(players: any[] = squad(6), logs: any[] = []): any {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).roundRobinDomain = roundRobinDomain;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 

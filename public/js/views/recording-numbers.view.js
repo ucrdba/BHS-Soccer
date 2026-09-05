@@ -31,25 +31,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * so this only fills the gaps, taking the lowest free number in the block.
    */
   proposeRecordingNumbers(players, startAt) {
-    const taken = new Set(
-      players.map(p => p.recordingNumber).filter(n => n != null).map(Number)
-    );
-
-    const bySurname = players.slice().sort((a, b) => {
-      const sa = String(a.lastName || a.name || '').toLowerCase();
-      const sb = String(b.lastName || b.name || '').toLowerCase();
-      return sa.localeCompare(sb) || String(a.name || '').localeCompare(String(b.name || ''));
-    });
-
-    let next = Number.isFinite(Number(startAt)) && Number(startAt) >= 1 ? Math.floor(Number(startAt)) : 1;
-    const out = new Map();
-    bySurname.forEach(p => {
-      if (p.recordingNumber != null) { out.set(p.id, Number(p.recordingNumber)); return; }
-      while (taken.has(next)) next += 1;
-      taken.add(next);
-      out.set(p.id, next);
-    });
-    return out;
+    return window.recordingNumbersDomain.proposeRecordingNumbers(players, startAt);
   },
 
   /**
@@ -106,10 +88,7 @@ Object.assign(BHSSoccerApp.prototype, {
    * 1. Otherwise the coach types it.
    */
   suggestedNumberStart() {
-    const nums = this.rosterForNumbering()
-      .map(p => p.recordingNumber).filter(n => n != null).map(Number);
-    if (nums.length) return Math.min(...nums);
-    return 1;
+    return window.recordingNumbersDomain.suggestedNumberStart(this.data.players || []);
   },
 
   /**
@@ -140,7 +119,7 @@ Object.assign(BHSSoccerApp.prototype, {
   },
 
   rosterForNumbering() {
-    return (this.data.players || []).filter(p => !p.is_deleted && !p.isDeleted);
+    return window.recordingNumbersDomain.rosterForNumbering(this.data.players || []);
   },
 
   openRecordingNumbersModal() {

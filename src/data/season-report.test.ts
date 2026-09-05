@@ -15,11 +15,13 @@ import seasonSrc from '../../public/js/views/season.view.js?raw';
 import * as plusMinus from './plus-minus';
 import * as seasonStats from './season-stats';
 import cssSrc from '../../styles.css?raw';
+import * as seasonDomain from '../domain/season';
 
 let ctor: any;
 
 beforeAll(() => {
   const w = globalThis as any;
+  (globalThis as any).seasonDomain = seasonDomain;
   w.window = w;
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
