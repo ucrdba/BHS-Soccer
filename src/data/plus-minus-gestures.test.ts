@@ -1661,3 +1661,57 @@ describe("where the refusal appears", () => {
     expect(pmSrc).toMatch(/id="pmError"[^>]*aria-live="polite"/);
   });
 });
+
+describe('opening a match that has already been played', () => {
+  /**
+   * The default lineup populates the pitch — but only for a match nobody has
+   * tracked yet. An imported match already has a history, and seeding an XI
+   * onto it would append `on` events to a finished game and change everyone's
+   * minutes.
+   *
+   * The guard reads the EVENT LOG rather than who is currently on the pitch,
+   * which is what makes it safe to take every player off at the final
+   * whistle: the pitch is empty, the history is not.
+   */
+  const finished = () => [
+    { kind: 'clock_start', playerId: null, atSeconds: 0, seq: 0 },
+    { kind: 'on',  playerId: 'p1', atSeconds: 0, seq: 1 },
+    { kind: 'plus', playerId: 'p1', atSeconds: 600, seq: 2 },
+    { kind: 'off', playerId: 'p1', atSeconds: 4800, seq: 3 },
+    { kind: 'clock_stop', playerId: null, atSeconds: 4800, seq: 4 }
+  ];
+
+  it('does not seed a lineup over a match that has been played', async () => {
+    const a = makeApp();
+    a._pmEvents = finished();
+    let asked = false;
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchLineup: async () => { asked = true; return { players: [{ player_id: 'p2', role: 'starter' }] }; }
+    };
+
+    const seeded = await a.pmSeedFromLineup(false);
+    expect(seeded).toBe(false);
+    expect(asked).toBe(false);              // it does not even look
+    expect(a._pmEvents).toHaveLength(5);    // nothing appended
+  });
+
+  it('leaves the finished match with an empty pitch and its figures intact', async () => {
+    const a = makeApp();
+    a._pmEvents = finished();
+    expect(a.pmOnPitch()).toEqual([]);
+    expect(a.pmStats().get('p1').plus).toBe(1);
+    expect(a.pmStats().get('p1').secondsPlayed).toBe(4800);
+  });
+
+  it('still seeds a match nobody has tracked', async () => {
+    const a = makeApp();
+    a._pmEvents = [];
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchLineup: async () => ({ players: [{ player_id: 'p1', role: 'starter', slot: 'GK' }] })
+    };
+    await a.pmSeedFromLineup(false);
+    expect(a.pmOnPitch()).toContain('p1');
+  });
+});

@@ -72,6 +72,10 @@ export interface BuiltMatch {
   events: BuiltEvent[];
   /** Recording numbers in the sheet that no player on the team matched. */
   unknownNumbers: number[];
+  /** Player-minutes the sheet asks for. */
+  minutesDemanded: number;
+  /** Player-minutes a match can supply: eleven on the pitch, throughout. */
+  minutesAvailable: number;
 }
 
 export const DEFAULT_FULL_MATCH_MINUTES = 80;
@@ -274,7 +278,12 @@ export function buildMatch(
   const changes: Array<{ at: number; kind: 'on' | 'off'; id: string }> = [];
   spells.forEach((sp, id) => {
     changes.push({ at: sp.on, kind: 'on', id });
-    if (sp.off < full) changes.push({ at: sp.off, kind: 'off', id });
+    // Always, including a spell that runs to the whistle. Skipping it left
+    // everyone still on the pitch in the log, so reopening a finished match
+    // in the live screen showed the whole squad standing on it at once.
+    // Minutes are unaffected: the off is ordered before clock_stop at the
+    // same second, so the last interval is credited either way.
+    changes.push({ at: Math.min(sp.off, full), kind: 'off', id });
   });
   changes.sort((a, b) => a.at - b.at || (a.kind === 'on' ? -1 : 1));
   changes.forEach(c => push(c.kind, c.id, c.at));
@@ -310,12 +319,23 @@ export function buildMatch(
 
   push('clock_stop', null, full);
 
+  // A match can only ever supply eleven players' worth of time. A sheet
+  // asking for more describes a match that could not have happened, and the
+  // log then has more than eleven on the pitch at once because there is no
+  // arrangement of spells that avoids it. Reported rather than quietly
+  // scaled: the figures are the coach's, and silently shrinking them would
+  // make the report disagree with the sheet it came from.
+  const minutesDemanded = Math.round(
+    [...spells.values()].reduce((t, sp) => t + (sp.off - sp.on) / 60, 0));
+
   return {
     date: String(first.date || '').trim(),
     opponent: String(first.opponent || '').trim(),
     goalsFor, goalsAgainst,
     events: orderBuilt(events),
-    unknownNumbers: [...new Set(unknownNumbers)]
+    unknownNumbers: [...new Set(unknownNumbers)],
+    minutesDemanded,
+    minutesAvailable: STARTERS * (full / 60)
   };
 }
 

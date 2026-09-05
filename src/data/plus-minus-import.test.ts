@@ -14,7 +14,7 @@ import {
   groupRows, goalTimes, orderBuilt, buildMatch, buildImport, resolveRowDates,
   DEFAULT_FULL_MATCH_MINUTES, type ImportRow, type FixtureRef
 } from './plus-minus-import';
-import { replay } from './plus-minus';
+import { replay, onPitch } from './plus-minus';
 import adminSrc from '../../public/js/admin.js?raw';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 
@@ -718,5 +718,78 @@ describe('reading a column out of a spreadsheet row', () => {
   it('treats an empty Minus cell as absent, which reads as zero', () => {
     // The sheet that was reported leaves Minus blank throughout.
     expect(app.pickColumn({ Minus: '' }, ['Minus', '-'])).toBeUndefined();
+  });
+});
+
+describe('a match that could not have happened', () => {
+  /**
+   * Reported: "ON THE PITCH · 18 / 11".
+   *
+   * The sheet was generated with random minutes — 24 players averaging around
+   * seventy of an eighty-minute match. That asks for 1670 player-minutes when
+   * a match supplies 880: eleven on the pitch, throughout. Averaged over the
+   * match it wants 20.9 players on at once, so no arrangement of spells keeps
+   * it under eleven and the pitch faithfully renders impossible input.
+   *
+   * Reported rather than scaled. The figures are the coach's, and quietly
+   * shrinking them would make the report disagree with the sheet it came from.
+   */
+  const squadOf = (count: number, minutes: number) =>
+    Array.from({ length: count }, (_, i) =>
+      row({ recordingNumber: i + 1, minutes }));
+
+  it('measures what the sheet asks for against what a match has', () => {
+    const [m] = buildImport(squadOf(24, 70), byNumber, HS);
+    expect(m.minutesAvailable).toBe(11 * HS);
+    expect(m.minutesDemanded).toBe(24 * 70);
+    expect(m.minutesDemanded).toBeGreaterThan(m.minutesAvailable);
+  });
+
+  it('is content with a squad that fits', () => {
+    // Eleven playing the whole match, six more sharing time off the bench.
+    const [m] = buildImport(
+      squadOf(11, HS).concat(squadOf(6, 0).map((r, i) => ({ ...r, recordingNumber: 12 + i }))),
+      byNumber, HS);
+    expect(m.minutesDemanded).toBeLessThanOrEqual(m.minutesAvailable);
+  });
+
+  it('still imports the figures, since they are what the report needs', () => {
+    const [m] = buildImport(
+      squadOf(24, 70).map((r, i) => ({ ...r, plus: i % 3 })), byNumber, HS);
+    const stats = replay(m.events as any);
+    expect(stats.get('p1')!.plus).toBe(0);
+    expect(stats.get('p2')!.plus).toBe(1);
+    expect(stats.get('p3')!.plus).toBe(2);
+  });
+});
+
+describe('the pitch after the final whistle', () => {
+  /**
+   * The other half of "18 / 11". A spell running to the whistle used to emit
+   * no `off`, so every one of those players stayed on in the log and the live
+   * screen drew the whole squad standing on the pitch at once.
+   */
+  it('leaves nobody on the pitch when the match is over', () => {
+    const built = buildMatch([
+      row({ recordingNumber: 1, minutes: HS }),
+      row({ recordingNumber: 2, minutes: HS }),
+      row({ recordingNumber: 3, minutes: 20 })
+    ], byNumber, HS);
+    expect(onPitch(built.events as any)).toEqual([]);
+  });
+
+  it('does not lose a minute by taking them off', () => {
+    // The off is ordered before clock_stop at the same second, so the final
+    // interval is still credited.
+    const { stats } = roundTrip([row({ recordingNumber: 1, minutes: HS })]);
+    expect(stats.get('p1')!.secondsPlayed).toBe(HS * 60);
+  });
+
+  it('takes a substitute off too', () => {
+    const rows = Array.from({ length: 11 }, (_, i) =>
+      row({ recordingNumber: i + 1, minutes: HS }));
+    rows.push(row({ recordingNumber: 12, minutes: 10 }));
+    const built = buildMatch(rows, byNumber, HS);
+    expect(built.events.filter(e => e.kind === 'off' && e.playerId === 'p12')).toHaveLength(1);
   });
 });

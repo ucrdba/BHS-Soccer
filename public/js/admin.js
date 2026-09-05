@@ -2897,6 +2897,19 @@ Object.assign(BHSSoccerApp.prototype, {
             for (const m of built) {
               m.unknownNumbers.forEach(n => unknown.add(n));
 
+              // A match supplies eleven players' worth of time and no more. A
+              // sheet asking for more describes something that could not have
+              // happened, and the pitch will show more than eleven players
+              // when it is opened, because no arrangement of spells avoids it.
+              // Said plainly rather than scaled away: the numbers are the
+              // coach's own.
+              if (m.minutesDemanded > m.minutesAvailable) {
+                warnings.push(
+                  `${m.opponent}: the sheet gives ${m.minutesDemanded} player-minutes, but a match only has `
+                  + `${m.minutesAvailable} (11 on the pitch). The totals still import, but opening this match in `
+                  + `Plus/Minus will show more than 11 players on the pitch.`);
+              }
+
               // Tie the session to the fixture so the season report can order
               // it by date. A sheet naming a fixture that is not on the
               // schedule still imports, as a labelled loose session, rather
