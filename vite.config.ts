@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import { execSync } from 'node:child_process';
 
 /**
@@ -29,6 +30,7 @@ function buildStamp() {
 export default defineConfig({
   root: '.',
   plugins: [
+    vue(),
     {
       name: 'build-stamp',
 
@@ -67,7 +69,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: 'index.html',
+      // Two apps, deliberately. index.html is the legacy app and stays
+      // untouched until Phase 7; app.html is the Vue rebuild. Sharing one
+      // document would reintroduce exactly the bridge code that choosing a
+      // parallel rebuild over a strangler was meant to avoid.
+      input: {
+        legacy: 'index.html',
+        vue: 'app.html'
+      },
     },
   },
   server: {
