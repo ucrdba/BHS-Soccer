@@ -19,6 +19,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import lineupSrc from '../../public/js/views/lineup.view.js?raw';
 import cssSrc from '../../styles.css?raw';
+import * as lineupDomain from '../domain/lineup';
 
 let ctor: any;
 
@@ -48,6 +49,7 @@ function makeApp(players: any[] = squad()): any {
 
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
+  (globalThis as any).lineupDomain = lineupDomain;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 

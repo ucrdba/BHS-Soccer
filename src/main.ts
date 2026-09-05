@@ -11,6 +11,7 @@ import { resolveActiveTeam } from './data/team-scope';
 import * as scheduleDomain from './domain/schedule';
 import * as matrixDomain from './domain/matrix';
 import * as matrixSessionDomain from './domain/matrix-session';
+import * as lineupDomain from './domain/lineup';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -111,6 +112,9 @@ window.can = can;
 
 /** Session-grid ordering and the attendance default. */
 (window as any).matrixSessionDomain = matrixSessionDomain;
+
+/** Formation geometry, squad partitioning and the drag-and-drop rules. */
+(window as any).lineupDomain = lineupDomain;
 
 /**
  * Show which build is serving this page, in the footer.
