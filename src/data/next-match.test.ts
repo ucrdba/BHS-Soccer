@@ -18,6 +18,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import appCoreSrc from '../../public/js/app.core.js?raw';
 import utilsSrc from '../../public/js/utils.js?raw';
+import * as scheduleDomain from '../domain/schedule';
 
 interface MatchApp {
   data: Record<string, any>;
@@ -41,6 +42,9 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
 
   const w = globalThis as any;
+  // These six methods now delegate to src/domain/schedule.ts through window,
+  // so the hand-built window this test evaluates utils.js against needs it.
+  w.scheduleDomain = scheduleDomain;
   w.auth = {
     isCoach: () => false, isAdmin: () => false, isLoggedIn: () => false,
     canAccessRatings: () => false, subscribe: () => {},

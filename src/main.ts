@@ -8,6 +8,7 @@ import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 import { backupLegacyBlob } from './data/cache';
 import { resolveActiveTeam } from './data/team-scope';
+import * as scheduleDomain from './domain/schedule';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -92,6 +93,16 @@ window.can = can;
 (window as any).seasonStats = seasonStats;
 // admin.js turns an imported sheet back into an event log through this.
 (window as any).plusMinusImport = plusMinusImport;
+
+/**
+ * Fixture-date logic, for the classic scripts.
+ *
+ * Same reason as the replay engine above: it is pure logic worth testing
+ * directly, and public/js/ cannot import. First of the Vue migration's
+ * Phase 0 extractions -- see
+ * docs/superpowers/specs/2026-09-05-vue-migration-design.md.
+ */
+(window as any).scheduleDomain = scheduleDomain;
 
 /**
  * Show which build is serving this page, in the footer.

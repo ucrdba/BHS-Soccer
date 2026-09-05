@@ -18,12 +18,16 @@ import utilsSrc from '../../public/js/utils.js?raw';
 import scheduleSrc from '../../public/js/views/schedule.view.js?raw';
 import indexHtml from '../../index.html?raw';
 import adminSrc from '../../public/js/admin.js?raw';
+import * as scheduleDomain from '../domain/schedule';
 
 let ctor: any;
 
 beforeAll(() => {
   const w = globalThis as any;
   w.window = w;
+  // The banner's fixture comes from getNextMatch, which now delegates to
+  // src/domain/schedule.ts through window.
+  w.scheduleDomain = scheduleDomain;
   w.auth = {
     isCoach: () => true, isAdmin: () => true, isLoggedIn: () => true,
     canAccessRatings: () => true, subscribe: () => {},
