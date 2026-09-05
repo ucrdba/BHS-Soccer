@@ -1,6 +1,7 @@
 // src/main.ts
 import { supabaseService } from './data/supabase';
 import * as plusMinus from './data/plus-minus';
+import * as seasonStats from './data/season-stats';
 import { buildInfo, formatBuildStamp, buildStampTitle } from './build-info';
 import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
@@ -85,6 +86,9 @@ window.can = can;
  * nothing recomputes it independently.
  */
 (window as any).plusMinus = plusMinus;
+// The season report is a classic script, so its maths reaches it the same way
+// the per-match replay engine does.
+(window as any).seasonStats = seasonStats;
 
 /**
  * Show which build is serving this page, in the footer.

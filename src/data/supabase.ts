@@ -1943,6 +1943,55 @@ class SupabaseService {
     return { ok: true, id: data[0].id };
   }
 
+  /**
+   * Every tracked session for a team, with the fixture it belongs to.
+   *
+   * One query for the sessions and one for all their events, rather than a
+   * query per session: a season is a couple of dozen fixtures, and a request
+   * each would make opening the season report a visibly slow thing on a phone
+   * at the side of a pitch.
+   *
+   * Returns null on failure rather than an empty array, so the caller can
+   * tell "the season is empty" apart from "the query did not work" — these
+   * tables are readable only by a coach of the team, so a signed-out visitor
+   * gets nothing back and must not be shown an empty season as if it were
+   * fact.
+   */
+  async fetchSeasonStats(teamId: string): Promise<{
+    sessions: Record<string, any>[];
+    eventsBySession: Record<string, Record<string, any>[]>;
+  } | null> {
+    if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
+
+    const { data: sessions, error: sErr } = await this.client!
+      .from('stat_matches')
+      .select('id, match_id, label, created_at')
+      .eq('team_id', teamId)
+      .eq('is_deleted', false);
+    if (sErr) { console.warn('Supabase fetchSeasonStats notice:', sErr.message); return null; }
+    if (!sessions || sessions.length === 0) return { sessions: [], eventsBySession: {} };
+
+    const ids = sessions.map(s => s.id);
+    const { data: events, error: eErr } = await this.client!
+      .from('stat_events')
+      .select('id, match_id, kind, player_id, at_seconds, period, created_at')
+      .in('match_id', ids)
+      .eq('is_deleted', false)
+      .order('created_at');
+    if (eErr) { console.warn('Supabase fetchSeasonStats events notice:', eErr.message); return null; }
+
+    const eventsBySession: Record<string, Record<string, any>[]> = {};
+    ids.forEach(id => { eventsBySession[id] = []; });
+    (events || []).forEach(r => {
+      (eventsBySession[r.match_id] ||= []).push({
+        id: r.id, kind: r.kind, playerId: r.player_id,
+        atSeconds: r.at_seconds, period: r.period, createdAt: r.created_at
+      });
+    });
+
+    return { sessions, eventsBySession };
+  }
+
   /** Every event of a tracked match, oldest first. */
   async fetchStatEvents(statMatchId: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured() || !statMatchId || !this.isUuid(statMatchId)) return null;

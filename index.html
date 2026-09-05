@@ -460,6 +460,16 @@
 
   <!-- Lineup builder. Tap a player, tap a position: HTML5 drag events do not
        fire on touch, and this is used on a phone at the ground. -->
+  <div id="seasonReportModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 1100px;">
+      <div class="modal-header">
+        <h3>&#128200; SEASON PLUS/MINUS</h3>
+        <button class="close-btn" onclick="app.closeModal('seasonReportModal')">&times;</button>
+      </div>
+      <div id="seasonReportBody"></div>
+    </div>
+  </div>
+
   <div id="lineupModal" class="modal-overlay">
     <div class="modal-window" style="max-width: 980px;">
       <div class="modal-header">
@@ -1542,6 +1552,8 @@
   <script src="./js/views/report.view.js"></script>
   <script src="./js/views/progress.view.js"></script>
   <script src="./js/views/plusminus.view.js"></script>
+  <!-- After plusminus: the season report replays each match through it. -->
+  <script src="./js/views/season.view.js"></script>
   <script src="./js/views/recording-numbers.view.js"></script>
   <script src="./js/views/lineup.view.js"></script>
   <script src="./js/views/coaches.view.js"></script>
