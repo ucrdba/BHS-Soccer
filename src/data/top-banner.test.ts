@@ -17,6 +17,7 @@ import homeSrc from '../../public/js/views/home.view.js?raw';
 import utilsSrc from '../../public/js/utils.js?raw';
 import scheduleSrc from '../../public/js/views/schedule.view.js?raw';
 import indexHtml from '../../index.html?raw';
+import adminSrc from '../../public/js/admin.js?raw';
 
 let ctor: any;
 
@@ -274,6 +275,64 @@ describe('the right-hand side of the banner', () => {
 
   it('offers a place to set the league', () => {
     // Nowhere to type it means it can only ever be whatever a migration set.
+    expect(indexHtml).toContain('id="schoolFormLeague"');
+  });
+});
+
+describe('League everywhere a school can be edited', () => {
+  /**
+   * A field is only real if every route into the record carries it. There are
+   * four here — the school profile form, the Admin Role Control Center, the
+   * CSV import, and the CSV export — and a league typed in one place then
+   * wiped by a sheet imported from another is worse than never offering it.
+   */
+  it('is on the Admin Role Control Center', () => {
+    expect(adminSrc).toContain('id="adminSchoolLeague"');
+  });
+
+  it('is saved by the Admin Role Control Center', () => {
+    expect(adminSrc).toContain("getElementById('adminSchoolLeague')");
+    const save = adminSrc.slice(adminSrc.indexOf('async saveSchoolDataFromAdmin'),
+                               adminSrc.indexOf('async saveSchoolDataFromAdmin') + 1800);
+    expect(save).toMatch(/league: league \|\| null/);
+  });
+
+  it('is in the schools template', () => {
+    const tmpl = adminSrc.slice(adminSrc.indexOf("Code:'bhs', Name:'Beaumont High School'"));
+    expect(tmpl.slice(0, 300)).toContain('League:');
+  });
+
+  it('is exported, so a sheet can be edited and put back', () => {
+    // Exported blank rather than defaulted: a club with no competition must
+    // round-trip as having none.
+    expect(adminSrc).toContain("League: this.data.schoolInfo?.league || ''");
+  });
+
+  it('is imported', () => {
+    const imp = adminSrc.slice(adminSrc.indexOf("if (activeTarget === 'schools')"),
+                               adminSrc.indexOf("} else if (activeTarget === 'profiles')"));
+    expect(imp).toContain('League');
+    expect(imp).toContain('this.pickColumn(');
+  });
+
+  it('never defaults a league on import', () => {
+    // Every other field falls back to Beaumont's. This one must not: handing
+    // one school's competition to every club that imports a sheet is the
+    // hardcoding this whole change removed.
+    const imp = adminSrc.slice(adminSrc.indexOf("if (activeTarget === 'schools')"),
+                               adminSrc.indexOf("} else if (activeTarget === 'profiles')"));
+    expect(imp).not.toMatch(/league:.*Citrus Belt/);
+    expect(imp).toMatch(/league:.*\|\| null/);
+  });
+
+  it('accepts the column however a coach spelled it', () => {
+    const imp = adminSrc.slice(adminSrc.indexOf("if (activeTarget === 'schools')"),
+                               adminSrc.indexOf("} else if (activeTarget === 'profiles')"));
+    expect(imp).toContain('Competition');
+    expect(imp).toContain('Division');
+  });
+
+  it('is on the school profile form too', () => {
     expect(indexHtml).toContain('id="schoolFormLeague"');
   });
 });

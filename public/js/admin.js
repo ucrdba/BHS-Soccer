@@ -177,6 +177,13 @@ Object.assign(BHSSoccerApp.prototype, {
               <label style="font-size:0.78rem;">City &amp; State Location</label>
               <input type="text" id="adminSchoolCity" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.city || 'Beaumont, CA'}" placeholder="Beaumont, CA" />
             </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:0.78rem;">League</label>
+              <!-- No default: a club that plays no named competition leaves
+                   this blank, and the banner then shows its city alone.
+                   Defaulting it would put one school's league on everyone. -->
+              <input type="text" id="adminSchoolLeague" class="form-control" style="font-size:0.85rem;" value="${this.data.school?.league || ''}" placeholder="e.g. Citrus Belt League" />
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px;">
@@ -682,6 +689,8 @@ Object.assign(BHSSoccerApp.prototype, {
     const name = (document.getElementById('adminSchoolName')?.value || 'Beaumont High School').trim();
     const mascot = (document.getElementById('adminSchoolMascot')?.value || 'Cougars').trim();
     const city = (document.getElementById('adminSchoolCity')?.value || 'Beaumont, CA').trim();
+    // No fallback: empty means this organization plays no named competition.
+    const league = (document.getElementById('adminSchoolLeague')?.value || '').trim();
     const wins = parseInt(document.getElementById('adminSchoolWins')?.value || 0, 10);
     const losses = parseInt(document.getElementById('adminSchoolLosses')?.value || 0, 10);
     const draws = parseInt(document.getElementById('adminSchoolDraws')?.value || 0, 10);
@@ -691,6 +700,7 @@ Object.assign(BHSSoccerApp.prototype, {
       name: name,
       mascot: mascot,
       city: city,
+      league: league || null,
       colors: this.data.school?.colors || { primary: '#0047AB', secondary: '#FFD700' },
       record: { wins, losses, draws }
     };
@@ -2019,7 +2029,7 @@ Object.assign(BHSSoccerApp.prototype, {
 
           if (t === 'schools') {
             fileName = '1_Schools_Config.xlsx'; sheetName = 'Schools';
-            const rows = [{ Code: this.data.schoolInfo?.code || 'bhs', Name: this.data.schoolInfo?.name || 'Beaumont High School', Mascot: this.data.schoolInfo?.mascot || 'Cougars', City: this.data.schoolInfo?.city || 'Beaumont, CA', PrimaryColor: this.data.schoolInfo?.colors?.primary || '#0047AB', SecondaryColor: this.data.schoolInfo?.colors?.secondary || '#FFD700', Wins: this.data.schoolInfo?.record?.wins || 0, Losses: this.data.schoolInfo?.record?.losses || 0, Draws: this.data.schoolInfo?.record?.draws || 0, IsDeleted: 'FALSE' }];
+            const rows = [{ Code: this.data.schoolInfo?.code || 'bhs', Name: this.data.schoolInfo?.name || 'Beaumont High School', Mascot: this.data.schoolInfo?.mascot || 'Cougars', City: this.data.schoolInfo?.city || 'Beaumont, CA', League: this.data.schoolInfo?.league || '', PrimaryColor: this.data.schoolInfo?.colors?.primary || '#0047AB', SecondaryColor: this.data.schoolInfo?.colors?.secondary || '#FFD700', Wins: this.data.schoolInfo?.record?.wins || 0, Losses: this.data.schoolInfo?.record?.losses || 0, Draws: this.data.schoolInfo?.record?.draws || 0, IsDeleted: 'FALSE' }];
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
           } else if (t === 'profiles') {
             fileName = '2_User_Profiles.xlsx'; sheetName = 'Profiles';
@@ -2096,6 +2106,7 @@ Object.assign(BHSSoccerApp.prototype, {
         Name: this.data.schoolInfo?.name || 'Beaumont High School',
         Mascot: this.data.schoolInfo?.mascot || 'Cougars',
         City: this.data.schoolInfo?.city || 'Beaumont, CA',
+        League: this.data.schoolInfo?.league || '',
         PrimaryColor: this.data.schoolInfo?.colors?.primary || '#0047AB',
         SecondaryColor: this.data.schoolInfo?.colors?.secondary || '#FFD700',
         Wins: this.data.schoolInfo?.record?.wins || 0,
@@ -2244,7 +2255,7 @@ Object.assign(BHSSoccerApp.prototype, {
     }
 
     if (type === 'schools') {
-      const headers = [{ Code:'bhs', Name:'Beaumont High School', Mascot:'Cougars', City:'Beaumont, CA', PrimaryColor:'#0047AB', SecondaryColor:'#FFD700', Wins:0, Losses:0, Draws:0, IsDeleted:'FALSE' }];
+      const headers = [{ Code:'bhs', Name:'Beaumont High School', Mascot:'Cougars', City:'Beaumont, CA', League:'blank = no named competition', PrimaryColor:'#0047AB', SecondaryColor:'#FFD700', Wins:0, Losses:0, Draws:0, IsDeleted:'FALSE' }];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(headers), 'Schools');
       XLSX.writeFile(wb, 'BHS_Schools_Template.xlsx');
     } else if (type === 'profiles') {
@@ -2705,6 +2716,9 @@ Object.assign(BHSSoccerApp.prototype, {
                 name: toStr(r.Name) || 'Beaumont High School',
                 mascot: toStr(r.Mascot) || 'Cougars',
                 city: toStr(r.City) || 'Beaumont, CA',
+                // Blank stays blank. Defaulting a league would hand one
+                // school's competition to every club that imports a sheet.
+                league: toStr(this.pickColumn(r, ['League', 'Competition', 'Division'])) || null,
                 colors: { primary: toStr(r.PrimaryColor) || '#0047AB', secondary: toStr(r.SecondaryColor) || '#FFD700' },
                 record: { wins: parseInt(r.Wins) || 0, losses: parseInt(r.Losses) || 0, draws: parseInt(r.Draws) || 0 }
               };
