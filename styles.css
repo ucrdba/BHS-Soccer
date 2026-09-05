@@ -2142,7 +2142,11 @@ canvas { touch-action: none; max-width: 100%; }
  * Tied to pmPerRow() in plusminus.view.js: change one and change the other,
  * or the chips collide again. */
 #plusMinusModal .pm-chip.placed {
-  max-width: 18%;
+  /* 15%, not 18%: the tightest gap any formation asks for, once respread, is
+   * the keeper to a centre back. A chip wider than that gap overlaps however
+   * the pitch is sized. Tied to pmSpreadSlot() and pmPerRow(); the tests
+   * check all three against each other. */
+  max-width: 15%;
   overflow: hidden;
 }
 #plusMinusModal .pm-chip.placed .pm-name {

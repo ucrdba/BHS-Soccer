@@ -409,7 +409,12 @@ Object.assign(BHSSoccerApp.prototype, {
     if (!this._pmPos) this._pmPos = {};
     on.forEach((id, i) => {
       const slot = slots[i];
-      if (slot) this._pmPos[id] = this.pmClampPosition(slot.x, slot.y);
+      // Respread for this pitch, or the keeper and the centre backs land on
+      // top of each other.
+      if (slot) {
+        const p = this.pmSpreadSlot(slot);
+        this._pmPos[id] = this.pmClampPosition(p.x, p.y);
+      }
     });
     this.pmSavePositions();
     this.renderPlusMinus();
@@ -437,6 +442,44 @@ Object.assign(BHSSoccerApp.prototype, {
   pmPerRow() {
     const w = (typeof window !== 'undefined' && window.innerWidth) || 1024;
     return w < 700 ? 3 : 4;
+  },
+
+  /**
+   * A formation slot, respread for this pitch.
+   *
+   * The coordinates come from the lineup screen, whose pitch is a tall 2:3
+   * portrait. This one is wide and short, so the same percentages put players
+   * much closer together on screen: the goalkeeper at x=50 and the centre
+   * backs at x=38 and x=62 are twelve percent apart, and a chip is wider than
+   * that. They collided, which is exactly where a coach reported it.
+   *
+   * So x is pushed out from the centre line and y is stretched across the
+   * full height. The SHAPE is preserved — a back four still sits in front of
+   * the keeper, wingers still hug the touchline — it is only spread to suit a
+   * landscape pitch.
+   *
+   * Clamped so a chip cannot hang off the edge: a player half off the pitch
+   * is as hard to tap as one underneath somebody else.
+   */
+  pmSpreadSlot(slot) {
+    const x = 50 + (Number(slot.x) - 50) * 1.35;
+
+    // The keeper is placed rather than scaled. A uniform stretch cannot save
+    // it: 3-5-2 puts a centre back directly in front of the keeper, eight
+    // percent away and on the same x, and no expansion that still fits on a
+    // pitch turns eight percent into a chip's height. So the keeper goes to
+    // the goal line and the outfield starts above it.
+    // Everything is bounded to 8..92 by pmClampPosition, so that band is what
+    // there is to work with: the keeper takes its floor and the outfield is
+    // mapped above, leaving more than a chip's height between them.
+    const raw = Number(slot.y);
+    const y = raw < 15
+      ? 8
+      : 21 + ((Math.min(raw, 86) - 18) / 68) * 71;
+    return {
+      x: Math.max(9, Math.min(91, x)),
+      y: Math.max(8, Math.min(92, y))
+    };
   },
 
   pmPositionFor(playerId, index, total) {
@@ -580,10 +623,16 @@ Object.assign(BHSSoccerApp.prototype, {
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .slice(0, this.pmMaxOnPitch())
       .map(r => {
+        // A position the coach dragged on the LINEUP screen is in that
+        // screen's coordinates, so it is respread here just like a slot is.
+        // Only the shape is adjusted; who stands where is theirs.
         const fallback = bySlot.get(r.slot);
-        const x = r.x != null ? Number(r.x) : (fallback ? fallback.x : 50);
-        const y = r.y != null ? Number(r.y) : (fallback ? fallback.y : 50);
-        return { playerId: r.player_id, ...this.pmClampPosition(x, y) };
+        const raw = {
+          x: r.x != null ? Number(r.x) : (fallback ? fallback.x : 50),
+          y: r.y != null ? Number(r.y) : (fallback ? fallback.y : 50)
+        };
+        const p = this.pmSpreadSlot(raw);
+        return { playerId: r.player_id, ...this.pmClampPosition(p.x, p.y) };
       });
   },
 

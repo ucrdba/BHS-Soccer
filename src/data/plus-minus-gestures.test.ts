@@ -51,6 +51,20 @@ function makeApp(): any {
   return app;
 }
 
+/**
+ * A lineup coordinate, as it lands on the PLUS/MINUS pitch.
+ *
+ * Not the same numbers. The lineup screen draws a tall 2:3 pitch; this one is
+ * wide and short, so the same percentages put players closer together and the
+ * keeper ended up underneath the centre backs. The shape is respread. What
+ * must hold is the arrangement, not the arithmetic.
+ */
+const onPmPitch = (x: number, y: number) => {
+  const a = makeApp();
+  const q = a.pmSpreadSlot({ x, y });
+  return a.pmClampPosition(q.x, q.y);
+};
+
 beforeEach(() => {
   (globalThis as any).window = globalThis as any;
   (window as any).plusMinus = plusMinus;
@@ -615,9 +629,14 @@ describe('placing players on the pitch', () => {
     await a.pmAppend('on', 'p2');
     a.pmApplyFormation('4-4-2');
 
+    // Respread, not copied: the lineup screen's tall pitch and this wide one
+    // need different spacing for the same shape. What must survive is the
+    // ORDER — slot one is the keeper, behind slot two.
     const slots = a.lineupSlots('4-4-2');
-    expect(a._pmPos.p1).toEqual({ x: slots[0].x, y: slots[0].y });
-    expect(a._pmPos.p2).toEqual({ x: slots[1].x, y: slots[1].y });
+    const place = (sl: any) => { const p = a.pmSpreadSlot(sl); return a.pmClampPosition(p.x, p.y); };
+    expect(a._pmPos.p1).toEqual(place(slots[0]));
+    expect(a._pmPos.p2).toEqual(place(slots[1]));
+    expect(a._pmPos.p1.y).toBeLessThan(a._pmPos.p2.y);
   });
 
   it('reuses the lineup formations rather than a second list', () => {
@@ -810,7 +829,7 @@ describe('starting from the saved lineup', () => {
 
   it('puts each one where the lineup had them', () => {
     const [gk] = app().pmStartersFromLineup(lineup());
-    expect(gk).toEqual({ playerId: 'p1', x: 50, y: 10 });
+    expect(gk).toEqual({ playerId: 'p1', ...onPmPitch(50, 10) });
   });
 
   it('falls back to the formation slot when the lineup has no coordinates', () => {
@@ -821,7 +840,7 @@ describe('starting from the saved lineup', () => {
       players: [{ player_id: 'p1', role: 'starter', slot: 'LB', x: null, y: null, sort_order: 0 }]
     }));
     const lb = a.lineupSlots('4-4-2').find((s: any) => s.slot === 'LB');
-    expect(out[0]).toEqual({ playerId: 'p1', x: lb.x, y: lb.y });
+    expect(out[0]).toEqual({ playerId: 'p1', ...onPmPitch(lb.x, lb.y) });
   });
 
   it('keeps the formation order', () => {
@@ -894,7 +913,7 @@ describe('seeding a match from the lineup', () => {
     const a = app();
     withLineup(L);
     await a.pmSeedFromLineup();
-    expect(a._pmPos.p1).toEqual({ x: 50, y: 10 });
+    expect(a._pmPos.p1).toEqual(onPmPitch(50, 10));
   });
 
   it("adopts the lineup's formation", async () => {
@@ -1729,7 +1748,7 @@ describe('players must not overlap on the pitch', () => {
    * The column count and the CSS width cap are two halves of one decision, so
    * these check them against each other rather than checking either alone.
    */
-  const CAP_DESKTOP = 18;   // #plusMinusModal .pm-chip.placed { max-width }
+  const CAP_DESKTOP = 15;   // #plusMinusModal .pm-chip.placed { max-width }
   const CAP_PHONE   = 25;
 
   const widthAt = (w: number) => {
@@ -1812,5 +1831,116 @@ describe('players must not overlap on the pitch', () => {
     const app = makeApp();
     app._pmPos = { p1: { x: 33, y: 44 } };
     expect(app.pmPositionFor('p1', 0, 11)).toEqual({ x: 33, y: 44 });
+  });
+});
+
+describe('no two players may sit on top of each other', () => {
+  /**
+   * Reported: "one or two players next to the goal keeper collide."
+   *
+   * Exactly right, and specific. The formations are drawn for the lineup
+   * screen's tall 2:3 pitch, where the keeper at x=50 and the centre backs at
+   * x=38 and x=62 look well apart. Plus/minus is wide and short, so those
+   * twelve percent become a narrower gap than a chip is wide, and the two
+   * centre backs land on the keeper.
+   *
+   * This is the invariant the screen actually needs, so it is checked
+   * directly: for every pair of slots in every formation, after respreading,
+   * the two chips must not overlap. Two rectangles miss each other when they
+   * are clear on EITHER axis.
+   */
+  const CHIP_W = 15;   // #plusMinusModal .pm-chip.placed max-width
+  const CHIP_H = 12;   // ~48px plus borders on a 62vh pitch, rounded up
+
+  const overlaps = (a: any, b: any) =>
+    Math.abs(a.x - b.x) < CHIP_W && Math.abs(a.y - b.y) < CHIP_H;
+
+  const formations = () => {
+    const app = makeApp();
+    return Object.keys(app.lineupFormations());
+  };
+
+  it('covers every formation the picker offers', () => {
+    expect(formations().length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('never overlaps two players in any formation', () => {
+    const app = makeApp();
+    for (const name of formations()) {
+      // Through both steps, exactly as pmApplyFormation does it. Testing the
+      // spread alone missed that pmClampPosition floors y at 8 and undid the
+      // keeper's placement — the fix looked right and did nothing.
+      const place = (sl: any) => {
+        const p = app.pmSpreadSlot(sl);
+        return app.pmClampPosition(p.x, p.y);
+      };
+      const spread = app.lineupSlots(name).map((sl: any) => ({ slot: sl.slot, ...place(sl) }));
+      for (let i = 0; i < spread.length; i++) {
+        for (let j = i + 1; j < spread.length; j++) {
+          const collision = overlaps(spread[i], spread[j])
+            ? `${name}: ${spread[i].slot} and ${spread[j].slot} overlap`
+            : '';
+          expect(collision).toBe('');
+        }
+      }
+    }
+  });
+
+  it('clears the keeper from both centre backs, which is what was reported', () => {
+    const app = makeApp();
+    const spread = app.lineupSlots('4-4-2').map((sl: any) => {
+      const p = app.pmSpreadSlot(sl);
+      return { slot: sl.slot, ...app.pmClampPosition(p.x, p.y) };
+    });
+    const gk = spread.find((s: any) => s.slot === 'GK');
+    for (const cb of ['LCB', 'RCB']) {
+      const d = spread.find((s: any) => s.slot === cb);
+      expect(overlaps(gk, d)).toBe(false);
+    }
+  });
+
+  it('would have failed before the respread', () => {
+    // The raw lineup coordinates, unspread: this is the bug, and it proves
+    // the test is capable of seeing it rather than passing by construction.
+    const app = makeApp();
+    const raw = app.lineupSlots('4-4-2');
+    const gk = raw.find((s: any) => s.slot === 'GK');
+    const lcb = raw.find((s: any) => s.slot === 'LCB');
+    expect(overlaps(gk, lcb)).toBe(true);
+  });
+
+  it('keeps every chip fully on the pitch', () => {
+    // Half off the edge is as hard to tap as underneath somebody.
+    const app = makeApp();
+    for (const name of formations()) {
+      for (const sl of app.lineupSlots(name)) {
+        const q = app.pmSpreadSlot(sl);
+        const p = app.pmClampPosition(q.x, q.y);
+        expect(p.x - CHIP_W / 2).toBeGreaterThanOrEqual(0);
+        expect(p.x + CHIP_W / 2).toBeLessThanOrEqual(100);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+
+  it('keeps the shape: the keeper is still behind the defence', () => {
+    // Spreading must not rearrange the team. A back four in front of the
+    // keeper and forwards ahead of midfield is the whole point of drawing it.
+    const app = makeApp();
+    const at = (slot: string) => {
+      const sl = app.lineupSlots('4-4-2').find((x: any) => x.slot === slot);
+      const p = app.pmSpreadSlot(sl);
+      return app.pmClampPosition(p.x, p.y);
+    };
+    expect(at('GK').y).toBeLessThan(at('LCB').y);
+    expect(at('LCB').y).toBeLessThan(at('LCM').y);
+    expect(at('LCM').y).toBeLessThan(at('LST').y);
+    expect(at('LB').x).toBeLessThan(at('LCB').x);
+    expect(at('RB').x).toBeGreaterThan(at('RCB').x);
+  });
+
+  it('matches the width the stylesheet actually allows', () => {
+    expect(cssSrc).toContain(`max-width: ${CHIP_W}%`);
   });
 });
