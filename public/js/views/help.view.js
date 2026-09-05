@@ -189,6 +189,126 @@ Object.assign(BHSSoccerApp.prototype, {
           a contradiction to everyone who looks at it.</p>`
       },
       {
+        id: 'directions', part: 'Every week', title: 'Directions to an away game', roles: [ALL],
+        body: `
+          <p>On an away fixture the <b>&#9992; AWAY</b> badge is a link. Tap it and your phone opens
+          turn-by-turn directions from wherever you are standing.</p>
+          <p>It only becomes a link when someone has recorded a <b>venue address</b> for that
+          fixture. Without one the badge stays plain.</p>
+          ${W('Why the app will not guess', `<p>The location on most fixtures is just the
+            opponent&rsquo;s name, and a name is not a destination. Sent to a map, &ldquo;Redlands&rdquo;
+            lands in the middle of a city of seventy thousand &mdash; and this schedule has both
+            <em>Redlands</em> and <em>Redlands East Valley</em> on it. A link to the wrong town is
+            worse than no link, so only an address a coach typed earns one.</p>`)}
+          <h4>Adding an address</h4>
+          ${P('Schedule', 'Edit', 'Venue address')}
+          <p>Or add an <b>Address</b> column to the schedule spreadsheet and import it. Clearing the
+          box removes the address and the link with it.</p>
+          ${N('It is the campus, not the pitch', `<p>Addresses point at a school&rsquo;s main
+            entrance. If a fixture is played on a district ground or an overflow field somewhere
+            else, edit that one fixture.</p>`)}`
+      },
+      {
+        id: 'lineup', part: 'Match day', title: 'Setting a lineup', roles: [COACH],
+        body: `
+          <p>A pitch, a formation, and your squad down the side. Drag a player onto a position, or
+          tap the player and then tap the position &mdash; the tap route works one-handed, which is
+          the one that matters on a touchline.</p>
+          ${P('Schedule', 'Lineup')}
+          <p>Every fixture can have its own. <b>Default lineup</b>, beside <em>Add New Match</em>,
+          sets a shape for the squad that is not tied to any fixture &mdash; it is what a new
+          fixture starts from.</p>
+          <h4>The rules it enforces</h4>
+          <ul>
+            <li>A position holds one player and a player holds one position. That is what stops a
+              printed card carrying twelve names.</li>
+            <li>Changing formation keeps everyone whose position still exists, so trying 4-3-3 and
+              going back does not cost you the XI.</li>
+            <li>Anyone not in the XI is on the bench unless you mark them <b>Out</b>.</li>
+          </ul>
+          <p>Print the card and it fits one page, with the XI, the bench and the shape.</p>`
+      },
+      {
+        id: 'plusminus', part: 'Match day', title: 'Tracking plus/minus live', roles: [COACH],
+        body: `
+          <p>Who is on the pitch when good things happen. One tap per moment, during the game.</p>
+          ${P('Schedule', '&plusmn; Plus/Minus')}
+          <h4>The gestures</h4>
+          ${T(['Do this', 'And it records'], [
+            ['Tap a player', 'Plus one'],
+            ['Long press, or two fingers', 'Minus one'],
+            ['Drag from the bench onto a player', 'A substitution &mdash; off, then on'],
+            ['Drag a player around the pitch', 'Moves them, records nothing'],
+            ['SHOT / GOAL / ASSIST, then a player', 'That event against them']
+          ])}
+          <p>The pitch opens with your saved lineup already on it, so nobody is arranging eleven
+          players at kickoff. Eleven is the limit; take one off before sending another on.</p>
+          ${W('Start the clock first', `<p>Plus and minus are refused while the clock is stopped,
+            and the screen says so under the clock button. It is not fussiness: every event is
+            stamped with the match clock, and playing time and goal differential are both worked
+            out from those stamps. Recorded before kickoff they stamp at 0:00 and every player
+            finishes the match credited with no minutes at all &mdash; the counters go up, the sheet
+            looks right, and the minutes column is quietly worthless.</p>`)}
+          ${N('Nothing is ever deleted', `<p><b>Undo</b> removes the last event. <b>Clear pitch</b>
+            takes everyone off. Neither erases what was earned: the log is append-only, so minutes
+            simply stop counting. That is also why the numbers survive a flat battery &mdash; reopen
+            the match and the clock, the period and every figure come back.</p>`)}`
+      },
+      {
+        id: 'season', part: 'Match day', title: 'Season plus/minus', roles: [COACH],
+        body: `
+          <p>Every tracked match added up, and a chart per player showing whether they are getting
+          better.</p>
+          ${P('Schedule', '&#128200; Season +/&minus;')}
+          <h4>Reading it</h4>
+          <p>Every figure is <b>per full match</b> &mdash; 80 minutes for a high school fixture, and
+          whatever your club plays otherwise. Not per 90: that is the professional convention, and
+          on an 80-minute game it would inflate every number by an eighth, so a player who was on
+          the whole time would show more than they actually did.</p>
+          <p>Raw totals mostly measure who got picked. A substitute working their way into the side
+          shows a rising total without having played any better, which is the opposite of what you
+          are looking for. The rate puts a starter and a substitute on the same footing.</p>
+          <h4>The two lines on each chart</h4>
+          ${T(['What you see', 'What it means'], [
+            ['A dot', 'One match. Sized by how long they were on, and labelled with the minutes'],
+            ['The line', 'Their running rate for the season, which steadies as minutes build up'],
+            ['A small faint dot', 'A short outing &mdash; a big number off very little time'],
+            ['A dash in the table', 'They have not been on the pitch, which is not the same as zero']
+          ])}
+          ${N('Short outings are shown on purpose', `<p>One plus in five minutes reads as +16, which
+            looks absurd because it is. The usual answer is to hide anyone under a minutes
+            threshold. That would hide exactly the players you are deciding about &mdash; this
+            report exists to tell you who deserves more minutes. So the uncertainty is drawn instead:
+            a faint speck is a wild number off almost no time, and the judgement stays yours.</p>`)}
+          <p>No trend arrow appears under three appearances. Two numbers are not a trend.</p>`
+      },
+      {
+        id: 'pmimport', part: 'Match day', title: 'Importing plus/minus figures', roles: [COACH, ADMIN],
+        body: `
+          <p>For loading a season you tracked on paper, or for filling the report with something to
+          look at.</p>
+          ${P('Admin', 'CSV', '&plusmn; Plus/Minus Match Stats', 'Download Template')}
+          <p>One row per player per match. Players are named by their <b>recording number</b>.</p>
+          ${T(['Column', 'Notes'], [
+            ['Date, Opponent', 'Must match a fixture. Any date the schedule sheet accepts &mdash; 12/8/2026, 8-Dec, DEC 8 2026'],
+            ['GoalsFor, GoalsAgainst', 'The match score. Repeat on every row; only the first is read'],
+            ['RecordingNumber', 'Which player. A number nobody carries is reported, never guessed'],
+            ['Minutes', 'Minutes played in that match'],
+            ['Plus, Minus, Shots, Goals, Assists', 'Counts. Blank means none']
+          ])}
+          <p>Drop the Date column and the opponent is enough, so long as you play them once. Play
+          them twice, home and away, and the rows are skipped rather than attached to a guess.</p>
+          ${W('A match holds 880 player-minutes and no more', `<p>Eleven on the pitch for eighty
+            minutes. Add up the Minutes column for a fixture: over that and the sheet describes a
+            match that could not have happened, and opening it in Plus/Minus will show more than
+            eleven players standing on the pitch. The import says so, and the totals still load.</p>`)}
+          ${N('There is no goal-differential column', `<p>It is not a figure a player has &mdash; it
+            is a consequence of who was on the pitch when a goal went in. Give the score once and
+            each player&rsquo;s differential falls out of it.</p>`)}
+          <p>Re-importing a corrected sheet replaces that fixture rather than adding to it, so the
+          figures never double.</p>`
+      },
+      {
         id: 'matrix', part: 'The Competitive Matrix', title: 'How the Matrix scores', roles: [ALL, COACH],
         body: `
           <p>The Competitive Matrix ranks players on how they compete in training. Two ideas drive
