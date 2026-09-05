@@ -8,6 +8,7 @@ import { auth } from './auth';
 import { can, setRoles, type RoleRow } from './auth/permissions';
 import { backupLegacyBlob } from './data/cache';
 import { resolveActiveTeam } from './data/team-scope';
+import { installDemoNotice, readDemoConfig } from './demo';
 
 // `window.supabaseService` is already declared (as `SupabaseServiceLike`) in
 // src/globals.d.ts, ambient-typing the classic scripts that still read this
@@ -110,8 +111,23 @@ function showBuildStamp(): void {
   el.setAttribute('title', buildStampTitle(info));
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', showBuildStamp);
-} else {
+/**
+ * On the demo deployment, the permanent warning above everything else.
+ *
+ * It goes up with the build stamp rather than waiting on auth, because it must
+ * be true before a visitor has read a single row — and it renders from the
+ * build-time flag alone, so it cannot appear on production and cannot be
+ * missing from the demo.
+ */
+const demoConfig = readDemoConfig(import.meta.env as Record<string, string | undefined>);
+
+function onReady(): void {
   showBuildStamp();
+  installDemoNotice(demoConfig);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', onReady);
+} else {
+  onReady();
 }
