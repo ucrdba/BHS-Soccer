@@ -1749,7 +1749,7 @@ describe('players must not overlap on the pitch', () => {
    * these check them against each other rather than checking either alone.
    */
   const CAP_DESKTOP = 15;   // #plusMinusModal .pm-chip.placed { max-width }
-  const CAP_PHONE   = 25;
+  const CAP_PHONE   = 16;   // narrowed to the tightest formation gap
 
   const widthAt = (w: number) => {
     (globalThis as any).window.innerWidth = w;
@@ -1849,8 +1849,14 @@ describe('no two players may sit on top of each other', () => {
    * the two chips must not overlap. Two rectangles miss each other when they
    * are clear on EITHER axis.
    */
-  const CHIP_W = 15;   // #plusMinusModal .pm-chip.placed max-width
-  const CHIP_H = 12;   // ~48px plus borders on a 62vh pitch, rounded up
+  // The LOOSER of the two caps: 15% on a desktop, 16% on a phone. A layout
+  // that clears the wider one clears both.
+  const CHIP_W = 16;
+  // ~52px with borders. As a share of the pitch that depends on the window:
+  // 9% on a tall one, 14% on a short one. Modelled at 15 so a laptop is
+  // covered, not just a desktop — 12% was what let the keeper and a 3-5-2
+  // centre back touch again.
+  const CHIP_H = 15;
 
   const overlaps = (a: any, b: any) =>
     Math.abs(a.x - b.x) < CHIP_W && Math.abs(a.y - b.y) < CHIP_H;
@@ -1941,6 +1947,7 @@ describe('no two players may sit on top of each other', () => {
   });
 
   it('matches the width the stylesheet actually allows', () => {
-    expect(cssSrc).toContain(`max-width: ${CHIP_W}%`);
+    // The phone cap is the looser one, so it is what CHIP_W must match.
+    expect(cssSrc).toContain(`.pm-chip.placed { max-width: ${CHIP_W}%;`);
   });
 });

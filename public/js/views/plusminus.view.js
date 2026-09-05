@@ -471,11 +471,23 @@ Object.assign(BHSSoccerApp.prototype, {
     // the goal line and the outfield starts above it.
     // Everything is bounded to 8..92 by pmClampPosition, so that band is what
     // there is to work with: the keeper takes its floor and the outfield is
-    // mapped above, leaving more than a chip's height between them.
+    // mapped above it.
+    //
+    // The outfield starts at 26 rather than immediately above the keeper. In
+    // 3-5-2 a centre back stands directly in front of the keeper on the same
+    // x, so their vertical gap is the ONLY thing keeping them apart, and it
+    // is measured as a percentage of a pitch whose height follows the
+    // viewport. Thirteen percent is comfortable on a tall window and about
+    // four pixels on a short one, which is where the overlap came back.
+    //
+    // The ceiling is 90, not 86: 4-4-1-1 stands a striker at 90 directly
+    // above a second forward at 72, and capping both at 86 squashed them
+    // together. The keeper's gap and the strikers' gap compete for the same
+    // vertical budget, so 25..92 is what satisfies each with room to spare.
     const raw = Number(slot.y);
     const y = raw < 15
       ? 8
-      : 21 + ((Math.min(raw, 86) - 18) / 68) * 71;
+      : 25 + ((Math.min(raw, 90) - 18) / 72) * 67;
     return {
       x: Math.max(9, Math.min(91, x)),
       y: Math.max(8, Math.min(92, y))

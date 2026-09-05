@@ -2176,9 +2176,16 @@ canvas { touch-action: none; max-width: 100%; }
 
 @media (max-width: 640px) {
   #plusMinusModal .pm-pitch { min-height: 58vh; }
-  /* Three columns on a phone, so a chip gets a readable share of a narrow
-     pitch rather than four unreadable ones. Matches pmPerRow(). */
-  #plusMinusModal .pm-chip.placed { max-width: 25%; }
+  /* On a phone a placed chip is its NUMBER, not a name.
+   *
+   * The tightest gap any formation asks for is 18% — a wing back beside a
+   * central midfielder in 3-5-2 — so a chip has to fit inside that however
+   * narrow the pitch is. Twenty-five percent did not, and they overlapped.
+   * Sixteen does, and at that width a name is a couple of letters and an
+   * ellipsis anyway. The number is how a coach calls a player, the bench
+   * below still lists names, and the chip stays tappable. */
+  #plusMinusModal .pm-chip.placed { max-width: 16%; }
+  #plusMinusModal .pm-chip.placed .pm-name { display: none; }
   /* Smaller once placed: eleven chips share the pitch rather than a row. */
   #plusMinusModal .pm-chip.placed { min-height: 46px; padding: 4px 8px; gap: 5px; }
   #plusMinusModal .pm-chip.placed .pm-name { max-width: 66px; font-size: 0.76rem; }
