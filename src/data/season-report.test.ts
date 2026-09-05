@@ -14,6 +14,7 @@ import appCoreSrc from '../../public/js/app.core.js?raw';
 import seasonSrc from '../../public/js/views/season.view.js?raw';
 import * as plusMinus from './plus-minus';
 import * as seasonStats from './season-stats';
+import cssSrc from '../../styles.css?raw';
 
 let ctor: any;
 
@@ -386,5 +387,43 @@ describe('sorting the season table', () => {
     };
     app.setSeasonSort('plus');
     expect(fetched).toBe(false);
+  });
+});
+
+describe('the column headings are readable', () => {
+  /**
+   * Reported: "The bold fonts for the column headings make the GD hard to
+   * read."
+   *
+   * The heading face is Oswald, which is condensed and is loaded only at
+   * weight 500 and above. A th is bold by default, so it was being set in the
+   * heaviest, narrowest weight available at 0.82rem — and a two-letter
+   * abbreviation in that is a shape rather than two letters.
+   */
+  const rule = () => {
+    const i = cssSrc.indexOf('.data-table th {');
+    return cssSrc.slice(i, cssSrc.indexOf('}', i));
+  };
+
+  it('sets headings in the body face, not the condensed display one', () => {
+    expect(rule()).toContain('font-family: var(--font-body)');
+    expect(rule()).not.toContain('font-family: var(--font-heading)');
+  });
+
+  it('does not leave them at the default bold', () => {
+    // Unstated means bold, which is where this started.
+    expect(rule()).toMatch(/font-weight:\s*[56]00/);
+  });
+
+  it('opens up the abbreviations', () => {
+    // GD, Apps, Mins. Capitals set tight read as one shape.
+    expect(rule()).toMatch(/letter-spacing/);
+  });
+
+  it('still labels the column GD rather than spelling it out', () => {
+    // The fix is the typography. Widening the column to "Goal Differential"
+    // would cost the table more than it gains.
+    app._seasonMatches = [match('m1', 'DEC 8 2026', 'Sultana', [{ id: 'p1', mins: 80, score: 2 }])];
+    expect(app.renderSeasonReport()).toContain('GD');
   });
 });

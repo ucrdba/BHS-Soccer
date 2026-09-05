@@ -630,7 +630,19 @@
 .data-table th {
   background: rgba(0, 0, 0, 0.3);
   color: var(--bhs-silver);
-  font-family: var(--font-heading);
+  /* The body face, not the heading one.
+   *
+   * Oswald is condensed and is loaded only at 500 and heavier, so a th — bold
+   * by default — got its heaviest, narrowest weight. At this size a
+   * two-letter abbreviation in it is genuinely hard to read: "GD" was
+   * reported, and "Apps" and "Mins" are no better. Inter is loaded across the
+   * range and is legible small, which is what a column heading has to be.
+   *
+   * The letter-spacing is for the abbreviations: condensed or not, capitals
+   * set tight read as one shape. */
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.04em;
   font-size: 0.82rem;
   padding: 10px 12px;
   border-bottom: 2px solid var(--bhs-navy-border);
