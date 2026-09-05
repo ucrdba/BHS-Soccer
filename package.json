@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "invite": "node scripts/invite-users.mjs",
-    "deployed": "node scripts/deployed.mjs"
+    "deployed": "node scripts/deployed.mjs",
+    "demo:schema": "node scripts/build-demo-schema.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4"
