@@ -191,6 +191,77 @@ Object.assign(BHSSoccerApp.prototype, {
       </svg>`;
   },
 
+  /**
+   * How each column of the season table is read, and which way it sorts first.
+   *
+   * Every figure but the name reads highest-first: the question a coach brings
+   * to this table is who is doing well, and one click should answer it.
+   *
+   * The rate columns can be null — a player who has not been on the pitch has
+   * no rate, which is different from a rate of zero.
+   */
+  seasonColumns() {
+    return [
+      { key: 'player',  label: 'Player',  desc: false, text: true,
+        get: (t, name) => String(name || '').toLowerCase() },
+      { key: 'apps',    label: 'Apps',    desc: true,  get: t => t.appearances || 0 },
+      { key: 'mins',    label: 'Mins',    desc: true,  get: t => t.minutes || 0 },
+      { key: 'plus',    label: '+',       desc: true,  get: t => t.plus || 0 },
+      { key: 'minus',   label: '&minus;', desc: true,  get: t => t.minus || 0 },
+      { key: 'net',     label: 'Net',     desc: true,  get: t => t.score || 0 },
+      { key: 'gd',      label: 'GD',      desc: true,  get: t => t.goalDiff || 0 },
+      { key: 'netrate', label: 'Net',     desc: true,  get: t => t.scorePerMatch },
+      { key: 'gdrate',  label: 'GD',      desc: true,  get: t => t.goalDiffPerMatch }
+    ];
+  },
+
+  /**
+   * Click a heading to sort by it; click again to reverse.
+   *
+   * The rate per full match is the default, because that is the comparison the
+   * report exists to make: raw totals mostly measure who got picked.
+   */
+  setSeasonSort(key) {
+    if ((this._seasonSort || 'netrate') === key) {
+      this._seasonSortReversed = !this._seasonSortReversed;
+    } else {
+      this._seasonSort = key;
+      this._seasonSortReversed = false;
+    }
+    const body = document.getElementById('seasonReportBody');
+    // Re-render from what is already loaded rather than fetching a season
+    // again to reorder rows that are sitting in memory.
+    if (body) body.innerHTML = this.renderSeasonReport();
+  },
+
+  /** The table's rows, in the order the chosen column asks for. */
+  seasonSortedRows(totals, nameOf) {
+    const key = this._seasonSort || 'netrate';
+    const cols = this.seasonColumns();
+    const col = cols.find(c => c.key === key) || cols.find(c => c.key === 'netrate');
+    const flip = (col.desc ? -1 : 1) * (this._seasonSortReversed ? -1 : 1);
+
+    return [...totals.values()].sort((a, b) => {
+      const x = col.get(a, nameOf(a.playerId));
+      const y = col.get(b, nameOf(b.playerId));
+
+      // A player with no rate has never been on the pitch. They sink
+      // whichever way the column is pointed rather than topping it: absent is
+      // not the same as best, and it is not the same as worst either.
+      const xn = x == null, yn = y == null;
+      if (xn || yn) {
+        if (xn && yn) return String(nameOf(a.playerId)).localeCompare(String(nameOf(b.playerId)));
+        return xn ? 1 : -1;
+      }
+
+      if (col.text) return flip * String(x).localeCompare(String(y));
+      if (x !== y) return flip * (x - y);
+      // A tie falls back to the name, so the order does not shuffle between
+      // redraws.
+      return String(nameOf(a.playerId)).localeCompare(String(nameOf(b.playerId)));
+    });
+  },
+
   /** The whole report. */
   renderSeasonReport() {
     const esc = v => this.seasonEsc(v);
@@ -215,25 +286,29 @@ Object.assign(BHSSoccerApp.prototype, {
       return p && p.number != null ? p.number : null;
     };
 
-    // Sorted by the rate rather than the raw total, since the rate is the
-    // comparison the report exists to make. Players who never got on go last:
-    // they have no rate, and floating them to either end of a sort would be
-    // an accident of null handling rather than a statement.
-    const rows = [...totals.values()].sort((a, b) => {
-      if (a.scorePerMatch == null && b.scorePerMatch == null) return 0;
-      if (a.scorePerMatch == null) return 1;
-      if (b.scorePerMatch == null) return -1;
-      return b.scorePerMatch - a.scorePerMatch;
-    });
+    // Sorted by whichever heading was last clicked, defaulting to the rate:
+    // that is the comparison the report exists to make, since raw totals
+    // mostly measure who got picked.
+    const rows = this.seasonSortedRows(totals, nameOf);
+    const active = this._seasonSort || 'netrate';
 
     const table = `
       <div style="overflow-x:auto;">
       <table class="data-table season-table">
-        <thead><tr>
-          <th>Player</th><th>Apps</th><th>Mins</th>
-          <th>+</th><th>&minus;</th><th>Net</th><th>GD</th>
-          <th>Net / ${full}</th><th>GD / ${full}</th>
-        </tr></thead>
+        <thead><tr>${this.seasonColumns().map(col => {
+          const on = col.key === active;
+          // The arrow shows the order in force, not merely that a column is
+          // the sorted one.
+          const desc = col.desc !== !!this._seasonSortReversed;
+          const arrow = on ? (desc ? ' ▼' : ' ▲') : '';
+          // The two rate columns say what they are a rate OF, since "Net" and
+          // "Net / 80" side by side are otherwise the same word twice.
+          const label = col.key === 'netrate' || col.key === 'gdrate'
+            ? `${col.label} / ${full}` : col.label;
+          return `<th class="sortable${col.text ? ' col-text' : ''}${on ? ' sorted' : ''}"
+                      title="Sort by ${label.replace(/&minus;/g, 'minus')}"
+                      onclick="app.setSeasonSort('${col.key}')">${label}${arrow}</th>`;
+        }).join('')}</tr></thead>
         <tbody>
           ${rows.map(t => `
             <tr>

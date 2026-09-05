@@ -265,3 +265,126 @@ describe('ordering the season', () => {
     expect(app.seasonSortKey('')).toBeNull();
   });
 });
+
+describe('sorting the season table', () => {
+  /**
+   * Same shape as the live plus/minus sheet: click a heading to sort by it,
+   * click again to reverse, and every figure but the name reads highest-first
+   * because the question a coach brings to this table is who is doing well.
+   */
+  const season = () => [
+    match('m1', 'DEC 8 2026', 'Sultana', [
+      { id: 'p1', mins: 80, score: 2, gd: 1 },     // Cesar Alva   — low rate, most minutes
+      { id: 'p3', mins: 10, score: 3, gd: 2 },     // Lenny Pelayo — high rate, few minutes
+      { id: 'p2', mins: 0 }                        // Tom Budde    — never on
+    ])
+  ];
+
+  const names = () => {
+    const html = app.renderSeasonReport();
+    const body = html.slice(html.indexOf('<tbody>'), html.indexOf('</tbody>'));
+    return [...body.matchAll(/([A-Z][a-z]+ [A-Z][a-z]+)/g)].map(m => m[1]);
+  };
+
+  beforeEach(() => {
+    app._seasonMatches = season();
+    app._seasonSort = undefined;
+    app._seasonSortReversed = undefined;
+    document.body.innerHTML = '<div id="seasonReportBody"></div>';
+  });
+
+  it('defaults to the rate, not the raw total', () => {
+    // Raw net has Lenny on 3 and Cesar on 2, but the rate is the comparison
+    // the report exists to make.
+    expect(names()[0]).toBe('Lenny Pelayo');
+  });
+
+  it('sorts by a column when its heading is clicked', () => {
+    app.setSeasonSort('mins');
+    expect(names()[0]).toBe('Cesar Alva');       // most minutes
+  });
+
+  it('reverses when the same heading is clicked again', () => {
+    app.setSeasonSort('mins');
+    expect(names()[0]).toBe('Cesar Alva');       // most minutes
+    app.setSeasonSort('mins');
+    // Fewest minutes is the player who has not been on at all. Zero is a real
+    // answer to "how many minutes", unlike a RATE, which they simply do not
+    // have — that is why only the rate columns sink them.
+    expect(names()[0]).toBe('Tom Budde');
+    expect(names()[1]).toBe('Lenny Pelayo');
+  });
+
+  it('starts a different column fresh rather than keeping the reversal', () => {
+    app.setSeasonSort('mins');
+    app.setSeasonSort('mins');                   // reversed
+    app.setSeasonSort('plus');                   // a new column
+    expect(app._seasonSortReversed).toBe(false);
+  });
+
+  it('sorts the player column alphabetically, ascending first', () => {
+    // A name reads A to Z first. Highest-first makes no sense for a word.
+    app.setSeasonSort('player');
+    expect(names()[0]).toBe('Cesar Alva');
+  });
+
+  it('sinks a player who never got on, whichever way the column points', () => {
+    // They have no rate. Absent is not the best and it is not the worst
+    // either, so they must not lead the table in either direction.
+    app.setSeasonSort('netrate');
+    expect(names()[names().length - 1]).toBe('Tom Budde');
+    app.setSeasonSort('netrate');                // reversed
+    expect(names()[names().length - 1]).toBe('Tom Budde');
+  });
+
+  it('breaks a tie on the name, so rows do not shuffle between redraws', () => {
+    app._seasonMatches = [match('m1', 'DEC 8 2026', 'Sultana', [
+      { id: 'p2', mins: 40, score: 1 },
+      { id: 'p1', mins: 40, score: 1 }
+    ])];
+    app.setSeasonSort('mins');
+    expect(names()).toEqual(['Cesar Alva', 'Tom Budde']);
+  });
+
+  it('marks the sorted heading and shows which way', () => {
+    app.setSeasonSort('mins');
+    const html = app.renderSeasonReport();
+    expect(html).toContain('sorted');
+    expect(html).toContain('\u25BC');            // highest first
+    app.setSeasonSort('mins');
+    expect(app.renderSeasonReport()).toContain('\u25B2');
+  });
+
+  it('makes every heading clickable', () => {
+    const html = app.renderSeasonReport();
+    for (const col of app.seasonColumns()) {
+      expect(html, col.key).toContain(`app.setSeasonSort('${col.key}')`);
+    }
+  });
+
+  it('still says what the rate columns are a rate of', () => {
+    // "Net" and "Net" side by side would be the same word twice.
+    const html = app.renderSeasonReport();
+    expect(html).toContain('Net / 80');
+    expect(html).toContain('GD / 80');
+  });
+
+  it('puts the charts in the same order as the table', () => {
+    // Scanning the table then scrolling to a chart that is somewhere else
+    // entirely wastes the trip.
+    app.setSeasonSort('mins');
+    const html = app.renderSeasonReport();
+    const blocks = html.slice(html.indexOf('Player by player'));
+    expect(blocks.indexOf('Cesar Alva')).toBeLessThan(blocks.indexOf('Lenny Pelayo'));
+  });
+
+  it('does not refetch the season to reorder rows already in memory', () => {
+    let fetched = false;
+    (window as any).supabaseService = {
+      isConfigured: () => true,
+      fetchSeasonStats: async () => { fetched = true; return null; }
+    };
+    app.setSeasonSort('plus');
+    expect(fetched).toBe(false);
+  });
+});
