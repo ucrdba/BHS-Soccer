@@ -10,6 +10,7 @@ import HomeView from '../views/HomeView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 import RosterView from '../views/RosterView.vue';
 import ScheduleView from '../views/ScheduleView.vue';
+import CoachesView from '../views/CoachesView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -72,7 +73,7 @@ export const router: Router = createRouter({
     { path: '/schedule', name: 'schedule', component: ScheduleView },
     { path: '/matrix',   name: 'matrix',   ...placeholder('Player Ratings', 'Phase 3') },
     { path: '/planner',  name: 'planner',  ...placeholder('Coach Planner', 'Phase 4') },
-    { path: '/coaches',  name: 'coaches',  ...placeholder('Coaching Staff', 'Phase 2') },
+    { path: '/coaches',  name: 'coaches',  component: CoachesView },
     { path: '/help',     name: 'help',     ...placeholder('Help', 'Phase 2') },
     // Anything else is the home page rather than a dead end.
     { path: '/:pathMatch(.*)*', redirect: '/' }
