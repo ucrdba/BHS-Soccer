@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,711 tests, config in vitest.config.mts
+npm test           # vitest — 2,924 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,711 tests across 140 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,924 tests across 149 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -57,14 +57,15 @@ per-exercise leaderboard, the logged-results panel and the player breakdown;
 Phase 3b added the write paths: the session grid, the weights and standards
 editors, and session history.
 
-**The Coach Planner is complete apart from its tactical board.** Phase 4a
-built the timeline, the drill form, the organization's drill library, saved
-plans (save, load, rename, delete, copy to another team) and the printed
-document. **Phase 4b still owes the diagrammer** — the canvas engine port and
-the board component — so a drill can carry a diagram through the Vue app but
-cannot yet be drawn there. Phases 5 and 6 own the match tools and the admin
-panel; the quiz, the daily thoughts and the school profile forms still live
-only in the legacy app.
+**The Coach Planner is complete**, tactical board included. Phase 4a built the
+timeline, the drill form, the organization's drill library, saved plans and
+the printed document; Phase 4b ported the canvas engine into `src/diagram/`
+and attached it to both a plan drill and a library drill.
+
+Phases 5 and 6 own the match tools and the admin panel. The quiz, the daily
+thoughts, the school profile forms and the round robin still live only in the
+legacy app — they sit inside `planner.view.js` by accident of the `app.js`
+split rather than because they belong to the planner.
 
 The session grid is the one screen where being marginally slower loses the
 user, because what it competes with is paper: a coach with a clipboard and a
@@ -106,6 +107,49 @@ Consequences worth respecting:
 - `src/app.core.ts`, `src/data.ts`, and `src/utils.ts` are dormant — not part of the module graph `src/main.ts` builds, and not referenced by `index.html`. They still carry the pre-migration seed logic (`DEFAULT_BHS_DATA`, the localStorage read/write cycle) that `public/js/app.core.js` already had stripped out. They must be ported to match the live behavior before anything wires them into the module graph in Phase 2 — do not activate them as-is.
 - `npm run build` **works**: `vue-tsc` typechecks `src/`, then Vite bundles both entry points and copies `public/` (including `public/js/`) into `dist/` via `publicDir`. `npm run build` is the only check that exercises real module resolution, and is mandatory before merging any change that touches imports.
 - The root `*.ps1` scripts (`split_app.ps1`, `patch_commas.ps1`, `fix_boundary.ps1`, `find_methods.ps1`) are one-off tooling from the `app.js` → `js/` split. They are not part of the build, and re-running them would overwrite hand-edits.
+
+## `src/diagram/` — the tactical board
+
+Six modules holding what was one 1,021-line class on the prototype. The
+**behaviour** is the legacy behaviour; what changed is what it talks to.
+
+| Module | Holds |
+| --- | --- |
+| `draw.ts` | `drawPitch`, `drawPath`, `drawElement`, `renderBoard` — functions of a context |
+| `geometry.ts` | Pointer position, hit testing, the coarse-pointer radius |
+| `frames.ts` | Keyframes, propagation, renumbering, interpolation |
+| `serialize.ts` | The `diagram_data` blob, read and written |
+| `board.ts` | The engine: a canvas, and one `onChange` callback |
+| `raster.ts` | A stored diagram as a PNG, for the printed plan |
+
+Three things are worth knowing before touching any of it.
+
+**`diagram_data` is stored, unversioned and irreplaceable.** Every drill in
+`drills_bank` and every plan row may carry one, and there is no migration path
+or validation. A reader that expects a subtly different shape orphans every
+diagram a coach has drawn, and *nothing on screen would say so* — the board
+opens empty. `serialize.test.ts` therefore builds a diagram on the **legacy**
+board via `?raw` + `new Function`, exports it with the legacy code, and hands
+the blob to both loaders to compare. `draw.test.ts`, `geometry.test.ts` and
+`frames.test.ts` carry the same kind of agreement test. **Keep them.**
+
+Its redundancy is deliberate: `elements` and `drawings` are written alongside
+the keyframes even though frame 0 holds the same thing, which is what lets a
+reader that knows nothing about keyframes still open the diagram. A
+pre-keyframe blob — `elements` and `drawings` and no `keyframes` — is a real
+shape in the library and must keep loading.
+
+**Coordinates are canvas pixels.** A resize that does not rescale everything
+by the same factor slides every player relative to the pitch: a diagram that
+still renders, still saves, and no longer means what it did. `board.resize()`
+rescales every keyframe, not just the visible one, and `raster.ts` renders at
+the board's native 800×480 for the same reason.
+
+**`node-canvas` is not installed**, so `getContext('2d')` returns null under
+jsdom and no test here asserts on a pixel. The drawing tests use a recording
+stub — evidence a routine ran and branched correctly, not evidence it looks
+right. `raster.ts` returns null rather than throwing when there is no context,
+so the print path drops the diagrams and still prints the plan.
 
 ## `src/domain/` — the extracted logic
 

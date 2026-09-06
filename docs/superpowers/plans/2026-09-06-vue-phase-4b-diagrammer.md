@@ -227,15 +227,15 @@ export function renderAllSteps(data: any, width?: number): { dataUrl: string; la
 
 ### Task 8: Close out Phase 4
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat 1af3c90..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`** — the diagrammer's two homes, what Phase 5 owes.
+- [x] **Step 2: Update `CLAUDE.md`** — the diagrammer's two homes, what Phase 5 owes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ## Definition of done
 
