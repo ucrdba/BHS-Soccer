@@ -184,7 +184,7 @@ The port, mechanically:
 
 **Files:** Both components and their tests; wire into `PlannerView` and `DrillsBankModal`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - The toolbar marks the active tool, and picking one tells the board.
 - The keyframe strip lists every frame, marks the current one, and moves the board when one is clicked.
@@ -193,9 +193,9 @@ The port, mechanically:
 - **Saving a diagram writes it to the drill it was opened from**, and to `drills_bank` when opened from the library.
 - The modal is coach-only.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

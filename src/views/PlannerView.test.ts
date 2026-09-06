@@ -370,3 +370,42 @@ describe('printing', () => {
     openSpy.mockRestore();
   });
 });
+
+describe('diagrams', () => {
+  const withDiagram = ROWS.map((r, i) => (i === 0
+    ? { ...r, diagram_data: { pitchType: 'full', keyframes: [] }, diagram_image: 'data:image/png;base64,AAA' }
+    : r));
+
+  it('offers a diagram on every drill', async () => {
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    expect(w.findAll('[data-drill-diagram]')).toHaveLength(2);
+  });
+
+  it('shows the thumbnail of a drill that has one', async () => {
+    // What the timeline can show without instantiating a board.
+    const w = await mountPlanner({ rows: withDiagram });
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    expect(w.findAll('[data-drill-thumb]')).toHaveLength(1);
+  });
+
+  it('opens the board on the drill it was asked about', async () => {
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+    await w.findAll('[data-drill-diagram]')[1].trigger('click');
+    await flush();
+
+    expect(w.find('[data-board-canvas]').exists()).toBe(true);
+    expect(w.find('[data-modal]').text()).toContain('Shooting');
+  });
+
+  it('offers a player no diagram controls at all', async () => {
+    const w = await mountPlanner({ coach: false });
+    expect(w.find('[data-drill-diagram]').exists()).toBe(false);
+  });
+});

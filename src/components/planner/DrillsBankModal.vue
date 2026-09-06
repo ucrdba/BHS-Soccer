@@ -21,7 +21,7 @@ import { supabaseService } from '../../data/supabase';
 import { usePlannerStore } from '../../stores/planner';
 
 const props = defineProps<{ open: boolean; schoolId: string | null }>();
-const emit = defineEmits<{ close: []; use: [any] }>();
+const emit = defineEmits<{ close: []; use: [any]; draw: [any] }>();
 
 const planner = usePlannerStore();
 
@@ -134,6 +134,9 @@ async function onDelete(drill: any): Promise<void> {
       <div class="row__acts">
         <button type="button" class="mini" data-library-use @click="emit('use', d)">
           Use in this plan
+        </button>
+        <button type="button" class="mini" data-library-draw @click="emit('draw', d)">
+          {{ d.diagram_data || d.diagramData ? 'Diagram' : '+ Diagram' }}
         </button>
         <button type="button" class="mini" data-library-edit @click="startEdit(d)">Edit</button>
         <button type="button" class="mini mini--danger" data-library-delete @click="onDelete(d)">

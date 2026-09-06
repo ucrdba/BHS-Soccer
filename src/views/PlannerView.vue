@@ -18,6 +18,7 @@ import { ref, computed, watch } from 'vue';
 import DrillFormModal from '../components/planner/DrillFormModal.vue';
 import DrillsBankModal from '../components/planner/DrillsBankModal.vue';
 import SavePlanModal from '../components/planner/SavePlanModal.vue';
+import DiagramModal from '../components/planner/DiagramModal.vue';
 import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -39,6 +40,24 @@ const drillOpen = ref(false);
 const drillIndex = ref<number | null>(null);
 const libraryOpen = ref(false);
 const plansOpen = ref(false);
+
+const diagramOpen = ref(false);
+/** A drill on the timeline, or one handed over from the library. */
+const diagramIndex = ref<number | null>(null);
+const diagramLibraryDrill = ref<any>(null);
+
+function openDiagram(index: number): void {
+  diagramIndex.value = index;
+  diagramLibraryDrill.value = null;
+  diagramOpen.value = true;
+}
+
+function openLibraryDiagram(drill: any): void {
+  libraryOpen.value = false;
+  diagramIndex.value = null;
+  diagramLibraryDrill.value = drill;
+  diagramOpen.value = true;
+}
 
 function openAdd(): void { drillIndex.value = null; drillOpen.value = true; }
 function openEdit(index: number): void { drillIndex.value = index; drillOpen.value = true; }
@@ -244,6 +263,9 @@ async function onDrop(index: number): Promise<void> {
         <div class="drill__what">
           <h2 class="drill__name" data-drill-name>{{ d.name }}</h2>
           <p v-if="d.coachNotes" class="drill__notes">{{ d.coachNotes }}</p>
+          <img
+            v-if="d.diagramImage" class="drill__diagram" :src="d.diagramImage"
+            alt="" data-drill-thumb @click.stop="openDiagram(i)" />
         </div>
 
         <div class="drill__acts">
@@ -259,6 +281,10 @@ async function onDrop(index: number): Promise<void> {
             :disabled="i === items.length - 1" data-move-down
             @click.stop="onMove(i, i + 1)"
           >↓</button>
+          <button
+            type="button" class="mini" data-drill-diagram
+            @click.stop="openDiagram(i)"
+          >{{ d.diagramData ? 'Diagram' : '+ Diagram' }}</button>
           <button
             type="button" class="mini" data-drill-edit
             @click.stop="openEdit(i)"
@@ -280,12 +306,18 @@ async function onDrop(index: number): Promise<void> {
     <DrillsBankModal
       v-if="isCoach"
       :open="libraryOpen" :school-id="schoolId"
-      @close="libraryOpen = false" @use="onUseFromLibrary" />
+      @close="libraryOpen = false" @use="onUseFromLibrary" @draw="openLibraryDiagram" />
 
     <SavePlanModal
       v-if="isCoach"
       :open="plansOpen" :team-id="org.activeTeamId"
       @close="plansOpen = false" />
+
+    <DiagramModal
+      v-if="isCoach"
+      :open="diagramOpen" :index="diagramIndex" :library-drill="diagramLibraryDrill"
+      :team-id="org.activeTeamId" :school-id="schoolId"
+      @close="diagramOpen = false" @saved="notice = 'Diagram saved.'" />
   </section>
 </template>
 
@@ -417,6 +449,15 @@ async function onDrop(index: number): Promise<void> {
 }
 
 .drill__acts { display: flex; gap: 0.3rem; align-items: center; }
+
+.drill__diagram {
+  display: block;
+  margin-top: 0.5rem;
+  max-width: 18rem;
+  border: 1px solid var(--bhs-gold-accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
 
 .mini {
   padding: 0.2rem 0.5rem;
