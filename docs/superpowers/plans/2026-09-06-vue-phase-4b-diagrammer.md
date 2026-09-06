@@ -205,7 +205,7 @@ The port, mechanically:
 
 **Files:** `src/diagram/raster.ts` and its test; wire into `PlannerView.onPrint`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 export function renderStep(data: any, stepIndex: number, width?: number):
@@ -219,9 +219,9 @@ export function renderAllSteps(data: any, width?: number): { dataUrl: string; la
 - **Returns null when there is no canvas** — under jsdom, and in any browser that refuses one — so the print path drops the diagrams and still prints the plan.
 - The step's label comes from the keyframe.
 
-- [ ] **Step 2: Write it, watch the tests pass**
+- [x] **Step 2: Write it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

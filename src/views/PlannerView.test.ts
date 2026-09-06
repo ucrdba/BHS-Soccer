@@ -409,3 +409,26 @@ describe('diagrams', () => {
     expect(w.find('[data-drill-diagram]').exists()).toBe(false);
   });
 });
+
+describe('printing a plan with diagrams', () => {
+  it('puts each drill\'s saved image in the document', async () => {
+    // jsdom has no 2D context, so the stored thumbnail is what gets printed.
+    // That fallback is the point: a browser that refuses a canvas prints the
+    // plan without freshly rendered steps rather than not printing.
+    const rows = [{
+      ...planRow(),
+      diagram_image: 'data:image/png;base64,SAVED',
+      diagram_data: { pitchType: 'full', keyframes: [], elements: [], drawings: [] }
+    }];
+    const win = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(win as any);
+
+    const w = await mountPlanner({ rows });
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+    await w.find('[data-print-plan]').trigger('click');
+
+    expect(win.document.write.mock.calls[0][0]).toContain('base64,SAVED');
+    openSpy.mockRestore();
+  });
+});

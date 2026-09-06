@@ -23,6 +23,7 @@ import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
 import { buildPrintDocument } from '../domain/plan-print';
+import { diagramsForPlan } from '../diagram/raster';
 
 const planner = usePlannerStore();
 const org = useOrganizationStore();
@@ -132,7 +133,11 @@ function onPrint(): void {
     planName: planner.activePlanName || 'Practice plan',
     organization: org.branding.name || '',
     team: org.activeTeam?.name || '',
-    items: planner.items
+    items: planner.items,
+    // Rendered from the stored blobs, falling back to each drill's saved
+    // thumbnail. A browser that refuses a canvas prints the plan without
+    // them rather than not printing.
+    diagrams: diagramsForPlan(planner.items)
   });
   if (!html) { notice.value = 'Add a drill before printing the plan.'; return; }
 
