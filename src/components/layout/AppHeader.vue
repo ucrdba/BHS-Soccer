@@ -6,30 +6,33 @@
  * hero read "BEAUMONT HIGH SCHOOL" and "HOME OF THE COUGARS" from literals in
  * a template string, which is wrong the moment a club coach opens it.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import AuthModal from '../auth/AuthModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { useOrganizationStore } from '../../stores/organization';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
+const authOpen = ref(false);
 
-/** The three states updateAuthUI() produces, in the same order. */
-const accountLabel = computed(() => {
-  if (auth.isGuest) return '🔑 Sign In / Register';
-  if (auth.isCoach || auth.isAdmin) return '⚙️ Admin Center';
-  return '👤 My Account';
-});
+/**
+ * The account button says what it does.
+ *
+ * A guest signs in. Everyone else signs out -- the admin centre and the
+ * account screen are Phase 6, and a button that opens nothing is worse than
+ * one that is not there.
+ */
+const accountLabel = computed(() =>
+  auth.isGuest ? '🔑 Sign In / Register' : '🚪 Sign Out');
 
 const badgeText = computed(() =>
   auth.user ? String(auth.role || '').toUpperCase() : 'GUEST');
 
 const displayName = computed(() => auth.user?.name || 'Public Visitor');
 
-// TODO(Phase 2): the sign-in and account modals are not rebuilt yet. Until
-// they are, this button says what it will do rather than doing nothing
-// silently -- the legacy app still has both screens.
-function onAccountClick(): void {
-  console.info('Account actions are rebuilt in Phase 2 of the Vue migration.');
+async function onAccountClick(): Promise<void> {
+  if (auth.isGuest) { authOpen.value = true; return; }
+  await auth.logout();
 }
 </script>
 
@@ -54,6 +57,8 @@ function onAccountClick(): void {
         {{ accountLabel }}
       </button>
     </div>
+
+    <AuthModal :open="authOpen" @close="authOpen = false" />
   </header>
 </template>
 

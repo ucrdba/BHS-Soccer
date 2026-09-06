@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { auth } from '../auth';
+import { checkEmail, type EmailCheck } from '../auth/email-typo';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<any>(null);
@@ -44,5 +45,51 @@ export const useAuthStore = defineStore('auth', () => {
   // view from this; here it updates seven refs and Vue does the rest.
   auth.subscribe(sync);
 
-  return { user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, sync };
+  // ── Actions ───────────────────────────────────────────────────────────────
+  // Thin wrappers over AuthManager, which is real Supabase Auth. Nothing here
+  // authenticates anything; it calls and then re-reads.
+
+  async function login(email: string, password: string) {
+    const res = await auth.loginUser(email, password);
+    sync();
+    return res;
+  }
+
+  async function register(f: { name: string; email: string; password: string; role: string }) {
+    const res = await auth.registerUser(f);
+    sync();
+    return res;
+  }
+
+  async function verifyOtp(email: string, code: string) {
+    const res = await auth.verifyUserOtp(email, code);
+    sync();
+    return res;
+  }
+
+  async function logout(): Promise<void> {
+    await auth.logout();
+    sync();
+  }
+
+  /**
+   * Inspect an address before registering with it.
+   *
+   * checkEmail has been imported into src/auth.ts and never called, and
+   * coaches.view.js branches on a `res.emailSuggestion` that RegisterResult
+   * never carries -- so this tested module has never actually run. Wired up
+   * here, at the point registration happens.
+   *
+   * A suggestion is an OFFER, never a verdict. An unfamiliar domain is
+   * ordinary for a club coach and unknowable from here, so the caller must
+   * leave keeping the typed address an equally easy path.
+   */
+  function inspectEmail(email: string): EmailCheck {
+    return checkEmail(email);
+  }
+
+  return {
+    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest,
+    sync, login, register, verifyOtp, logout, inspectEmail
+  };
 });
