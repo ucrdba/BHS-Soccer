@@ -13,6 +13,8 @@
 import { ref, computed, watch } from 'vue';
 import MatrixBoard from '../components/matrix/MatrixBoard.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
+import ResultsPanel from '../components/matrix/ResultsPanel.vue';
+import PlayerBreakdownModal from '../components/matrix/PlayerBreakdownModal.vue';
 import { useMatrixStore } from '../stores/matrix';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -26,6 +28,32 @@ const schoolId = computed(() => org.school?.id ?? null);
 const settled = computed(() => !matrix.loading && matrix.loadedTeamId !== null);
 
 const openPlayerId = ref<string | null>(null);
+const notice = ref<string | null>(null);
+
+/**
+ * Deleting one result re-derives every rank, so the confirmation says so.
+ *
+ * A coach removing a single bad row should know the whole board moves — that
+ * is the point of points being derived rather than stored, but it is not
+ * obvious from a delete button.
+ */
+async function onRemoveResult(r: any): Promise<void> {
+  const teamId = org.activeTeamId;
+  if (!teamId) return;
+
+  const who = r.drew ? `${r.a} and ${r.b}` : `${r.winner} and ${r.loser}`;
+  const when = r.log.occurred_on ? ` on ${r.log.occurred_on}` : '';
+  const ok = window.confirm(
+    `Delete the result between ${who}${when}?\n\n`
+    + "Both players' points and ranks will be recalculated without it."
+  );
+  if (!ok) return;
+
+  const res = await matrix.removeResult(r.log.id, teamId, schoolId.value);
+  notice.value = res?.ok
+    ? 'Result deleted; ranks recalculated.'
+    : (res?.error || 'Could not delete that result.');
+}
 
 watch(
   () => [org.activeTeamId, schoolId.value],
@@ -50,6 +78,10 @@ watch(
       </div>
     </header>
 
+    <p v-if="notice" class="notice" role="status" data-notice>
+      {{ notice }}
+      <button type="button" class="notice__x" aria-label="Dismiss" @click="notice = null">&times;</button>
+    </p>
     <p v-if="matrix.loadError" class="notice notice--bad" role="alert" data-load-error>
       {{ matrix.loadError }}
     </p>
@@ -75,7 +107,13 @@ watch(
     <template v-else>
       <ExerciseLeaderboard v-if="matrix.exerciseFilter" />
       <MatrixBoard v-else @open-player="openPlayerId = $event" />
+
+      <ResultsPanel :can-edit="isCoach" @remove="onRemoveResult" />
     </template>
+
+    <PlayerBreakdownModal
+      :player-id="openPlayerId" :team-id="org.activeTeamId"
+      @close="openPlayerId = null" />
   </section>
 </template>
 

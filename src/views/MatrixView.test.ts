@@ -66,11 +66,11 @@ async function flush(): Promise<void> {
 
 async function mountMatrix(opts: {
   roster?: any[]; points?: any[]; filter?: string;
-  coach?: boolean; failWith?: string | null;
+  coach?: boolean; failWith?: string | null; logs?: any[];
 } = {}) {
   const {
     roster = ROSTER_ROWS, points = [point()], filter = '',
-    coach = false, failWith = null
+    coach = false, failWith = null, logs = []
   } = opts;
 
   vi.clearAllMocks();
@@ -82,7 +82,7 @@ async function mountMatrix(opts: {
   svc.fetchMatrixStandings.mockResolvedValue(STANDINGS);
   svc.fetchTeamExercisePoints.mockResolvedValue(points);
   svc.fetchDrillsForWeighting.mockResolvedValue(DRILLS);
-  svc.fetchMatrixLogs.mockResolvedValue([]);
+  svc.fetchMatrixLogs.mockResolvedValue(logs);
 
   const w = mount(MatrixView, {
     global: {
@@ -223,5 +223,58 @@ describe('a fitness standard', () => {
   it('shows a best time as a time, not a number of seconds', async () => {
     const w = await mountMatrix(opts);
     expect(w.text()).toContain('4:10');   // 250 seconds
+  });
+});
+
+describe('the results panel', () => {
+  const LOGS = [
+    { id: 'l1', player_a_id: 'p1', player_b_id: 'p2', outcome: 'a',
+      score_text: '2-1', occurred_on: 'SEP 4 2026', drill_id: SMALL },
+    { id: 'l2', player_a_id: 'p2', player_b_id: 'p3', outcome: 'draw',
+      score_text: null, occurred_on: 'SEP 5 2026', drill_id: SMALL }
+  ];
+
+  it('is absent entirely for a player, not merely hidden', async () => {
+    // It exists to correct results, which a player may not do.
+    const w = await mountMatrix({ coach: false, logs: LOGS });
+    expect(w.find('[data-results-panel]').exists()).toBe(false);
+    expect(w.find('[data-result-remove]').exists()).toBe(false);
+  });
+
+  it('lists every logged result for a coach', async () => {
+    const w = await mountMatrix({ coach: true, logs: LOGS });
+    expect(w.findAll('[data-result-row]')).toHaveLength(2);
+  });
+
+  it('marks the winner rather than leaving a reader to decode a and b', async () => {
+    const w = await mountMatrix({ coach: true, logs: LOGS });
+    const first = w.findAll('[data-result-row]')[0];
+    expect(first.text()).toContain('beat');
+    expect(first.find('.won').text()).toContain('Alva');
+  });
+
+  it('names a draw without inventing a winner', async () => {
+    const w = await mountMatrix({ coach: true, logs: LOGS });
+    expect(w.findAll('[data-result-row]')[1].text()).toContain('drew with');
+  });
+
+  it('uses the recording number beside a name', async () => {
+    // The Matrix is read alongside paper sheets, which carry those numbers.
+    const w = await mountMatrix({ coach: true, logs: LOGS });
+    expect(w.find('[data-result-row]').text()).toContain('(1)');
+  });
+
+  it('says what an empty panel is for', async () => {
+    const w = await mountMatrix({ coach: true, logs: [] });
+    expect(w.find('[data-results-empty]').text()).toMatch(/leaderboard is calculated from/i);
+  });
+
+  it('warns that deleting recalculates every rank', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountMatrix({ coach: true, logs: LOGS });
+    await w.find('[data-result-remove]').trigger('click');
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/recalculated/i));
+    confirmSpy.mockRestore();
   });
 });
