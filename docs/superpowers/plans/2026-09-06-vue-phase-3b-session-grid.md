@@ -215,7 +215,7 @@ What each exercise is worth, what kind of thing it measures, and the standards f
 
 **Files:** Create `src/components/matrix/SessionHistory.vue` and its test; edit `src/views/MatrixView.vue` and its test.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - **Newest first**, and a session whose drill has since been deleted renders a label rather than `undefined`.
 - **Edit reopens the grid prefilled** from `fetchMatrixSessionResults`, with the same session id, so saving upserts rather than inserting a second session for the same day.
@@ -223,9 +223,9 @@ What each exercise is worth, what kind of thing it measures, and the standards f
 - **All of it is coach-only and absent from a player's document**, the same as the results panel — assert absence, not `display: none`.
 - **`MatrixView` gains one "Record a session" control and one "Weights and standards" control**, both coach-only, and the board re-reads after either modal saves.
 
-- [ ] **Step 2: Build and wire, watch the tests pass**
+- [x] **Step 2: Build and wire, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

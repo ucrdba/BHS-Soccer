@@ -19,7 +19,14 @@ const svc = {
   fetchTeamExercisePoints: vi.fn(),
   fetchDrillsForWeighting: vi.fn(),
   fetchMatrixLogs: vi.fn(),
-  deleteMatrixResult: vi.fn()
+  deleteMatrixResult: vi.fn(),
+  fetchTeamSessionHistory: vi.fn(),
+  fetchMatrixSessionResults: vi.fn(),
+  fetchTimeBands: vi.fn(),
+  saveMatrixSession: vi.fn(),
+  deleteMatrixSession: vi.fn(),
+  updateDrillWeights: vi.fn(),
+  findPlayerOnTeam: vi.fn()
 };
 vi.mock('../data/supabase', () => ({ supabaseService: new Proxy({}, { get: (_t, k) => (...a: any[]) => (svc as any)[k](...a) }) }));
 
@@ -66,11 +73,11 @@ async function flush(): Promise<void> {
 
 async function mountMatrix(opts: {
   roster?: any[]; points?: any[]; filter?: string;
-  coach?: boolean; failWith?: string | null; logs?: any[];
+  coach?: boolean; failWith?: string | null; logs?: any[]; drills?: any[];
 } = {}) {
   const {
     roster = ROSTER_ROWS, points = [point()], filter = '',
-    coach = false, failWith = null, logs = []
+    coach = false, failWith = null, logs = [], drills = DRILLS
   } = opts;
 
   vi.clearAllMocks();
@@ -81,8 +88,11 @@ async function mountMatrix(opts: {
   }
   svc.fetchMatrixStandings.mockResolvedValue(STANDINGS);
   svc.fetchTeamExercisePoints.mockResolvedValue(points);
-  svc.fetchDrillsForWeighting.mockResolvedValue(DRILLS);
+  svc.fetchDrillsForWeighting.mockResolvedValue(drills);
   svc.fetchMatrixLogs.mockResolvedValue(logs);
+  svc.fetchTeamSessionHistory.mockResolvedValue([]);
+  svc.fetchMatrixSessionResults.mockResolvedValue([]);
+  svc.fetchTimeBands.mockResolvedValue([]);
 
   const w = mount(MatrixView, {
     global: {
@@ -276,5 +286,37 @@ describe('the results panel', () => {
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/recalculated/i));
     confirmSpy.mockRestore();
+  });
+});
+
+describe('recording a session', () => {
+  it('offers a coach somewhere to record one', async () => {
+    const w = await mountMatrix({ coach: true });
+    expect(w.find('[data-record-session]').exists()).toBe(true);
+    expect(w.find('[data-open-weights]').exists()).toBe(true);
+  });
+
+  it('offers a player neither control, absent rather than hidden', async () => {
+    const w = await mountMatrix({ coach: false });
+    expect(w.find('[data-record-session]').exists()).toBe(false);
+    expect(w.find('[data-open-weights]').exists()).toBe(false);
+    expect(w.find('[data-history]').exists()).toBe(false);
+  });
+
+  it('does not offer a 1v1 exercise as a session', async () => {
+    // Those are entered as pairings. Offering both routes for one drill would
+    // let the same day's competition be counted twice.
+    const w = await mountMatrix({
+      coach: true,
+      drills: DRILLS.concat([{ id: 'd-1v1', name: 'One v One', measure: 'head_to_head' }])
+    });
+    const names = w.find('[data-session-drill]').findAll('option').map(o => o.text());
+    expect(names).not.toContain('One v One');
+  });
+
+  it('reads the session history for the team', async () => {
+    const w = await mountMatrix({ coach: true });
+    expect(svc.fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    expect(w.find('[data-history]').exists()).toBe(true);
   });
 });

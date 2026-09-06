@@ -15,11 +15,16 @@ import MatrixBoard from '../components/matrix/MatrixBoard.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
 import ResultsPanel from '../components/matrix/ResultsPanel.vue';
 import PlayerBreakdownModal from '../components/matrix/PlayerBreakdownModal.vue';
+import SessionModal from '../components/matrix/SessionModal.vue';
+import SessionHistory from '../components/matrix/SessionHistory.vue';
+import WeightsModal from '../components/matrix/WeightsModal.vue';
 import { useMatrixStore } from '../stores/matrix';
+import { useSessionStore } from '../stores/session';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
 
 const matrix = useMatrixStore();
+const session = useSessionStore();
 const org = useOrganizationStore();
 const auth = useAuthStore();
 
@@ -29,6 +34,49 @@ const settled = computed(() => !matrix.loading && matrix.loadedTeamId !== null);
 
 const openPlayerId = ref<string | null>(null);
 const notice = ref<string | null>(null);
+
+const sessionOpen = ref(false);
+const weightsOpen = ref(false);
+/** The exercise the grid is recording. Chosen before it opens. */
+const sessionDrillId = ref('');
+
+/**
+ * Sessions are recorded per exercise, and head_to_head is deliberately not
+ * offered: those are entered as pairings, and giving one drill both routes
+ * would let the same day's competition be counted twice.
+ */
+const sessionDrills = computed(() =>
+  session.drills.filter((d: any) => d.measure !== 'head_to_head'));
+
+async function openSessions(): Promise<void> {
+  await session.loadDrills(schoolId.value);
+  await session.loadHistory(org.activeTeamId);
+}
+
+async function onRecordSession(): Promise<void> {
+  const drillId = sessionDrillId.value || sessionDrills.value[0]?.id || '';
+  if (!drillId) { notice.value = 'Add an exercise in the practice planner first.'; return; }
+  sessionDrillId.value = drillId;
+  await session.openNew(drillId, org.activeTeamId);
+  sessionOpen.value = true;
+}
+
+async function onEditSession(drillId: string): Promise<void> {
+  // openExisting has already loaded the results and the bands; the grid reads
+  // them off the store.
+  sessionDrillId.value = drillId;
+  sessionOpen.value = true;
+}
+
+/**
+ * Points are derived in Postgres, so nothing on the board moves until it is
+ * read again — a recorded session, a corrected one, or a changed weight all
+ * re-derive every rank.
+ */
+async function reload(): Promise<void> {
+  await matrix.load(org.activeTeamId, schoolId.value);
+  await session.loadHistory(org.activeTeamId);
+}
 
 /**
  * Deleting one result re-derives every rank, so the confirmation says so.
@@ -57,7 +105,10 @@ async function onRemoveResult(r: any): Promise<void> {
 
 watch(
   () => [org.activeTeamId, schoolId.value],
-  () => { matrix.load(org.activeTeamId, schoolId.value); },
+  () => {
+    matrix.load(org.activeTeamId, schoolId.value);
+    if (isCoach.value) openSessions();
+  },
   { immediate: true }
 );
 </script>
@@ -75,6 +126,22 @@ watch(
           {{ org.branding.name }}
           <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
         </p>
+      </div>
+
+      <div v-if="isCoach" class="matrix__acts">
+        <select
+          v-if="sessionDrills.length" v-model="sessionDrillId"
+          class="acts__select" aria-label="Exercise to record"
+          data-session-drill
+        >
+          <option v-for="d in sessionDrills" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+        <button type="button" class="act" data-record-session @click="onRecordSession">
+          Record a session
+        </button>
+        <button type="button" class="act" data-open-weights @click="weightsOpen = true">
+          Weights &amp; standards
+        </button>
       </div>
     </header>
 
@@ -109,11 +176,26 @@ watch(
       <MatrixBoard v-else @open-player="openPlayerId = $event" />
 
       <ResultsPanel :can-edit="isCoach" @remove="onRemoveResult" />
+
+      <SessionHistory
+        :can-edit="isCoach" :team-id="org.activeTeamId"
+        @edit="onEditSession" @changed="reload" />
     </template>
 
     <PlayerBreakdownModal
       :player-id="openPlayerId" :team-id="org.activeTeamId"
       @close="openPlayerId = null" />
+
+    <SessionModal
+      v-if="isCoach"
+      :open="sessionOpen" :team-id="org.activeTeamId" :school-id="schoolId"
+      :players="matrix.players" :drill-id="sessionDrillId"
+      @close="sessionOpen = false" @saved="reload" />
+
+    <WeightsModal
+      v-if="isCoach"
+      :open="weightsOpen" :team-id="org.activeTeamId" :school-id="schoolId"
+      @close="weightsOpen = false" @saved="reload" />
   </section>
 </template>
 
@@ -168,6 +250,30 @@ watch(
 }
 
 .picker__hint { color: var(--text-muted, #94a3b8); font-size: 0.74rem; }
+
+.matrix__head { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; }
+.matrix__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
+
+.acts__select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--bhs-navy-border);
+  border-radius: 6px;
+  background: var(--bhs-navy-bg);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.act {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--bhs-cyan-accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bhs-cyan-accent);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
 
 .empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
 
