@@ -1660,6 +1660,12 @@ class SupabaseService {
    * rather than after a save and a reload.
    */
   factorForTime(seconds: any, bands: Record<string, any>[]): number {
+    // An absent value is not a fast time. Number(null) and Number('') are both
+    // 0, which fits under every band and would hand out full marks for a run
+    // nobody recorded. No caller passes one today; the guard is here so that
+    // stays true. Mirrored in src/domain/band-score.ts, which must agree.
+    if (seconds === null || seconds === undefined || String(seconds).trim() === '') return 0;
+
     const n = Number(seconds);
     if (!Number.isFinite(n)) return 0;
 

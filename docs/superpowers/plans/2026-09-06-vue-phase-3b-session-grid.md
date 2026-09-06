@@ -62,7 +62,7 @@ export function bandFeedback(raw: string, bands: Band[]):
   { text: string; tone: 'good' | 'none' | 'bad' | 'empty' };
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `factorForTime` must **agree with `SupabaseService.factorForTime`**, the same way `time.ts` agrees with the client's parser — that is what "tightest band it still fits under" means, and a second reading of it would hand a player marks for a time they did not run. Include an agreement `describe` that runs the same inputs through both, as `time.test.ts` does.
 
@@ -75,9 +75,9 @@ Cover: a time under the tightest band earns that band's factor, not the loosest 
 - earns something → `earns 0.5`, `good`.
 - fits no band → `no band`, `none` — distinct from `bad`. The time was read fine; it simply met no standard, which is a real result and not a typo.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit** — all four, by exit code.
+- [x] **Step 3: Gates and commit** — all four, by exit code.
 
 ---
 
