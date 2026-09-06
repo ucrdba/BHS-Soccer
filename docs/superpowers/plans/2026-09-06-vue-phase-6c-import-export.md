@@ -78,16 +78,16 @@ export function sheetFor(def: TableDef, data: any): Record<string, any>[];
 
 **Files:** `src/components/admin/ImportExportModal.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - One workbook, per-table files, and a zip — all three from the same definitions.
 - **The quiz sheet contains the team's real questions**, and nothing when there are none.
 - A template downloads with the headers and no rows.
 - The library being absent is reported rather than throwing — the CDN may not have loaded yet.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -123,7 +123,7 @@ export function planImport(sheets: Record<string, any[]>, known: { teams: any[] 
 
 **Files:** Extend `ImportExportModal.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **Choosing a file previews and writes nothing.** Assert no client write method is called.
 - The preview names each sheet, its row count, and what it maps to.
@@ -131,9 +131,9 @@ export function planImport(sheets: Record<string, any[]>, known: { teams: any[] 
 - Applying writes, and reports what was inserted, updated and **rejected** — the legacy loop counts rejections because a refused row otherwise reports as a clean import.
 - A second press does not double-write: the preview is consumed.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
