@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 1,994 tests, config in vitest.config.mts
+npm test           # vitest — 2,074 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (1,994 tests across 100 files), including Vue component tests.
+- `npm test` — Vitest unit tests (2,074 tests across 106 files), including Vue component tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -65,7 +65,7 @@ Consequences worth respecting:
 
 ## `src/domain/` — the extracted logic
 
-Sixteen framework-free modules holding logic that used to live on the
+Nineteen framework-free modules holding logic that used to live on the
 `BHSSoccerApp` prototype: `schedule`, `matrix`, `matrix-session`, `lineup`,
 `plus-minus-court`, `round-robin`, `season`, `progress`, `report`,
 `recording-numbers`, `roster`, `csv` and `upsert`, plus three the Vue rebuild's
@@ -124,6 +124,10 @@ Postgres is the source of truth. `loadData()` in `app.core.js` returns empty col
 Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `diagram_data`); app state is **camelCase**. There is no ORM — every field is hand-mapped, on read in `syncFromSupabase()` and on write in each `upsert*` method of `src/data/supabase.ts`. Adding a column means editing both sides. Soft deletes are a repo-wide convention: rows carry `is_deleted` and readers filter on it.
 
 `src/data/supabase.ts` exports a single `SupabaseService` instance that `src/main.ts` assigns to `window.supabaseService`. Credentials resolve in order: `window.ENV_SUPABASE_URL` / `ENV_SUPABASE_ANON_KEY` → `localStorage['bhs_supabase_url' / 'bhs_supabase_anon_key']` (settable at runtime from the admin panel via `setCredentials`) → a hardcoded project URL and anon key in the file. If none produce a valid client, every service method returns `null` — so "nothing loaded from the DB" is usually an unconfigured client, not a query bug.
+
+**Ten of its methods default `schoolId` to `'bhs'`, and calling one without an argument is a multi-tenant bug that will not announce itself.** `getSchoolUuid`, `fetchPendingApprovals`, `fetchPlayers`, `fetchSoccerCategories`, `fetchDrillsBank`, `upsertDrillBankItem`, `fetchSchool`, `upsertSchool`, `fetchCoaches` and `upsertCoach` all declare `schoolId: string = 'bhs'`. A club coach calling any of them bare is silently served Beaumont's data, and the default makes it invisible at the call site. **Always pass the resolved organization id.** Where a team-scoped equivalent exists — `fetchTeamRoster(teamId)` for the roster — prefer it: it has no default to fall through.
+
+Removing the defaults is worth doing and is not a small change: both apps call these, so it wants its own commit rather than being folded into a view.
 
 ### Teams
 
