@@ -81,7 +81,7 @@ The most dangerous section: approving a signup hands somebody access to a squad 
 
 **Files:** `src/components/admin/TeamsSection.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Admin-only, absent for a coach.
 - Every team across every organization is listed, with its organization — `fetchAllTeams` exists because `this.data.teams` holds only the viewer's own.
@@ -89,9 +89,9 @@ The most dangerous section: approving a signup hands somebody access to a squad 
 - **Creating an organization and creating a team both take a kind** — `school` or `club` — because that distinction is what the whole multi-tenant model rests on.
 - **No default organization.** Creating a team asks which one; it must not fall back to the first, or the only, or Beaumont.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

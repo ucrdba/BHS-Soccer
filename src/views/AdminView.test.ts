@@ -44,7 +44,15 @@ vi.mock('../auth', () => ({
   }
 }));
 
-vi.mock('../data/supabase', () => ({ supabaseService: {} }));
+// The sections read through this on mount; an incomplete mock leaves an
+// unhandled rejection, which exits non-zero while every test "passes".
+vi.mock('../data/supabase', () => ({
+  supabaseService: {
+    fetchAllTeams: vi.fn().mockResolvedValue([]),
+    fetchTeamCoaches: vi.fn().mockResolvedValue([]),
+    fetchAssignableCoaches: vi.fn().mockResolvedValue([])
+  }
+}));
 
 const ADMIN_ROLES = [
   { name: 'admin', permissions: { can_access_admin_dashboard: true } },

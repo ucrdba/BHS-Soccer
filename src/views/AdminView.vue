@@ -25,6 +25,7 @@ import { useAuthStore } from '../stores/auth';
 import { useOrganizationStore } from '../stores/organization';
 import { can } from '../auth/permissions';
 import ApprovalsSection from '../components/admin/ApprovalsSection.vue';
+import TeamsSection from '../components/admin/TeamsSection.vue';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
@@ -58,10 +59,7 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
       v-if="isCoach"
       :school-id="schoolId" data-admin-approvals />
 
-    <section v-if="mayManage" class="sec" data-admin-manage>
-      <h2 class="sec__h">Squads and organizations</h2>
-      <p class="sec__note">Built in Phase 6a.</p>
-    </section>
+    <TeamsSection v-if="mayManage" data-admin-manage />
 
     <!-- Not merely hidden: an admin whose roles table did not load would
          otherwise see a page that looks complete and is missing half of
