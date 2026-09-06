@@ -51,11 +51,31 @@ function getSupabaseAnonKey(): string {
 
 let supabaseClient: SupabaseClient | null = null;
 
+/**
+ * Is this a Supabase endpoint worth pointing a client at?
+ *
+ * A hosted project, or a stack the Supabase CLI is running locally. The
+ * check used to be `url.includes('.supabase.co')` alone, which silently
+ * refused every local URL: `supabase start` serves its API on
+ * http://127.0.0.1:54321, so the app reported "Operating in Local Database
+ * Mode" and every service method returned null. That made it impossible to
+ * develop or test against a local stack at all, and the reason was one
+ * console line nobody reads.
+ *
+ * Deliberately narrow: only loopback, so a typo in a deployment's
+ * configuration still fails loudly rather than half-connecting to something.
+ */
+export function isSupabaseEndpoint(url: string): boolean {
+  if (!url) return false;
+  if (url.includes('.supabase.co')) return true;
+  return /^https?:\/\/(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?(\/|$)/i.test(url);
+}
+
 function initSupabaseClient(): void {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
 
-  if (url && url.includes('.supabase.co') && key && key.startsWith('eyJ')) {
+  if (isSupabaseEndpoint(url) && key && key.startsWith('eyJ')) {
     try {
       supabaseClient = createClient(url, key, {
         auth: {
@@ -74,14 +94,14 @@ function initSupabaseClient(): void {
           autoRefreshToken: true
         }
       });
-      console.log('⚡ Connected to Supabase Cloud Database:', url);
+      console.log('⚡ Connected to Supabase:', url);
     } catch (err: any) {
       console.warn('Supabase init notice:', err.message);
       supabaseClient = null;
     }
   } else {
     supabaseClient = null;
-    console.log('📦 Operating in Local Database Mode (LocalStorage active). Provide valid Supabase Anon Key (starts with eyJ...) to enable Cloud DB.');
+    console.log('📦 No Supabase client: needs a .supabase.co or loopback URL and an anon key starting eyJ. Got:', url || '(none)');
   }
 }
 
