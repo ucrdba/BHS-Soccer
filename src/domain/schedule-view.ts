@@ -67,6 +67,31 @@ export function format24hTo12h(timeStr: string): string {
   return `${hrs}:${mins} ${ampm}`;
 }
 
+/**
+ * 6:00 PM to 18:00. Passed through if it already reads that way.
+ *
+ * The inverse of `format24hTo12h`, and it lives beside it so the two cannot
+ * drift: a stored slot is written in twelve-hour text and read back as
+ * minutes, so a round trip that loses the meridiem shifts practice by twelve
+ * hours.
+ */
+export function format12hTo24h(timeStr: string): string {
+  if (!timeStr) return '';
+
+  const lower = timeStr.toLowerCase();
+  if (timeStr.includes(':') && !lower.includes('am') && !lower.includes('pm')) return timeStr;
+
+  const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!m) return '';
+
+  let hrs = parseInt(m[1], 10);
+  const mins = m[2];
+  const ampm = (m[3] || '').toUpperCase();
+  if (ampm === 'PM' && hrs < 12) hrs += 12;
+  if (ampm === 'AM' && hrs === 12) hrs = 0;
+  return `${String(hrs).padStart(2, '0')}:${mins}`;
+}
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**

@@ -71,7 +71,7 @@ export function moveItem(items: PlanItem[], from: number, to: number):
   { items: PlanItem[]; selected: (was: number) => number };
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `groupPracticePlans` — rows sharing a `name` become one plan; a `[Plan: Warmups] real notes` prefix in `coach_notes` sets the plan name and is **stripped from the notes** (or the note reads as its own metadata); the drill name falls back through `drill` → `name` → a label; `diagram_image` and `diagram_data` map to camelCase; the plan's date comes from `created_at`.
 
@@ -81,9 +81,9 @@ export function moveItem(items: PlanItem[], from: number, to: number):
 
 `moveItem` — the moved drill lands at the target index, and the **selection follows**: moving the selected drill moves the selection with it, and moving another drill past it shifts it by one. That arithmetic is four branches in the legacy handler and is exactly the kind of thing that silently selects the wrong row.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

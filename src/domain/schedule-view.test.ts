@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatIsoToDisplayDate, formatDisplayDateToIso,
-  format24hTo12h, matchDirectionsUrl, displayDate
+  format24hTo12h, format12hTo24h, matchDirectionsUrl, displayDate
 } from './schedule-view';
 
 describe('formatIsoToDisplayDate', () => {
@@ -131,5 +131,35 @@ describe('displayDate', () => {
   it('is empty when there is no date at all', () => {
     expect(displayDate({ date: '' })).toBe('');
     expect(displayDate(null)).toBe('');
+  });
+});
+
+describe('format12hTo24h', () => {
+  it('reads an evening kickoff back as 24-hour', () => {
+    expect(format12hTo24h('6:00 PM')).toBe('18:00');
+  });
+
+  it('handles noon and midnight, which are the two that go wrong', () => {
+    // 12 AM is 00, and 12 PM stays 12. Naive arithmetic gets both backwards.
+    expect(format12hTo24h('12:30 AM')).toBe('00:30');
+    expect(format12hTo24h('12:15 PM')).toBe('12:15');
+  });
+
+  it('passes through something already in 24-hour', () => {
+    expect(format12hTo24h('18:00')).toBe('18:00');
+  });
+
+  it('round trips with its inverse', () => {
+    // A stored slot is written as twelve-hour text and read back as minutes,
+    // so a round trip that lost the meridiem would shift practice by twelve
+    // hours.
+    ['08:15', '12:00', '00:45', '16:30', '23:59'].forEach(t => {
+      expect(format12hTo24h(format24hTo12h(t))).toBe(t);
+    });
+  });
+
+  it('gives nothing back for text that is not a time', () => {
+    expect(format12hTo24h('')).toBe('');
+    expect(format12hTo24h('kickoff')).toBe('');
   });
 });
