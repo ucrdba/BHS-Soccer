@@ -119,7 +119,7 @@ export function presentWithoutResult(
 ): any[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The behaviours, each with its reason:
 
@@ -131,9 +131,9 @@ The behaviours, each with its reason:
 - **`presentWithoutResult` names the players**, so the component can say who rather than echoing the client's `"<uuid> is marked present but has no result"`. The client keeps its guard; this is so the message is readable.
 - Deleted players are excluded, on both `is_deleted` and `isDeleted` — Supabase rows and app state spell it differently.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
