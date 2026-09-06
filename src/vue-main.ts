@@ -13,6 +13,21 @@ import { auth } from './auth';
 import { supabaseService } from './data/supabase';
 import { setRoles, type RoleRow } from './auth/permissions';
 
+/**
+ * AuthManager reaches for `window.supabaseService`, in fifteen places.
+ *
+ * It predates this entry point and was written for the legacy app, where
+ * `src/main.ts` publishes the service as a global. Without this line every
+ * auth call here silently degrades to a guest — `window.supabaseService?.…`
+ * optional-chains to undefined — and signing in reports "Cloud authentication
+ * is not configured" with nothing in the console to say why.
+ *
+ * The tidier fix is for auth.ts to import the service directly, but it is
+ * shared code with fifteen call sites and both apps depend on it, so that
+ * wants its own change rather than being folded in here.
+ */
+(window as any).supabaseService = supabaseService;
+
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);

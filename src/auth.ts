@@ -188,8 +188,22 @@ export class AuthManager {
     return !!row;
   }
 
-  async getPendingApprovals(): Promise<AppUser[]> {
-    const rows = await window.supabaseService?.fetchPendingApprovals();
+  /**
+   * Accounts awaiting approval, for one organization.
+   *
+   * The argument is not optional by accident. `fetchPendingApprovals` declares
+   * `schoolId: string = 'bhs'`, so calling it bare — as this did — shows a club
+   * admin Beaumont's pending signups, and the default makes that invisible at
+   * the call site. Callers pass the organization they are looking at.
+   *
+   * It stays optional only so the legacy admin panel, which has no resolved id
+   * to hand, keeps its existing behaviour rather than breaking. New callers
+   * should always pass one.
+   */
+  async getPendingApprovals(schoolId?: string): Promise<AppUser[]> {
+    const rows = schoolId
+      ? await window.supabaseService?.fetchPendingApprovals(schoolId)
+      : await window.supabaseService?.fetchPendingApprovals();
     return (rows || []).map(mapProfileRowToAppUser);
   }
 
