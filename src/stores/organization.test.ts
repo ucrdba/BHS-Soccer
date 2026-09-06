@@ -107,4 +107,16 @@ describe('the organization store', () => {
     expect(document.documentElement.style.getPropertyValue('--bhs-blue-primary'))
       .toBe('#123456');
   });
+
+  it('PUTS THE ORGANIZATION IN THE BROWSER TAB', async () => {
+    // index.html ships a neutral title because the document is static and the
+    // organization is not known until the teams load. Leaving it there means
+    // a club coach's tab never says their club.
+    localStorage.setItem('bhs_active_team_id', 't2');
+    const store = useOrganizationStore();
+    await store.load();
+    await Promise.resolve();
+
+    expect(document.title).toBe('Legends FC');
+  });
 });

@@ -128,31 +128,10 @@ describe('typos it should catch', () => {
   });
 });
 
-describe('the suggestion reaches the sign-up form', () => {
-  // The pure check is useless if the UI swallows it, so these assert the
-  // wiring: both answers must be offered, and "use what I typed" must work.
-  it('offers both answers, not just the correction', async () => {
-    const src = (await import('../../public/js/views/coaches.view.js?raw')).default;
-    expect(src).toContain('showEmailSuggestion');
-    expect(src).toContain('Yes, use that');
-    expect(src).toContain('No, use what I typed');
-  });
-
-  it('passes acceptTypedEmail through so the person can overrule it', async () => {
-    // Without this the "No, use what I typed" button would re-run the same
-    // check and offer the same suggestion forever.
-    const src = (await import('../../public/js/views/coaches.view.js?raw')).default;
-    expect(src).toContain('handleRegister(true)');
-    expect(src).toContain('acceptTypedEmail');
-  });
-
-  it('does not re-offer after applying a correction', async () => {
-    // A corrected address could itself be one character from another provider.
-    const src = (await import('../../public/js/views/coaches.view.js?raw')).default;
-    // Slice from the DEFINITION, not the first mention: openVerifyTab is
-    // called earlier than it is defined, which inverts a naive range.
-    const start = src.indexOf('useSuggestedEmail(suggestion) {');
-    const fn = src.slice(start, start + 420);
-    expect(fn).toContain('this.handleRegister(true)');
-  });
-});
+/*
+ * The block that asserted the LEGACY sign-up form offered both answers lived
+ * here. It loaded views/coaches.view.js, which Phase 7 deleted, and the same
+ * wiring is now held where it actually runs: AuthModal.test.ts checks that
+ * the suggestion appears, that "use what I typed" is offered beside it, and
+ * that accepting a correction does not re-offer another.
+ */

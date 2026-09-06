@@ -68,16 +68,9 @@ export default defineConfig({
   ],
   build: {
     outDir: 'dist',
-    rollupOptions: {
-      // Two apps, deliberately. index.html is the legacy app and stays
-      // untouched until Phase 7; app.html is the Vue rebuild. Sharing one
-      // document would reintroduce exactly the bridge code that choosing a
-      // parallel rebuild over a strangler was meant to avoid.
-      input: {
-        legacy: 'index.html',
-        vue: 'app.html'
-      },
-    },
+    // One application, one document. There were two entry points during the
+    // migration -- index.html for the legacy app, app.html for the rebuild --
+    // so that the two never shared a document; Phase 7 retired the legacy one.
   },
   server: {
     port: 3000,

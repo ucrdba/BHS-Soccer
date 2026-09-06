@@ -15,7 +15,7 @@
  */
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import legacySrc from '../../public/js/diagrammer.js?raw';
+import legacySrc from './legacy/diagrammer.legacy.js?raw';
 import { drawPitch, drawPath, drawElement, renderBoard } from './draw';
 
 interface Call { fn: string; args: any[] }

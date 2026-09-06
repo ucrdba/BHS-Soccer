@@ -55,6 +55,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     for (const [prop, value] of Object.entries(themeVars(branding.value))) {
       document.documentElement.style.setProperty(prop, value);
     }
+
+    // The tab, for the same reason as the colours. index.html ships a neutral
+    // title because the document is static and the organization is not known
+    // until the teams load -- so a club coach's tab would otherwise read
+    // somebody else's name, or nothing that identifies the app at all.
+    const name = branding.value.name;
+    if (name) document.title = name;
   });
 
   function setActiveTeam(id: string | null): void {

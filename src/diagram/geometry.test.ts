@@ -185,7 +185,7 @@ describe('agreement with the legacy board', () => {
   const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
 
   it('measures distances the same way', async () => {
-    const src = (await import('../../public/js/diagrammer.js?raw')).default;
+    const src = (await import('./legacy/diagrammer.legacy.js?raw')).default;
     const Legacy: any = new Function(strip(src) + '\nreturn SoccerTacticalBoard;')();
     const board = new Legacy();
 

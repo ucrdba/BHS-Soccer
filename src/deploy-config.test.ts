@@ -74,8 +74,9 @@ describe('THE REWRITE createWebHistory NEEDS', () => {
       .forEach(p => expect(matches(p), p).toBe(false));
   });
 
-  it('does not swallow the legacy scripts while they are still served', () => {
-    expect(matches('/js/app.core.js')).toBe(false);
+  it('does not swallow anything else that looks like a file', () => {
+    expect(matches('/robots.txt')).toBe(false);
+    expect(matches('/img/crest.png')).toBe(false);
   });
 });
 

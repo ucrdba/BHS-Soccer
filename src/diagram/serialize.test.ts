@@ -14,7 +14,7 @@
  */
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import legacySrc from '../../public/js/diagrammer.js?raw';
+import legacySrc from './legacy/diagrammer.legacy.js?raw';
 import { exportDiagram, loadDiagram } from './serialize';
 
 const strip = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
