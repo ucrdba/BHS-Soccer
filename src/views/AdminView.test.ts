@@ -53,7 +53,8 @@ vi.mock('../data/supabase', () => ({
     fetchAssignableCoaches: vi.fn().mockResolvedValue([]),
     fetchUnassignedPlayers: vi.fn().mockResolvedValue([]),
     fetchSoccerCategories: vi.fn().mockResolvedValue([]),
-    fetchCategoryUsage: vi.fn().mockResolvedValue({})
+    fetchCategoryUsage: vi.fn().mockResolvedValue({}),
+    fetchQuizBank: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -176,6 +177,7 @@ describe('the coach-visible sections', () => {
     const w = await mountAdmin({ coach: true, admin: false });
     expect(w.find('[data-admin-unassigned]').exists()).toBe(true);
     expect(w.find('[data-admin-categories]').exists()).toBe(true);
+    expect(w.find('[data-admin-quiz]').exists()).toBe(true);
   });
 
   it('shows them to an admin too', async () => {

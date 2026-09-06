@@ -89,7 +89,7 @@ export function markQuiz(questions: QuizQuestion[], chosen: Record<string, strin
 
 **Files:** `src/components/admin/QuizBankSection.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Coach-visible, like the categories.
 - Every question in the organization's bank is listed — including ones **no team asks**, which are invisible everywhere else.
@@ -98,9 +98,9 @@ export function markQuiz(questions: QuizQuestion[], chosen: Record<string, strin
 - **Retiring a question says it stops being asked** and that past attempts keep their record.
 - A question naming a daily message says so, since that is why it may not be appearing.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
