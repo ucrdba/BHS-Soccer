@@ -20,6 +20,7 @@ import HelpView from '../views/HelpView.vue';
 import MatrixView from '../views/MatrixView.vue';
 import PlannerView from '../views/PlannerView.vue';
 import AdminView from '../views/AdminView.vue';
+import QuizView from '../views/QuizView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
