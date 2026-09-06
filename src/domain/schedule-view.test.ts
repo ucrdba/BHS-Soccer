@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatIsoToDisplayDate, formatDisplayDateToIso,
-  format24hTo12h, matchDirectionsUrl
+  format24hTo12h, matchDirectionsUrl, displayDate
 } from './schedule-view';
 
 describe('formatIsoToDisplayDate', () => {
@@ -105,5 +105,31 @@ describe('matchDirectionsUrl', () => {
     // Only an explicit isHome === false is an away fixture.
     expect(matchDirectionsUrl({ venueAddress: 'somewhere' })).toBeNull();
     expect(matchDirectionsUrl(null)).toBeNull();
+  });
+});
+
+describe('displayDate', () => {
+  const match = (over: any = {}) => ({
+    date: 'SEP 4, 2026', time: '6:00 PM',
+    matchOn: '2026-09-04', kickoffTime: '18:00:00', ...over
+  });
+
+  it('shows the stored text with the day of the week', () => {
+    // A coach checks which day a fixture falls on more often than the date.
+    expect(displayDate(match())).toBe('SEP 4, 2026 (Fri)');
+  });
+
+  it('derives the day from the text when match_on is absent', () => {
+    expect(displayDate(match({ matchOn: null }))).toBe('SEP 4, 2026 (Fri)');
+  });
+
+  it('shows the text alone when no day can be worked out', () => {
+    expect(displayDate({ date: 'sometime in spring', matchOn: null }))
+      .toBe('sometime in spring');
+  });
+
+  it('is empty when there is no date at all', () => {
+    expect(displayDate({ date: '' })).toBe('');
+    expect(displayDate(null)).toBe('');
   });
 });

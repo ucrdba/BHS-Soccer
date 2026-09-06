@@ -9,6 +9,7 @@ import { auth } from '../auth';
 import HomeView from '../views/HomeView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 import RosterView from '../views/RosterView.vue';
+import ScheduleView from '../views/ScheduleView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -68,7 +69,7 @@ export const router: Router = createRouter({
   routes: [
     { path: '/',         name: 'home',     component: HomeView },
     { path: '/roster',   name: 'roster',   component: RosterView },
-    { path: '/schedule', name: 'schedule', ...placeholder('Schedule & Results', 'Phase 2') },
+    { path: '/schedule', name: 'schedule', component: ScheduleView },
     { path: '/matrix',   name: 'matrix',   ...placeholder('Player Ratings', 'Phase 3') },
     { path: '/planner',  name: 'planner',  ...placeholder('Coach Planner', 'Phase 4') },
     { path: '/coaches',  name: 'coaches',  ...placeholder('Coaching Staff', 'Phase 2') },

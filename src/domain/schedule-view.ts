@@ -12,6 +12,8 @@
  * migration.
  */
 
+import { matchDateTime } from './schedule';
+
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -63,6 +65,28 @@ export function format24hTo12h(timeStr: string): string {
   hrs = hrs % 12;
   if (hrs === 0) hrs = 12;
   return `${hrs}:${mins} ${ampm}`;
+}
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * A fixture's date as the schedule is read.
+ *
+ * The stored text, plus the day of the week — a coach checks which day a
+ * fixture falls on far more often than the date itself.
+ *
+ * The day comes from `matchDateTime`, which prefers the trigger-derived
+ * `match_on` and falls back to parsing the text. The legacy version asked the
+ * Supabase client for this, which meant the schedule could not be rendered
+ * without a configured database; here it is arithmetic on data already loaded.
+ */
+export function displayDate(match: any): string {
+  const raw = String(match?.date ?? '').trim();
+  if (!raw) return '';
+
+  const when = matchDateTime(match);
+  if (!when) return raw;
+  return `${raw} (${DAYS[when.getDay()]})`;
 }
 
 /**
