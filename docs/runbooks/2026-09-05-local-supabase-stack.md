@@ -116,7 +116,26 @@ Docker Desktop can be set not to start with Windows, in its settings, if you wou
 
 ## If it will not start
 
-- **`docker: command not found`** after installing — Docker Desktop has not been launched, or the shell predates the PATH change. Open a new terminal.
+- **`docker: command not found`** after installing — Docker Desktop has not been launched, or the shell predates the PATH change. Open a new terminal. Note this machine has a **per-user** install: the CLI is at `%LOCALAPPDATA%\Programs\DockerDesktop\resources\bin\docker.exe`, not under `Program Files`.
 - **"cannot connect to the Docker daemon"** — the daemon is not running. Launch Docker Desktop and wait for the whale icon to stop animating.
 - **A port is already in use** — something else holds 54321–54327. `supabase stop` then `supabase start` usually clears a stale set of containers.
 - **WSL 2 errors** — `wsl --update`, then restart Docker Desktop.
+
+### `EPERM: operation not permitted, mkdir '…\supabase\.temp\start-secrets\supabase_db_<project>'`
+
+Hit repeatedly on this machine. The diagnosis, and what it is **not**:
+
+- **Not a drive-sharing problem.** Verified directly: a container bind-mounts a `D:` path and reads *and writes* through it. Windows *network* sharing on `D:` is unrelated — with the WSL 2 backend Docker has no per-drive file-sharing list at all.
+- **It is Windows delete-pending.** Removing a directory marks the name for deletion but leaves the entry until the last handle closes. Creating a directory over a tombstone fails with `ERROR_ACCESS_DENIED`, which Node surfaces as `EPERM` — not `EEXIST`, which is why the message is misleading.
+- **It is self-perpetuating.** Each `supabase start` creates the staging directory, fails, and deletes it; the next attempt's `mkdir` lands on the tombstone. So the EPERM usually **masks whatever failed first**.
+
+To break the cycle, delete the leaf and then wait for the name to actually free before starting:
+
+```bash
+LEAF="supabase/.temp/start-secrets/supabase_db_<project>"
+rm -rf "$LEAF"
+until [ ! -e "$LEAF" ] && mkdir "$LEAF" 2>/dev/null && rmdir "$LEAF" 2>/dev/null; do sleep 1; done
+supabase start
+```
+
+If it still fails after that, the EPERM is no longer masking anything and the next error is the real one. Restarting Docker Desktop also releases the handle, and `supabase/.temp` is gitignored, so none of this can reach a commit.
