@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 3,067 tests, config in vitest.config.mts
+npm test           # vitest — 3,159 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (3,067 tests across 156 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,159 tests across 161 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -62,17 +62,22 @@ timeline, the drill form, the organization's drill library, saved plans and
 the printed document; Phase 4b ported the canvas engine into `src/diagram/`
 and attached it to both a plan drill and a library drill.
 
-**Phase 5 is bringing the match tools across**, and they are not routes —
-each hangs off the screen it is launched from, which is where the legacy app
-puts it and where a coach looks. Done so far: the **lineup**, the **season
-report** and **plus/minus**, all on Schedule. Still owed (5c): the squad
-report and progress chart on Player Ratings, the round robin on the Planner,
-and the recording numbers on the Roster.
+**Phase 5 is complete.** The match tools are not routes — each hangs off the
+screen it is launched from, which is where the legacy app puts it and where a
+coach looks:
 
-Phase 6 owns the admin panel. The quiz, the daily thoughts and the school
-profile forms still live only in the legacy app — they sit inside
-`planner.view.js` by accident of the `app.js` split rather than because they
-belong to the planner.
+| Tool | Lives on |
+| --- | --- |
+| Lineup, plus/minus, season report | Schedule |
+| Squad report, progress chart | Player Ratings |
+| 1v1 round robin | Coach Planner |
+| Recording numbers | Roster |
+
+**Phase 6 owns the admin panel and the XLSX import/export.** Still legacy-only
+after that: the quiz, the daily thoughts and the school profile forms. They
+sit inside `planner.view.js` and `thoughts.view.js` by accident of the
+`app.js` split rather than because they belong to the planner, and they go
+with Phase 6.
 
 ### Two rules the match tools must keep
 
@@ -91,6 +96,8 @@ sheet looks right either way. Substitutions and starting the clock itself
 stay outside the rule.
 
 **Low-minute players are the audience for the reports, not noise in them.**
+Held by the season report, the plus/minus sheet, the squad report and the
+progress chart alike — each asserts the inclusion rather than assuming it.
 NFHS rules allow unlimited substitution and re-entry, so much of the roster
 finishes any fixture well under a full match — and a coach reads these views
 to decide who to give more minutes to. Filtering out the fringe players
@@ -307,6 +314,23 @@ Removing the defaults is worth doing and is not a small change: both apps call t
 - **`openAddCoachModal` is defined twice in `planner.view.js`**, at lines 580 and 826, inside one `Object.assign`. The second wins, so the first is dead — and editing it does nothing. It is the only duplicate across all 22 classic scripts.
 - **`checkEmail` in `src/auth/email-typo.ts` never ran.** It was imported into `src/auth.ts` and never called, while `coaches.view.js` branched on a `res.emailSuggestion` that `RegisterResult` never carries. A tested 161-line module wired to nothing. The Vue sign-up flow now calls it properly; the legacy path is still dead.
 - **`deleteCoach` in `src/data/supabase.ts` returns nothing at all** — it logs its error and falls off the end, so success and failure are indistinguishable from the return value. The Vue store reloads and checks whether the row survived rather than reporting a success it cannot verify.
+
+### Recording numbers — the unique index
+
+`team_players.recording_number` is unique per team, and that shapes both ends
+of the feature.
+
+**They are proposed, never assigned.** `proposeRecordingNumbers` fills a draft
+the coach accepts; nothing renumbers a squad on its own, because the numbers
+are what the paper sheets carry all season and both the Matrix board and the
+session grid are read against those sheets.
+
+**A swap needs a clearing pass.** Writing one side of an exchange first hits
+the unique index even though the final state is legal, so `planNumberWrites`
+clears anything whose number is being taken before setting anything — and
+returns only the rows that changed. A duplicate is refused *before* any write
+starts, since the database would otherwise stop halfway and leave the squad
+part-renumbered.
 
 ### Practice plans — four traps in the storage shape
 

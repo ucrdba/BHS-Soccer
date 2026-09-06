@@ -320,3 +320,35 @@ describe('recording a session', () => {
     expect(w.find('[data-history]').exists()).toBe(true);
   });
 });
+
+describe('the reports', () => {
+  it('offers a coach the squad report and the progress chart', async () => {
+    const w = await mountMatrix({ coach: true });
+    expect(w.find('[data-open-squad]').exists()).toBe(true);
+    expect(w.find('[data-open-progress]').exists()).toBe(true);
+  });
+
+  it('offers a player neither, absent rather than hidden', async () => {
+    const w = await mountMatrix({ coach: false });
+    expect(w.find('[data-open-squad]').exists()).toBe(false);
+    expect(w.find('[data-open-progress]').exists()).toBe(false);
+  });
+
+  it('opens the squad report on this team', async () => {
+    svc.fetchTeamSessionHistory.mockResolvedValue([]);
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-open-squad]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-modal]').text()).toMatch(/squad report/i);
+  });
+
+  it('opens the progress chart on this team', async () => {
+    svc.fetchTeamSessionHistory.mockResolvedValue([]);
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-open-progress]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-modal]').text()).toMatch(/progress/i);
+  });
+});

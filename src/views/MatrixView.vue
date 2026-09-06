@@ -18,6 +18,8 @@ import PlayerBreakdownModal from '../components/matrix/PlayerBreakdownModal.vue'
 import SessionModal from '../components/matrix/SessionModal.vue';
 import SessionHistory from '../components/matrix/SessionHistory.vue';
 import WeightsModal from '../components/matrix/WeightsModal.vue';
+import SquadReportModal from '../components/matrix/SquadReportModal.vue';
+import ProgressModal from '../components/matrix/ProgressModal.vue';
 import { useMatrixStore } from '../stores/matrix';
 import { useSessionStore } from '../stores/session';
 import { useOrganizationStore } from '../stores/organization';
@@ -37,6 +39,8 @@ const notice = ref<string | null>(null);
 
 const sessionOpen = ref(false);
 const weightsOpen = ref(false);
+const squadOpen = ref(false);
+const progressOpen = ref(false);
 /** The exercise the grid is recording. Chosen before it opens. */
 const sessionDrillId = ref('');
 
@@ -142,6 +146,12 @@ watch(
         <button type="button" class="act" data-open-weights @click="weightsOpen = true">
           Weights &amp; standards
         </button>
+        <button type="button" class="act" data-open-squad @click="squadOpen = true">
+          Squad report
+        </button>
+        <button type="button" class="act" data-open-progress @click="progressOpen = true">
+          Progress
+        </button>
       </div>
     </header>
 
@@ -191,6 +201,14 @@ watch(
       :open="sessionOpen" :team-id="org.activeTeamId" :school-id="schoolId"
       :players="matrix.players" :drill-id="sessionDrillId"
       @close="sessionOpen = false" @saved="reload" />
+
+    <SquadReportModal
+      v-if="isCoach"
+      :open="squadOpen" :team-id="org.activeTeamId" @close="squadOpen = false" />
+
+    <ProgressModal
+      v-if="isCoach"
+      :open="progressOpen" :team-id="org.activeTeamId" @close="progressOpen = false" />
 
     <WeightsModal
       v-if="isCoach"

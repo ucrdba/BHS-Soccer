@@ -108,7 +108,7 @@ export function planNumberWrites(assignments: Assignment[]): { playerId: string;
 
 **Files:** Both components and their tests; wire into `MatrixView`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Squad report:
 
@@ -124,23 +124,23 @@ Progress:
 - The chart is an SVG polyline, drawn from the series. No library.
 - **A player with one reading is still shown**, with no trend rather than being dropped.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
 ### Task 5: Close out Phase 5
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat 2fc2b0a..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`** — Phase 5 done, what Phase 6 owes.
+- [x] **Step 2: Update `CLAUDE.md`** — Phase 5 done, what Phase 6 owes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ## Definition of done
 
