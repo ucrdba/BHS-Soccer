@@ -29,6 +29,14 @@ Verification is a four-part story, and each part covers a different slice of the
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
 
+### Database tests
+
+`src/data/testdb/` runs SQL against a **real Postgres**, because constraints, partial indexes and triggers cannot be proved by asserting on a file's text. `setupDb()` builds a uniquely-named scratch database, applies `src/data/testdb/prelude.sql` and then `Resouces/SQL/demo/demo_schema.sql`, and `withDb()` wraps each test in a transaction that is always rolled back.
+
+The connection resolves as `TEST_DATABASE_URL` → a gitignored `.env.test` at the repo root → `postgres://postgres:postgres@localhost:5432/postgres`. **`hasTestDb()` returns false when nothing answers, and the suites `describe.skipIf` off it**, so a machine with no Postgres still runs everything else rather than reporting a wall of red.
+
+What this **cannot** test is `src/data/supabase.ts`. That client speaks HTTP to PostgREST and GoTrue, which the Supabase CLI only runs under Docker — not installed here. So "the SQL is right" is covered; "the client sends the right SQL" is not.
+
 `npm run dev` serves the app correctly — do not serve the repo root statically. `index.html` loads `./src/main.ts` as an ES module (no browser executes a `.ts` file directly), and everything under `./js/*` resolves only through Vite's `publicDir` mapping to `public/js/`. Use `npm run dev` to run the app locally.
 
 ## Two apps, two entry points — read this first
