@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,119 tests, config in vitest.config.mts
+npm test           # vitest — 2,246 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,119 tests across 111 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,246 tests across 120 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -48,7 +48,7 @@ There are **two HTML entry points**, and `npm run build` emits both:
 | Entry | App |
 | --- | --- |
 | `index.html` | The **legacy** app, and the one Vercel serves at the root. Loads `src/main.ts` plus 22 classic scripts from `./js/*`. |
-| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. |
+| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. Five of the seven nav views are real there: Home, Roster, Schedule, Coaching Staff and Help, plus sign-in. Player Ratings and Coach Planner are still placeholders, built in Phases 3 and 4. |
 
 They never share a document. Cutover is Phase 7 of the migration, when `app.html` becomes `index.html` and the legacy files are deleted.
 
@@ -59,7 +59,8 @@ They never share a document. Cutover is Phase 7 of the migration, when `app.html
 | `src/domain/*.ts` | Framework-free logic, shared by both apps. See its own section below. |
 | `src/data/`, `src/auth.ts`, `src/auth/permissions.ts` | Supabase client, real Supabase Auth and RBAC. Shared by both apps. |
 | `src/main.ts` | The **legacy** entry. Installs `window.auth`, `window.authReady`, `window.can`, `window.supabaseService` and the domain namespaces the classic scripts read. |
-| `src/vue-main.ts`, `src/App.vue`, `src/views/*.vue`, `src/components/`, `src/stores/`, `src/router/` | The **Vue** app. Imports the shared modules directly; publishes no globals. |
+| `src/vue-main.ts`, `src/App.vue`, `src/views/*.vue`, `src/components/`, `src/stores/`, `src/router/` | The **Vue** app. Imports the shared modules directly. It publishes exactly one global, `window.supabaseService`, because `src/auth.ts` reads it off `window` in fifteen places — remove that line and every auth call silently degrades to a guest. |
+| `src/content/help.ts` | The handbook, 700 lines of authored HTML, moved verbatim out of `help.view.js`. Shared. |
 
 Because `src/domain/`, `src/data/` and `src/auth.ts` are shared, a change there affects **both** apps — and only `npm run build` plus the full suite proves it.
 
@@ -142,6 +143,18 @@ Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `
 **Ten of its methods default `schoolId` to `'bhs'`, and calling one without an argument is a multi-tenant bug that will not announce itself.** `getSchoolUuid`, `fetchPendingApprovals`, `fetchPlayers`, `fetchSoccerCategories`, `fetchDrillsBank`, `upsertDrillBankItem`, `fetchSchool`, `upsertSchool`, `fetchCoaches` and `upsertCoach` all declare `schoolId: string = 'bhs'`. A club coach calling any of them bare is silently served Beaumont's data, and the default makes it invisible at the call site. **Always pass the resolved organization id.** Where a team-scoped equivalent exists — `fetchTeamRoster(teamId)` for the roster — prefer it: it has no default to fall through.
 
 Removing the defaults is worth doing and is not a small change: both apps call these, so it wants its own commit rather than being folded into a view.
+
+**Three places this has already bitten**, all found while building Phase 2:
+
+- `public/js/app.core.js:523` calls `fetchCoaches('bhs')` outright, so a club coach's Coaching Staff screen shows Beaumont's staff. Still live in the legacy app.
+- `src/auth.ts`'s `getPendingApprovals()` called `fetchPendingApprovals()` bare, showing a club admin Beaumont's pending signups. Fixed — it now takes an organization, optional only so the legacy admin panel keeps working.
+- Every `fetchPlayers` call site, which is why the Vue roster uses `fetchTeamRoster(teamId)` instead.
+
+## Duplicated and dead code worth knowing about
+
+- **`openAddCoachModal` is defined twice in `planner.view.js`**, at lines 580 and 826, inside one `Object.assign`. The second wins, so the first is dead — and editing it does nothing. It is the only duplicate across all 22 classic scripts.
+- **`checkEmail` in `src/auth/email-typo.ts` never ran.** It was imported into `src/auth.ts` and never called, while `coaches.view.js` branched on a `res.emailSuggestion` that `RegisterResult` never carries. A tested 161-line module wired to nothing. The Vue sign-up flow now calls it properly; the legacy path is still dead.
+- **`deleteCoach` in `src/data/supabase.ts` returns nothing at all** — it logs its error and falls off the end, so success and failure are indistinguishable from the return value. The Vue store reloads and checks whether the row survived rather than reporting a success it cannot verify.
 
 ### Teams
 
