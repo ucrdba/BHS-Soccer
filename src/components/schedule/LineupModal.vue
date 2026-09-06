@@ -14,7 +14,9 @@
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { useLineupStore } from '../../stores/lineup';
-import { lineupShortName, lineupGrade } from '../../domain/lineup';
+import {
+  lineupSquad, lineupBench, lineupShortName, lineupGrade
+} from '../../domain/lineup';
 
 const props = defineProps<{
   open: boolean;
@@ -37,8 +39,12 @@ const saving = ref(false);
 
 const FORMATIONS = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '4-4-1-1'];
 
-const squad = computed(() => lineup.squadOf(props.players));
-const bench = computed(() => lineup.bench(props.players));
+// Straight from the domain rather than through the store: these are pure
+// functions of the players prop, and a store's returned functions are stubbed
+// out in component tests.
+const squad = computed(() => lineupSquad(props.players));
+const bench = computed(() =>
+  lineupBench(lineup.assignments, squad.value, lineup.formation, lineup.dressed));
 const byId = computed(() => new Map(squad.value.map((p: any) => [p.id, p])));
 
 const title = computed(() =>

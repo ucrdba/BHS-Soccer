@@ -28,10 +28,11 @@ const FIXTURES = [
 function mountSchedule(opts: {
   matches?: any[]; coach?: boolean; loading?: boolean;
   loadedTeamId?: string | null; loadError?: string | null;
+  lineupIndex?: any[];
 } = {}) {
   const {
     matches = FIXTURES, coach = false, loading = false,
-    loadedTeamId = 't1', loadError = null
+    loadedTeamId = 't1', loadError = null, lineupIndex = []
   } = opts;
 
   return mount(ScheduleView, {
@@ -41,6 +42,8 @@ function mountSchedule(opts: {
         stubActions: true,
         initialState: {
           schedule: { matches, loading, loadError, loadedTeamId },
+          roster: { players: [{ id: 'p1', name: 'Cesar Alva', number: 1 }] },
+          lineup: { index: lineupIndex },
           organization: {
             schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions' }],
             teams: [{ id: 't1', name: 'U16', school_id: 's1' }],
@@ -173,11 +176,62 @@ describe('what a coach may do', () => {
 });
 
 describe('the Phase 5 entry points', () => {
-  it('renders none of them', () => {
-    // The legacy schedule links to the lineup board and plus/minus tracking.
-    // Both still work in the legacy app.
+  it('has the lineup, and not yet plus/minus', () => {
+    // Phase 5a brought the lineup and the season report across. Plus/minus
+    // is 5b and still runs only in the legacy app.
     const text = mountSchedule({ coach: true }).text().toLowerCase();
-    expect(text).not.toContain('lineup');
+    expect(text).toContain('lineup');
     expect(text).not.toContain('plus/minus');
+  });
+});
+
+describe('the match tools', () => {
+  it('offers a coach a lineup on every fixture', () => {
+    const w = mountSchedule({ coach: true });
+    expect(w.findAll('[data-fixture-lineup]')).toHaveLength(FIXTURES.length);
+  });
+
+  it('offers the season report, and a lineup with no fixture attached', () => {
+    const w = mountSchedule({ coach: true });
+    expect(w.find('[data-open-season]').exists()).toBe(true);
+    expect(w.find('[data-open-lineup]').exists()).toBe(true);
+  });
+
+  it('offers a guest none of it, absent rather than hidden', () => {
+    const w = mountSchedule({ coach: false });
+    expect(w.find('[data-fixture-lineup]').exists()).toBe(false);
+    expect(w.find('[data-open-season]').exists()).toBe(false);
+    expect(w.find('[data-open-lineup]').exists()).toBe(false);
+  });
+
+  it('MARKS a fixture that has no team sheet yet', () => {
+    // The whole reason the lineup index is read: a coach checking on a
+    // Thursday which of the weekend's games still needs one.
+    const w = mountSchedule({ coach: true, lineupIndex: [] });
+    expect(w.findAll('[data-lineup-missing]')).toHaveLength(FIXTURES.length);
+  });
+
+  it('does not mark a fixture that already has one', () => {
+    const w = mountSchedule({
+      coach: true,
+      lineupIndex: FIXTURES.map(m => ({ id: `l-${m.id}`, match_id: m.id }))
+    });
+    expect(w.find('[data-lineup-missing]').exists()).toBe(false);
+  });
+
+  it('marks only the fixtures that are actually missing one', () => {
+    const w = mountSchedule({
+      coach: true,
+      lineupIndex: [{ id: 'l-m1', match_id: 'm1' }]
+    });
+    expect(w.findAll('[data-lineup-missing]')).toHaveLength(1);
+  });
+
+  it('opens the lineup on the fixture it was asked about', async () => {
+    const w = mountSchedule({ coach: true });
+    await w.findAll('[data-fixture-lineup]')[0].trigger('click');
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-lineup-pitch]').exists()).toBe(true);
   });
 });

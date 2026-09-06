@@ -93,16 +93,16 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 
 **Files:** Edit `src/views/ScheduleView.vue` and its test.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - A fixture offers a lineup; the header offers the season report and a lineup with no fixture attached.
 - **A fixture with no lineup yet is marked**, because that is the whole point of the index.
 - Both controls are coach-only and **absent** from a player's document, not hidden.
 - Saving a lineup re-reads the index, so the mark clears.
 
-- [ ] **Step 2: Wire it, watch the tests pass**
+- [x] **Step 2: Wire it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

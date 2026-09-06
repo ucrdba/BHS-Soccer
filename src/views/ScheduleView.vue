@@ -11,15 +11,22 @@
  */
 import { ref, computed, watch } from 'vue';
 import MatchFormModal from '../components/schedule/MatchFormModal.vue';
+import LineupModal from '../components/schedule/LineupModal.vue';
+import SeasonReportModal from '../components/schedule/SeasonReportModal.vue';
 import { useScheduleStore, type MatchForm } from '../stores/schedule';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
+import { useRosterStore } from '../stores/roster';
+import { useLineupStore } from '../stores/lineup';
+import { fixturesWithoutLineup } from '../domain/lineup';
 import { displayDate, matchDirectionsUrl } from '../domain/schedule-view';
 import type { Match } from '../domain/schedule-row';
 
 const schedule = useScheduleStore();
 const org = useOrganizationStore();
 const auth = useAuthStore();
+const roster = useRosterStore();
+const lineup = useLineupStore();
 
 const canEdit = computed(() => auth.isCoach || auth.isAdmin);
 
@@ -29,9 +36,39 @@ const busy = ref(false);
 const formError = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
+const lineupOpen = ref(false);
+const lineupMatch = ref<Match | null>(null);
+const seasonOpen = ref(false);
+
+const schoolId = computed(() => org.school?.id ?? null);
+
+/**
+ * Fixtures with no team sheet yet.
+ *
+ * The whole reason the lineup index is read: a coach checking on a Thursday
+ * which of the weekend's games still needs one.
+ */
+const missingLineup = computed(() => new Set(
+  fixturesWithoutLineup(schedule.matches, lineup.index).map((m: any) => m.id)));
+
+function openLineup(m: Match | null): void {
+  lineupMatch.value = m;
+  lineupOpen.value = true;
+}
+
+async function onLineupSaved(): Promise<void> {
+  notice.value = 'Lineup saved.';
+  await lineup.loadIndex(org.activeTeamId);
+}
+
 const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
 
-watch(() => org.activeTeamId, (id) => { schedule.load(id); }, { immediate: true });
+watch(() => org.activeTeamId, (id) => {
+  schedule.load(id);
+  // The roster is the squad a lineup is picked from, and the index is what
+  // marks the fixtures still missing one.
+  if (canEdit.value) { roster.load(id); lineup.loadIndex(id); }
+}, { immediate: true });
 
 /** Upcoming first, then results — the order a coach reads the page in. */
 const upcoming = computed(() =>
@@ -93,9 +130,17 @@ async function onRemove(m: Match): Promise<void> {
           <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
         </p>
       </div>
-      <button v-if="canEdit" type="button" class="btn btn--go" data-add-match @click="openAdd">
-        + Add fixture
-      </button>
+      <div v-if="canEdit" class="sched__acts">
+        <button type="button" class="btn btn--go" data-add-match @click="openAdd">
+          + Add fixture
+        </button>
+        <button type="button" class="btn" data-open-lineup @click="openLineup(null)">
+          Lineup
+        </button>
+        <button type="button" class="btn" data-open-season @click="seasonOpen = true">
+          Season report
+        </button>
+      </div>
     </header>
 
     <p v-if="notice" class="notice" role="status" data-notice>
@@ -131,6 +176,9 @@ async function onRemove(m: Match): Promise<void> {
               <a v-if="matchDirectionsUrl(m)" class="row__link" data-directions
                  :href="matchDirectionsUrl(m)!" target="_blank" rel="noopener">Directions</a>
               <template v-if="canEdit">
+                <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
+                  Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
+                </button>
                 <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
                 <button type="button" class="row__btn row__btn--danger" data-match-remove
                         @click="onRemove(m)">Delete</button>
@@ -160,6 +208,9 @@ async function onRemove(m: Match): Promise<void> {
             <div class="row__side">
               <span v-if="m.score" class="row__score" data-score>{{ m.score }}</span>
               <template v-if="canEdit">
+                <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
+                  Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
+                </button>
                 <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
                 <button type="button" class="row__btn row__btn--danger" data-match-remove
                         @click="onRemove(m)">Delete</button>
@@ -169,6 +220,19 @@ async function onRemove(m: Match): Promise<void> {
         </ul>
       </section>
     </template>
+
+    <LineupModal
+      v-if="canEdit"
+      :open="lineupOpen" :match-id="lineupMatch?.id ?? null"
+      :match-label="lineupMatch ? `${lineupMatch.opponent}` : ''"
+      :team-id="org.activeTeamId" :school-id="schoolId" :players="roster.players"
+      @close="lineupOpen = false" @saved="onLineupSaved" />
+
+    <SeasonReportModal
+      v-if="canEdit"
+      :open="seasonOpen" :team-id="org.activeTeamId"
+      :teams="org.teams" :players="roster.players"
+      @close="seasonOpen = false" />
 
     <MatchFormModal
       v-if="canEdit"
@@ -280,6 +344,10 @@ async function onRemove(m: Match): Promise<void> {
 .row__btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
 
 .empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
+
+.sched__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
+
+.row__dot { margin-left: 0.25rem; color: var(--bhs-gold-accent); }
 
 .notice {
   display: flex;

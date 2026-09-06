@@ -14,6 +14,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { lineupSquad, lineupBench, lineupStarters } from '../domain/lineup';
 
 const fetchLineup = vi.fn();
 const saveLineup = vi.fn();
@@ -130,7 +131,7 @@ describe('changing the formation', () => {
     s.setFormation('4-3-3');
 
     expect(s.assignments.LM).toBeUndefined();
-    expect(s.bench(PLAYERS).map((p: any) => p.id)).toContain('p1');
+    expect(lineupBench(s.assignments, lineupSquad(PLAYERS), s.formation, s.dressed).map((p: any) => p.id)).toContain('p1');
   });
 
   it('offers the new formation\'s slots', () => {
@@ -163,7 +164,7 @@ describe('placing players', () => {
     s.place('p2', 'GK');
 
     expect(s.assignments.GK).toBe('p2');
-    expect(s.bench(PLAYERS).map((p: any) => p.id)).toContain('p1');
+    expect(lineupBench(s.assignments, lineupSquad(PLAYERS), s.formation, s.dressed).map((p: any) => p.id)).toContain('p1');
   });
 
   it('clears a slot', () => {
@@ -216,19 +217,19 @@ describe('the starters and the bench', () => {
     s.place('p1', 'GK');
 
     // GK is first in every formation, whatever order they were placed in.
-    expect(s.starters(PLAYERS)[0].player.id).toBe('p1');
+    expect(lineupStarters(s.assignments, lineupSquad(PLAYERS), s.formation)[0].player.id).toBe('p1');
   });
 
   it('puts everyone else on the bench', () => {
     const s = useLineupStore();
     s.place('p1', 'GK');
 
-    expect(s.bench(PLAYERS).map((p: any) => p.id)).toEqual(['p2', 'p3', 'p4']);
+    expect(lineupBench(s.assignments, lineupSquad(PLAYERS), s.formation, s.dressed).map((p: any) => p.id)).toEqual(['p2', 'p3', 'p4']);
   });
 
   it('keeps a squad in shirt-number order, unnumbered last', () => {
     const s = useLineupStore();
-    const squad = s.squadOf(PLAYERS.concat([{ id: 'p9', name: 'Aaron', number: null } as any]));
+    const squad = lineupSquad(PLAYERS.concat([{ id: 'p9', name: 'Aaron', number: null } as any]));
     expect(squad[squad.length - 1].id).toBe('p9');
   });
 });

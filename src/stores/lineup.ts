@@ -20,8 +20,7 @@ import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 import {
   lineupSlots, lineupSquad, assignLineupSlot, clearLineupSlot,
-  lineupStarters, lineupBench, lineupRowsForSave,
-  resolveLineupDrop, applyLineupDrop,
+  lineupRowsForSave, resolveLineupDrop, applyLineupDrop,
   type DropTarget
 } from '../domain/lineup';
 
@@ -42,15 +41,15 @@ export const useLineupStore = defineStore('lineup', () => {
 
   const slots = computed(() => lineupSlots(formation.value));
 
-  function squadOf(players: any[]): any[] { return lineupSquad(players); }
-
-  function starters(players: any[]): any[] {
-    return lineupStarters(assignments.value, squadOf(players), formation.value);
-  }
-
-  function bench(players: any[]): any[] {
-    return lineupBench(assignments.value, squadOf(players), formation.value, dressed.value);
-  }
+  /*
+   * The squad, the XI and the bench are NOT exposed here.
+   *
+   * They are pure functions of a `players` argument, and `createTestingPinia`
+   * with `stubActions` replaces every function a setup store returns — so a
+   * component test would get `undefined` back from what looks like a getter.
+   * Components call `domain/lineup.ts` directly instead; only `save` needs
+   * them, and it has them internally.
+   */
 
   function reset(): void {
     formation.value = '4-4-2';
@@ -144,7 +143,7 @@ export const useLineupStore = defineStore('lineup', () => {
     if (!schoolId) return { ok: false, error: 'No organization for this team.' };
 
     const rows = lineupRowsForSave(
-      assignments.value, squadOf(players), formation.value, dressed.value);
+      assignments.value, lineupSquad(players), formation.value, dressed.value);
 
     const res = await supabaseService.saveLineup(
       teamId, schoolId, matchId.value, formation.value, rows, notes.value || null);
@@ -162,7 +161,6 @@ export const useLineupStore = defineStore('lineup', () => {
   return {
     formation, assignments, dressed, notes, matchId, index,
     loading, loadError, saveError, slots,
-    load, loadIndex, setFormation, place, clear, drop, slotOf, save,
-    squadOf, starters, bench, reset
+    load, loadIndex, setFormation, place, clear, drop, slotOf, save, reset
   };
 });
