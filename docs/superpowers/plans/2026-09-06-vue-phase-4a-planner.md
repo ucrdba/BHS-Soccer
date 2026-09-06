@@ -224,17 +224,19 @@ The document is built as a string and handed to the browser's own print dialog �
 
 ### Task 8: Close out 4a
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat 1af3c90..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Check the round trip by hand.** A plan saved in the Vue planner must open in the legacy one and the reverse — they share `practice_plans`, and the grouping and the row mapping are the two places that can drift.
+- [x] **Step 2: The round trip is a test, not a hand check.**
 
-- [ ] **Step 3: Update `CLAUDE.md`** — the planner route is real, what 4b owes.
+`groupPracticePlans` is the same algorithm `app.core.js` uses to read `practice_plans`, so a plan that survives `toPlanRows` → `groupPracticePlans` is a plan the **legacy app reads correctly too**. `plan-row.test.ts` now asserts that round trip — the plan's name, every drill's slot, duration and notes, the row ids, and the diagram blob — rather than leaving the two mappings tested apart and free to drift.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 3: Update `CLAUDE.md`** — the planner route is real, what 4b owes.
+
+- [x] **Step 4: Commit**
 
 ## Definition of done
 

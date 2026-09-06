@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,502 tests, config in vitest.config.mts
+npm test           # vitest — 2,711 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,502 tests across 133 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,711 tests across 140 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -48,15 +48,23 @@ There are **two HTML entry points**, and `npm run build` emits both:
 | Entry | App |
 | --- | --- |
 | `index.html` | The **legacy** app, and the one Vercel serves at the root. Loads `src/main.ts` plus 22 classic scripts from `./js/*`. |
-| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. Six of the seven nav views are real there: Home, Roster, Schedule, Player Ratings, Coaching Staff and Help, plus sign-in. Coach Planner is still a placeholder, built in Phase 4. |
+| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. **All seven nav views are real there** — Home, Roster, Schedule, Player Ratings, Coach Planner, Coaching Staff and Help — plus sign-in. |
 
 They never share a document. Cutover is Phase 7 of the migration, when `app.html` becomes `index.html` and the legacy files are deleted.
 
 **Player Ratings is complete in the Vue app** — Phase 3a built the board, the
 per-exercise leaderboard, the logged-results panel and the player breakdown;
 Phase 3b added the write paths: the session grid, the weights and standards
-editors, and session history. Coach Planner is the only nav view still a
-placeholder, and Phase 4 owes it.
+editors, and session history.
+
+**The Coach Planner is complete apart from its tactical board.** Phase 4a
+built the timeline, the drill form, the organization's drill library, saved
+plans (save, load, rename, delete, copy to another team) and the printed
+document. **Phase 4b still owes the diagrammer** — the canvas engine port and
+the board component — so a drill can carry a diagram through the Vue app but
+cannot yet be drawn there. Phases 5 and 6 own the match tools and the admin
+panel; the quiz, the daily thoughts and the school profile forms still live
+only in the legacy app.
 
 The session grid is the one screen where being marginally slower loses the
 user, because what it competes with is paper: a coach with a clipboard and a
@@ -101,7 +109,7 @@ Consequences worth respecting:
 
 ## `src/domain/` — the extracted logic
 
-Twenty-seven framework-free modules, in two groups.
+Thirty-one framework-free modules, in two groups.
 
 **Thirteen were cut off the `BHSSoccerApp` prototype** — `schedule`, `matrix`,
 `matrix-session`, `lineup`, `plus-minus-court`, `round-robin`, `season`,
@@ -109,14 +117,17 @@ Twenty-seven framework-free modules, in two groups.
 are the ones both apps use, so `src/main.ts` publishes each on `window` (see
 below) and the legacy prototype method is a one-line delegation.
 
-**Fourteen were added by the Vue rebuild** as it needed them, and are imported
+**Eighteen were added by the Vue rebuild** as it needed them, and are imported
 directly rather than published: `season-record`, `theme` (an organization's
 branding), `roster-view` (the position filters), `schedule-view`, `help-search`,
 the four table read mappings `schedule-row`, `player-row`, `coach-row` and
-`matrix-standings`, and the five the Matrix needed — `matrix-threshold`
-(which measures are standards rather than rankings), `matrix-breakdown` (how a
-result reads in words), `time`, `band-score` (what a time earns) and
-`session-entry` (the grid's state).
+`matrix-standings`, the five the Matrix needed — `matrix-threshold` (which
+measures are standards rather than rankings), `matrix-breakdown` (how a result
+reads in words), `time`, `band-score` (what a time earns) and `session-entry`
+(the grid's state) — and the four the planner needed: `practice-plan`,
+`plan-row`, `drill-time` and `plan-print`. (`format12hTo24h` was added to the
+existing `schedule-view` rather than to a module of its own, so it sits beside
+its inverse.)
 
 `band-score.ts` is the only scoring the browser does at all; everything else
 comes from Postgres. It duplicates `SupabaseService.factorForTime` on purpose,
@@ -212,6 +223,33 @@ Removing the defaults is worth doing and is not a small change: both apps call t
 - **`openAddCoachModal` is defined twice in `planner.view.js`**, at lines 580 and 826, inside one `Object.assign`. The second wins, so the first is dead — and editing it does nothing. It is the only duplicate across all 22 classic scripts.
 - **`checkEmail` in `src/auth/email-typo.ts` never ran.** It was imported into `src/auth.ts` and never called, while `coaches.view.js` branched on a `res.emailSuggestion` that `RegisterResult` never carries. A tested 161-line module wired to nothing. The Vue sign-up flow now calls it properly; the legacy path is still dead.
 - **`deleteCoach` in `src/data/supabase.ts` returns nothing at all** — it logs its error and falls off the end, so success and failure are indistinguishable from the return value. The Vue store reloads and checks whether the row survived rather than reporting a success it cannot verify.
+
+### Practice plans — four traps in the storage shape
+
+`practice_plans` predates most of the conventions elsewhere in this file, and
+each of these is a failure the app has actually hit. `src/domain/plan-row.ts`
+and `src/stores/planner.ts` exist largely to hold them.
+
+- **`saveFullPracticePlan` upserts and never deletes.** A drill removed from
+  the plan locally is still a row, and returns on the next reload. Removing
+  one means calling `deletePracticePlanItem` for its id as well.
+- **A plan is rows, not a record.** There is no plans table: a plan is
+  whatever rows share a `name`, so grouping is client-side. Older rows carry
+  the plan name in a `[Plan: X]` prefix inside `coach_notes`, which the
+  grouping reads out and strips.
+- **Plan rows carry ids that belong to a team.** Merging another team's plans
+  into the picker let a coach load one, which copied that team's row ids into
+  the working plan — and the next edit upserted on those ids under the new
+  team, *moving* the other team's rows. An empty team must show an empty
+  picker. Never merge.
+- **`saveFullPracticePlan` returns `{ success }`, not `{ ok }`**, and
+  `savePracticePlanItem` returns the row or `null`. Reading `res.ok` on either
+  is always `undefined`, so every successful save reports as a failure.
+
+A fifth is not the table's fault but bites the same way: a newly added drill
+must be written with `savePracticePlanItem`, because that is what returns its
+id. Added through the full-plan save it has none, so the *next* save inserts a
+second copy — visible only after a reload.
 
 ### Teams
 
