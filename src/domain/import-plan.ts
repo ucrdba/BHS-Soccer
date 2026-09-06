@@ -26,6 +26,8 @@ export interface PlannedSheet {
   rows: Record<string, any>[];
   /** Team names in this sheet that match no known team. */
   unknownTeams: string[];
+  /** False for a sheet the importer has no branch for — the Matrix logs. */
+  importable: boolean;
 }
 
 export interface ImportPlan {
@@ -89,23 +91,35 @@ export function planImport(
       return out;
     });
 
+    // A sheet that cannot be written names no teams worth resolving.
     const teamNames = new Set<string>();
     rows.forEach(r => { if (r.Team) teamNames.add(String(r.Team)); });
 
     const unknownHere: string[] = [];
     teamNames.forEach(name => {
+      if (!def.importable) return;
       if (!resolveTeam(name, known?.teams || [])) {
         unknownHere.push(name);
         unknown.add(name);
       }
     });
 
+    // Said out loud rather than skipped in silence: the Matrix sheet is
+    // exported and has no import branch, so an admin restoring a backup gets
+    // everything back except their Matrix history.
+    if (!def.importable) {
+      warnings.push(
+        `"${sheetName}" is exported but cannot be imported, so it will be left `
+        + 'alone. Matrix results are recorded through Player Ratings.');
+    }
+
     planned.push({
       key: def.key,
       sheetName: def.sheetName,
       fileName: def.fileName,
       rows,
-      unknownTeams: unknownHere
+      unknownTeams: unknownHere,
+      importable: def.importable
     });
   });
 

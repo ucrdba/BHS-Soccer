@@ -171,3 +171,43 @@ describe('whether a plan may be applied', () => {
     expect(readyToApply(clean, {})).toBe(true);
   });
 });
+
+describe('A SHEET THAT CANNOT BE IMPORTED', () => {
+  // The legacy importer handles ten targets and has no branch for MatrixLogs,
+  // so the sheet is exported and can never be restored. An admin who exports
+  // everything, loses something and re-imports gets it all back EXCEPT their
+  // Matrix history -- with nothing on screen saying so.
+  const sheets = { MatrixLogs: [{ PlayerName: 'Cesar Alva', Result: 'WIN' }] };
+
+  it('is marked as not importable rather than silently skipped', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.sheets[0].importable).toBe(false);
+  });
+
+  it('SAYS SO, so a restore does not look complete when it is not', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.warnings.join(' ')).toMatch(/cannot be imported/i);
+    expect(plan.warnings.join(' ')).toContain('MatrixLogs');
+  });
+
+  it('is told apart from a sheet nobody recognises', () => {
+    // "Exported but not imported" and "that is not a table" are different
+    // things and want different words.
+    const plan = planImport({ ...sheets, MyNotes: [{}] }, known);
+
+    expect(plan.warnings.join(' ')).toMatch(/does not match any table/i);
+    expect(plan.warnings.join(' ')).toMatch(/cannot be imported/i);
+  });
+
+  it('does not ask about its team names, since nothing will be written', () => {
+    const plan = planImport({
+      MatrixLogs: [{ Team: 'Boys Varsity', PlayerName: 'Cesar Alva' }]
+    }, known);
+    expect(plan.unknownTeams).toEqual([]);
+  });
+
+  it('still marks every importable sheet as importable', () => {
+    const plan = planImport({ Players: [{ Team: 'Varsity' }] }, known);
+    expect(plan.sheets[0].importable).toBe(true);
+  });
+});

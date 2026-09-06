@@ -30,6 +30,16 @@ export interface TableDef {
   /** The column order. Also the template, and what an export's keys must match. */
   headers: string[];
   toRows: (data: ExportData) => Record<string, any>[];
+  /**
+   * Whether an import can write this sheet back.
+   *
+   * **The Matrix logs cannot.** The legacy importer handles ten targets and
+   * has no branch for `MatrixLogs`, so the sheet is exported and can never be
+   * restored — an admin who exports everything, loses something and
+   * re-imports gets it all back *except* their Matrix history, with nothing
+   * on screen saying so. Marked here so the preview can say it out loud.
+   */
+  importable: boolean;
 }
 
 /** Everything the sheets read. Absent collections export as empty. */
@@ -63,6 +73,7 @@ export function tableDefs(): TableDef[] {
       sheetName: 'Schools',
       headers: ['Code', 'Name', 'Mascot', 'City', 'League', 'PrimaryColor',
         'SecondaryColor', 'Wins', 'Losses', 'Draws', 'IsDeleted'],
+      importable: true,
       toRows: (d) => {
         const s = d.school;
         // No row at all rather than a Beaumont-shaped one.
@@ -81,6 +92,7 @@ export function tableDefs(): TableDef[] {
       fileName: '2_User_Profiles.xlsx',
       sheetName: 'Profiles',
       headers: ['Username', 'Name', 'Role', 'PlayerId', 'SchoolCode', 'Approved', 'IsDeleted'],
+      importable: true,
       // No invented users. The legacy fallback shipped coach_bob and sam_admin
       // into any export made before profiles had loaded.
       toRows: (d) => (d.profiles || []).map(u => ({
@@ -97,6 +109,7 @@ export function tableDefs(): TableDef[] {
       headers: ['Team', 'Number', 'RecordingNumber', 'FirstName', 'LastName', 'Position',
         'Class', 'Height', 'Goals', 'Assists', 'Saves', 'CleanSheets',
         'Tech', 'Tactical', 'Physical', 'Mental', 'Photo', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.players || []).map(p => ({
         Team: t(d.teamName), Number: p.number ?? '', RecordingNumber: p.recordingNumber ?? '',
         FirstName: t(p.firstName || p.first_name), LastName: t(p.lastName || p.last_name),
@@ -114,6 +127,7 @@ export function tableDefs(): TableDef[] {
       sheetName: 'Schedule',
       headers: ['Team', 'Date', 'Time', 'Opponent', 'Location', 'Address',
         'Home', 'Status', 'Score', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.schedule || []).map(m => ({
         Team: t(d.teamName), Date: t(m.date), Time: t(m.time), Opponent: t(m.opponent),
         Location: t(m.location), Address: t(m.venueAddress || m.venue_address),
@@ -127,6 +141,7 @@ export function tableDefs(): TableDef[] {
       fileName: '5_Master_Drills_Library.xlsx',
       sheetName: 'MasterDrills',
       headers: ['Name', 'Category', 'CoachNotes', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.drillsBank || []).map(x => ({
         Name: t(x.name), Category: t(x.category),
         CoachNotes: t(x.coachNotes || x.coach_notes),
@@ -138,6 +153,7 @@ export function tableDefs(): TableDef[] {
       fileName: '6_Practice_Plans.xlsx',
       sheetName: 'PracticePlans',
       headers: ['PlanName', 'TimeSlot', 'DrillName', 'Duration', 'CoachNotes', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.practicePlan || []).map(x => ({
         PlanName: t(d.activePlanName), TimeSlot: t(x.time), DrillName: t(x.name),
         Duration: t(x.duration), CoachNotes: t(x.coachNotes),
@@ -149,6 +165,8 @@ export function tableDefs(): TableDef[] {
       fileName: '7_Matrix_Logs.xlsx',
       sheetName: 'MatrixLogs',
       headers: ['PlayerName', 'DrillName', 'Result', 'OpponentName', 'ScoreText', 'Date', 'IsDeleted'],
+      // Export only -- see `importable` on TableDef.
+      importable: false,
       // No sample row. The legacy export substituted a fabricated result when
       // a team had none, which a re-import would have written in as real.
       toRows: (d) => (d.matrixLogs || []).map(l => ({
@@ -162,6 +180,7 @@ export function tableDefs(): TableDef[] {
       fileName: '8_Coaching_Staff.xlsx',
       sheetName: 'Coaches',
       headers: ['Name', 'Level', 'Phone', 'Email', 'Address', 'Bio', 'Photo', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.coaches || []).map(c => ({
         Name: t(c.name), Level: t(c.level), Phone: t(c.phone), Email: t(c.email),
         Address: t(c.address), Bio: t(c.bio), Photo: t(c.photo || c.photo_url),
@@ -173,6 +192,7 @@ export function tableDefs(): TableDef[] {
       fileName: '9_Coach_Daily_Thoughts.xlsx',
       sheetName: 'DailyThoughts',
       headers: ['CoachName', 'Title', 'ThoughtsText', 'IsActive', 'CreatedAt', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.thoughts || []).map(x => ({
         CoachName: t(x.coachName || x.coach_name), Title: t(x.title),
         ThoughtsText: t(x.text || x.thoughts_text),
@@ -187,6 +207,7 @@ export function tableDefs(): TableDef[] {
       sheetName: 'QuizQuestions',
       headers: ['QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD',
         'CorrectAnswer', 'Explanation', 'IsDeleted'],
+      importable: true,
       // The real bank. The legacy export shipped one hardcoded sample question
       // every time, whatever the organization had written.
       toRows: (d) => (d.quiz || []).map(q => {
@@ -214,6 +235,7 @@ export function tableDefs(): TableDef[] {
       fileName: '11_Soccer_Categories.xlsx',
       sheetName: 'SoccerCategories',
       headers: ['Name', 'Description', 'IsDeleted'],
+      importable: true,
       toRows: (d) => (d.categories || []).map(c => ({
         Name: t(c.name), Description: t(c.description),
         IsDeleted: flag(c.is_deleted || c.isDeleted)
