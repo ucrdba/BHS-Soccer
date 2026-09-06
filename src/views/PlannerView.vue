@@ -21,6 +21,7 @@ import SavePlanModal from '../components/planner/SavePlanModal.vue';
 import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
+import { buildPrintDocument } from '../domain/plan-print';
 
 const planner = usePlannerStore();
 const org = useOrganizationStore();
@@ -101,6 +102,34 @@ async function onRemove(index: number): Promise<void> {
   report(await planner.removeDrill(org.activeTeamId, index), 'Drill removed.');
 }
 
+/**
+ * Hand the plan to the browser's own print dialog.
+ *
+ * A rendered document rather than a PDF library, which would be a dependency
+ * for a worse result. Diagrams are 4b's: the document leaves a slot for them.
+ */
+function onPrint(): void {
+  const html = buildPrintDocument({
+    planName: planner.activePlanName || 'Practice plan',
+    organization: org.branding.name || '',
+    team: org.activeTeam?.name || '',
+    items: planner.items
+  });
+  if (!html) { notice.value = 'Add a drill before printing the plan.'; return; }
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    // A blocked pop-up is silent otherwise, and the coach just sees nothing
+    // happen when they press print.
+    notice.value = 'Your browser blocked the print window. Allow pop-ups for this site and try again.';
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 function onChoosePlan(planId: string): void {
   planner.loadPlan(planId);
   picking.value = false;
@@ -146,6 +175,9 @@ async function onDrop(index: number): Promise<void> {
         </button>
         <button type="button" class="act" data-open-plans @click="plansOpen = true">
           Save &amp; share
+        </button>
+        <button type="button" class="act" data-print-plan @click="onPrint">
+          Print
         </button>
       </div>
     </header>

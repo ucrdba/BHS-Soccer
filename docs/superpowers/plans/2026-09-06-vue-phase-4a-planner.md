@@ -206,7 +206,7 @@ And the library:
 
 **Files:** `src/domain/plan-print.ts` and its test; a control in `PlannerView`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The document is built as a string and handed to the browser's own print dialog — no PDF library, which is a dependency for a worse result.
 
@@ -216,9 +216,9 @@ The document is built as a string and handed to the browser's own print dialog �
 - **A drill's name is escaped**, since it is coach-entered text going into a document.
 - Diagram steps are left as a slot the caller fills — rasterizing them needs a canvas, which is 4b's.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

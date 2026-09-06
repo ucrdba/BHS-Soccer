@@ -326,3 +326,47 @@ describe('saved plans', () => {
     expect(w.find('[data-open-library]').exists()).toBe(false);
   });
 });
+
+describe('printing', () => {
+  const fakeWindow = () => ({
+    document: { write: vi.fn(), close: vi.fn() },
+    focus: vi.fn(), print: vi.fn()
+  });
+
+  it('writes a document and opens the print dialog', async () => {
+    const win = fakeWindow();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(win as any);
+
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+    await w.find('[data-print-plan]').trigger('click');
+
+    expect(win.document.write).toHaveBeenCalled();
+    expect(win.document.write.mock.calls[0][0]).toContain('Rondo');
+    expect(win.print).toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('refuses an empty plan rather than printing a blank page', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWindow() as any);
+    const w = await mountPlanner({ rows: [] });
+    await w.find('[data-print-plan]').trigger('click');
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(w.find('[data-notice]').text()).toMatch(/add a drill/i);
+    openSpy.mockRestore();
+  });
+
+  it('says so when the pop-up was blocked', async () => {
+    // Otherwise pressing print appears to do nothing at all.
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+    await w.find('[data-print-plan]').trigger('click');
+
+    expect(w.find('[data-notice]').text()).toMatch(/pop-ups/i);
+    openSpy.mockRestore();
+  });
+});
