@@ -165,7 +165,7 @@ The port, mechanically:
 - The `this.app.masterDiagrammer === this` check goes with them. It only existed to pick between two hard-coded sets of element ids; two boards are two component instances.
 - `alert()` becomes a returned result. A modal cannot be styled, cannot be tested, and blocks the page.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Placing a tool adds an element of that type at that position, numbered per side.
 - Undo restores the previous state; the history is capped and drops the oldest.
@@ -174,9 +174,9 @@ The port, mechanically:
 - Playing needs two frames, and says so by returning a reason rather than calling `alert`.
 - `resize` rescales every element by the same factor. Coordinates are canvas pixels, so a resize that does not rescale slides every player relative to the pitch — a diagram that still renders and no longer means what it did. (`diagrammer-responsive.test.ts` asserts this for the legacy board; the port needs its own.)
 
-- [ ] **Step 2: Port it, watch the tests pass**
+- [x] **Step 2: Port it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
