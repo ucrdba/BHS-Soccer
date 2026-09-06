@@ -60,7 +60,7 @@ export function tableDefs(): TableDef[];
 export function sheetFor(def: TableDef, data: any): Record<string, any>[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - All eleven tables are defined, once, with the file names the legacy export used — a coach's saved workbooks and their habits both depend on those.
 - **An empty table produces an empty array, not a sample row.** Assert it for the quiz, the matrix and the profiles specifically: those are the three that fabricate today.
@@ -68,9 +68,9 @@ export function sheetFor(def: TableDef, data: any): Record<string, any>[];
 - Every sheet's keys match its declared headers, so a template and an export agree — the template is what a coach fills in and re-imports.
 - `IsDeleted` is written for every table that has it, since the importer reads it.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -105,7 +105,7 @@ export interface ImportPlan {
 export function planImport(sheets: Record<string, any[]>, known: { teams: any[] }): ImportPlan;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - A sheet is matched to a table by its name, and an unrecognised sheet is **warned about rather than ignored** — a coach who renamed a tab needs to know why nothing happened.
 - **Team names that match nothing are collected, not guessed.** This is the list the preview asks about.
@@ -113,9 +113,9 @@ export function planImport(sheets: Record<string, any[]>, known: { teams: any[] 
 - The row counts are per sheet, because "1,400 rows" tells a coach nothing about which table is about to change.
 - A blank cell is `undefined` rather than `''`, so `upsertByKey`'s blank-skip can tell "not supplied" from "supplied empty" — that distinction is what stops a sparse sheet wiping columns it never mentioned.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

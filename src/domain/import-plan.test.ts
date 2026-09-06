@@ -1,0 +1,173 @@
+/**
+ * Reading a workbook into a plan, before anything is written.
+ *
+ * The legacy importer applies as it reads, so a misread column is discovered
+ * AFTER it has overwritten a season. This describes what would change so a
+ * coach can look at it first.
+ *
+ * The rule that carries the file: a team is never guessed. A spreadsheet
+ * names a team as text and the database holds uuids, and a row imported
+ * against the wrong team is a player on a squad they never played for -- in
+ * team_players, where minutes, ratings and recording numbers live.
+ */
+import { describe, it, expect } from 'vitest';
+import { planImport, resolveTeam, cell, readyToApply } from './import-plan';
+
+const TEAMS = [
+  { id: 't1', name: 'Varsity' },
+  { id: 't2', name: 'JV' }
+];
+
+const known = { teams: TEAMS };
+
+describe('a blank cell', () => {
+  it('becomes undefined, not an empty string', () => {
+    // upsertByKey's blank-skip distinguishes "not supplied" from "supplied
+    // empty", and that is what stops a sparse sheet wiping columns it never
+    // mentioned.
+    expect(cell('')).toBeUndefined();
+    expect(cell('   ')).toBeUndefined();
+    expect(cell(null)).toBeUndefined();
+    expect(cell(undefined)).toBeUndefined();
+  });
+
+  it('keeps a real value, trimmed', () => {
+    expect(cell('  Cesar  ')).toBe('Cesar');
+    expect(cell(0)).toBe('0');
+  });
+});
+
+describe('resolving a team', () => {
+  it('matches by name', () => {
+    expect(resolveTeam('Varsity', TEAMS)).toBe('t1');
+  });
+
+  it('ignores case and extra spaces', () => {
+    // A spreadsheet is typed by hand.
+    expect(resolveTeam('  varsity ', TEAMS)).toBe('t1');
+    expect(resolveTeam('J V', TEAMS)).toBeNull();
+    expect(resolveTeam('jv', TEAMS)).toBe('t2');
+  });
+
+  it('returns NULL rather than guessing', () => {
+    // Not the first team, not the only team, not a fuzzy match.
+    expect(resolveTeam('Boys Varsity', TEAMS)).toBeNull();
+    expect(resolveTeam('', TEAMS)).toBeNull();
+  });
+});
+
+describe('planning an import', () => {
+  const sheets = {
+    Players: [
+      { Team: 'Varsity', FirstName: 'Cesar', LastName: 'Alva' },
+      { Team: 'Varsity', FirstName: 'Tom', LastName: 'Budde' }
+    ],
+    Schedule: [{ Team: 'JV', Opponent: 'Yucaipa' }]
+  };
+
+  it('matches a sheet to its table', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.sheets.map(s => s.key).sort()).toEqual(['players', 'schedule']);
+  });
+
+  it('counts the rows PER SHEET', () => {
+    // "1,400 rows" says nothing about which table is about to change.
+    const plan = planImport(sheets, known);
+    expect(plan.sheets.find(s => s.key === 'players')!.rows).toHaveLength(2);
+    expect(plan.totals).toEqual({ rows: 3, sheets: 2 });
+  });
+
+  it('WARNS about a sheet it does not recognise rather than ignoring it', () => {
+    // A coach who renamed a tab needs to know that is why nothing happened.
+    const plan = planImport({ ...sheets, MyNotes: [{ a: 1 }] }, known);
+
+    expect(plan.warnings).toHaveLength(1);
+    expect(plan.warnings[0]).toContain('MyNotes');
+    expect(plan.sheets.map(s => s.key)).not.toContain('MyNotes');
+  });
+
+  it('normalises every cell, so a blank never reaches the merge as ""', () => {
+    const plan = planImport({ Players: [{ FirstName: 'Cesar', LastName: '  ' }] }, known);
+    expect(plan.sheets[0].rows[0]).toEqual({ FirstName: 'Cesar', LastName: undefined });
+  });
+
+  it('writes nothing at all — it only describes', () => {
+    // The whole point of a preview. There is no client here to call, which is
+    // itself the assertion: this module cannot write.
+    const plan = planImport(sheets, known);
+    expect(plan).toHaveProperty('sheets');
+    expect(Object.keys(plan)).toEqual(['sheets', 'totals', 'warnings', 'unknownTeams']);
+  });
+
+  it('copes with an empty workbook', () => {
+    const plan = planImport({}, known);
+    expect(plan.totals).toEqual({ rows: 0, sheets: 0 });
+  });
+});
+
+describe('UNKNOWN TEAMS ARE COLLECTED, NOT GUESSED', () => {
+  const sheets = {
+    Players: [
+      { Team: 'Varsity', FirstName: 'Cesar' },
+      { Team: 'Boys Varsity', FirstName: 'Unknown' },
+      { Team: 'U16 Reds', FirstName: 'Also unknown' }
+    ]
+  };
+
+  it('lists the names that match nothing', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.unknownTeams).toEqual(['Boys Varsity', 'U16 Reds']);
+  });
+
+  it('does not list one that resolves', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.unknownTeams).not.toContain('Varsity');
+  });
+
+  it('reports them per sheet as well, so the coach knows where they are', () => {
+    const plan = planImport(sheets, known);
+    expect(plan.sheets[0].unknownTeams).toHaveLength(2);
+  });
+
+  it('deduplicates a name that appears on many rows', () => {
+    const plan = planImport({
+      Players: [
+        { Team: 'Boys Varsity', FirstName: 'One' },
+        { Team: 'Boys Varsity', FirstName: 'Two' }
+      ]
+    }, known);
+    expect(plan.unknownTeams).toEqual(['Boys Varsity']);
+  });
+
+  it('finds none in a sheet with no Team column at all', () => {
+    // The categories and drills sheets have none, and are not team-scoped.
+    const plan = planImport({ SoccerCategories: [{ Name: 'Possession' }] }, known);
+    expect(plan.unknownTeams).toEqual([]);
+  });
+});
+
+describe('whether a plan may be applied', () => {
+  const plan = planImport({
+    Players: [{ Team: 'Boys Varsity', FirstName: 'One' }]
+  }, known);
+
+  it('is REFUSED while a team is unmapped', () => {
+    expect(readyToApply(plan, {})).toBe(false);
+  });
+
+  it('is allowed once every name has somewhere to go', () => {
+    expect(readyToApply(plan, { 'Boys Varsity': 't1' })).toBe(true);
+  });
+
+  it('is refused when only some are mapped', () => {
+    const two = planImport({
+      Players: [{ Team: 'Boys Varsity' }, { Team: 'U16 Reds' }]
+    }, known);
+    expect(readyToApply(two, { 'Boys Varsity': 't1' })).toBe(false);
+  });
+
+  it('is allowed for a workbook that names no unknown team', () => {
+    const clean = planImport({ Players: [{ Team: 'Varsity' }] }, known);
+    expect(readyToApply(clean, {})).toBe(true);
+  });
+});
