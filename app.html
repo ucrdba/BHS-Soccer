@@ -19,6 +19,17 @@
     See docs/superpowers/specs/2026-09-05-vue-phase-1-foundation-design.md.
   -->
   <div id="vue-app"></div>
+
+  <!--
+    SheetJS and JSZip, for the workbook import and export. Read off `window`
+    by ImportExportModal.vue, which reports their absence rather than throwing
+    -- so a missing tag here does not crash anything, it just means export
+    quietly refuses. Both versions are pinned: an unpinned CDN URL changes the
+    library under a deployment that was never rebuilt.
+  -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
   <script type="module" src="/src/vue-main.ts"></script>
 </body>
 

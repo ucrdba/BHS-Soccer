@@ -89,7 +89,7 @@ handlers, no `window` namespaces published for readers that no longer exist.
 
 **Files:** Create `src/domain/{csv,upsert,progress,report,roster,round-robin,season}.test.ts`.
 
-- [ ] **Step 1: Write the tests**
+- [x] **Step 1: Write the tests**
 
 - Ported from the assertions in the `src/data/*` agreement tests, importing the
   module directly — no `?raw`, no `new Function`, no hand-built `window`.
@@ -101,12 +101,12 @@ handlers, no `window` namespaces published for readers that no longer exist.
 - **`report.ts` and `progress.ts` must pin that low-minute players are
   included.** They are the audience for these views, not noise in them.
 
-- [ ] **Step 2: Watch them pass against the current modules**
+- [x] **Step 2: Watch them pass against the current modules**
 
 They are characterisation tests of code that already works — a failure here is
 a bug found, not a test to adjust.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -114,15 +114,15 @@ a bug found, not a test to adjust.
 
 **Files:** `vercel.json`, `app.html`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - A test asserting `vercel.json` rewrites unknown paths to the app's HTML, and
   that it does **not** swallow `/version.json` or the asset directory.
 - A test asserting the Vue entry document loads `XLSX` and `JSZip`.
 
-- [ ] **Step 2: Make them pass**
+- [x] **Step 2: Make them pass**
 
-- [ ] **Step 3: Gates and commit** — deployable on its own, and changes nothing
+- [x] **Step 3: Gates and commit** — deployable on its own, and changes nothing
   a user sees.
 
 ---
