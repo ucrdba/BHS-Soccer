@@ -141,16 +141,16 @@ export function planImport(sheets: Record<string, any[]>, known: { teams: any[] 
 
 **Files:** `src/components/admin/SchoolProfileSection.vue`, `src/components/admin/DiagnosticsSection.vue`, tests.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - The profile edits the **active organization's** name, mascot, city, league, colours and record — never a defaulted one, and the mascot is required because headings render it.
 - Changing it updates the branding the app shows, since `schools` is where every heading reads from.
 - Credentials and diagnostics are **admin-only**, and the credentials editor says what it changes and that it is stored on this device.
 - The diagnostic reports what it found rather than only pass/fail — it exists so a misconfigured deployment can be diagnosed without a developer.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

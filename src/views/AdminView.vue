@@ -29,6 +29,8 @@ import TeamsSection from '../components/admin/TeamsSection.vue';
 import UnassignedPlayersSection from '../components/admin/UnassignedPlayersSection.vue';
 import CategoriesSection from '../components/admin/CategoriesSection.vue';
 import QuizBankSection from '../components/admin/QuizBankSection.vue';
+import SchoolProfileSection from '../components/admin/SchoolProfileSection.vue';
+import DiagnosticsSection from '../components/admin/DiagnosticsSection.vue';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
@@ -36,6 +38,8 @@ const org = useOrganizationStore();
 const isCoach = computed(() => auth.isCoach || auth.isAdmin);
 const isAdmin = computed(() => auth.isAdmin);
 const schoolId = computed(() => org.school?.id ?? null);
+// The profile keys on `schools.code`, not the uuid the other sections take.
+const schoolCode = computed(() => org.school?.code ?? null);
 
 /**
  * Whether the admin-only sections may be shown.
@@ -84,6 +88,16 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
          A standalone v-if rather than a v-else-if on the section above:
          `lockedOut` is already a complete condition, and chaining it meant
          inserting a component between the two silently disabled it. -->
+    <SchoolProfileSection
+      v-if="isAdmin"
+      :school-code="schoolCode" :is-admin="isAdmin"
+      data-admin-school @saved="org.load()" />
+
+    <DiagnosticsSection
+      v-if="isAdmin"
+      :is-admin="isAdmin" :team-id="org.activeTeamId"
+      :school-id="schoolId" data-admin-diagnostics />
+
     <p v-if="lockedOut" class="notice notice--bad" role="alert" data-admin-locked>
       Your account is an administrator, but the permissions table has not
       loaded — so the squad and organization tools are unavailable. That

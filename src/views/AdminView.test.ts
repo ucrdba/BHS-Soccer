@@ -170,6 +170,22 @@ describe('the page itself', () => {
   });
 });
 
+describe('THE ADMIN-ONLY SECTIONS', () => {
+  it('shows the organization profile and the diagnostics to an admin', async () => {
+    const w = await mountAdmin({ coach: true, admin: true });
+    expect(w.find('[data-admin-school]').exists()).toBe(true);
+    expect(w.find('[data-admin-diagnostics]').exists()).toBe(true);
+  });
+
+  it('shows NEITHER to a coach who is not an admin', async () => {
+    // The profile rewrites the branding every heading reads, and the
+    // credentials editor repoints the whole app at another database.
+    const w = await mountAdmin({ coach: true, admin: false });
+    expect(w.find('[data-admin-school]').exists()).toBe(false);
+    expect(w.find('[data-admin-diagnostics]').exists()).toBe(false);
+  });
+});
+
 describe('the coach-visible sections', () => {
   it('shows the unassigned players and the categories to a coach', async () => {
     // soccer_categories_write and the membership policies both allow a coach,

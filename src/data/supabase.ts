@@ -471,7 +471,7 @@ class SupabaseService {
     }
   }
 
-  async runFullDatabaseDiagnostic(teamId?: string): Promise<any> {
+  async runFullDatabaseDiagnostic(teamId?: string, schoolId?: string): Promise<any> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -480,7 +480,10 @@ class SupabaseService {
       };
     }
 
-    const schoolUuid = await this.getSchoolUuid('bhs');
+    // The organization under test. The legacy admin panel calls this bare,
+    // so 'bhs' remains its fallback -- but a club admin's diagnostic must
+    // write its test rows into their own school, not Beaumont's.
+    const schoolUuid = await this.getSchoolUuid(schoolId || 'bhs');
     // practice_plans and daily_thoughts dropped school_id in migration 0015
     // and are now written under team-scoped RLS (is_team_coach(team_id)), so
     // their diagnostic rows need a real team, not the legacy school lookup.
