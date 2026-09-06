@@ -131,13 +131,13 @@ a bug found, not a test to adjust.
 
 **Files:** `index.html`, `app.html`, `vite.config.ts`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - `index.html` mounts `#vue-app` and loads `src/vue-main.ts`.
 - It loads **no** `./js/*` script.
 - Its `<title>` names no single organization.
 
-- [ ] **Step 2: Make them pass**
+- [x] **Step 2: Make them pass**
 
 - The legacy `index.html` is replaced by what `app.html` holds; `app.html` is
   removed and `vite.config.ts` drops to one input.
@@ -146,7 +146,7 @@ a bug found, not a test to adjust.
   `window.supabaseService` is still published by `src/vue-main.ts`, because
   `src/auth.ts` reads it off `window` in fifteen places.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -155,14 +155,14 @@ a bug found, not a test to adjust.
 **Files:** `public/js/` (22 scripts), `app.js`, the 62 tests that load them,
 `src/domain/test-globals.ts`.
 
-- [ ] **Step 1: Keep the diagram fixture**
+- [x] **Step 1: Keep the diagram fixture**
 
 - Move `public/js/diagrammer.js` to `src/diagram/legacy/diagrammer.legacy.js`,
   update the four agreement tests' import paths, and write the comment
   explaining that it is a golden master for an unversioned stored format and is
   not shipped.
 
-- [ ] **Step 2: Delete, and account for what went**
+- [x] **Step 2: Delete, and account for what went**
 
 - Every `src/data/*.test.ts` that loads a classic script goes with it: they
   test prototype methods that no longer exist.
@@ -170,7 +170,7 @@ a bug found, not a test to adjust.
 - **Record the test-count drop in the commit message**, with the count before
   and after, so the loss is stated rather than discovered.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -179,7 +179,7 @@ a bug found, not a test to adjust.
 **Files:** `src/app.core.ts`, `src/data.ts`, `src/utils.ts`, `src/globals.d.ts`,
 `check_syntax.ps1`, the root one-off `*.ps1` scripts, `package.json`.
 
-- [ ] **Step 1: Delete what is now unreachable**
+- [x] **Step 1: Delete what is now unreachable**
 
 - The three dormant modules still carry the pre-migration seed logic
   (`DEFAULT_BHS_DATA`, the localStorage cycle) that the live app had already
@@ -188,18 +188,18 @@ a bug found, not a test to adjust.
 - `split_app.ps1`, `patch_commas.ps1`, `fix_boundary.ps1`, `find_methods.ps1`
   are one-off tooling from a split whose source is gone.
 
-- [ ] **Step 2: Prune `src/globals.d.ts`**
+- [x] **Step 2: Prune `src/globals.d.ts`**
 
 Keep the `XLSX` / `JSZip` UMD declarations and `window.supabaseService`; drop
 the "Pending migration" surface that existed for the classic scripts.
 
-- [ ] **Step 3: Gates and commit** — three gates from here on.
+- [x] **Step 3: Gates and commit** — three gates from here on.
 
 ---
 
 ### Task 6: Rewrite `CLAUDE.md`
 
-- [ ] **Step 1: One application, not two**
+- [x] **Step 1: One application, not two**
 
 - "Two apps, two entry points" goes; so does the per-phase migration history,
   which is what the plans and commit messages are for.
@@ -211,7 +211,7 @@ the "Pending migration" surface that existed for the classic scripts.
   and the setup-store rule.
 - The four gates become three.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ## Definition of done
 
