@@ -71,16 +71,16 @@ export function isPointNearDrawing(pos: Point, drawing: any, maxDist?: number): 
 export function canvasPos(e: any, canvas: HTMLCanvasElement): Point;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - A point on a segment is at distance zero; beside it, the perpendicular distance; past its end, the distance to the nearer endpoint. A zero-length segment does not divide by zero.
 - **A coarse pointer gets double the catchment.** 18px was measured against a mouse; a fingertip covers roughly 40px and you cannot see under it, so selecting a line on a phone becomes guesswork at the mouse radius. Test both branches by stubbing `matchMedia`.
 - `canvasPos` scales by `canvas.width / rect.width`, because a board displayed smaller than its backing store would otherwise place every element at an offset that grows across the pitch.
 - A touch event reads `touches[0]`; a mouse event reads `clientX`.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -100,7 +100,7 @@ export function appendKeyframe(frames: Keyframe[], fromIndex: number): Keyframe[
 export function interpolateFrames(a: any[], b: any[], t: number): any[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **A player added on frame 2 appears on every later frame**, at the position it was added. Without that they pop into existence mid-animation, which reads as a bug in the diagram rather than in the tool.
 - **Interpolation matches on id first**, then on type-and-number, then — for a ball only — on type. The fallbacks exist because a diagram drawn frame by frame has elements that are "the same player" without sharing an id.
@@ -110,9 +110,9 @@ export function interpolateFrames(a: any[], b: any[], t: number): any[];
 - **Renumbering is per side and in array order**: attackers 1..n, defenders 1..n, and a goalkeeper or a cone is never numbered.
 - The first frame is labelled as the start position and `blankKeyframes()` always returns exactly one.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
