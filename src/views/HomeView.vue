@@ -13,10 +13,12 @@ import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useAuthStore } from '../stores/auth';
 import { nextMatchCountdown } from '../domain/schedule';
+import DailyThought from '../components/home/DailyThought.vue';
 
 const org = useOrganizationStore();
 const schedule = useScheduleStore();
 const auth = useAuthStore();
+const canWriteThought = computed(() => auth.isCoach || auth.isAdmin);
 
 /**
  * The countdown, re-derived on a tick rather than stored.
@@ -123,6 +125,10 @@ const headline = computed(() => {
       </div>
     </div>
   </section>
+
+  <!-- Directly after the hero: it is the coach speaking to the squad, and
+       the squad reads this page first. -->
+  <DailyThought :team-id="org.activeTeamId" :can-edit="canWriteThought" />
 
   <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats">
     <div class="stat">

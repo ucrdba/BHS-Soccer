@@ -21,7 +21,11 @@ const row = (over: any = {}) => toMatch({
   status: 'SCHEDULED', is_home: true, score: null, result: null, ...over
 });
 
-function mountHome(scheduleState: Record<string, any>, orgState: Record<string, any> = {}) {
+function mountHome(
+  scheduleState: Record<string, any>,
+  orgState: Record<string, any> = {},
+  extra: Record<string, any> = {}
+) {
   return mount(HomeView, {
     global: {
       plugins: [createTestingPinia({
@@ -35,7 +39,8 @@ function mountHome(scheduleState: Record<string, any>, orgState: Record<string, 
             activeTeamId: 't1',
             ...orgState
           },
-          auth: { isCoach: false, isAdmin: false, isGuest: true, canAccessRatings: false }
+          auth: { isCoach: false, isAdmin: false, isGuest: true, canAccessRatings: false },
+          ...extra
         }
       })],
       stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } }
@@ -150,5 +155,37 @@ describe('loading and failure', () => {
   it('surfaces a load failure instead of an empty season', () => {
     const w = mountHome({ matches: [], loadError: 'offline', loadedTeamId: null });
     expect(w.text()).toContain('offline');
+  });
+});
+
+describe("the coach's message", () => {
+  const MESSAGE = {
+    id: 'd1', title: 'Press together', thoughts_text: 'Squeeze the space.',
+    coach_name: 'Coach Bob', is_active: true
+  };
+
+  it('is on Home, where the squad looks', () => {
+    // It lived in the practice planner only as an artefact of the app.js
+    // split; a message to the squad belongs on the page the squad opens.
+    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] } });
+    expect(w.find('[data-thought-text]').text()).toBe('Squeeze the space.');
+  });
+
+  it('shows a guest no controls for it', () => {
+    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] } });
+    expect(w.find('[data-thought-new]').exists()).toBe(false);
+  });
+
+  it('takes no room at all when no message is set', () => {
+    const w = mountHome({}, {}, { thoughts: { thoughts: [] } });
+    expect(w.find('[data-daily-thought]').exists()).toBe(false);
+  });
+
+  it('offers a coach a way to write one', () => {
+    const w = mountHome({}, {}, {
+      thoughts: { thoughts: [] },
+      auth: { isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
+    });
+    expect(w.find('[data-thought-new]').exists()).toBe(true);
   });
 });

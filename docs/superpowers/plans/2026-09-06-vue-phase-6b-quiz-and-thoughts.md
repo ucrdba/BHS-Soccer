@@ -108,7 +108,7 @@ export function markQuiz(questions: QuizQuestion[], chosen: Record<string, strin
 
 **Files:** `src/stores/thoughts.ts`, `src/components/home/DailyThought.vue`, tests; wire into `HomeView`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - The active thought is shown to everyone; there is no thought and no empty box when none is set.
 - A coach can write one, edit it, and **make it the active one** — only one is active, and setting a new one stands the old one down.
@@ -116,9 +116,9 @@ export function markQuiz(questions: QuizQuestion[], chosen: Record<string, strin
 - **Copy-to-team offers only teams the coach may write to**, the same rule as the practice plan.
 - A failed read is reported.
 
-- [ ] **Step 2: Build and wire, watch the tests pass**
+- [x] **Step 2: Build and wire, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
