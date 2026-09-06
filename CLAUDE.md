@@ -315,6 +315,28 @@ Removing the defaults is worth doing and is not a small change: both apps call t
 - **`checkEmail` in `src/auth/email-typo.ts` never ran.** It was imported into `src/auth.ts` and never called, while `coaches.view.js` branched on a `res.emailSuggestion` that `RegisterResult` never carries. A tested 161-line module wired to nothing. The Vue sign-up flow now calls it properly; the legacy path is still dead.
 - **`deleteCoach` in `src/data/supabase.ts` returns nothing at all** — it logs its error and falls off the end, so success and failure are indistinguishable from the return value. The Vue store reloads and checks whether the row survived rather than reporting a success it cannot verify.
 
+### Drill categories are NOT organization-scoped
+
+`soccer_categories` has a `school_id` column and **nothing uses it**:
+
+- `fetchSoccerCategories(schoolId)` demands an organization, runs it through
+  `requireOrg`, and then never filters by it.
+- `upsertSoccerCategory` takes no organization at all.
+- `soccer_categories.name` is globally `UNIQUE`, and the upsert conflicts on
+  `name`.
+
+So every organization shares one category list, a club coach sees Beaumont's
+categories, and two clubs cannot both have a "Possession" — the second write
+updates the first's row. `drills_bank.category` is free TEXT rather than a
+foreign key, which is why the drift is survivable rather than fatal, and why
+`CategoriesSection.vue` shows the undefined names as their own group.
+
+**This is pre-existing and unfixed.** Closing it needs a migration — drop the
+global unique, add `unique (school_id, name)`, backfill `school_id` — plus
+changes to those three client methods. It is written down here rather than
+worked around in a component, because a screen that *looked* scoped would
+hide it.
+
 ### Recording numbers — the unique index
 
 `team_players.recording_number` is unique per team, and that shapes both ends

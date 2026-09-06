@@ -26,6 +26,8 @@ import { useOrganizationStore } from '../stores/organization';
 import { can } from '../auth/permissions';
 import ApprovalsSection from '../components/admin/ApprovalsSection.vue';
 import TeamsSection from '../components/admin/TeamsSection.vue';
+import UnassignedPlayersSection from '../components/admin/UnassignedPlayersSection.vue';
+import CategoriesSection from '../components/admin/CategoriesSection.vue';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
@@ -61,10 +63,23 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
 
     <TeamsSection v-if="mayManage" data-admin-manage />
 
+    <!-- Coach-visible, unlike the squads section: soccer_categories_write and
+         the membership policies both allow a coach, so these are not controls
+         the database would refuse. -->
+    <UnassignedPlayersSection
+      v-if="isCoach"
+      :team-id="org.activeTeamId" :teams="org.teams" data-admin-unassigned />
+
+    <CategoriesSection v-if="isCoach" :school-id="schoolId" data-admin-categories />
+
     <!-- Not merely hidden: an admin whose roles table did not load would
          otherwise see a page that looks complete and is missing half of
-         itself. -->
-    <p v-else-if="lockedOut" class="notice notice--bad" role="alert" data-admin-locked>
+         itself.
+
+         A standalone v-if rather than a v-else-if on the section above:
+         `lockedOut` is already a complete condition, and chaining it meant
+         inserting a component between the two silently disabled it. -->
+    <p v-if="lockedOut" class="notice notice--bad" role="alert" data-admin-locked>
       Your account is an administrator, but the permissions table has not
       loaded — so the squad and organization tools are unavailable. That
       usually means the database is unreachable or the <code>roles</code>

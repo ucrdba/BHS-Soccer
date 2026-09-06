@@ -99,7 +99,7 @@ The most dangerous section: approving a signup hands somebody access to a squad 
 
 **Files:** `src/components/admin/UnassignedPlayersSection.vue`, `src/components/admin/CategoriesSection.vue`, and tests.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Unassigned players — people in `players` with no `team_players` row, which is how an import leaves them:
 
@@ -113,9 +113,9 @@ Categories:
 - Renaming and merging both exist; **merging names both sides and is not reversible**, so it says so.
 - A **stray** category — one used by drills but absent from the table — can be adopted or merged. That is a real state the legacy panel handles and the rebuild must not drop.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

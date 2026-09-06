@@ -50,7 +50,10 @@ vi.mock('../data/supabase', () => ({
   supabaseService: {
     fetchAllTeams: vi.fn().mockResolvedValue([]),
     fetchTeamCoaches: vi.fn().mockResolvedValue([]),
-    fetchAssignableCoaches: vi.fn().mockResolvedValue([])
+    fetchAssignableCoaches: vi.fn().mockResolvedValue([]),
+    fetchUnassignedPlayers: vi.fn().mockResolvedValue([]),
+    fetchSoccerCategories: vi.fn().mockResolvedValue([]),
+    fetchCategoryUsage: vi.fn().mockResolvedValue({})
   }
 }));
 
@@ -163,5 +166,21 @@ describe('the page itself', () => {
     const w = await mountAdmin();
     expect(w.text()).toContain('Legends FC');
     expect(w.text()).not.toMatch(/beaumont|cougars/i);
+  });
+});
+
+describe('the coach-visible sections', () => {
+  it('shows the unassigned players and the categories to a coach', async () => {
+    // soccer_categories_write and the membership policies both allow a coach,
+    // so these are not controls the database would refuse.
+    const w = await mountAdmin({ coach: true, admin: false });
+    expect(w.find('[data-admin-unassigned]').exists()).toBe(true);
+    expect(w.find('[data-admin-categories]').exists()).toBe(true);
+  });
+
+  it('shows them to an admin too', async () => {
+    const w = await mountAdmin({ coach: true, admin: true });
+    expect(w.find('[data-admin-unassigned]').exists()).toBe(true);
+    expect(w.find('[data-admin-categories]').exists()).toBe(true);
   });
 });
