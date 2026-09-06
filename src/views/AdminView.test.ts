@@ -175,6 +175,7 @@ describe('THE ADMIN-ONLY SECTIONS', () => {
     const w = await mountAdmin({ coach: true, admin: true });
     expect(w.find('[data-admin-school]').exists()).toBe(true);
     expect(w.find('[data-admin-diagnostics]').exists()).toBe(true);
+    expect(w.find('[data-admin-importexport]').exists()).toBe(true);
   });
 
   it('shows NEITHER to a coach who is not an admin', async () => {
@@ -183,6 +184,7 @@ describe('THE ADMIN-ONLY SECTIONS', () => {
     const w = await mountAdmin({ coach: true, admin: false });
     expect(w.find('[data-admin-school]').exists()).toBe(false);
     expect(w.find('[data-admin-diagnostics]').exists()).toBe(false);
+    expect(w.find('[data-admin-importexport]').exists()).toBe(false);
   });
 });
 

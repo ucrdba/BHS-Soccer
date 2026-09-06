@@ -31,6 +31,7 @@ import CategoriesSection from '../components/admin/CategoriesSection.vue';
 import QuizBankSection from '../components/admin/QuizBankSection.vue';
 import SchoolProfileSection from '../components/admin/SchoolProfileSection.vue';
 import DiagnosticsSection from '../components/admin/DiagnosticsSection.vue';
+import ImportExportSection from '../components/admin/ImportExportSection.vue';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
@@ -92,6 +93,13 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
       v-if="isAdmin"
       :school-code="schoolCode" :is-admin="isAdmin"
       data-admin-school @saved="org.load()" />
+
+    <ImportExportSection
+      v-if="isAdmin"
+      :is-admin="isAdmin" :team-id="org.activeTeamId"
+      :school-id="schoolId" :school-code="schoolCode"
+      :team-name="org.activeTeam?.name ?? null" :teams="org.teams"
+      data-admin-importexport />
 
     <DiagnosticsSection
       v-if="isAdmin"
