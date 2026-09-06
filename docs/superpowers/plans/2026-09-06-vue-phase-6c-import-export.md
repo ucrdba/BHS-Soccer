@@ -156,15 +156,15 @@ export function planImport(sheets: Record<string, any[]>, known: { teams: any[] 
 
 ### Task 6: Close out Phase 6
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat 05ed4b1..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`** — Phase 6 done, and what Phase 7 inherits.
+- [x] **Step 2: Update `CLAUDE.md`** — Phase 6 done, and what Phase 7 inherits.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ## Definition of done
 

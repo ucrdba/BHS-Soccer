@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 3,314 tests, config in vitest.config.mts
+npm test           # vitest — 3,424 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (3,314 tests across 172 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,424 tests across 175 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -73,13 +73,34 @@ coach looks:
 | 1v1 round robin | Coach Planner |
 | Recording numbers | Roster |
 
-**Phase 6 is under way.** `/admin` is real — the migration's one route that
-is not a nav view, because the admin panel was never really a modal. Done:
-approvals, squads and organizations, unassigned players, drill categories and
-the quiz bank, plus `/quiz` for players and the coach's daily message on
-Home. **Still owed (6c): the XLSX import/export, the school profile form and
-the credentials/diagnostics panel** — after which `public/js/` has nothing
-the Vue app cannot do.
+**Phase 6 is done.** `/admin` is real — the migration's one route that is not
+a nav view, because the admin panel was never really a modal. It carries
+approvals, squads and organizations, unassigned players, drill categories,
+the quiz bank, the organization profile, the XLSX import/export and the
+credentials/diagnostics panel, plus `/quiz` for players and the coach's daily
+message on Home. **`public/js/` now has nothing the Vue app cannot do**, which
+is the precondition Phase 7 was waiting on.
+
+Three things the rebuild does that the legacy panel does not, each pinned by
+tests:
+
+- **An export invents nothing.** The legacy export shipped a hardcoded sample
+  quiz question, a fabricated match result, two made-up user profiles and
+  Beaumont's name, code, mascot and city as defaults. An export is a backup,
+  so re-importing one injected all of that. An empty table now exports an
+  empty sheet with its headers, which is what says the table is empty.
+- **An import previews before it writes.** The legacy importer applies as it
+  reads, so a misread column was found after it had overwritten a season.
+  And a team is never guessed: unrecognised team names are put to the coach
+  to map, and applying is refused while any are unmapped, because a row
+  written against the wrong team is a player on a squad they never played
+  for — in `team_players`, where minutes, ratings and recording numbers live.
+- **`MatrixLogs` is export-only** — the importer has no branch for it, so a
+  full restore silently omitted Matrix history. The preview now says so.
+
+**Owed from Phase 6:** the Profiles sheet exports with its headers and no
+rows, because no service method reads an organization's profiles. The screen
+says so rather than letting an empty sheet read as "no users".
 
 **`/admin` is gated coach-or-admin, with each section gated individually.**
 Guarding the route on `can_access_admin_dashboard` is the obvious design and
@@ -204,7 +225,7 @@ so the print path drops the diagrams and still prints the plan.
 
 ## `src/domain/` — the extracted logic
 
-Thirty-one framework-free modules, in two groups.
+Thirty-four framework-free modules, in two groups.
 
 **Thirteen were cut off the `BHSSoccerApp` prototype** — `schedule`, `matrix`,
 `matrix-session`, `lineup`, `plus-minus-court`, `round-robin`, `season`,
@@ -212,7 +233,7 @@ Thirty-one framework-free modules, in two groups.
 are the ones both apps use, so `src/main.ts` publishes each on `window` (see
 below) and the legacy prototype method is a one-line delegation.
 
-**Eighteen were added by the Vue rebuild** as it needed them, and are imported
+**Twenty-one were added by the Vue rebuild** as it needed them, and are imported
 directly rather than published: `season-record`, `theme` (an organization's
 branding), `roster-view` (the position filters), `schedule-view`, `help-search`,
 the four table read mappings `schedule-row`, `player-row`, `coach-row` and
@@ -222,7 +243,10 @@ reads in words), `time`, `band-score` (what a time earns) and `session-entry`
 (the grid's state) — and the four the planner needed: `practice-plan`,
 `plan-row`, `drill-time` and `plan-print`. (`format12hTo24h` was added to the
 existing `schedule-view` rather than to a module of its own, so it sits beside
-its inverse.)
+its inverse.) Phase 6 added three more: `quiz` (how an attempt is marked),
+`workbook` (the eleven XLSX tables, defined once — the legacy panel wrote the
+list out three times and they had drifted) and `import-plan` (what a workbook
+would change, before anything is written).
 
 `band-score.ts` is the only scoring the browser does at all; everything else
 comes from Postgres. It duplicates `SupabaseService.factorForTime` on purpose,
