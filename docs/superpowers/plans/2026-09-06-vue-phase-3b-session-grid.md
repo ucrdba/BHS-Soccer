@@ -168,7 +168,7 @@ The screen this phase exists for.
 
 Layout, in the order a coach reads it: exercise and date; a jump box; the grid — recording number, name, attendance, the entry field for this measure, and for `time_bands` what the time earns; then Save.
 
-- [ ] **Step 1: Write the failing test, keyboard first**
+- [x] **Step 1: Write the failing test, keyboard first**
 
 The three speed requirements above are tests, not prose:
 
@@ -183,9 +183,9 @@ The three speed requirements above are tests, not prose:
 - **Save is disabled for the duration of the request.** A double-click would write two sessions and double everyone's `available`. Assert it is re-enabled on the failure path too, or a refused save strands the coach.
 - **Present with nothing recorded is refused, naming the players.**
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
