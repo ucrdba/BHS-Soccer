@@ -195,7 +195,7 @@ What each exercise is worth, what kind of thing it measures, and the standards f
 
 **Files:** Create both components and their tests.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - **Changing a measure to `time_bands` reveals the bands editor** for that drill and nothing else.
 - **A drill always has at least one band row.** Removing the last one leaves an empty pair of boxes rather than a section with no way back in.
@@ -205,9 +205,9 @@ What each exercise is worth, what kind of thing it measures, and the standards f
 - **A bad time or factor is named in words** before anything is deleted, so a typo in the third row cannot leave the squad with no standards at all.
 - **Nothing suggests tightening a band.** No "scores are bunched" hint, no spread warning. Assert the absence — this is the coach's stated position and the kind of "helpful" addition that gets added later by someone who has not read it.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
