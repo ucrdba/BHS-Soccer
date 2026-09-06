@@ -145,7 +145,7 @@ State: `sessions`, `results`, `bands`, `drills`, `editingId`, `loading`, `saveEr
 
 Actions: `loadHistory(teamId)`, `loadDrills(schoolId)`, `openNew(drillId, teamId)`, `openExisting(sessionId, teamId)`, `loadBands(drillId, teamId)`, `save(teamId, session, results)`, `remove(sessionId)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **`loadBands` is called for a `time_bands` drill and nothing else.** Bands are per `(drill_id, team_id)`; fetching them for a `win_loss` drill is a wasted round trip whose empty result would then read as "no standards set".
 - **Both ids are threaded.** `loadDrills` needs the organization (the drill library is school-scoped); everything else needs the team. A bare `fetchDrillsForWeighting()` returns `null`, and the picker is then silently empty — the Phase 3a failure, repeated.
@@ -154,9 +154,9 @@ Actions: `loadHistory(teamId)`, `loadDrills(schoolId)`, `openNew(drillId, teamId
 - **A successful save clears `editingId`.** Leaving it set makes the next "record a session" overwrite the one just edited.
 - **`remove` reloads too**, and reports the client's error rather than a generic one.
 
-- [ ] **Step 2: Run it, watch it fail, write the store, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the store, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
