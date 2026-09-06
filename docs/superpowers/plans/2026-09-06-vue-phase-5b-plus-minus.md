@@ -81,7 +81,7 @@ Actions: `open(teamId, schoolId, matchId, label)`, `append(kind, playerId)`, `un
 
 **Files:** Create `src/components/schedule/PlusMinusModal.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - The clock reads as `mm:ss` and starts, stops and resets.
 - **A plus and a minus are both reachable without a gesture.** Two-finger and right-click are the fast paths, but a coach on a phone with one hand, or anyone using a keyboard, needs a plain control — the same reasoning as the planner's move buttons and the lineup's tap-to-place.
@@ -90,9 +90,9 @@ Actions: `open(teamId, schoolId, matchId, label)`, `append(kind, playerId)`, `un
 - Sending a player on and off works, and the eleventh is the last one accepted.
 - **The board is coach-only** and absent from anyone else's document.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -100,16 +100,16 @@ Actions: `open(teamId, schoolId, matchId, label)`, `append(kind, playerId)`, `un
 
 **Files:** `src/components/schedule/PlusMinusTable.vue` and its test; edit `ScheduleView`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - Every column sorts, using `pmColumns` and `pmSortedRows`.
 - **Minutes are on the row**, beside plus and minus — the same rule as the season report, for the same reason.
 - **Every player in the squad has a row**, including one who has not been on.
 - A fixture offers Plus/Minus, coach-only, and opening it opens the tracked session for that fixture.
 
-- [ ] **Step 2: Build and wire, watch the tests pass**
+- [x] **Step 2: Build and wire, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

@@ -56,9 +56,15 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
   const everStarted = computed(() => pmClockEverStarted(events.value));
   const onPitch = computed(() => pitchOf(events.value));
 
-  function statsFor(playerIds: string[]) {
-    return replay(orderEvents(events.value), playerIds);
-  }
+  /*
+   * `statsFor` is deliberately NOT here.
+   *
+   * Replaying the log is a pure function of `events` and a squad, and
+   * `createTestingPinia` with `stubActions` replaces every function a setup
+   * store returns — a component test would get `undefined` back from it. The
+   * components call `replay(orderEvents(...))` themselves. Same trap the
+   * lineup store hit; see CLAUDE.md.
+   */
 
   function say(message: string): void { notice.value = message || ''; }
 
@@ -176,7 +182,11 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
     events.value = events.value.slice(0, -1);
 
     if (last.kind === 'clock_start') { clockBase.value = last.atSeconds; runningSince.value = null; }
-    if (last.kind === 'clock_stop') { clockBase.value = last.atSeconds; runningSince.value = Date.now(); }
+    if (last.kind === 'clock_stop') {
+      clockBase.value = last.atSeconds;
+      runningSince.value = Date.now();
+      now.value = runningSince.value;
+    }
     say('');
 
     if (last.id) {
@@ -195,7 +205,14 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
       runningSince.value = null;
       return append('clock_stop');
     }
-    runningSince.value = Date.now();
+
+    const at = Date.now();
+    runningSince.value = at;
+    // `now` only moves when the ticker asks, so without this the first event
+    // after a start is measured against a stale reading and stamps a second
+    // BEFORE the clock began. One second, silently, on the event a coach is
+    // most likely to record immediately after kick-off.
+    now.value = at;
     return append('clock_start');
   }
 
@@ -222,6 +239,7 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
 
     if (wasRunning) {
       runningSince.value = Date.now();
+      now.value = runningSince.value;
       return append('clock_start');
     }
     return { ok: true };
@@ -280,6 +298,6 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
     events, statMatchId, clockBase, runningSince, period, armed, notice, loading,
     clock, clockText, running, everStarted, onPitch,
     open, append, undo, toggleClock, setClock, endPeriod, arm, teamGoal,
-    movePlayer, seedFromLineup, statsFor, say, tick
+    movePlayer, seedFromLineup, say, tick
   };
 });

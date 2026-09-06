@@ -13,6 +13,7 @@ import { ref, computed, watch } from 'vue';
 import MatchFormModal from '../components/schedule/MatchFormModal.vue';
 import LineupModal from '../components/schedule/LineupModal.vue';
 import SeasonReportModal from '../components/schedule/SeasonReportModal.vue';
+import PlusMinusModal from '../components/schedule/PlusMinusModal.vue';
 import { useScheduleStore, type MatchForm } from '../stores/schedule';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -39,6 +40,13 @@ const notice = ref<string | null>(null);
 const lineupOpen = ref(false);
 const lineupMatch = ref<Match | null>(null);
 const seasonOpen = ref(false);
+const pmOpen = ref(false);
+const pmMatch = ref<Match | null>(null);
+
+function openPlusMinus(m: Match): void {
+  pmMatch.value = m;
+  pmOpen.value = true;
+}
 
 const schoolId = computed(() => org.school?.id ?? null);
 
@@ -179,6 +187,9 @@ async function onRemove(m: Match): Promise<void> {
                 <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
                   Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
                 </button>
+                <button type="button" class="row__btn" data-fixture-pm @click="openPlusMinus(m)">
+                  &plusmn;
+                </button>
                 <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
                 <button type="button" class="row__btn row__btn--danger" data-match-remove
                         @click="onRemove(m)">Delete</button>
@@ -211,6 +222,9 @@ async function onRemove(m: Match): Promise<void> {
                 <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
                   Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
                 </button>
+                <button type="button" class="row__btn" data-fixture-pm @click="openPlusMinus(m)">
+                  &plusmn;
+                </button>
                 <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
                 <button type="button" class="row__btn row__btn--danger" data-match-remove
                         @click="onRemove(m)">Delete</button>
@@ -227,6 +241,13 @@ async function onRemove(m: Match): Promise<void> {
       :match-label="lineupMatch ? `${lineupMatch.opponent}` : ''"
       :team-id="org.activeTeamId" :school-id="schoolId" :players="roster.players"
       @close="lineupOpen = false" @saved="onLineupSaved" />
+
+    <PlusMinusModal
+      v-if="canEdit"
+      :open="pmOpen" :match-id="pmMatch?.id ?? null"
+      :match-label="pmMatch ? `${pmMatch.opponent}` : ''"
+      :team-id="org.activeTeamId" :school-id="schoolId" :players="roster.players"
+      @close="pmOpen = false" />
 
     <SeasonReportModal
       v-if="canEdit"

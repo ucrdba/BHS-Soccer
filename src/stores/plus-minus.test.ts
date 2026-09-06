@@ -16,6 +16,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { replay, orderEvents } from '../data/plus-minus';
 
 const openStatMatch = vi.fn();
 const fetchStatEvents = vi.fn();
@@ -231,7 +232,10 @@ describe('eleven on the pitch', () => {
 });
 
 describe('the event that gets written', () => {
-  it('is stamped with the clock', async () => {
+  it('is stamped with the clock, not with zero', async () => {
+    // And not a second EARLY: the clock is read against a cached timestamp
+    // that only the ticker moves, so starting it has to refresh that reading
+    // or the first event after kick-off stamps before the clock began.
     const s = await running();
     s.clockBase = 754;
     s.runningSince = null;
@@ -460,7 +464,7 @@ describe('the figures on the board', () => {
     await s.append('plus', 'p1');
     await s.append('minus', 'p1');
 
-    const stats = s.statsFor(['p1']);
+    const stats = replay(orderEvents(s.events), ['p1']);
     expect(stats.get('p1')!.plus).toBe(2);
     expect(stats.get('p1')!.minus).toBe(1);
   });
@@ -468,7 +472,7 @@ describe('the figures on the board', () => {
   it('include a player who has not been on', async () => {
     // Same rule as the reports: the fringe players are the audience.
     const s = await running();
-    const stats = s.statsFor(['p1', 'p2']);
+    const stats = replay(orderEvents(s.events), ['p1', 'p2']);
 
     expect(stats.has('p2')).toBe(true);
   });
@@ -479,6 +483,6 @@ describe('the figures on the board', () => {
     await s.append('plus', 'p1');
     await s.undo();
 
-    expect(s.statsFor(['p1']).get('p1')!.plus).toBe(0);
+    expect(replay(orderEvents(s.events), ['p1']).get('p1')!.plus).toBe(0);
   });
 });

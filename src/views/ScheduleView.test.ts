@@ -175,13 +175,22 @@ describe('what a coach may do', () => {
   });
 });
 
-describe('the Phase 5 entry points', () => {
-  it('has the lineup, and not yet plus/minus', () => {
-    // Phase 5a brought the lineup and the season report across. Plus/minus
-    // is 5b and still runs only in the legacy app.
-    const text = mountSchedule({ coach: true }).text().toLowerCase();
-    expect(text).toContain('lineup');
-    expect(text).not.toContain('plus/minus');
+describe('plus / minus', () => {
+  it('is offered on every fixture, for a coach', () => {
+    const w = mountSchedule({ coach: true });
+    expect(w.findAll('[data-fixture-pm]')).toHaveLength(FIXTURES.length);
+  });
+
+  it('is absent for a guest, not merely hidden', () => {
+    expect(mountSchedule({ coach: false }).find('[data-fixture-pm]').exists()).toBe(false);
+  });
+
+  it('opens the board on the fixture it was asked about', async () => {
+    const w = mountSchedule({ coach: true });
+    await w.findAll('[data-fixture-pm]')[0].trigger('click');
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-pm-clock]').exists()).toBe(true);
   });
 });
 
