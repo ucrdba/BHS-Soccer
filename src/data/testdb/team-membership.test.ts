@@ -151,6 +151,31 @@ describe.skipIf(!available)('the schedule date trigger', () => {
     });
   });
 
+  /**
+   * Which formats parse_match_date actually accepts.
+   *
+   * The form stores "SEP 4, 2026" via formatIsoToDisplayDate, and the comma
+   * is fine. What is NOT fine is an ISO or slash date: both return null, so a
+   * fixture stored that way has no match_on and sorts as though it had no
+   * date at all -- invisible as a bug, because the text column still reads
+   * correctly on screen.
+   *
+   * Pinned here so a later "simplification" that stores ISO is caught.
+   */
+  it('accepts the formats the app writes, and rejects the ones it must not', async () => {
+    await withDb(async (c) => {
+      const parses = async (raw: string) =>
+        (await c.query('select public.parse_match_date($1) as d', [raw])).rows[0].d !== null;
+
+      for (const good of ['SEP 4 2026', 'SEP 4, 2026', 'Sep 4, 2026', 'SEPT 4 2026']) {
+        expect(await parses(good), good).toBe(true);
+      }
+      for (const bad of ['2026-09-04', '9/4/2026']) {
+        expect(await parses(bad), bad).toBe(false);
+      }
+    });
+  });
+
   it('leaves match_on null rather than guessing at an unreadable date', async () => {
     // A guessed date sorts and filters as though it were real, which is worse
     // than a null the UI can notice.
