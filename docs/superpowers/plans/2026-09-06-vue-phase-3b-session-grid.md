@@ -231,17 +231,23 @@ What each exercise is worth, what kind of thing it measures, and the standards f
 
 ### Task 7: Close out Phase 3
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat e1fcc08..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Retire what the rebuild replaced.** The spec notes twenty-four legacy-coupled test files under `src/data/` touching the matrix and session grid, and that they are retired as their views are replaced. **Retire only what the new tests now cover**, and say in the commit message which assertion moved where. Anything covered there and not here is a regression, not a stale test.
+- [x] **Step 2: Retire what the rebuild replaced — deferred to Phase 7, deliberately.**
 
-- [ ] **Step 3: Update `CLAUDE.md`** — all seven nav views bar the planner, what Phase 4 owes, and the domain module count.
+The spec says the legacy-coupled tests under `src/data/` are retired "as their views are replaced". They have not been replaced; they have been **shadowed**. `index.html` is what Vercel serves at the root, `public/js/views/matrix-session.view.js` is still what a coach actually records a session in, and this plan's own constraints name the legacy grid as the fallback if the new one turns out slower.
 
-- [ ] **Step 4: Commit**
+Deleting `session-keys.test.ts`, `session-attendance.test.ts`, `session-sort.test.ts`, `session-time-entry.test.ts`, `session-jump.test.ts`, `band-rows.test.ts`, `drill-weight-editor.test.ts`, `time-bands.test.ts` and the rest now would remove the only automated coverage of code that is still shipping, in exchange for a shorter test run. **They stay until `public/js/` is deleted in Phase 7**, which is when the code they cover actually goes away.
+
+The duplication that remains is therefore intentional and bounded: two grids, two test suites, one of them ending at cutover.
+
+- [x] **Step 3: Update `CLAUDE.md`** — all seven nav views bar the planner, what Phase 4 owes, and the domain module count.
+
+- [x] **Step 4: Commit**
 
 ## Definition of done
 

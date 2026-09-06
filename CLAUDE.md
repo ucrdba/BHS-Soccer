@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,364 tests, config in vitest.config.mts
+npm test           # vitest — 2,502 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,364 tests across 127 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,502 tests across 133 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -52,11 +52,21 @@ There are **two HTML entry points**, and `npm run build` emits both:
 
 They never share a document. Cutover is Phase 7 of the migration, when `app.html` becomes `index.html` and the legacy files are deleted.
 
-Player Ratings landed in Phase 3a as the board, the per-exercise leaderboard,
-the logged-results panel and the player breakdown. **Phase 3b still owes the
-write paths**: the session grid for keyboard entry, the drill weights editor,
-the standards and time-bands editor, and session history. Until those exist,
-results are still entered through the legacy app.
+**Player Ratings is complete in the Vue app** — Phase 3a built the board, the
+per-exercise leaderboard, the logged-results panel and the player breakdown;
+Phase 3b added the write paths: the session grid, the weights and standards
+editors, and session history. Coach Planner is the only nav view still a
+placeholder, and Phase 4 owes it.
+
+The session grid is the one screen where being marginally slower loses the
+user, because what it competes with is paper: a coach with a clipboard and a
+stopwatch entering twenty-five times, one hand on the number pad. Three
+behaviours exist for that and have tests holding them in place — **Enter moves
+to the next entry field** rather than submitting, **it moves in the order shown
+rather than the roster order** (they differ after a sort), and **typing a value
+marks the player present**, because a recorded time outranks whatever the
+dropdown said. A rebuild that walks the players array instead of the rendered
+rows passes every other test and fails the second of these.
 
 One distinction in that screen is worth stating outright, because it is not
 obvious from the data and a later tidy-up would quietly erase it. Four of the
@@ -91,7 +101,7 @@ Consequences worth respecting:
 
 ## `src/domain/` — the extracted logic
 
-Twenty-five framework-free modules, in two groups.
+Twenty-seven framework-free modules, in two groups.
 
 **Thirteen were cut off the `BHSSoccerApp` prototype** — `schedule`, `matrix`,
 `matrix-session`, `lineup`, `plus-minus-court`, `round-robin`, `season`,
@@ -99,13 +109,20 @@ Twenty-five framework-free modules, in two groups.
 are the ones both apps use, so `src/main.ts` publishes each on `window` (see
 below) and the legacy prototype method is a one-line delegation.
 
-**Twelve were added by the Vue rebuild** as it needed them, and are imported
+**Fourteen were added by the Vue rebuild** as it needed them, and are imported
 directly rather than published: `season-record`, `theme` (an organization's
 branding), `roster-view` (the position filters), `schedule-view`, `help-search`,
 the four table read mappings `schedule-row`, `player-row`, `coach-row` and
-`matrix-standings`, and the three the Matrix needed — `matrix-threshold`
+`matrix-standings`, and the five the Matrix needed — `matrix-threshold`
 (which measures are standards rather than rankings), `matrix-breakdown` (how a
-result reads in words) and `time`.
+result reads in words), `time`, `band-score` (what a time earns) and
+`session-entry` (the grid's state).
+
+`band-score.ts` is the only scoring the browser does at all; everything else
+comes from Postgres. It duplicates `SupabaseService.factorForTime` on purpose,
+so a coach sees what each time earns as it is typed, and its test runs both
+over the same inputs — two readings of "the tightest band it fits" that
+disagree would show one number and store another.
 
 `time.ts` deserves a note, because a second implementation of it is the easy
 mistake: `parseTimeToSeconds` treats `.` as `:`, so `"4.30"` is four minutes
@@ -113,6 +130,14 @@ thirty and not four-point-three, and it **refuses** a single-digit seconds
 field because `"4:5"` could be either `4:05` or `4:50`. `src/data/supabase.ts`
 has its own copy that must agree, and `time.test.ts` runs both over the same
 inputs to prove it.
+
+The measure decides which parser applies, and both directions bite.
+**`time_bands` is entered as mm:ss** — `parseFloat("4:30")` is 4, which fits
+under every standard and awards full marks for a time nobody ran. **`time_low`
+is entered as decimal seconds** — a sprint of 4.85, which `parseTimeToSeconds`
+refuses outright, so reading it as mm:ss would drop every sprint on the sheet.
+`domain/session-entry.ts` holds that distinction, and the legacy grid draws the
+same one with its input types.
 
 `src/domain/test-globals.ts` sits alongside them but is a test helper, not a
 domain module.
