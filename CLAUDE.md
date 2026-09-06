@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 3,242 tests, config in vitest.config.mts
+npm test           # vitest — 3,314 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (3,242 tests across 166 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,314 tests across 172 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -75,9 +75,11 @@ coach looks:
 
 **Phase 6 is under way.** `/admin` is real — the migration's one route that
 is not a nav view, because the admin panel was never really a modal. Done:
-approvals, squads and organizations, unassigned players, drill categories.
-Still owed: the quiz and the daily thoughts (6b), and the XLSX import/export,
-the school profile and the diagnostics (6c).
+approvals, squads and organizations, unassigned players, drill categories and
+the quiz bank, plus `/quiz` for players and the coach's daily message on
+Home. **Still owed (6c): the XLSX import/export, the school profile form and
+the credentials/diagnostics panel** — after which `public/js/` has nothing
+the Vue app cannot do.
 
 **`/admin` is gated coach-or-admin, with each section gated individually.**
 Guarding the route on `can_access_admin_dashboard` is the obvious design and
@@ -323,6 +325,27 @@ Removing the defaults is worth doing and is not a small change: both apps call t
 - **`openAddCoachModal` is defined twice in `planner.view.js`**, at lines 580 and 826, inside one `Object.assign`. The second wins, so the first is dead — and editing it does nothing. It is the only duplicate across all 22 classic scripts.
 - **`checkEmail` in `src/auth/email-typo.ts` never ran.** It was imported into `src/auth.ts` and never called, while `coaches.view.js` branched on a `res.emailSuggestion` that `RegisterResult` never carries. A tested 161-line module wired to nothing. The Vue sign-up flow now calls it properly; the legacy path is still dead.
 - **`deleteCoach` in `src/data/supabase.ts` returns nothing at all** — it logs its error and falls off the end, so success and failure are indistinguishable from the return value. The Vue store reloads and checks whether the row survived rather than reporting a success it cannot verify.
+
+### The quiz is marked from the database, never from a key
+
+`domain/quiz.ts` reads the correct letter from the `quiz_answers` row flagged
+`is_correct`, falling back to `correct_option` for a question whose options
+are still columns. **Nothing anywhere holds an answer key.** The original
+`submitQuizAnswer` hardcoded `['B','A','A','B','C']` in the view, so editing a
+question in the database silently broke the marking — a player answering
+correctly was told they were wrong, and the attempt was recorded that way.
+`quiz.test.ts` gives the same question the opposite stored answer and expects
+the marking to follow, which is the test that fails if a key comes back.
+
+A question with **no** stored correct answer marks nothing right, not even the
+option the player picked: defaulting to A would quietly award or deny a point
+on a half-written question.
+
+**A question may name the daily message it tests.** `fetchTeamQuiz` only asks
+such a question while that message is the team's active one, which is what
+stops last week's questions testing a focus nobody remembers — and means
+deleting a daily message quietly shortens the quiz. `DailyThought.vue` says
+so before deleting one.
 
 ### Drill categories are NOT organization-scoped
 
