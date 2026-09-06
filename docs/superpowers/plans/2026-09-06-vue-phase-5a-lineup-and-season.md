@@ -74,7 +74,7 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 
 **Files:** Create `src/components/schedule/SeasonReportModal.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Every column sorts, and sorting reverses on a second click.
 - **The minutes are on the row, beside every rate.** That is what lets a coach read a noisy figure as noisy, and it is the alternative to hiding the player.
@@ -83,9 +83,9 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 - A team that has stated no length falls back, and the fallback is a fallback rather than a fact about the sport.
 - A failed read is reported.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
