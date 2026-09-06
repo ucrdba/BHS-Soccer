@@ -14,6 +14,7 @@ import { ref, computed, watch } from 'vue';
 import PlayerCard from '../components/roster/PlayerCard.vue';
 import PlayerDetailModal from '../components/roster/PlayerDetailModal.vue';
 import PlayerFormModal from '../components/roster/PlayerFormModal.vue';
+import RecordingNumbersModal from '../components/roster/RecordingNumbersModal.vue';
 import { useRosterStore, type PlayerForm } from '../stores/roster';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -24,6 +25,8 @@ const org = useOrganizationStore();
 const auth = useAuthStore();
 
 const canEdit = computed(() => auth.isCoach || auth.isAdmin);
+
+const numbersOpen = ref(false);
 
 const detailFor = ref<Player | null>(null);
 const editing = ref<Player | null>(null);
@@ -98,6 +101,10 @@ async function onRemove(p: Player): Promise<void> {
           <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
         </p>
       </div>
+      <button
+        v-if="canEdit" type="button" class="btn" data-open-numbers
+        @click="numbersOpen = true"
+      >Recording numbers</button>
       <button v-if="canEdit" type="button" class="btn btn--go" data-add-player @click="openAdd">
         + Add player
       </button>
@@ -155,7 +162,12 @@ async function onRemove(p: Player): Promise<void> {
       v-if="canEdit"
       :open="formOpen" :player="editing" :busy="busy" :error="formError"
       @close="formOpen = false" @save="onSave" />
-  </section>
+  
+    <RecordingNumbersModal
+      v-if="canEdit"
+      :open="numbersOpen" :team-id="org.activeTeamId" :players="roster.players"
+      @close="numbersOpen = false" />
+</section>
 </template>
 
 <style scoped>

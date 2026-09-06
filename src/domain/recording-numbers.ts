@@ -55,3 +55,73 @@ export function proposeRecordingNumbers(players: any[], startAt: number): Map<st
   });
   return out;
 }
+
+export interface Assignment {
+  playerId: string;
+  name: string;
+  /** What the database holds now. */
+  current: number | null;
+  /** What the coach wants it to be. */
+  value: number | null;
+}
+
+/**
+ * Numbers used more than once.
+ *
+ * Checked before any write starts: `recording_number` is unique per team, so
+ * a duplicate would stop the save halfway and leave the squad part-renumbered
+ * — a state the coach then has to unpick by hand.
+ *
+ * Nulls are ignored. Several players having no number yet is the normal state
+ * of a squad being numbered for the first time.
+ */
+export function duplicateNumbers(assignments: Assignment[]): number[] {
+  const seen = new Set<number>();
+  const dupes = new Set<number>();
+
+  (assignments || []).forEach(a => {
+    if (a?.value == null) return;
+    const n = Number(a.value);
+    if (seen.has(n)) dupes.add(n);
+    seen.add(n);
+  });
+
+  return Array.from(dupes).sort((a, b) => a - b);
+}
+
+function isChanged(a: Assignment): boolean {
+  if ((a.value == null) !== (a.current == null)) return true;
+  return Number(a.value) !== Number(a.current);
+}
+
+/**
+ * The order writes must happen in to avoid a transient collision.
+ *
+ * The unique index is per team, so **swapping two players' numbers by writing
+ * one at a time hits the constraint on the first write**, even though the
+ * final state is perfectly legal. Anything whose current number somebody else
+ * is about to take is therefore cleared to null first, and everything is set
+ * afterwards.
+ *
+ * Rows that are not changing are left out entirely: a squad of twenty-five
+ * with two edits makes two writes, not fifty.
+ */
+export function planNumberWrites(
+  assignments: Assignment[]
+): { playerId: string; value: number | null }[] {
+  const list = assignments || [];
+  const changed = list.filter(isChanged);
+  if (changed.length === 0) return [];
+
+  const wanted = new Set(
+    changed.map(a => a.value).filter(v => v != null).map(Number));
+
+  // Whose current number somebody else is about to take.
+  const mustClear = list.filter(a =>
+    a.current != null && wanted.has(Number(a.current)) && Number(a.current) !== Number(a.value));
+
+  return [
+    ...mustClear.map(a => ({ playerId: a.playerId, value: null })),
+    ...changed.map(a => ({ playerId: a.playerId, value: a.value }))
+  ];
+}

@@ -143,14 +143,38 @@ describe('what a coach may do', () => {
 });
 
 describe('the Phase 5 entry points', () => {
-  it('renders none of them, rather than stubbing them', () => {
-    // The legacy roster links to lineup, plus/minus, the season report and
-    // recording numbers. All four are match tools, and all four still work in
-    // the legacy app.
+  it('has the recording numbers, and leaves the rest to the Schedule', () => {
+    // The legacy roster links to the lineup, plus/minus and the season report
+    // as well. Those three belong to a fixture rather than to the squad, so
+    // in the rebuild they hang off Schedule, which is where a coach looks for
+    // them.
     const w = mountRoster({ coach: true });
     const text = w.text().toLowerCase();
-    for (const gone of ['lineup', 'plus/minus', 'season report', 'recording number']) {
-      expect(text, gone).not.toContain(gone);
+
+    expect(text).toContain('recording number');
+    for (const elsewhere of ['lineup', 'plus/minus', 'season report']) {
+      expect(text, elsewhere).not.toContain(elsewhere);
     }
+  });
+});
+
+describe('recording numbers', () => {
+  it('offers a coach the block editor', () => {
+    const w = mountRoster({ coach: true });
+    expect(w.find('[data-open-numbers]').exists()).toBe(true);
+  });
+
+  it('is absent for a guest, not merely hidden', () => {
+    expect(mountRoster({ coach: false }).find('[data-open-numbers]').exists()).toBe(false);
+  });
+
+  it('opens on the squad, proposing nothing until asked', async () => {
+    // Nothing renumbers a squad on its own.
+    const w = mountRoster({ coach: true });
+    await w.find('[data-open-numbers]').trigger('click');
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-rn-propose]').exists()).toBe(true);
+    expect(w.find('[data-rn-pending]').text()).toContain('0');
   });
 });
