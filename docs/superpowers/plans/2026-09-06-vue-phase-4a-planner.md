@@ -188,7 +188,7 @@ And the library:
 
 **Files:** `src/components/planner/SavePlanModal.vue`, `src/components/planner/LoadPlanModal.vue`, tests, and the wiring in `PlannerView`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - Saving under a name replaces that name's rows and shows the plan as active.
 - Loading a plan replaces the timeline and sets `activePlanName`.
@@ -196,9 +196,9 @@ And the library:
 - Renaming and deleting a plan ask before they act and report the client's error.
 - The team list offered for a copy is **the teams the coach may write to**, not every team: `teamsCoachedBy()` exists precisely so the control does not always fail.
 
-- [ ] **Step 2: Build and wire, watch the tests pass**
+- [x] **Step 2: Build and wire, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

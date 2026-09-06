@@ -50,8 +50,8 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
 };
 
-async function mountPlanner(opts: { rows?: any[]; items?: any[] } = {}) {
-  const { rows = ROWS, items = null } = opts;
+async function mountPlanner(opts: { rows?: any[]; items?: any[]; coach?: boolean } = {}) {
+  const { rows = ROWS, items = null, coach = true } = opts;
   svc.fetchPracticePlans.mockResolvedValue(rows);
 
   const w = mount(PlannerView, {
@@ -66,7 +66,7 @@ async function mountPlanner(opts: { rows?: any[]; items?: any[] } = {}) {
             teams: [{ id: TEAM, name: 'U16', school_id: 's1' }],
             activeTeamId: TEAM
           },
-          auth: { isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
+          auth: { isCoach: coach, isAdmin: false, isGuest: false, canAccessRatings: true }
         }
       })],
       stubs: { RouterLink: true }
@@ -299,5 +299,30 @@ describe('the drill controls', () => {
     await flush();
 
     expect(w.find('[data-notice]').text()).toMatch(/disappear on reload/i);
+  });
+});
+
+describe('saved plans', () => {
+  it('offers a coach somewhere to save and share one', async () => {
+    const w = await mountPlanner();
+    expect(w.find('[data-open-plans]').exists()).toBe(true);
+  });
+
+  it('opens on the active plan\'s name', async () => {
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+    await w.find('[data-open-plans]').trigger('click');
+    await flush();
+
+    expect((w.find('[data-plan-name]').element as HTMLInputElement).value)
+      .toBe('Tuesday Session');
+  });
+
+  it('offers none of it to a player', async () => {
+    const w = await mountPlanner({ coach: false });
+    expect(w.find('[data-open-plans]').exists()).toBe(false);
+    expect(w.find('[data-add-drill]').exists()).toBe(false);
+    expect(w.find('[data-open-library]').exists()).toBe(false);
   });
 });

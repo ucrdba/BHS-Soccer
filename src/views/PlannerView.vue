@@ -17,6 +17,7 @@
 import { ref, computed, watch } from 'vue';
 import DrillFormModal from '../components/planner/DrillFormModal.vue';
 import DrillsBankModal from '../components/planner/DrillsBankModal.vue';
+import SavePlanModal from '../components/planner/SavePlanModal.vue';
 import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -36,6 +37,7 @@ const drillOpen = ref(false);
 /** Null adds a drill; an index edits the one already there. */
 const drillIndex = ref<number | null>(null);
 const libraryOpen = ref(false);
+const plansOpen = ref(false);
 
 function openAdd(): void { drillIndex.value = null; drillOpen.value = true; }
 function openEdit(index: number): void { drillIndex.value = index; drillOpen.value = true; }
@@ -142,6 +144,9 @@ async function onDrop(index: number): Promise<void> {
         <button type="button" class="act" data-load-plan @click="picking = !picking">
           Select a plan ({{ planner.savedPlans.length }})
         </button>
+        <button type="button" class="act" data-open-plans @click="plansOpen = true">
+          Save &amp; share
+        </button>
       </div>
     </header>
 
@@ -244,6 +249,11 @@ async function onDrop(index: number): Promise<void> {
       v-if="isCoach"
       :open="libraryOpen" :school-id="schoolId"
       @close="libraryOpen = false" @use="onUseFromLibrary" />
+
+    <SavePlanModal
+      v-if="isCoach"
+      :open="plansOpen" :team-id="org.activeTeamId"
+      @close="plansOpen = false" />
   </section>
 </template>
 
