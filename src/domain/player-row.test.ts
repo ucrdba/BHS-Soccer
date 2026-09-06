@@ -8,7 +8,10 @@
  * so the two ids must not be confused.
  */
 import { describe, it, expect } from 'vitest';
-import { toPlayer, toRoster } from './player-row';
+import {
+  toPlayer, toRoster, photoOrPlaceholder,
+  PLAYER_SILHOUETTE, COACH_SILHOUETTE
+} from './player-row';
 
 const row = (over: any = {}) => ({
   id: 'tp1',
@@ -100,5 +103,24 @@ describe('toRoster', () => {
     // Not an empty squad -- a failed read.
     expect(toRoster(null)).toEqual([]);
     expect(toRoster(undefined)).toEqual([]);
+  });
+});
+
+describe('photoOrPlaceholder', () => {
+  it('uses the photo when there is one', () => {
+    expect(photoOrPlaceholder('https://example.test/a.jpg')).toBe('https://example.test/a.jpg');
+  });
+
+  it('falls back for null, undefined and whitespace alike', () => {
+    // Imports and manual edits all leave photo_url an empty string, not null.
+    expect(photoOrPlaceholder(null)).toBe(PLAYER_SILHOUETTE);
+    expect(photoOrPlaceholder(undefined)).toBe(PLAYER_SILHOUETTE);
+    expect(photoOrPlaceholder('')).toBe(PLAYER_SILHOUETTE);
+    expect(photoOrPlaceholder('   ')).toBe(PLAYER_SILHOUETTE);
+  });
+
+  it('has a separate placeholder for a coach', () => {
+    expect(photoOrPlaceholder('', 'coach')).toBe(COACH_SILHOUETTE);
+    expect(COACH_SILHOUETTE).not.toBe(PLAYER_SILHOUETTE);
   });
 });

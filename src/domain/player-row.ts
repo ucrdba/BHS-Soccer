@@ -37,6 +37,26 @@ export interface Player {
   ratings: Record<string, any>;
 }
 
+/**
+ * The placeholder images, as app.core.js names them.
+ *
+ * Kept identical rather than re-pointed: both apps serve them from the same
+ * public/img, and a second placeholder would drift from the first.
+ */
+export const PLAYER_SILHOUETTE = 'img/player-placeholder.png';
+export const COACH_SILHOUETTE = 'img/coach-placeholder.png';
+
+/**
+ * A photo, or the silhouette when none is set.
+ *
+ * Treats null, undefined and whitespace-only strings alike — imports and
+ * manual edits all leave photo_url as an empty string rather than null.
+ */
+export function photoOrPlaceholder(url: string | null | undefined, kind: 'player' | 'coach' = 'player'): string {
+  if (url && String(url).trim()) return url;
+  return kind === 'coach' ? COACH_SILHOUETTE : PLAYER_SILHOUETTE;
+}
+
 export function toPlayer(m: any): Player {
   return {
     id: m?.players?.id,

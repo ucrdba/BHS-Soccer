@@ -8,6 +8,7 @@ import { createRouter, createWebHistory, type Router } from 'vue-router';
 import { auth } from '../auth';
 import HomeView from '../views/HomeView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
+import RosterView from '../views/RosterView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -66,7 +67,7 @@ export const router: Router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/',         name: 'home',     component: HomeView },
-    { path: '/roster',   name: 'roster',   ...placeholder('Roster & Bios', 'Phase 2') },
+    { path: '/roster',   name: 'roster',   component: RosterView },
     { path: '/schedule', name: 'schedule', ...placeholder('Schedule & Results', 'Phase 2') },
     { path: '/matrix',   name: 'matrix',   ...placeholder('Player Ratings', 'Phase 3') },
     { path: '/planner',  name: 'planner',  ...placeholder('Coach Planner', 'Phase 4') },
