@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,997 tests, config in vitest.config.mts
+npm test           # vitest — 3,067 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,997 tests across 153 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,067 tests across 156 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -64,9 +64,10 @@ and attached it to both a plan drill and a library drill.
 
 **Phase 5 is bringing the match tools across**, and they are not routes —
 each hangs off the screen it is launched from, which is where the legacy app
-puts it and where a coach looks. Done so far: the **lineup** and the **season
-report**, both on Schedule. Still owed: **plus/minus** (5b) and the squad
-report, progress chart, round robin and recording numbers (5c).
+puts it and where a coach looks. Done so far: the **lineup**, the **season
+report** and **plus/minus**, all on Schedule. Still owed (5c): the squad
+report and progress chart on Player Ratings, the round robin on the Planner,
+and the recording numbers on the Roster.
 
 Phase 6 owns the admin panel. The quiz, the daily thoughts and the school
 profile forms still live only in the legacy app — they sit inside
@@ -78,7 +79,10 @@ belong to the planner.
 Both are the coach's, and neither is guessable from the code.
 
 **A statistic may only be recorded while the clock is RUNNING** — not merely
-started. Every plus/minus event is stamped with the match clock, and playing
+started. Enforced in `stores/plus-minus.ts`, in `append()` and **nowhere
+else**: every gesture arrives through that one door, and a guard repeated per
+gesture is a guard that drifts. The gated kinds are a constant there, so a
+new clock-stamped statistic joins the rule rather than sidestepping it. Every plus/minus event is stamped with the match clock, and playing
 time and goal difference are *derived from those stamps*, so an event
 recorded during a stoppage is attributed to whoever was on the pitch at a
 minute that has already passed. Before kick-off everything stamps at 0:00 and
