@@ -90,7 +90,7 @@ export function planNumberWrites(assignments: Assignment[]): { playerId: string;
 
 **Files:** Create `src/components/planner/RoundRobinModal.vue` and its test; wire into `PlannerView`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Every player meets every other exactly once, across the rounds `buildRoundRobin` produces.
 - An odd squad gives somebody a bye each round, and the bye moves.
@@ -98,9 +98,9 @@ export function planNumberWrites(assignments: Assignment[]): { playerId: string;
 - The CSV carries every round and is offered as a download.
 - Players are labelled by recording number where they have one — the sheet is read beside the paper ones.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

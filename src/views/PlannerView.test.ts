@@ -24,7 +24,9 @@ const svc = {
   renamePracticePlan: vi.fn(),
   copyPracticePlan: vi.fn(),
   fetchDrillsBank: vi.fn(),
-  teamsCoachedBy: vi.fn()
+  teamsCoachedBy: vi.fn(),
+  fetchMatrixLogs: vi.fn(),
+  fetchTeamRoster: vi.fn()
 };
 vi.mock('../data/supabase', () => ({
   supabaseService: new Proxy({}, { get: (_t, k) => (...a: any[]) => (svc as any)[k](...a) })
@@ -90,6 +92,8 @@ beforeEach(() => {
   svc.deletePracticePlanItem.mockResolvedValue(undefined);
   svc.fetchDrillsBank.mockResolvedValue([]);
   svc.teamsCoachedBy.mockResolvedValue([]);
+  svc.fetchMatrixLogs.mockResolvedValue([]);
+  svc.fetchTeamRoster.mockResolvedValue([]);
 });
 
 describe('the timeline', () => {
@@ -430,5 +434,26 @@ describe('printing a plan with diagrams', () => {
 
     expect(win.document.write.mock.calls[0][0]).toContain('base64,SAVED');
     openSpy.mockRestore();
+  });
+});
+
+describe('the round robin', () => {
+  it('is offered to a coach', async () => {
+    const w = await mountPlanner();
+    expect(w.find('[data-open-round-robin]').exists()).toBe(true);
+  });
+
+  it('is absent for a player', async () => {
+    const w = await mountPlanner({ coach: false });
+    expect(w.find('[data-open-round-robin]').exists()).toBe(false);
+  });
+
+  it('opens on the squad', async () => {
+    svc.fetchMatrixLogs.mockResolvedValue([]);
+    const w = await mountPlanner();
+    await w.find('[data-open-round-robin]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-modal]').text()).toMatch(/round robin/i);
   });
 });

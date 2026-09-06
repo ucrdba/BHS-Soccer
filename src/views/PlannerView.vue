@@ -19,14 +19,17 @@ import DrillFormModal from '../components/planner/DrillFormModal.vue';
 import DrillsBankModal from '../components/planner/DrillsBankModal.vue';
 import SavePlanModal from '../components/planner/SavePlanModal.vue';
 import DiagramModal from '../components/planner/DiagramModal.vue';
+import RoundRobinModal from '../components/planner/RoundRobinModal.vue';
 import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
+import { useRosterStore } from '../stores/roster';
 import { useAuthStore } from '../stores/auth';
 import { buildPrintDocument } from '../domain/plan-print';
 import { diagramsForPlan } from '../diagram/raster';
 
 const planner = usePlannerStore();
 const org = useOrganizationStore();
+const roster = useRosterStore();
 const auth = useAuthStore();
 
 const isCoach = computed(() => auth.isCoach || auth.isAdmin);
@@ -41,6 +44,7 @@ const drillOpen = ref(false);
 const drillIndex = ref<number | null>(null);
 const libraryOpen = ref(false);
 const plansOpen = ref(false);
+const roundRobinOpen = ref(false);
 
 const diagramOpen = ref(false);
 /** A drill on the timeline, or one handed over from the library. */
@@ -95,7 +99,11 @@ const items = computed(() => planner.items);
 
 watch(
   () => [org.activeTeamId, schoolId.value],
-  () => { planner.load(org.activeTeamId, schoolId.value); },
+  () => {
+    planner.load(org.activeTeamId, schoolId.value);
+    // The squad the round robin pairs up.
+    if (isCoach.value) roster.load(org.activeTeamId);
+  },
   { immediate: true }
 );
 
@@ -202,6 +210,9 @@ async function onDrop(index: number): Promise<void> {
         </button>
         <button type="button" class="act" data-print-plan @click="onPrint">
           Print
+        </button>
+        <button type="button" class="act" data-open-round-robin @click="roundRobinOpen = true">
+          1v1 round robin
         </button>
       </div>
     </header>
@@ -317,6 +328,11 @@ async function onDrop(index: number): Promise<void> {
       v-if="isCoach"
       :open="plansOpen" :team-id="org.activeTeamId"
       @close="plansOpen = false" />
+
+    <RoundRobinModal
+      v-if="isCoach"
+      :open="roundRobinOpen" :team-id="org.activeTeamId" :players="roster.players"
+      @close="roundRobinOpen = false" />
 
     <DiagramModal
       v-if="isCoach"
