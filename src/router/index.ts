@@ -3,6 +3,11 @@
  *
  * The seven nav routes, in the order the menu reads. The strategy settled that
  * only these get URLs; the app's thirty-six modals stay as component state.
+ *
+ * `/admin` is the one deliberate exception, and it is not in the nav. It was
+ * never really a modal — several unrelated sections, deep-linkable, and long
+ * enough that a dialog fights it — but it is reached on purpose rather than
+ * browsed to, and a menu item most visitors cannot open is noise.
  */
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 import { auth } from '../auth';
@@ -14,6 +19,7 @@ import CoachesView from '../views/CoachesView.vue';
 import HelpView from '../views/HelpView.vue';
 import MatrixView from '../views/MatrixView.vue';
 import PlannerView from '../views/PlannerView.vue';
+import AdminView from '../views/AdminView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -60,6 +66,11 @@ export function routeAllowed(name: string, a: AuthLike): boolean {
   if (name === 'matrix') return a.canAccessRatings();
   if (name === 'planner') return a.isCoach();
   if (name === 'coaches') return a.isCoach() || a.isAdmin();
+  // Coach OR admin, deliberately. Gating this on can_access_admin_dashboard
+  // would be tighter and wrong: schema_roles.sql grants that to admin alone,
+  // while the legacy panel shows the categories, the unassigned players and
+  // the quiz bank to any coach. The admin-only SECTIONS carry their own gate.
+  if (name === 'admin') return a.isCoach() || a.isAdmin();
   return true;
 }
 

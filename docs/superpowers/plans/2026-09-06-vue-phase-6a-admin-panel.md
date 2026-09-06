@@ -42,7 +42,7 @@ Gating the route on it would take away access a coach has today. So `/admin` is 
 
 **Files:** Create `src/views/AdminView.vue` and its test; edit `src/router/index.ts` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **A guest is redirected**, as `/matrix` and `/planner` already are.
 - **A coach reaches it** and sees the coach sections.
@@ -51,9 +51,9 @@ Gating the route on it would take away access a coach has today. So `/admin` is 
 - **When `roles` has not loaded, the admin sections say so** rather than rendering nothing. Assert the message, because this is the case an admin hits when a deployment is misconfigured and the panel is exactly where they would go to find out.
 - It is not in the main nav — it is reached deliberately, and a nav item for a page most people cannot open is noise.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -63,7 +63,7 @@ The most dangerous section: approving a signup hands somebody access to a squad 
 
 **Files:** `src/components/admin/ApprovalsSection.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Pending signups are listed with **who they say they are and what they asked for** — a name and an email alone is not enough to decide on.
 - **Approving names the person and the role** before it happens.
@@ -71,9 +71,9 @@ The most dangerous section: approving a signup hands somebody access to a squad 
 - The list is scoped to the **organization**, never bare — `getPendingApprovals()` called without one served a club admin Beaumont's signups, and that is a fixed bug this must not reintroduce.
 - A failed read is reported rather than shown as "nobody is waiting", which would leave a real person waiting indefinitely.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
