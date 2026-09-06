@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,924 tests, config in vitest.config.mts
+npm test           # vitest — 2,997 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,924 tests across 149 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,997 tests across 153 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -62,10 +62,39 @@ timeline, the drill form, the organization's drill library, saved plans and
 the printed document; Phase 4b ported the canvas engine into `src/diagram/`
 and attached it to both a plan drill and a library drill.
 
-Phases 5 and 6 own the match tools and the admin panel. The quiz, the daily
-thoughts, the school profile forms and the round robin still live only in the
-legacy app — they sit inside `planner.view.js` by accident of the `app.js`
-split rather than because they belong to the planner.
+**Phase 5 is bringing the match tools across**, and they are not routes —
+each hangs off the screen it is launched from, which is where the legacy app
+puts it and where a coach looks. Done so far: the **lineup** and the **season
+report**, both on Schedule. Still owed: **plus/minus** (5b) and the squad
+report, progress chart, round robin and recording numbers (5c).
+
+Phase 6 owns the admin panel. The quiz, the daily thoughts and the school
+profile forms still live only in the legacy app — they sit inside
+`planner.view.js` by accident of the `app.js` split rather than because they
+belong to the planner.
+
+### Two rules the match tools must keep
+
+Both are the coach's, and neither is guessable from the code.
+
+**A statistic may only be recorded while the clock is RUNNING** — not merely
+started. Every plus/minus event is stamped with the match clock, and playing
+time and goal difference are *derived from those stamps*, so an event
+recorded during a stoppage is attributed to whoever was on the pitch at a
+minute that has already passed. Before kick-off everything stamps at 0:00 and
+every player finishes credited with zero minutes. The counters go up and the
+sheet looks right either way. Substitutions and starting the clock itself
+stay outside the rule.
+
+**Low-minute players are the audience for the reports, not noise in them.**
+NFHS rules allow unlimited substitution and re-entry, so much of the roster
+finishes any fixture well under a full match — and a coach reads these views
+to decide who to give more minutes to. Filtering out the fringe players
+removes exactly the players the decision is about, invisibly. Show the
+minutes beside the rate instead. Relatedly, **a match is not ninety
+minutes**: high school is 80, club age groups vary, `teams.match_minutes`
+holds it, and `seasonFullMatchMinutes` reads it. Nothing may hardcode a
+length, and one organization can field teams playing different ones.
 
 The session grid is the one screen where being marginally slower loses the
 user, because what it competes with is paper: a coach with a clipboard and a
@@ -211,6 +240,13 @@ neither — publish one on `window` only when a classic script actually reads
 it.
 
 Two things follow from that:
+
+- **A setup store must not return plain helper functions.**
+  `createTestingPinia` with `stubActions` replaces *every* function a store
+  returns, so a helper that looks like a getter hands a component test
+  `undefined`. `stores/lineup.ts` carries a comment about this after the
+  lineup modal fell over on it. Pure functions of a prop belong in the
+  component, calling `src/domain/` directly.
 
 - **Tests for domain modules import them directly** — no `?raw`, no
   `new Function`, no hand-built `window`. New tests should be written this way.

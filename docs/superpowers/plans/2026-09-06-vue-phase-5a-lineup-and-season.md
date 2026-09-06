@@ -108,15 +108,15 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 
 ### Task 5: Close out 5a
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat 2fc2b0a..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`** — what 5b and 5c still owe.
+- [x] **Step 2: Update `CLAUDE.md`** — what 5b and 5c still owe.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ## Definition of done
 
