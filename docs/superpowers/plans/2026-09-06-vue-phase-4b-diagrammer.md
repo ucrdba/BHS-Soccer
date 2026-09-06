@@ -135,7 +135,7 @@ export function exportDiagram(state): DiagramData;
 export function loadDiagram(data: any): { keyframes; currentFrameIndex; elements; drawings; pitchType };
 ```
 
-- [ ] **Step 1: Write the failing test, agreement first**
+- [x] **Step 1: Write the failing test, agreement first**
 
 Load the legacy class with `?raw` + `new Function`. Build a board with two keyframes, some elements and a drawing, export it, and assert the ported loader reads back **exactly** what the legacy loader does — element positions, ids, numbers, colours, drawings, pitch type, frame index.
 
@@ -148,9 +148,9 @@ Then the loader's own cases:
 - `currentFrameIndex` is clamped: a blob saved on frame 3 whose frames were later cut must not index past the end.
 - Export always writes the current frame back first, or the last thing the coach drew is missing from the save.
 
-- [ ] **Step 2: Move the bodies verbatim, watch the tests pass**
+- [x] **Step 2: Move the bodies verbatim, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
