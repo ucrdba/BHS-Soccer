@@ -55,7 +55,7 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 
 **Files:** Create `src/components/schedule/LineupModal.vue` and its test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Every slot of the chosen formation is on the pitch, and the squad not yet placed is on the bench.
 - Placing from the bench, moving on the pitch, and clearing a slot all work **by click as well as by drag**. Drag-only is the legacy planner's mistake repeated: a coach setting a lineup on a phone at the touchline cannot drag reliably, and a keyboard cannot drag at all.
@@ -64,9 +64,9 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 - Saving sends the formation, the slots and the notes; a refusal is reported in the database's words.
 - The modal is coach-only.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
