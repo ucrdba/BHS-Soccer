@@ -48,15 +48,15 @@ export function drawPath(ctx: CanvasRenderingContext2D, drawing: any): void;
 export function drawElement(ctx: CanvasRenderingContext2D, el: any): void;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Against a recording stub. Cover: each pitch type draws a different set of calls, and `blank` draws the ground and no markings; an arrow draws its head as well as its line; a player draws its number and a ball does not; a selected element draws its highlight. Assert on the **calls made**, and say in the file comment that this proves the routine runs, not that the result looks right.
 
-- [ ] **Step 2: Move the bodies verbatim, watch the tests pass**
+- [x] **Step 2: Move the bodies verbatim, watch the tests pass**
 
 Verbatim: the numbers in these routines are a pitch's proportions, and "tidying" one moves a penalty spot.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
