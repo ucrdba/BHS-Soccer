@@ -15,6 +15,8 @@
  * ends is worse than no times at all.
  */
 import { ref, computed, watch } from 'vue';
+import DrillFormModal from '../components/planner/DrillFormModal.vue';
+import DrillsBankModal from '../components/planner/DrillsBankModal.vue';
 import { usePlannerStore } from '../stores/planner';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -29,6 +31,42 @@ const schoolId = computed(() => org.school?.id ?? null);
 const picking = ref(false);
 const notice = ref<string | null>(null);
 const dragFrom = ref<number | null>(null);
+
+const drillOpen = ref(false);
+/** Null adds a drill; an index edits the one already there. */
+const drillIndex = ref<number | null>(null);
+const libraryOpen = ref(false);
+
+function openAdd(): void { drillIndex.value = null; drillOpen.value = true; }
+function openEdit(index: number): void { drillIndex.value = index; drillOpen.value = true; }
+
+async function onDrillSaved(item: any): Promise<void> {
+  const res = drillIndex.value === null
+    ? await planner.addDrill(org.activeTeamId, item)
+    : await planner.editDrill(org.activeTeamId, drillIndex.value, item);
+
+  drillOpen.value = false;
+  report(res, drillIndex.value === null ? 'Drill added.' : 'Drill saved.');
+}
+
+/**
+ * A library drill dropped straight into the session.
+ *
+ * It brings its notes and its diagram with it, and lands at the end of the
+ * timeline, where the drill form would have put it.
+ */
+async function onUseFromLibrary(drill: any): Promise<void> {
+  libraryOpen.value = false;
+  const res = await planner.addDrill(org.activeTeamId, {
+    name: drill.name || 'Soccer Drill',
+    time: '',
+    duration: drill.duration || '20 min',
+    coachNotes: drill.coach_notes || drill.coachNotes || '',
+    diagramImage: drill.diagram_image || drill.diagramImage || null,
+    diagramData: drill.diagram_data || drill.diagramData || null
+  });
+  report(res, `"${drill.name}" added to the plan.`);
+}
 
 const items = computed(() => planner.items);
 
@@ -95,6 +133,12 @@ async function onDrop(index: number): Promise<void> {
       </div>
 
       <div v-if="isCoach" class="planner__acts">
+        <button type="button" class="act act--go" data-add-drill @click="openAdd">
+          Add a drill
+        </button>
+        <button type="button" class="act" data-open-library @click="libraryOpen = true">
+          Drill library ({{ planner.drillsBank.length }})
+        </button>
         <button type="button" class="act" data-load-plan @click="picking = !picking">
           Select a plan ({{ planner.savedPlans.length }})
         </button>
@@ -179,6 +223,10 @@ async function onDrop(index: number): Promise<void> {
             @click.stop="onMove(i, i + 1)"
           >↓</button>
           <button
+            type="button" class="mini" data-drill-edit
+            @click.stop="openEdit(i)"
+          >Edit</button>
+          <button
             type="button" class="mini mini--danger" title="Remove from the plan"
             data-drill-remove
             @click.stop="onRemove(i)"
@@ -186,6 +234,16 @@ async function onDrop(index: number): Promise<void> {
         </div>
       </li>
     </ol>
+
+    <DrillFormModal
+      v-if="isCoach"
+      :open="drillOpen" :index="drillIndex"
+      @close="drillOpen = false" @save="onDrillSaved" />
+
+    <DrillsBankModal
+      v-if="isCoach"
+      :open="libraryOpen" :school-id="schoolId"
+      @close="libraryOpen = false" @use="onUseFromLibrary" />
   </section>
 </template>
 
@@ -220,6 +278,8 @@ async function onDrop(index: number): Promise<void> {
 }
 
 .planner__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
+
+.act--go { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
 
 .act {
   padding: 0.35rem 0.7rem;

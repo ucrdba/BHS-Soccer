@@ -163,7 +163,7 @@ Actions: `load(teamId, schoolId)`, `addDrill(item)`, `editDrill(index, item)`, `
 
 **Files:** `src/components/planner/DrillFormModal.vue`, `src/components/planner/DrillsBankModal.vue`, and tests.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 The start/end/duration arithmetic is the substance here, and it is three-way: typing a start and an end fills the duration; picking a duration fills the end; typing an end recomputes the duration. Cover:
 
@@ -178,9 +178,9 @@ And the library:
 - Adding from the library copies the drill's name, duration and notes into the plan, and its diagram along with them.
 - A drill's default duration is used when it has one.
 
-- [ ] **Step 2: Build both, watch the tests pass**
+- [x] **Step 2: Build both, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

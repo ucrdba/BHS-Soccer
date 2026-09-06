@@ -18,6 +18,7 @@ import { setActivePinia, createPinia } from 'pinia';
 
 const fetchPracticePlans = vi.fn();
 const saveFullPracticePlan = vi.fn();
+const savePracticePlanItem = vi.fn();
 const deletePracticePlanItem = vi.fn();
 const renamePracticePlan = vi.fn();
 const copyPracticePlan = vi.fn();
@@ -28,6 +29,7 @@ vi.mock('../data/supabase', () => ({
   supabaseService: {
     fetchPracticePlans: (...a: any[]) => fetchPracticePlans(...a),
     saveFullPracticePlan: (...a: any[]) => saveFullPracticePlan(...a),
+    savePracticePlanItem: (...a: any[]) => savePracticePlanItem(...a),
     deletePracticePlanItem: (...a: any[]) => deletePracticePlanItem(...a),
     renamePracticePlan: (...a: any[]) => renamePracticePlan(...a),
     copyPracticePlan: (...a: any[]) => copyPracticePlan(...a),
@@ -65,6 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fetchPracticePlans.mockResolvedValue(ROWS);
   saveFullPracticePlan.mockResolvedValue({ success: true });
+  savePracticePlanItem.mockResolvedValue({ id: ROW_A });
   deletePracticePlanItem.mockResolvedValue(undefined);
   renamePracticePlan.mockResolvedValue({ ok: true, slots: 2 });
   copyPracticePlan.mockResolvedValue({ ok: true, slots: 2 });
@@ -399,5 +402,47 @@ describe('the session start holds still', () => {
     await s.removeDrill(TEAM, 0);
 
     expect(s.items[0].time).toBe('4:00 PM - 4:15 PM');
+  });
+});
+
+describe('a drill that has just been added', () => {
+  it('keeps the row id the database gave it', async () => {
+    // Without this the drill has no id, so the next save upserts a row with
+    // no key and INSERTS a second one. The coach sees the drill twice after
+    // a reload, and only after a reload.
+    savePracticePlanItem.mockResolvedValue({ id: ROW_A, drill: 'New Drill' });
+    const s = usePlannerStore();
+    await s.addDrill(TEAM, drill());
+
+    expect(s.items[0].id).toBe(ROW_A);
+  });
+
+  it('is written one row at a time, which is what returns the id', async () => {
+    const s = usePlannerStore();
+    await s.addDrill(TEAM, drill());
+    expect(savePracticePlanItem).toHaveBeenCalled();
+  });
+
+  it('always names the plan, so the client never falls back to window.app', async () => {
+    // savePracticePlanItem defaults the name from window.app.data when it is
+    // not given one -- a global the Vue app does not set, which would file
+    // the drill under "Standard Practice Plan".
+    const s = usePlannerStore();
+    s.activePlanName = 'Tuesday Session';
+    await s.addDrill(TEAM, drill());
+
+    expect(savePracticePlanItem.mock.calls[0][1].planName).toBe('Tuesday Session');
+  });
+
+  it('says so when the database refused it', async () => {
+    // savePracticePlanItem returns null when it refuses. The drill is on the
+    // timeline but not in Postgres, and it vanishes on reload -- so the coach
+    // has to be told rather than left to find out.
+    savePracticePlanItem.mockResolvedValue(null);
+    const s = usePlannerStore();
+    const res = await s.addDrill(TEAM, drill());
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/not saved|reload/i);
   });
 });

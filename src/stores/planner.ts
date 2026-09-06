@@ -118,11 +118,44 @@ export const usePlannerStore = defineStore('planner', () => {
     items.value = recalculateTimeline(items.value);
   }
 
+  /**
+   * Add one drill, and keep the row id the database assigns it.
+   *
+   * Written a row at a time rather than through the full-plan save, because
+   * that is what returns the id. Without it the drill has none, so the next
+   * save upserts a row with no key and INSERTS a second one — the coach sees
+   * the drill twice, and only after a reload.
+   *
+   * `planName` is always sent: `savePracticePlanItem` otherwise falls back to
+   * `window.app.data.activePlanName`, a global the Vue app does not set, and
+   * files the drill under "Standard Practice Plan".
+   */
   async function addDrill(teamId: string | null, item: PlanItem): Promise<WriteResult> {
-    items.value = items.value.concat([item]);
-    reflow();
+    if (!teamId) return { ok: false, error: 'Choose a team first.' };
+
+    const planName = activePlanName.value || 'Current Practice Session';
+    const withTimes = recalculateTimeline(
+      items.value.concat([item]), sessionStartMinutes(items.value));
+    const added = withTimes[withTimes.length - 1];
+
+    const saved = await supabaseService.savePracticePlanItem(
+      teamId, { ...added, planName });
+
+    // The drill is on the timeline either way; it just is not in Postgres,
+    // and it would vanish on the next reload without a word.
+    if (!saved?.id) {
+      items.value = withTimes;
+      selectedIndex.value = items.value.length - 1;
+      saveError.value = `"${added.name}" was added to the timeline but NOT saved. `
+        + 'It will disappear on reload — check a team is selected.';
+      return { ok: false, error: saveError.value };
+    }
+
+    saveError.value = null;
+    items.value = withTimes.map((d, i) =>
+      (i === withTimes.length - 1 ? { ...d, id: saved.id } : d));
     selectedIndex.value = items.value.length - 1;
-    return persist(teamId);
+    return { ok: true };
   }
 
   async function editDrill(teamId: string | null, index: number, item: PlanItem): Promise<WriteResult> {

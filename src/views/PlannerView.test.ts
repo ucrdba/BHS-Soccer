@@ -19,6 +19,7 @@ import PlannerView from './PlannerView.vue';
 const svc = {
   fetchPracticePlans: vi.fn(),
   saveFullPracticePlan: vi.fn(),
+  savePracticePlanItem: vi.fn(),
   deletePracticePlanItem: vi.fn(),
   renamePracticePlan: vi.fn(),
   copyPracticePlan: vi.fn(),
@@ -51,12 +52,7 @@ const flush = async () => {
 
 async function mountPlanner(opts: { rows?: any[]; items?: any[] } = {}) {
   const { rows = ROWS, items = null } = opts;
-  vi.clearAllMocks();
   svc.fetchPracticePlans.mockResolvedValue(rows);
-  svc.saveFullPracticePlan.mockResolvedValue({ success: true });
-  svc.deletePracticePlanItem.mockResolvedValue(undefined);
-  svc.fetchDrillsBank.mockResolvedValue([]);
-  svc.teamsCoachedBy.mockResolvedValue([]);
 
   const w = mount(PlannerView, {
     global: {
@@ -82,7 +78,19 @@ async function mountPlanner(opts: { rows?: any[]; items?: any[] } = {}) {
 
 const drillNames = (w: any) => w.findAll('[data-drill-name]').map((n: any) => n.text());
 
-beforeEach(() => { document.body.innerHTML = ''; });
+// Defaults live here, not in the mount helper: vi.clearAllMocks() clears
+// calls but leaves an implementation in place, so a mockResolvedValue a test
+// sets before mounting would be overwritten by the helper's own default.
+beforeEach(() => {
+  document.body.innerHTML = '';
+  vi.clearAllMocks();
+  svc.fetchPracticePlans.mockResolvedValue(ROWS);
+  svc.saveFullPracticePlan.mockResolvedValue({ success: true });
+  svc.savePracticePlanItem.mockResolvedValue({ id: ROW_A });
+  svc.deletePracticePlanItem.mockResolvedValue(undefined);
+  svc.fetchDrillsBank.mockResolvedValue([]);
+  svc.teamsCoachedBy.mockResolvedValue([]);
+});
 
 describe('the timeline', () => {
   it('starts empty and says how to fill it', async () => {
@@ -246,5 +254,50 @@ describe('who can see it', () => {
     // and nothing checks that boundary when a method is renamed.
     const w = await mountPlanner();
     expect(w.html()).not.toContain('app.');
+  });
+});
+
+describe('the drill controls', () => {
+  it('offers a coach a way to add one', async () => {
+    const w = await mountPlanner();
+    expect(w.find('[data-add-drill]').exists()).toBe(true);
+    expect(w.find('[data-open-library]').exists()).toBe(true);
+  });
+
+  it('opens the form on the drill being edited', async () => {
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    await w.findAll('[data-drill-edit]')[1].trigger('click');
+    expect((w.find('[data-drill-name-input]').element as HTMLInputElement).value)
+      .toBe('Shooting');
+  });
+
+  it('adds a drill through the form, one row at a time', async () => {
+    svc.savePracticePlanItem.mockResolvedValue({ id: ROW_A });
+    const w = await mountPlanner();
+
+    await w.find('[data-add-drill]').trigger('click');
+    await w.find('[data-drill-name-input]').setValue('Pressing shape');
+    await w.find('[data-drill-save]').trigger('click');
+    await flush();
+
+    expect(drillNames(w)).toEqual(['Pressing shape']);
+    expect(svc.savePracticePlanItem).toHaveBeenCalled();
+  });
+
+  it('says so when a drill was added but not saved', async () => {
+    // savePracticePlanItem returns null when it refuses. The drill is on the
+    // timeline and not in Postgres, and it vanishes on the next reload.
+    svc.savePracticePlanItem.mockResolvedValue(null);
+    const w = await mountPlanner();
+
+    await w.find('[data-add-drill]').trigger('click');
+    await w.find('[data-drill-name-input]').setValue('Pressing shape');
+    await w.find('[data-drill-save]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-notice]').text()).toMatch(/disappear on reload/i);
   });
 });
