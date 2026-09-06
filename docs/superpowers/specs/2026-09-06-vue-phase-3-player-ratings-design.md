@@ -37,6 +37,10 @@ A time is scored against **absolute standards**, taking the tightest band it sti
 - Nothing in this phase may propose tightening bands to spread scores out, and no view should present a bunched threshold result as a problem.
 - The competitive measures keep their ranking presentation unchanged. The distinction is the design, not an inconsistency.
 
+**The emphasis is additive, and this is a condition of the change.** Asked to approve it, the coach's answer was *"as long as we can sort the time bands."* So highlighting who fell below a standard must **not** replace the sortable leaderboard with a curated "who missed" list, and must not remove or disable any column's sort. Every figure stays on screen, ordered however the reader chooses; the emphasis sits on top of that table rather than instead of it.
+
+A test asserts every sort remains available on a `time_bands` exercise, so this cannot be lost to a later tidy-up.
+
 ## Decisions taken
 
 **The phase splits in two, and the board comes first.** 3a is the board, the exercise leaderboard and the results panel — read-mostly, with one destructive action. 3b is the session grid and the weights editor, which are the hard part. Proving the read surfaces first means the grid is built against a screen that already shows its results correctly.
