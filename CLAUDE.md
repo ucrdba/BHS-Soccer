@@ -65,12 +65,16 @@ Consequences worth respecting:
 
 ## `src/domain/` — the extracted logic
 
-Nineteen framework-free modules holding logic that used to live on the
-`BHSSoccerApp` prototype: `schedule`, `matrix`, `matrix-session`, `lineup`,
+Eighteen framework-free modules. Thirteen hold logic that used to live on the
+`BHSSoccerApp` prototype — `schedule`, `matrix`, `matrix-session`, `lineup`,
 `plus-minus-court`, `round-robin`, `season`, `progress`, `report`,
-`recording-numbers`, `roster`, `csv` and `upsert`, plus three the Vue rebuild's
-first screen needed: `season-record`, `schedule-row` (the schedule table's
-snake_case read mapping) and `theme` (an organization's branding).
+`recording-numbers`, `roster`, `csv` and `upsert` — and five were added by the
+Vue rebuild as it needed them: `season-record`, `theme` (an organization's
+branding), `roster-view` (the position filters), and the two table read
+mappings, `schedule-row` and `player-row`.
+
+`src/domain/test-globals.ts` sits alongside them but is a test helper, not a
+domain module.
 
 They are **side-effect free** — no DOM, no `localStorage`, no Supabase, no
 `this` — which is the whole point: they can be tested without booting the app,
