@@ -1,16 +1,19 @@
 /**
- * That the Vue entry point wires auth up at all.
+ * How auth reaches the database client.
  *
- * This exists because it did not, and nothing caught it. AuthManager reaches
- * for `window.supabaseService` in fifteen places — it was written for the
- * legacy app, where src/main.ts publishes that global — and src/vue-main.ts
- * deliberately published none. So every auth call in the Vue app optional-
- * chained to undefined and degraded to a guest, and signing in reported
- * "Cloud authentication is not configured".
+ * This exists because it went wrong and nothing caught it. AuthManager read
+ * `window.supabaseService` in fifteen places — it was written for the legacy
+ * app, where src/main.ts publishes that global — while src/vue-main.ts
+ * published none. So every auth call in the Vue app optional-chained to
+ * undefined and degraded to a guest, and signing in reported "Cloud
+ * authentication is not configured".
  *
- * The component tests all passed throughout, because they mock the store
- * rather than exercising the real path. Only running it would have shown the
- * problem — so this asserts the wiring itself against a live stack.
+ * Every component test passed throughout, because they mock the store rather
+ * than exercising the real path. The dependency was invisible to the compiler
+ * too, since `window.supabaseService` is typed by the looser ambient
+ * declaration in globals.d.ts rather than by the client's own signatures.
+ *
+ * auth.ts now imports the client directly, which is the invariant these guard.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -31,23 +34,33 @@ async function stackIsUp(): Promise<boolean> {
 
 const available = await stackIsUp();
 
-describe('the Vue entry point', () => {
-  it('publishes supabaseService, because AuthManager reads it off window', () => {
-    // A source assertion rather than a behavioural one: importing vue-main
-    // mounts the whole app. The point is that the line cannot be removed
-    // without a failing test, since removing it breaks auth silently.
-    const src = readFileSync('src/vue-main.ts', 'utf8');
-    expect(src).toMatch(/window\s*as\s*any\)\.supabaseService\s*=\s*supabaseService/);
+/** Source without comments, so a line describing the old way is not a match. */
+function codeOf(path: string): string {
+  return readFileSync(path, 'utf8')
+    .split('\n')
+    .filter(l => {
+      const t = l.trim();
+      return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
+    })
+    .join('\n');
+}
+
+describe('how auth reaches the database client', () => {
+  it('imports the client rather than reaching for a global', () => {
+    expect(codeOf('src/auth.ts'))
+      .toMatch(/import \{[^}]*supabaseService[^}]*\} from '\.\/data\/supabase'/);
   });
 
-  it('sets it before auth.init() runs', () => {
-    const src = readFileSync('src/vue-main.ts', 'utf8');
-    const assign = src.indexOf('.supabaseService = supabaseService');
-    const init = src.indexOf('auth.init()');
-    expect(assign).toBeGreaterThan(-1);
-    expect(init).toBeGreaterThan(-1);
-    // Otherwise init reads a global that is not there yet.
-    expect(assign).toBeLessThan(init);
+  it('reads it off window nowhere', () => {
+    // Fifteen call sites did, and the Vue app silently had no auth because
+    // of it.
+    expect(codeOf('src/auth.ts')).not.toMatch(/window\.supabaseService/);
+  });
+
+  it('leaves the Vue entry point publishing no globals', () => {
+    // src/main.ts still publishes the client, because the classic scripts
+    // under public/js cannot import. This entry has no reason to.
+    expect(codeOf('src/vue-main.ts')).not.toMatch(/\.supabaseService\s*=/);
   });
 });
 
@@ -58,10 +71,6 @@ describe.skipIf(!available)('AuthManager against a live stack', () => {
     (globalThis as any).window = globalThis;
     (globalThis as any).ENV_SUPABASE_URL = API;
     (globalThis as any).ENV_SUPABASE_ANON_KEY = ANON;
-
-    // The same order vue-main.ts uses: publish the service, then load auth.
-    const { supabaseService } = await import('../supabase');
-    (globalThis as any).supabaseService = supabaseService;
     auth = (await import('../../auth')).auth;
   }, 60_000);
 

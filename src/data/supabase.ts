@@ -107,6 +107,33 @@ function initSupabaseClient(): void {
 
 initSupabaseClient();
 
+
+/**
+ * The organization an operation is scoped to.
+ *
+ * Ten methods below used to declare `schoolId: string = 'bhs'`. A bare call
+ * was therefore silently served Beaumont's data — and because it was a default
+ * rather than an argument, nothing at the call site showed it. Three real bugs
+ * came from this: a club coach seeing Beaumont's coaching staff, a club admin
+ * seeing Beaumont's pending signups, and the roster before it moved to
+ * fetchTeamRoster.
+ *
+ * The parameter is now REQUIRED, so TypeScript refuses a new bare call. The
+ * fallback survives only for the two remaining callers in public/js, which is
+ * not typechecked — and it says so loudly rather than pretending all is well.
+ */
+export const LEGACY_DEFAULT_ORG = 'bhs';
+
+function requireOrg(method: string, schoolId: string | undefined | null): string {
+  if (schoolId) return schoolId;
+  console.warn(
+    `${method}() was called with no organization, so it is falling back to ` +
+    `'${LEGACY_DEFAULT_ORG}'. That serves one organization's data to whoever ` +
+    `asked. Pass the resolved organization id.`
+  );
+  return LEGACY_DEFAULT_ORG;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────
 
 class SupabaseService {
@@ -303,7 +330,8 @@ class SupabaseService {
     return typeof str === 'string' && str.length === 36 && str.includes('-');
   }
 
-  async getSchoolUuid(schoolCodeOrId: string = 'bhs'): Promise<string | null> {
+  async getSchoolUuid(schoolCodeOrId: string): Promise<string | null> {
+    schoolCodeOrId = requireOrg('getSchoolUuid', schoolCodeOrId);
     if (!schoolCodeOrId) return null;
     if (this.isUuid(schoolCodeOrId)) return schoolCodeOrId;
     if (!this.isConfigured()) return null;
@@ -396,7 +424,8 @@ class SupabaseService {
     }
   }
 
-  async fetchPendingApprovals(schoolId: string = 'bhs'): Promise<any> {
+  async fetchPendingApprovals(schoolId: string): Promise<any> {
+    schoolId = requireOrg('fetchPendingApprovals', schoolId);
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
       .from('profiles')
@@ -619,7 +648,8 @@ class SupabaseService {
   }
 
   // Database Query Wrappers
-  async fetchPlayers(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+  async fetchPlayers(schoolId: string): Promise<Record<string, any>[] | null> {
+    schoolId = requireOrg('fetchPlayers', schoolId);
     if (!this.isConfigured()) return null;
     let query = this.client!.from('players').select('*').or('is_deleted.is.null,is_deleted.eq.false') as any;
     const schoolUuid = await this.getSchoolUuid(schoolId);
@@ -1297,7 +1327,8 @@ class SupabaseService {
     if (error) console.error('Supabase soft deletePracticePlanItem error:', error);
   }
 
-  async fetchSoccerCategories(schoolId: string = 'bhs'): Promise<Partial<SoccerCategoryRow>[] | null> {
+  async fetchSoccerCategories(schoolId: string): Promise<Partial<SoccerCategoryRow>[] | null> {
+    schoolId = requireOrg('fetchSoccerCategories', schoolId);
     if (!this.isConfigured()) return null;
     try {
       let query = this.client!.from('soccer_categories').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('name', { ascending: true });
@@ -2389,7 +2420,8 @@ class SupabaseService {
     return { ok: true };
   }
 
-  async fetchDrillsBank(schoolId: string = 'bhs'): Promise<Record<string, any>[] | null> {
+  async fetchDrillsBank(schoolId: string): Promise<Record<string, any>[] | null> {
+    schoolId = requireOrg('fetchDrillsBank', schoolId);
     if (!this.isConfigured()) return null;
     try {
       let query = this.client!.from('drills_bank').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
@@ -2401,7 +2433,8 @@ class SupabaseService {
     }
   }
 
-  async upsertDrillBankItem(schoolId: string = 'bhs', drill: any = {}): Promise<any> {
+  async upsertDrillBankItem(schoolId: string, drill: any = {}): Promise<any> {
+    schoolId = requireOrg('upsertDrillBankItem', schoolId);
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
 
@@ -3099,7 +3132,8 @@ class SupabaseService {
     return data;
   }
 
-  async fetchSchool(schoolCode: string = 'bhs'): Promise<Partial<SchoolRow> | null> {
+  async fetchSchool(schoolCode: string): Promise<Partial<SchoolRow> | null> {
+    schoolCode = requireOrg('fetchSchool', schoolCode);
     if (!this.isConfigured()) return null;
     try {
       const { data, error } = await this.client!
@@ -3128,7 +3162,8 @@ class SupabaseService {
     }
   }
 
-  async upsertSchool(schoolCode: string = 'bhs', school: any = {}): Promise<any> {
+  async upsertSchool(schoolCode: string, school: any = {}): Promise<any> {
+    schoolCode = requireOrg('upsertSchool', schoolCode);
     if (!this.isConfigured()) return { data: null, error: 'Supabase Cloud DB is not configured (Anon Key missing).' };
     const payload: Record<string, any> = {
       code: schoolCode || school.code || 'bhs',
@@ -3211,7 +3246,8 @@ class SupabaseService {
     }
   }
 
-  async fetchCoaches(schoolId: string = 'bhs'): Promise<Partial<CoachRow>[] | null> {
+  async fetchCoaches(schoolId: string): Promise<Partial<CoachRow>[] | null> {
+    schoolId = requireOrg('fetchCoaches', schoolId);
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     let query = this.client!.from('coaches').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true }) as any;
@@ -3221,7 +3257,8 @@ class SupabaseService {
     return data;
   }
 
-  async upsertCoach(schoolId: string = 'bhs', coach: any = {}): Promise<any> {
+  async upsertCoach(schoolId: string, coach: any = {}): Promise<any> {
+    schoolId = requireOrg('upsertCoach', schoolId);
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload: Record<string, any> = {

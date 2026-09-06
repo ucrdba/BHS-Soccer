@@ -10,6 +10,12 @@ import type {
 } from './types';
 
 import { checkEmail } from './auth/email-typo';
+// Imported rather than read off `window`. It used to reach for
+// window.supabaseService in fifteen places, which meant the Vue entry point
+// silently had no auth at all until it published that global, and which
+// bypassed the client's real type signatures in favour of the looser ambient
+// declaration in globals.d.ts.
+import { supabaseService, LEGACY_DEFAULT_ORG } from './data/supabase';
 
 const ROLES = {
   GUEST: 'guest' as UserRole,
@@ -69,11 +75,11 @@ export class AuthManager {
   }
 
   async init(): Promise<void> {
-    const sessionResult = await window.supabaseService?.getSession();
+    const sessionResult = await supabaseService.getSession();
     const session = sessionResult?.data?.session;
     this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
 
-    window.supabaseService?.onAuthStateChange((_event, changedSession) => {
+    supabaseService.onAuthStateChange((_event, changedSession) => {
       // Deferred via setTimeout: this callback runs while GoTrueClient holds its
       // navigator.locks lock, and loadProfileForSession() awaits another `auth`
       // call (getUser()) — awaiting that here, inside the callback's synchronous
@@ -87,7 +93,7 @@ export class AuthManager {
   }
 
   private async loadProfileForSession(): Promise<AppUser | null> {
-    const row = await window.supabaseService?.fetchOwnProfile();
+    const row = await supabaseService.fetchOwnProfile();
     return row ? mapProfileRowToAppUser(row) : null;
   }
 
@@ -97,18 +103,18 @@ export class AuthManager {
   }
 
   async loginUser(email: string, password: string): Promise<LoginResult> {
-    if (!window.supabaseService?.isConfigured()) {
+    if (!supabaseService.isConfigured()) {
       return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    const result = await window.supabaseService.signInUser(String(email || '').trim().toLowerCase(), password);
+    const result = await supabaseService.signInUser(String(email || '').trim().toLowerCase(), password);
     if (!result || result.error) {
       return { success: false, message: humanizeAuthError(result?.error) };
     }
 
     const profile = await this.loadProfileForSession();
     if (!profile) {
-      await window.supabaseService.signOutUser();
+      await supabaseService.signOutUser();
       return { success: false, message: 'Account profile could not be loaded. Please try again.' };
     }
 
@@ -121,7 +127,7 @@ export class AuthManager {
       return { success: false, isPendingApproval: true, user: profile, message: 'Your account email is verified! Request for Coach / Player access is currently pending Coach Bob / AD approval.' };
     }
     if (profile.status === 'rejected') {
-      await window.supabaseService.signOutUser();
+      await supabaseService.signOutUser();
       return { success: false, message: 'Account access request was denied by team administrator.' };
     }
 
@@ -137,11 +143,11 @@ export class AuthManager {
     if (!cleanName || !cleanEmail || !password) {
       return { success: false, message: 'Please provide Name, Email, and Password.' };
     }
-    if (!window.supabaseService?.isConfigured()) {
+    if (!supabaseService.isConfigured()) {
       return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    const result = await window.supabaseService.signUpUser(cleanEmail, password, { name: cleanName, requested_role: roleValue });
+    const result = await supabaseService.signUpUser(cleanEmail, password, { name: cleanName, requested_role: roleValue });
     if (!result || result.error) {
       return { success: false, message: humanizeAuthError(result?.error) };
     }
@@ -150,11 +156,11 @@ export class AuthManager {
   }
 
   async verifyUserOtp(email: string, inputCode: string): Promise<OtpVerifyResult> {
-    if (!window.supabaseService?.isConfigured()) {
+    if (!supabaseService.isConfigured()) {
       return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    const result = await window.supabaseService.verifyOtp(String(email || '').trim().toLowerCase(), String(inputCode || '').trim());
+    const result = await supabaseService.verifyOtp(String(email || '').trim().toLowerCase(), String(inputCode || '').trim());
     if (!result || result.error) {
       return { success: false, message: 'Incorrect or expired verification code. Please try again.' };
     }
@@ -177,13 +183,13 @@ export class AuthManager {
   }
 
   async approveUserAccess(userId: string): Promise<boolean> {
-    const row = await window.supabaseService?.approveProfile(userId);
+    const row = await supabaseService.approveProfile(userId);
     if (row) this.notifySubscribers();
     return !!row;
   }
 
   async rejectUserAccess(userId: string): Promise<boolean> {
-    const row = await window.supabaseService?.rejectProfile(userId);
+    const row = await supabaseService.rejectProfile(userId);
     if (row) this.notifySubscribers();
     return !!row;
   }
@@ -201,14 +207,15 @@ export class AuthManager {
    * should always pass one.
    */
   async getPendingApprovals(schoolId?: string): Promise<AppUser[]> {
-    const rows = schoolId
-      ? await window.supabaseService?.fetchPendingApprovals(schoolId)
-      : await window.supabaseService?.fetchPendingApprovals();
+    // The fallback is named rather than implied, so it is greppable and so
+    // nobody mistakes it for a considered default. public/js/admin.js:1662 is
+    // the only caller that reaches here without an organization.
+    const rows = await supabaseService.fetchPendingApprovals(schoolId || LEGACY_DEFAULT_ORG);
     return (rows || []).map(mapProfileRowToAppUser);
   }
 
   async logout(): Promise<void> {
-    await window.supabaseService?.signOutUser();
+    await supabaseService.signOutUser();
     this.setCurrentUser(GUEST_USER);
   }
 
