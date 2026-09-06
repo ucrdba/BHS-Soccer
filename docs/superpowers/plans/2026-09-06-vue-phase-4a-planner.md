@@ -123,7 +123,7 @@ State: `items`, `savedPlans`, `drillsBank`, `activePlanName`, `selectedIndex`, `
 
 Actions: `load(teamId, schoolId)`, `addDrill(item)`, `editDrill(index, item)`, `removeDrill(index)`, `move(from, to)`, `savePlan(name)`, `loadPlan(planId)`, `renamePlan(planId, name)`, `deletePlan(planId)`, `copyToTeam(planName, teamId)`, `loadDrillsBank(schoolId)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **Removing a drill soft-deletes its row**, and only when it has a real uuid. Trap 1.
 - **Saving after a removal does not resurrect it** — assert `deletePracticePlanItem` was called before or alongside the save.
@@ -134,9 +134,9 @@ Actions: `load(teamId, schoolId)`, `addDrill(item)`, `editDrill(index, item)`, `
 - **Loading a plan sets `activePlanName`** — the "Copy to team" control is gated on it matching a real saved plan, because `copyPracticePlan` matches on the name.
 - **A failed read is reported**, not rendered as an empty plan.
 
-- [ ] **Step 2: Run it, watch it fail, write the store, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the store, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
