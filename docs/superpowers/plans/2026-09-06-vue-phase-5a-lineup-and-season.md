@@ -36,7 +36,7 @@ State: `formation`, `assignments` (slot → playerId), `notes`, `matchId`, `load
 
 Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(target)`, `setFormation(name)`, `save(teamId, schoolId, matchId)`, `loadIndex(teamId)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - **Changing the formation keeps the players it can.** A 4-4-2 to 4-3-3 move is one slot changing, not a lineup thrown away — a coach adjusting shape mid-thought loses ten placements otherwise.
 - A player dropped onto an occupied slot swaps with whoever was there, rather than one of them vanishing.
@@ -45,9 +45,9 @@ Actions: `load(teamId, matchId)`, `place(playerId, slot)`, `clear(slot)`, `drop(
 - A failed read is reported rather than shown as an empty pitch.
 - `loadIndex` drives "fixtures with no lineup yet", which is the reason the list exists.
 
-- [ ] **Step 2: Run it, watch it fail, write the store, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the store, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
