@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 3,159 tests, config in vitest.config.mts
+npm test           # vitest — 3,242 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (3,159 tests across 161 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,242 tests across 166 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -73,11 +73,20 @@ coach looks:
 | 1v1 round robin | Coach Planner |
 | Recording numbers | Roster |
 
-**Phase 6 owns the admin panel and the XLSX import/export.** Still legacy-only
-after that: the quiz, the daily thoughts and the school profile forms. They
-sit inside `planner.view.js` and `thoughts.view.js` by accident of the
-`app.js` split rather than because they belong to the planner, and they go
-with Phase 6.
+**Phase 6 is under way.** `/admin` is real — the migration's one route that
+is not a nav view, because the admin panel was never really a modal. Done:
+approvals, squads and organizations, unassigned players, drill categories.
+Still owed: the quiz and the daily thoughts (6b), and the XLSX import/export,
+the school profile and the diagnostics (6c).
+
+**`/admin` is gated coach-or-admin, with each section gated individually.**
+Guarding the route on `can_access_admin_dashboard` is the obvious design and
+is wrong: `schema_roles.sql` grants that to `admin` alone, while the legacy
+panel shows the categories, the unassigned players and the quiz bank to any
+coach. And the permission fails closed when `fetchRoles()` returns null — the
+client unconfigured, or `roles` unreadable — which locks a real admin out of
+the panel they would visit to diagnose exactly that, so `AdminView` says so
+rather than rendering nothing.
 
 ### Two rules the match tools must keep
 
