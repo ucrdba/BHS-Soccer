@@ -1,22 +1,29 @@
 /**
- * BHS Soccer - Ambient globals
+ * Ambient globals.
  *
- * These declare the shape of code that has NOT been migrated to TypeScript
- * modules yet. They exist purely so the parts of the app that HAVE been
- * converted can type-check against the parts that haven't.
+ * Two things live on `window` and nothing else should join them.
  *
- * As each piece below gets its own real `src/*.ts` module (with real
- * `export`/`import`), delete the matching declaration here.
+ * **`supabaseService`** is published by `src/vue-main.ts` because
+ * `src/auth.ts` reads it off `window` in fifteen places. That is a leftover
+ * from the legacy app, where the classic scripts had no other way to reach a
+ * module; remove the assignment and every auth call silently degrades to a
+ * guest. The shapes here are deliberately loose, because these are raw
+ * snake_case Supabase rows and callers re-map them by hand.
+ *
+ * **`XLSX` and `JSZip`** are third-party UMD builds loaded from CDN by
+ * `index.html`, for the workbook import and export. They are optional on
+ * purpose: `ImportExportModal.vue` reports their absence rather than
+ * throwing, so a slow CDN is a message rather than a crash.
+ *
+ * This file used to declare a much larger surface -- the prototype methods of
+ * the un-migrated legacy app, so the TypeScript side could type-check against
+ * it. Phase 7 deleted that app, and the declarations went with it.
  */
 
 import type { Coach, DailyThought, School, SoccerCategory } from './types';
 
 declare global {
   // ─── window.supabaseService (src/data/supabase.ts) ─────────────────────────
-  // Assigned by src/main.ts at startup. Shapes here are intentionally loose
-  // (the raw rows are snake_case Supabase rows, not our camelCase app types)
-  // — callers re-map fields by hand, same as the original supabaseClient.js
-  // (now deleted) did.
   interface SupabaseAuthResult {
     data: Record<string, any>;
     error: { message: string } | null;
@@ -171,11 +178,9 @@ declare global {
 
   interface Window {
     supabaseService?: SupabaseServiceLike;
-    // Third-party UMD globals, loaded via CDN <script> tags in index.html.
+    // Third-party UMD globals, loaded via CDN script tags in index.html.
     XLSX?: any;
     JSZip?: any;
-    /** The plus/minus replay engine, published for public/js/. */
-    plusMinus?: any;
   }
 
 }
