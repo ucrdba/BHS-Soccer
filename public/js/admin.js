@@ -1289,8 +1289,11 @@ Object.assign(BHSSoccerApp.prototype, {
   async loadCategoryAdminData() {
     if (!window.supabaseService?.isConfigured()) return;
     const [cats, usage] = await Promise.all([
-      window.supabaseService.fetchSoccerCategories(),
-      window.supabaseService.fetchCategoryUsage()
+      // 'bhs' explicitly: these take the organization since migration 0027,
+      // and this panel has only ever shown Beaumont's. The Vue admin screen
+      // passes the resolved organization instead.
+      window.supabaseService.fetchSoccerCategories('bhs'),
+      window.supabaseService.fetchCategoryUsage('bhs')
     ]);
     if (cats) {
       this.data.soccerCategories = cats.map(c => ({
@@ -1356,7 +1359,7 @@ Object.assign(BHSSoccerApp.prototype, {
       return;
     }
     await this._applyCategoryChange(
-      () => window.supabaseService.upsertSoccerCategory({ name, description }),
+      () => window.supabaseService.upsertSoccerCategory('bhs', { name, description }),
       `Added "${name}".`
     );
   },
@@ -1381,19 +1384,19 @@ Object.assign(BHSSoccerApp.prototype, {
         `Rename "${oldName}" to "${name}"?\n\nThis also re-tags the ${count} drill${count === 1 ? '' : 's'} using it, so the two stay in step.`
       )) return;
       const ok = await this._applyCategoryChange(
-        () => window.supabaseService.renameSoccerCategory(id, oldName, name),
+        () => window.supabaseService.renameSoccerCategory('bhs', id, oldName, name),
         (res) => `Renamed to "${name}"${res.drillsUpdated ? ` and re-tagged ${res.drillsUpdated} drill${res.drillsUpdated === 1 ? '' : 's'}` : ''}.`
       );
       // The description may have changed in the same edit.
       if (ok) await this._applyCategoryChange(
-        () => window.supabaseService.upsertSoccerCategory({ id, name, description }),
+        () => window.supabaseService.upsertSoccerCategory('bhs', { id, name, description }),
         `Renamed to "${name}".`
       );
       return;
     }
 
     await this._applyCategoryChange(
-      () => window.supabaseService.upsertSoccerCategory({ id, name, description }),
+      () => window.supabaseService.upsertSoccerCategory('bhs', { id, name, description }),
       `Updated "${name}".`
     );
   },
@@ -1413,7 +1416,7 @@ Object.assign(BHSSoccerApp.prototype, {
   /** Promote a name that drills already use into a real category. */
   async adoptStrayCategory(name) {
     await this._applyCategoryChange(
-      () => window.supabaseService.upsertSoccerCategory({ name, description: '' }),
+      () => window.supabaseService.upsertSoccerCategory('bhs', { name, description: '' }),
       `Added "${name}" to the list.`
     );
   },
@@ -1432,7 +1435,7 @@ Object.assign(BHSSoccerApp.prototype, {
     )) return;
 
     await this._applyCategoryChange(
-      () => window.supabaseService.mergeSoccerCategory(fromName, to),
+      () => window.supabaseService.mergeSoccerCategory('bhs', fromName, to),
       (res) => `Merged into "${to}", re-tagging ${res.drillsUpdated || 0} drill${res.drillsUpdated === 1 ? '' : 's'}.`
     );
   },
@@ -3108,7 +3111,7 @@ Object.assign(BHSSoccerApp.prototype, {
               // No school code: soccer_categories has no school_id column, and
               // passing one is what made every category import fail silently.
               for (const cat of imported) {
-                const res = await window.supabaseService.upsertSoccerCategory(cat);
+                const res = await window.supabaseService.upsertSoccerCategory('bhs', cat);
                 if (res && !res.ok) warnings.push(`Category "${cat.name}": ${res.error}`);
               }
             }

@@ -105,18 +105,20 @@ describe('adding a category', () => {
       <input id="newCategoryDesc" value="Win it and go" />`;
     await makeApp().addSoccerCategory();
     const call = calls.find(c => c.method === 'upsertSoccerCategory');
-    expect(call!.args[0]).toEqual({ name: 'Transition Play', description: 'Win it and go' });
+    expect(call!.args[1]).toEqual({ name: 'Transition Play', description: 'Win it and go' });
   });
 
-  it('never passes a school code, because the column does not exist', async () => {
+  it('passes Beaumont explicitly, which is the only organization this panel has shown', async () => {
+    // Categories take an organization since migration 0027. This legacy panel
+    // has always been Beaumont's, so it names it rather than relying on
+    // requireOrg's fallback -- the fallback exists to warn, not to be used.
     document.body.innerHTML = `
       <input id="newCategoryName" value="Transition Play" />
       <input id="newCategoryDesc" value="" />`;
     await makeApp().addSoccerCategory();
     const call = calls.find(c => c.method === 'upsertSoccerCategory')!;
-    // The old import passed 'bhs' here and every write failed with 42703.
-    expect(typeof call.args[0]).toBe('object');
-    expect(call.args.length).toBe(1);
+    expect(call.args[0]).toBe('bhs');
+    expect(typeof call.args[1]).toBe('object');
   });
 
   it('refuses an empty name without calling the service', async () => {
@@ -164,7 +166,7 @@ describe('editing a category', () => {
       <input id="editCategoryDesc" value="Keep the ball" />`;
     await makeApp().saveCategoryEdit('c2', 'Passing & Possession');
     const call = calls.find(c => c.method === 'renameSoccerCategory');
-    expect(call!.args).toEqual(['c2', 'Passing & Possession', 'Possession']);
+    expect(call!.args).toEqual(['bhs', 'c2', 'Passing & Possession', 'Possession']);
   });
 
   it('only updates the description when the name is unchanged', async () => {
@@ -174,7 +176,7 @@ describe('editing a category', () => {
     await makeApp().saveCategoryEdit('c2', 'Passing & Possession');
     expect(calls.some(c => c.method === 'renameSoccerCategory')).toBe(false);
     const call = calls.find(c => c.method === 'upsertSoccerCategory');
-    expect(call!.args[0].description).toBe('Now with rondos');
+    expect(call!.args[1].description).toBe('Now with rondos');
   });
 });
 
@@ -184,7 +186,7 @@ describe('merging a stray category', () => {
       <select id="mergeInto_Small_Sided"><option value="Small-Sided Games" selected>x</option></select>`;
     await makeApp().mergeStrayCategory('Small Sided', 'mergeInto_Small_Sided');
     const call = calls.find(c => c.method === 'mergeSoccerCategory');
-    expect(call!.args).toEqual(['Small Sided', 'Small-Sided Games']);
+    expect(call!.args).toEqual(['bhs', 'Small Sided', 'Small-Sided Games']);
   });
 
   it('asks for a destination instead of merging into nothing', async () => {

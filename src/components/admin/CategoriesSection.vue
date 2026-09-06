@@ -17,23 +17,17 @@
  *
  * ---
  *
- * **KNOWN GAP: categories are NOT scoped to an organization.**
+ * **This list belongs to one organization**, as of migration 0027. Before it
+ * `soccer_categories` had no `school_id` at all and `name` was globally
+ * UNIQUE, so every organization shared one list, a club coach was shown
+ * Beaumont's categories, and two clubs could not both have a "Possession" —
+ * the second save updated the first's row.
  *
- * `soccer_categories` has a `school_id` column, but nothing uses it:
- * `fetchSoccerCategories(schoolId)` demands an organization, calls
- * `requireOrg` on it, and then never filters by it; `upsertSoccerCategory`
- * takes no organization at all and upserts `onConflict: 'name'` against a
- * globally `UNIQUE` name.
- *
- * So every organization shares one list, and two clubs cannot both have a
- * category called "Possession" — the second write updates the first's row.
- * This screen therefore shows a club coach Beaumont's categories.
- *
- * That is pre-existing behaviour, not something introduced here, and fixing
- * it needs a migration (drop the global unique, add `unique (school_id,
- * name)`, backfill `school_id`) plus three client changes. It is recorded in
- * CLAUDE.md rather than quietly worked around, because a component that
- * *looked* organization-scoped would hide it.
+ * Every call from here therefore passes the resolved organization, including
+ * the rename and merge, which work by NAME: unscoped, merging a club's
+ * "Warmup" re-tagged Beaumont's drills and retired their category of that
+ * name. The screen renders nothing until `schoolId` resolves rather than
+ * falling back, because `requireOrg`'s fallback is Beaumont.
  */
 import { ref, computed, onMounted } from 'vue';
 import { supabaseService } from '../../data/supabase';
@@ -73,7 +67,7 @@ async function load(): Promise<void> {
   try {
     const [rows, counts] = await Promise.all([
       props.schoolId ? supabaseService.fetchSoccerCategories(props.schoolId) : Promise.resolve([]),
-      supabaseService.fetchCategoryUsage()
+      supabaseService.fetchCategoryUsage(props.schoolId)
     ]);
     if (rows === null || counts === null) {
       loadError.value = 'Could not load the categories.';
@@ -102,9 +96,7 @@ async function onAdd(): Promise<void> {
   if (!name) { error.value = 'Give the category a name.'; return; }
   if (!props.schoolId) { error.value = 'No organization for this team.'; return; }
 
-  // One argument: the client takes no organization here. See the note at the
-  // top of this file — categories are global, and that is a known gap.
-  const res = await supabaseService.upsertSoccerCategory({ name });
+  const res = await supabaseService.upsertSoccerCategory(props.schoolId, { name });
   if (report(res, `"${name}" added.`)) { newName.value = ''; await load(); }
 }
 
@@ -115,7 +107,7 @@ function startEdit(c: any): void {
 
 async function onRename(c: any): Promise<void> {
   const to = editName.value.trim();
-  const res = await supabaseService.renameSoccerCategory(c.id, c.name, to);
+  const res = await supabaseService.renameSoccerCategory(props.schoolId, c.id, c.name, to);
 
   if (report(res, `Renamed to "${to}"${res?.drillsUpdated ? `, moving ${res.drillsUpdated} drills.` : '.'}`)) {
     editingId.value = null;
@@ -148,14 +140,14 @@ async function onMergeStray(stray: any): Promise<void> {
   );
   if (!ok) return;
 
-  const res = await supabaseService.mergeSoccerCategory(stray.name, to);
+  const res = await supabaseService.mergeSoccerCategory(props.schoolId, stray.name, to);
   if (report(res, `Merged "${stray.name}" into "${to}".`)) await load();
 }
 
 async function onAdoptStray(stray: any): Promise<void> {
   if (!props.schoolId) { error.value = 'No organization for this team.'; return; }
 
-  const res = await supabaseService.upsertSoccerCategory({ name: stray.name });
+  const res = await supabaseService.upsertSoccerCategory(props.schoolId, { name: stray.name });
   if (report(res, `"${stray.name}" is now a real category.`)) await load();
 }
 </script>

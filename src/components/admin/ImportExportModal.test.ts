@@ -384,14 +384,16 @@ describe('applying', () => {
     expect(w.emitted('imported')).toBeTruthy();
   });
 
-  it('writes a category, which needs no team at all', async () => {
+  it('writes a category into the IMPORTING organization, needing no team', async () => {
+    // Categories belong to an organization since migration 0027, so an
+    // imported one joins the importer's own list rather than everybody's.
     stubXLSX();
     const w = mountIE();
     await choose(w, { SoccerCategories: [{ Name: 'Possession' }] });
     await w.find('[data-import-apply]').trigger('click');
     await flush();
 
-    expect(upsertSoccerCategory).toHaveBeenCalledWith({
+    expect(upsertSoccerCategory).toHaveBeenCalledWith('s1', {
       name: 'Possession', description: undefined
     });
   });

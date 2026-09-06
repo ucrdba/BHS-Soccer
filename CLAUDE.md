@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 3,424 tests, config in vitest.config.mts
+npm test           # vitest — 3,447 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (3,424 tests across 175 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (3,447 tests across 176 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -371,27 +371,52 @@ stops last week's questions testing a focus nobody remembers — and means
 deleting a daily message quietly shortens the quiz. `DailyThought.vue` says
 so before deleting one.
 
-### Drill categories are NOT organization-scoped
+### Drill categories belong to an organization (migration 0027)
 
-`soccer_categories` has a `school_id` column and **nothing uses it**:
+They did not until `supabase/migrations/0027_scope_soccer_categories.sql`.
+`soccer_categories` had no `school_id` at all — `supabase_schema.sql` declares
+one, but production never had it, which is why `demo_schema.sql` drops it
+explicitly — and `name` was globally `UNIQUE` with the upsert conflicting on
+it. So every organization shared one list, a club coach was shown Beaumont's
+categories, and two clubs could not both have a "Possession": the second save
+updated the first's row.
 
-- `fetchSoccerCategories(schoolId)` demands an organization, runs it through
-  `requireOrg`, and then never filters by it.
-- `upsertSoccerCategory` takes no organization at all.
-- `soccer_categories.name` is globally `UNIQUE`, and the upsert conflicts on
-  `name`.
+0027 adds the column, makes the name unique per organization, and scopes the
+write policy to `current_profile_school_id()`. Three things about it are worth
+knowing:
 
-So every organization shares one category list, a club coach sees Beaumont's
-categories, and two clubs cannot both have a "Possession" — the second write
-updates the first's row. `drills_bank.category` is free TEXT rather than a
-foreign key, which is why the drift is survivable rather than fatal, and why
-`CategoriesSection.vue` shows the undefined names as their own group.
+- **It copies every existing category into every organization** rather than
+  backfilling them to Beaumont. Nothing records who created a row, so
+  backfilling would silently take away a category a club had added, and open
+  every club's editor empty. Nobody loses anything on the day it is applied;
+  the lists diverge from then on.
+- **The unique index covers retired rows too.** The partial index reads better
+  — a retired name should not be reserved forever — but PostgREST cannot
+  upsert against a partial index and every category save would fail with
+  42P10. The full index also gives the better behaviour: re-adding a retired
+  category revives it instead of leaving a second row beside an invisible
+  first.
+- **It must be applied before the client that reads it.** PostgREST answers
+  42703 for a column that is not there, so an unmigrated database shows every
+  category list as empty.
 
-**This is pre-existing and unfixed.** Closing it needs a migration — drop the
-global unique, add `unique (school_id, name)`, backfill `school_id` — plus
-changes to those three client methods. It is written down here rather than
-worked around in a component, because a screen that *looked* scoped would
-hide it.
+`src/data/testdb/soccer-categories-scope.test.ts` runs the migration against a
+real Postgres and holds all of that.
+
+**Every category method now takes the organization** — `fetchSoccerCategories`,
+`upsertSoccerCategory`, `fetchCategoryUsage`, `renameSoccerCategory`,
+`mergeSoccerCategory` and `retagDrills`. The last three matter most: they work
+by **name**, so unscoped, merging a club's "Warmup" re-tagged Beaumont's drills
+and retired their category of that name.
+
+`fetchDrillsBank` was fixed in the same change and for the same reason: it
+demanded an organization and then never filtered by it, so the planner's
+library, its category dropdown and the drill counts beside each category were
+every organization's at once.
+
+`drills_bank.category` is still free TEXT rather than a foreign key, which is
+why `CategoriesSection.vue` shows names no category row has as their own
+group.
 
 ### Recording numbers — the unique index
 
@@ -460,6 +485,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS, and the `current_profile_role()` status fix.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived from the text columns by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the two `matrix_session*` tables, and the rewritten `matrix_standings`.
+8. `supabase/migrations/0027_scope_soccer_categories.sql` — drill categories belong to an organization. **Apply this before deploying the client that reads it**; see the section above.
 
 Prefer adding a new dated migration file over editing an already-applied script.
 

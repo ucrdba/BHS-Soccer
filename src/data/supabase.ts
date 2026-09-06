@@ -1330,12 +1330,28 @@ class SupabaseService {
     if (error) console.error('Supabase soft deletePracticePlanItem error:', error);
   }
 
+  /**
+   * One organization's drill categories.
+   *
+   * Needs migration 0027, which adds `school_id` and makes the name unique
+   * per organization instead of globally. Before it, this method demanded an
+   * organization, ran it through `requireOrg` and then never filtered by it,
+   * so a club coach was shown Beaumont's categories -- and PostgREST answers
+   * 42703 for a column that is not there, so against an unmigrated database
+   * this reads as empty rather than as everybody's.
+   */
   async fetchSoccerCategories(schoolId: string): Promise<Partial<SoccerCategoryRow>[] | null> {
     schoolId = requireOrg('fetchSoccerCategories', schoolId);
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client!.from('soccer_categories').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('name', { ascending: true });
-      const { data, error } = await query;
+      const schoolUuid = await this.getSchoolUuid(schoolId);
+      if (!schoolUuid) return [];
+      const { data, error } = await this.client!
+        .from('soccer_categories')
+        .select('*')
+        .eq('school_id', schoolUuid)
+        .or('is_deleted.is.null,is_deleted.eq.false')
+        .order('name', { ascending: true });
       if (error) { console.error('Supabase fetchSoccerCategories error:', error.message); return null; }
       return data;
     } catch (e) {
@@ -2240,27 +2256,36 @@ class SupabaseService {
   }
 
   /**
-   * Insert or update one drill category.
+   * Insert or update one drill category, in one organization.
    *
-   * `soccer_categories` has NO `school_id` column -- the category list is
-   * shared across every organization. The previous version of this method set
-   * one anyway, so every call failed with 42703, this method logged and
-   * returned null, and the XLSX category import reported success while
-   * importing nothing. Verified against the live database, not against
-   * supabase_schema.sql, which has drifted.
+   * Takes the organization since migration 0027. Before it there was no
+   * `school_id` column at all -- an earlier version of this method set one
+   * anyway and every call failed with 42703, which is why the column was
+   * dropped from the mirrored demo schema -- and `name` was globally UNIQUE
+   * with the upsert conflicting on it, so a club saving "Possession"
+   * overwrote Beaumont's row of that name.
+   *
+   * The conflict target is now `(school_id, name)`, matching the index 0027
+   * creates. That index deliberately covers retired rows too, so re-adding a
+   * category that was retired revives it rather than failing.
    *
    * Returns {ok, error} rather than null so an RLS refusal is reported in
    * words instead of silently doing nothing.
    */
   async upsertSoccerCategory(
-    categoryObj: any = {}
+    schoolId: string, categoryObj: any = {}
   ): Promise<{ ok: boolean; error?: string; data?: any }> {
+    schoolId = requireOrg('upsertSoccerCategory', schoolId);
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
 
     const name = (categoryObj.name || '').trim();
     if (!name) return { ok: false, error: 'A category needs a name.' };
 
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return { ok: false, error: 'That organization could not be resolved.' };
+
     const payload: Record<string, any> = {
+      school_id: schoolUuid,
       name,
       description: (categoryObj.description || '').trim(),
       is_deleted: categoryObj.is_deleted || false
@@ -2270,7 +2295,7 @@ class SupabaseService {
     try {
       const { data, error } = await this.client!
         .from('soccer_categories')
-        .upsert([payload], { onConflict: 'name' })
+        .upsert([payload], { onConflict: 'school_id,name' })
         .select();
       if (error) { console.warn('Supabase upsertSoccerCategory notice:', error.message); return { ok: false, error: error.message }; }
       if (!data || data.length === 0) {
@@ -2290,11 +2315,19 @@ class SupabaseService {
    * Those are exactly the entries the editor has to surface -- on the live data
    * five of ten drills are in that state.
    */
-  async fetchCategoryUsage(): Promise<Record<string, number> | null> {
+  async fetchCategoryUsage(schoolId: string): Promise<Record<string, number> | null> {
+    schoolId = requireOrg('fetchCategoryUsage', schoolId);
     if (!this.isConfigured()) return null;
+    // Scoped, because these counts are what the editor shows beside each
+    // category and what its "used by drills, not defined" group is built
+    // from -- unscoped, a club coach reads Beaumont's drill names as their
+    // own undefined categories.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return {};
     const { data, error } = await this.client!
       .from('drills_bank')
       .select('category')
+      .eq('school_id', schoolUuid)
       .or('is_deleted.is.null,is_deleted.eq.false');
     if (error) { console.warn('Supabase fetchCategoryUsage notice:', error.message); return null; }
 
@@ -2315,14 +2348,22 @@ class SupabaseService {
    * them to guess.
    */
   async retagDrills(
-    fromName: string, toName: string
+    schoolId: string, fromName: string, toName: string
   ): Promise<{ ok: boolean; error?: string; count?: number }> {
+    schoolId = requireOrg('retagDrills', schoolId);
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!fromName || !toName) return { ok: false, error: 'Both the old and the new name are needed.' };
+
+    // Scoped, or a club merging its own "Warmup" re-tags Beaumont's drills
+    // too -- drills_bank.category is free text, so the names collide across
+    // organizations by design.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return { ok: false, error: 'That organization could not be resolved.' };
 
     const { data, error } = await this.client!
       .from('drills_bank')
       .update({ category: toName })
+      .eq('school_id', schoolUuid)
       .eq('category', fromName)
       .select();
     if (error) { console.warn('Supabase retagDrills notice:', error.message); return { ok: false, error: error.message }; }
@@ -2342,24 +2383,31 @@ class SupabaseService {
    * above conflicts on name. That operation is a merge.
    */
   async renameSoccerCategory(
-    id: string, oldName: string, newName: string
+    schoolId: string, id: string, oldName: string, newName: string
   ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
+    schoolId = requireOrg('renameSoccerCategory', schoolId);
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
 
     const to = (newName || '').trim();
     if (!id || !oldName || !to) return { ok: false, error: 'A category and a new name are needed.' };
     if (to === oldName) return { ok: false, error: 'That is already the name.' };
 
+    // Scoped: another organization holding the name is not a clash, and
+    // refusing the rename because of one would be inexplicable on screen.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return { ok: false, error: 'That organization could not be resolved.' };
+
     const { data: clash } = await this.client!
       .from('soccer_categories')
       .select('id')
+      .eq('school_id', schoolUuid)
       .eq('name', to)
       .or('is_deleted.is.null,is_deleted.eq.false');
     if (clash && clash.length > 0) {
       return { ok: false, error: `"${to}" already exists. Use Merge to combine the two instead.` };
     }
 
-    const retag = await this.retagDrills(oldName, to);
+    const retag = await this.retagDrills(schoolId, oldName, to);
     if (!retag.ok) return { ok: false, error: retag.error };
 
     const { error } = await this.client!
@@ -2385,18 +2433,25 @@ class SupabaseService {
    * nothing to retire.
    */
   async mergeSoccerCategory(
-    fromName: string, toName: string
+    schoolId: string, fromName: string, toName: string
   ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
+    schoolId = requireOrg('mergeSoccerCategory', schoolId);
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!fromName || !toName) return { ok: false, error: 'Pick a category and a destination.' };
     if (fromName === toName) return { ok: false, error: 'That is the same category.' };
 
-    const retag = await this.retagDrills(fromName, toName);
+    const retag = await this.retagDrills(schoolId, fromName, toName);
     if (!retag.ok) return { ok: false, error: retag.error };
+
+    // Retiring by name has to be scoped, or merging a category here retires
+    // the same-named one in every other organization.
+    const schoolUuid = await this.getSchoolUuid(schoolId);
+    if (!schoolUuid) return { ok: false, error: 'That organization could not be resolved.' };
 
     const { error } = await this.client!
       .from('soccer_categories')
       .update({ is_deleted: true })
+      .eq('school_id', schoolUuid)
       .eq('name', fromName)
       .select();
     if (error) {
@@ -2429,12 +2484,26 @@ class SupabaseService {
     return { ok: true };
   }
 
+  /**
+   * One organization's drill library.
+   *
+   * This demanded an organization and then never filtered by it, exactly as
+   * `fetchSoccerCategories` did -- so the planner's library, the category
+   * dropdown it fills and the drill counts beside each category were every
+   * organization's at once.
+   */
   async fetchDrillsBank(schoolId: string): Promise<Record<string, any>[] | null> {
     schoolId = requireOrg('fetchDrillsBank', schoolId);
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client!.from('drills_bank').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true });
-      const { data, error } = await query;
+      const schoolUuid = await this.getSchoolUuid(schoolId);
+      if (!schoolUuid) return [];
+      const { data, error } = await this.client!
+        .from('drills_bank')
+        .select('*')
+        .eq('school_id', schoolUuid)
+        .or('is_deleted.is.null,is_deleted.eq.false')
+        .order('created_at', { ascending: true });
       if (error) { console.error('Supabase fetchDrillsBank error:', error.message); return null; }
       return data;
     } catch (e) {

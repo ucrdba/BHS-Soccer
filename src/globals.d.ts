@@ -87,14 +87,16 @@ declare global {
     upsertDailyThought(teamId: string, thought: any): Promise<any>;
     setActiveDailyThought(teamId: string, activeId?: string): Promise<any>;
     fetchSoccerCategories(schoolCode?: string): Promise<Partial<SoccerCategory>[] | null>;
-    // soccer_categories has no school_id column -- the list is shared across
-    // every organization -- so none of these take one.
-    upsertSoccerCategory(category: any): Promise<{ ok: boolean; error?: string; data?: any }>;
-    fetchCategoryUsage(): Promise<Record<string, number> | null>;
-    retagDrills(fromName: string, toName: string): Promise<{ ok: boolean; error?: string; count?: number }>;
-    renameSoccerCategory(id: string, oldName: string, newName: string):
+    // Every one of these takes the organization: migration 0027 gave
+    // soccer_categories a school_id and made the name unique per
+    // organization, and the rename and merge work by NAME, so unscoped they
+    // reach into every other organization's list.
+    upsertSoccerCategory(schoolCode: string, category: any): Promise<{ ok: boolean; error?: string; data?: any }>;
+    fetchCategoryUsage(schoolCode: string): Promise<Record<string, number> | null>;
+    retagDrills(schoolCode: string, fromName: string, toName: string): Promise<{ ok: boolean; error?: string; count?: number }>;
+    renameSoccerCategory(schoolCode: string, id: string, oldName: string, newName: string):
       Promise<{ ok: boolean; error?: string; drillsUpdated?: number }>;
-    mergeSoccerCategory(fromName: string, toName: string):
+    mergeSoccerCategory(schoolCode: string, fromName: string, toName: string):
       Promise<{ ok: boolean; error?: string; drillsUpdated?: number }>;
     retireSoccerCategory(id: string): Promise<{ ok: boolean; error?: string }>;
     upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string }): Promise<Record<string, any> | null>;

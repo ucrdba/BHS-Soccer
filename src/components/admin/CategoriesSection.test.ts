@@ -116,7 +116,7 @@ describe('THE STRAYS', () => {
     await flush();
 
     // One argument: the client takes no organization for this write.
-    expect(upsertSoccerCategory).toHaveBeenCalledWith({ name: 'Set Pieces' });
+    expect(upsertSoccerCategory).toHaveBeenCalledWith('s1', { name: 'Set Pieces' });
   });
 
   it('MERGES one, naming both sides and the drill count', async () => {
@@ -195,7 +195,7 @@ describe('renaming', () => {
     await w.find('[data-category-save]').trigger('click');
     await flush();
 
-    expect(renameSoccerCategory).toHaveBeenCalledWith('c1', 'Possession', 'Rondos');
+    expect(renameSoccerCategory).toHaveBeenCalledWith('s1', 'c1', 'Possession', 'Rondos');
   });
 
   it('says how many drills moved with it', async () => {
@@ -229,7 +229,7 @@ describe('adding a category', () => {
     await w.find('[data-category-add-form]').trigger('submit');
     await flush();
 
-    expect(upsertSoccerCategory).toHaveBeenCalledWith({ name: 'Transition' });
+    expect(upsertSoccerCategory).toHaveBeenCalledWith('s1', { name: 'Transition' });
   });
 
   it('will not add an empty one', async () => {

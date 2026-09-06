@@ -268,7 +268,9 @@ async function writeRow(key: string, row: any): Promise<boolean> {
   }
 
   if (key === 'categories') {
-    const res = await supabaseService.upsertSoccerCategory({
+    // Categories belong to an organization since 0027, so an imported one
+    // lands in the importer's own list rather than everybody's.
+    const res = await supabaseService.upsertSoccerCategory(props.schoolId!, {
       name: row.Name, description: row.Description
     });
     return !!res?.ok;
