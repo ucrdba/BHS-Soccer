@@ -62,12 +62,12 @@ async function onSave(f: MatchForm): Promise<void> {
       ? await schedule.updateMatch(editing.value.id, f, teamId)
       : await schedule.addMatch(f, teamId);
 
-    if (res.ok) {
+    if (res?.ok) {
       formOpen.value = false;
       notice.value = editing.value ? 'Fixture updated.' : 'Fixture added.';
       return;
     }
-    formError.value = res.error || 'Could not save.';
+    formError.value = res?.error || 'Could not save.';
   } finally {
     busy.value = false;
   }
@@ -79,7 +79,7 @@ async function onRemove(m: Match): Promise<void> {
   if (!window.confirm(`Delete the fixture against ${m.opponent} on ${displayDate(m)}?`)) return;
 
   const res = await schedule.removeMatch(m.id, teamId);
-  notice.value = res.ok ? 'Fixture deleted.' : (res.error || 'Could not delete.');
+  notice.value = res?.ok ? 'Fixture deleted.' : (res?.error || 'Could not delete.');
 }
 </script>
 

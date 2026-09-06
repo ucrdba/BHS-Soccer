@@ -59,12 +59,12 @@ async function onSave(f: CoachForm): Promise<void> {
       ? await store.updateCoach(editing.value.id, f, schoolId.value)
       : await store.addCoach(f, schoolId.value);
 
-    if (res.ok) {
+    if (res?.ok) {
       formOpen.value = false;
       notice.value = editing.value ? 'Coach updated.' : 'Coach added.';
       return;
     }
-    formError.value = res.error || 'Could not save.';
+    formError.value = res?.error || 'Could not save.';
   } finally {
     busy.value = false;
   }
@@ -74,18 +74,18 @@ async function onRemove(c: Coach): Promise<void> {
   if (!schoolId.value) return;
   if (!window.confirm(`Remove ${c.name} from the coaching staff?`)) return;
   const res = await store.removeCoach(c.id, schoolId.value);
-  notice.value = res.ok ? `${c.name} removed.` : (res.error || 'Could not remove.');
+  notice.value = res?.ok ? `${c.name} removed.` : (res?.error || 'Could not remove.');
 }
 
 async function onApprove(userId: string, name: string): Promise<void> {
   const res = await store.approve(userId, schoolId.value);
-  notice.value = res.ok ? `${name} approved.` : (res.error || 'Could not approve.');
+  notice.value = res?.ok ? `${name} approved.` : (res?.error || 'Could not approve.');
 }
 
 async function onReject(userId: string, name: string): Promise<void> {
   if (!window.confirm(`Reject ${name}'s request for access?`)) return;
   const res = await store.reject(userId, schoolId.value);
-  notice.value = res.ok ? `${name} rejected.` : (res.error || 'Could not reject.');
+  notice.value = res?.ok ? `${name} rejected.` : (res?.error || 'Could not reject.');
 }
 </script>
 

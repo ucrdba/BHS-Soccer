@@ -61,7 +61,7 @@ async function onSave(f: PlayerForm): Promise<void> {
       ? await roster.updatePlayer(editing.value.id, f, teamId, schoolId)
       : await roster.addPlayer(f, teamId, schoolId);
 
-    if (res.ok) {
+    if (res?.ok) {
       formOpen.value = false;
       notice.value = editing.value ? 'Player updated.' : 'Player added.';
       return;
@@ -69,7 +69,7 @@ async function onSave(f: PlayerForm): Promise<void> {
     // A half-saved edit keeps the form open with what was typed: the profile
     // is stored, this team's fields are not, and re-typing the lot would be
     // the wrong instruction.
-    formError.value = res.error || 'Could not save.';
+    formError.value = res?.error || 'Could not save.';
   } finally {
     busy.value = false;
   }
@@ -84,7 +84,7 @@ async function onRemove(p: Player): Promise<void> {
   if (!ok) return;
 
   const res = await roster.removePlayer(p.id, teamId);
-  notice.value = res.ok ? `${p.name} removed from this team.` : (res.error || 'Could not remove.');
+  notice.value = res?.ok ? `${p.name} removed from this team.` : (res?.error || 'Could not remove.');
 }
 </script>
 
