@@ -102,16 +102,16 @@ export function toPlanRows(planName: string, items: PlanItem[], teamId: string):
 export function removedItemIds(before: PlanItem[], after: PlanItem[]): string[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - The row shape matches what the client sends today: `drill`, `time_slot`, `duration`, `coach_notes`, `diagram_image`, `diagram_data`.
 - **An id is sent only when it is a real uuid.** A locally generated `p_1724…` must insert, not fail an update against nothing.
 - `removedItemIds` returns ids present before and absent after, and **only real uuids** — an unsaved drill the coach added and removed has no row to delete.
 - It returns nothing for a reorder: the same drills in a different order have lost nobody.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
