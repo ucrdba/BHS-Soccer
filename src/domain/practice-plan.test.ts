@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   groupPracticePlans, totalSessionTime, recalculateTimeline,
-  moveItem, formatDuration, durationMinutes,
+  moveItem, formatDuration, durationMinutes, sessionStartMinutes,
   type PlanItem
 } from './practice-plan';
 
@@ -226,5 +226,44 @@ describe('reading and writing a duration', () => {
     // Distinct from zero: the caller decides what an unreadable one is worth.
     expect(durationMinutes('a while')).toBeNull();
     expect(durationMinutes('')).toBeNull();
+  });
+});
+
+describe('when the session starts', () => {
+  it('reads the start off the first drill', () => {
+    expect(sessionStartMinutes([item({ time: '5:30 PM - 5:45 PM' })])).toBe(17 * 60 + 30);
+  });
+
+  it('defaults to 4:00 PM for a plan with no times yet', () => {
+    expect(sessionStartMinutes([item({ time: '' })])).toBe(16 * 60);
+    expect(sessionStartMinutes([])).toBe(16 * 60);
+  });
+
+  it('holds the session still when the first drill moves', () => {
+    // The bug this exists to stop: the start belongs to the SESSION, not to
+    // whichever drill happens to sit at the top. Reflowing off the new first
+    // drill moves practice itself -- move the 4:00 drill down and the session
+    // starts at 4:20 instead. The legacy planner does exactly that.
+    const before = [
+      item({ name: 'A', time: '4:00 PM - 4:20 PM', duration: '20 min' }),
+      item({ name: 'B', time: '4:20 PM - 4:35 PM', duration: '15 min' })
+    ];
+    const start = sessionStartMinutes(before);
+    const moved = moveItem(before, 0, 1).items;
+
+    const out = recalculateTimeline(moved, start);
+    expect(out[0].time).toBe('4:00 PM - 4:15 PM');
+    expect(out[1].time).toBe('4:15 PM - 4:35 PM');
+  });
+
+  it('holds it still when the first drill is removed too', () => {
+    const before = [
+      item({ time: '4:00 PM - 4:20 PM', duration: '20 min' }),
+      item({ time: '4:20 PM - 4:35 PM', duration: '15 min' })
+    ];
+    const start = sessionStartMinutes(before);
+    const out = recalculateTimeline(before.slice(1), start);
+
+    expect(out[0].time).toBe('4:00 PM - 4:15 PM');
   });
 });

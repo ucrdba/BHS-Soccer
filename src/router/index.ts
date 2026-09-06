@@ -13,6 +13,7 @@ import ScheduleView from '../views/ScheduleView.vue';
 import CoachesView from '../views/CoachesView.vue';
 import HelpView from '../views/HelpView.vue';
 import MatrixView from '../views/MatrixView.vue';
+import PlannerView from '../views/PlannerView.vue';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -74,7 +75,7 @@ export const router: Router = createRouter({
     { path: '/roster',   name: 'roster',   component: RosterView },
     { path: '/schedule', name: 'schedule', component: ScheduleView },
     { path: '/matrix',   name: 'matrix',   component: MatrixView },
-    { path: '/planner',  name: 'planner',  ...placeholder('Coach Planner', 'Phase 4') },
+    { path: '/planner',  name: 'planner',  component: PlannerView },
     { path: '/coaches',  name: 'coaches',  component: CoachesView },
     { path: '/help',     name: 'help',     component: HelpView },
     // Anything else is the home page rather than a dead end.

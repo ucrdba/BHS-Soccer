@@ -23,6 +23,7 @@ import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 import {
   groupPracticePlans, recalculateTimeline, moveItem, totalSessionTime,
+  sessionStartMinutes,
   type PlanItem, type SavedPlan
 } from '../domain/practice-plan';
 import { toPlanRows, removedItemIds } from '../domain/plan-row';
@@ -138,13 +139,16 @@ export const usePlannerStore = defineStore('planner', () => {
    */
   async function removeDrill(teamId: string | null, index: number): Promise<WriteResult> {
     const before = items.value;
+    // Captured first: removing the drill that happens to be at the top would
+    // otherwise move practice itself to whenever the second one started.
+    const start = sessionStartMinutes(before);
     const after = before.filter((_, i) => i !== index);
 
     for (const id of removedItemIds(before, after)) {
       await supabaseService.deletePracticePlanItem(id);
     }
 
-    items.value = recalculateTimeline(after);
+    items.value = recalculateTimeline(after, start);
     if (selectedIndex.value >= items.value.length) {
       selectedIndex.value = Math.max(0, items.value.length - 1);
     }
@@ -153,8 +157,12 @@ export const usePlannerStore = defineStore('planner', () => {
 
   /** A reorder is a save: the order is the plan. */
   async function move(teamId: string | null, from: number, to: number): Promise<WriteResult> {
+    // The session's start belongs to the session, not to whichever drill is
+    // first. Read before the move, or dragging the 4:00 drill down moves
+    // practice to 4:20.
+    const start = sessionStartMinutes(items.value);
     const moved = moveItem(items.value, from, to);
-    items.value = recalculateTimeline(moved.items);
+    items.value = recalculateTimeline(moved.items, start);
     selectedIndex.value = moved.selected(selectedIndex.value);
     return persist(teamId);
   }

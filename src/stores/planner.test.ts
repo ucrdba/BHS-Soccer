@@ -375,3 +375,29 @@ describe('renaming and deleting a plan', () => {
     expect(s.items).toEqual([]);
   });
 });
+
+describe('the session start holds still', () => {
+  const timed = () => [
+    drill({ id: ROW_A, name: 'A', time: '4:00 PM - 4:20 PM', duration: '20 min' }),
+    drill({ id: ROW_B, name: 'B', time: '4:20 PM - 4:35 PM', duration: '15 min' })
+  ];
+
+  it('when the first drill is moved down', async () => {
+    // The start belongs to the session, not to whichever drill is at the top.
+    // Reflowing off the new first drill moves practice itself to 4:20.
+    const s = usePlannerStore();
+    s.items = timed();
+    await s.move(TEAM, 0, 1);
+
+    expect(s.items[0].time).toBe('4:00 PM - 4:15 PM');
+    expect(s.items[1].time).toBe('4:15 PM - 4:35 PM');
+  });
+
+  it('when the first drill is removed', async () => {
+    const s = usePlannerStore();
+    s.items = timed();
+    await s.removeDrill(TEAM, 0);
+
+    expect(s.items[0].time).toBe('4:00 PM - 4:15 PM');
+  });
+});

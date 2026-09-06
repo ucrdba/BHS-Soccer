@@ -144,7 +144,7 @@ Actions: `load(teamId, schoolId)`, `addDrill(item)`, `editDrill(index, item)`, `
 
 **Files:** Create `src/views/PlannerView.vue` and its test. Point the `/planner` route at it, replacing the placeholder.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - The route is **coach-only**; a player or guest is redirected, as `/matrix` already is.
 - Every drill shows its slot, duration, name and notes, and the header shows the total session time and the drill count.
@@ -153,9 +153,9 @@ Actions: `load(teamId, schoolId)`, `addDrill(item)`, `editDrill(index, item)`, `
 - An empty timeline says how to fill it, naming the two controls.
 - **No `onclick="app.…"` strings**: this is a component, and that boundary is what nothing checks in the legacy app.
 
-- [ ] **Step 2: Build it, watch the tests pass**
+- [x] **Step 2: Build it, watch the tests pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 

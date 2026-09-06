@@ -142,16 +142,32 @@ function slotText(startMins: number, endMins: number): string {
 }
 
 /**
- * Every drill's slot, reflowed from the first one's start plus the durations.
+ * When the session starts, from the first drill that says.
+ *
+ * The caller captures this **before** reordering or removing, because the
+ * start belongs to the session rather than to whichever drill happens to sit
+ * at the top of the list. Without it, moving the 4:00 drill down moves
+ * practice itself to 4:20 — the legacy planner does exactly that.
+ */
+export function sessionStartMinutes(items: PlanItem[]): number {
+  return startMinutesOf((items || [])[0]?.time) ?? DEFAULT_START_MINUTES;
+}
+
+/**
+ * Every drill's slot, reflowed from the session's start plus the durations.
+ *
+ * `startMinutes` is the session's start. Left out, it comes from the first
+ * drill's own slot, which is right for a plan being loaded and wrong right
+ * after a reorder — see `sessionStartMinutes`.
  *
  * Returns a new array: these are held in a store, and mutating in place would
  * skip reactivity and leave the screen showing the old times.
  */
-export function recalculateTimeline(items: PlanItem[]): PlanItem[] {
+export function recalculateTimeline(items: PlanItem[], startMinutes?: number): PlanItem[] {
   const list = items || [];
   if (list.length === 0) return [];
 
-  let current = startMinutesOf(list[0]?.time) ?? DEFAULT_START_MINUTES;
+  let current = startMinutes ?? sessionStartMinutes(list);
 
   return list.map(drill => {
     const mins = durationMinutes(drill?.duration) ?? DEFAULT_DRILL_MINUTES;
