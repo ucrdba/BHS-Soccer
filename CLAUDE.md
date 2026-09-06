@@ -16,7 +16,7 @@ A single-page web app for high-school and club soccer programs — Beaumont High
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/ (both entry points)
 npm run typecheck  # vue-tsc --noEmit over src/ only (components included)
-npm test           # vitest — 2,074 tests, config in vitest.config.mts
+npm test           # vitest — 2,119 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 
 powershell -File check_syntax.ps1   # node --check every file under public/js/ (22 of them)
@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,074 tests across 106 files), including Vue component tests.
+- `npm test` — Vitest unit tests (2,119 tests across 111 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -35,7 +35,9 @@ Verification is a four-part story, and each part covers a different slice of the
 
 The connection resolves as `TEST_DATABASE_URL` → a gitignored `.env.test` at the repo root → `postgres://postgres:postgres@localhost:5432/postgres`. **`hasTestDb()` returns false when nothing answers, and the suites `describe.skipIf` off it**, so a machine with no Postgres still runs everything else rather than reporting a wall of red.
 
-What this **cannot** test is `src/data/supabase.ts`. That client speaks HTTP to PostgREST and GoTrue, which the Supabase CLI only runs under Docker — not installed here. So "the SQL is right" is covered; "the client sends the right SQL" is not.
+`src/data/testdb/supabase-client.test.ts` goes further and tests `src/data/supabase.ts` itself against a **full local Supabase stack** — PostgREST and GoTrue, not just Postgres. It needs `supabase start` (see `docs/runbooks/2026-09-05-local-supabase-stack.md`) and skips when the stack is not answering.
+
+Note the two are separate databases: the harness uses the standalone Postgres on **5432**, and the CLI stack runs its own on **54322** behind the API on **54321**.
 
 `npm run dev` serves the app correctly — do not serve the repo root statically. `index.html` loads `./src/main.ts` as an ES module (no browser executes a `.ts` file directly), and everything under `./js/*` resolves only through Vite's `publicDir` mapping to `public/js/`. Use `npm run dev` to run the app locally.
 

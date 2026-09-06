@@ -2,7 +2,12 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "BHS-Soccer"
+# Not "BHS-Soccer": the CLI names its secret-staging directory
+# supabase/.temp/start-secrets/supabase_db_<project_id>, and that exact name
+# is stuck in a Windows delete-pending state from a failed first start --
+# surviving Docker restarts and wsl --shutdown alike. A different id sidesteps
+# the tombstone without needing a reboot. See the runbook.
+project_id = "bhs-soccer-local"
 
 [api]
 enabled = true

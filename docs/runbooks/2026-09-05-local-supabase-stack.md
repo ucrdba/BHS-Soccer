@@ -129,13 +129,26 @@ Hit repeatedly on this machine. The diagnosis, and what it is **not**:
 - **It is Windows delete-pending.** Removing a directory marks the name for deletion but leaves the entry until the last handle closes. Creating a directory over a tombstone fails with `ERROR_ACCESS_DENIED`, which Node surfaces as `EPERM` — not `EEXIST`, which is why the message is misleading.
 - **It is self-perpetuating.** Each `supabase start` creates the staging directory, fails, and deletes it; the next attempt's `mkdir` lands on the tombstone. So the EPERM usually **masks whatever failed first**.
 
-To break the cycle, delete the leaf and then wait for the name to actually free before starting:
+**What actually worked: change `project_id`.**
 
-```bash
-LEAF="supabase/.temp/start-secrets/supabase_db_<project>"
-rm -rf "$LEAF"
-until [ ! -e "$LEAF" ] && mkdir "$LEAF" 2>/dev/null && rmdir "$LEAF" 2>/dev/null; do sleep 1; done
-supabase start
+The tombstone here proved permanent. It survived killing Docker's processes, restarting Docker Desktop, and `wsl --shutdown` — which did terminate the `docker-desktop` VM, ruling that out as the holder. A reboot is normally the only thing that clears one.
+
+But the directory is named `supabase_db_<project_id>`, so a different id never touches the stuck name:
+
+```toml
+# supabase/config.toml
+project_id = "bhs-soccer-local"    # was "BHS-Soccer"
 ```
 
-If it still fails after that, the EPERM is no longer masking anything and the next error is the real one. Restarting Docker Desktop also releases the handle, and `supabase/.temp` is gitignored, so none of this can reach a commit.
+That started the stack immediately. It also renames every container (`supabase_db_bhs-soccer-local`, and so on), which is harmless.
+
+**Things ruled out along the way**, so nobody repeats them:
+
+| Suspected | Verdict |
+| --- | --- |
+| `D:` not shared with Docker | **No.** A container bind-mounts a `D:` path and reads *and writes* through it — verified directly. |
+| Windows network sharing on `D:` | **Irrelevant.** With the WSL 2 backend Docker has no per-drive file-sharing list. |
+| The WSL VM holding the handle | **No.** `wsl --shutdown` stopped it; the tombstone remained. |
+| A leftover container or volume | **No.** `docker ps -a` and `docker volume ls` were both empty. |
+
+`supabase/.temp` is gitignored, so none of this churn can reach a commit.
