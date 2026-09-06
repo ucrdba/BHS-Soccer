@@ -46,7 +46,7 @@ export function bandStanding(row: { earned: number; available: number; attempts:
 export function belowStandard(rows: any[]): any[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The four standings, and why each matters:
 
@@ -57,9 +57,9 @@ The four standings, and why each matters:
 
 Cover: each standing; that `none` is excluded from `belowStandard`; that `isThresholdMeasure` is true only for `time_bands` and false for `time_low` (fast *is* competitive — it ranks players against each other); and that a row with zero available does not divide by anything.
 
-- [ ] **Step 2: Run it, watch it fail, write the module, watch it pass**
+- [x] **Step 2: Run it, watch it fail, write the module, watch it pass**
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -67,7 +67,7 @@ Cover: each standing; that `none` is excluded from `belowStandard`; that `isThre
 
 **Files:** Create `src/stores/matrix.ts` and its test.
 
-- [ ] **Step 1: Read what feeds the board**
+- [x] **Step 1: Read what feeds the board**
 
 ```bash
 grep -n "matrixStats\|matrix_standings\|fetchTeamExercisePoints\|fetchMatrixLogs" src/data/supabase.ts | head
@@ -76,7 +76,7 @@ sed -n '367,420p' public/js/app.core.js
 
 The board reads `player.matrixStats`, which `syncFromSupabase` left-joins from the `matrix_standings` view onto the roster — **a player with no results must still appear at 0/0/0 rather than vanishing.** The per-exercise figures come from `fetchTeamExercisePoints(teamId)`.
 
-- [ ] **Step 2: Write the failing test, then the store**
+- [x] **Step 2: Write the failing test, then the store**
 
 ```ts
 // state
@@ -92,7 +92,7 @@ The sort actions delegate to `nextSortState` from `domain/matrix.ts` and keep on
 
 Cover: a player with no results still appears; the board sorts every way; the leaderboard filters to one drill; and `removeResult` reloads rather than patching, because points are derived in Postgres and a local edit would show a rank the database does not agree with.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
@@ -100,11 +100,11 @@ Cover: a player with no results still appears; the board sorts every way; the le
 
 **Files:** Create `src/views/MatrixView.vue`, `src/components/matrix/MatrixBoard.vue`, `ExerciseLeaderboard.vue`, and tests. Modify the router.
 
-- [ ] **Step 1: Build the board, test-first**
+- [x] **Step 1: Build the board, test-first**
 
 Cover: every player renders including one with no results; each column sorts and reverses; the arrow shows the **direction in force**, not merely that a column is sorted; an unranked player sinks in both directions; the bar tracks points against the leader rather than share.
 
-- [ ] **Step 2: Build the leaderboard, test-first**
+- [x] **Step 2: Build the leaderboard, test-first**
 
 Columns differ by measure — wins/draws/losses for a head-to-head or small-sided drill, a best count or a best time otherwise — because showing all of them fills the table with columns that are always zero.
 
@@ -117,7 +117,7 @@ Columns differ by measure — wins/draws/losses for a head-to-head or small-side
 
 For a competitive measure none of this appears, and the presentation is unchanged.
 
-- [ ] **Step 3: Point `/matrix` at the view, run the gates, commit**
+- [x] **Step 3: Point `/matrix` at the view, run the gates, commit**
 
 The route already guards on `canAccessRatings()`. Add a test that a player sees the board but no coach controls, and that a guest is redirected.
 
@@ -127,7 +127,7 @@ The route already guards on `canAccessRatings()`. Add a test that a player sees 
 
 **Files:** Create `src/components/matrix/ResultsPanel.vue`, `PlayerBreakdownModal.vue`, and tests.
 
-- [ ] **Step 1: Read what the panel is for**
+- [x] **Step 1: Read what the panel is for**
 
 ```bash
 sed -n '164,225p' public/js/views/matrix.view.js
@@ -136,25 +136,25 @@ sed -n '954,1020p' public/js/views/matrix-session.view.js
 
 Points are derived rather than stored, and the argument for that is that correcting a mis-entered result re-derives every rank. **That argument only holds if there is somewhere to correct it** — otherwise a typo needs the SQL editor. This panel is that somewhere, which is why it is not optional.
 
-- [ ] **Step 2: Build both, test-first**
+- [x] **Step 2: Build both, test-first**
 
 The panel is coach-only, and a guest or player must not have its controls in the document. Deleting asks first and names the result. The breakdown phrases a result for the exercise it was in — a time is not a count.
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
 
 ### Task 5: Close out 3a
 
-- [ ] **Step 1: Confirm the legacy app is untouched**
+- [x] **Step 1: Confirm the legacy app is untouched**
 
 ```bash
 git diff --stat e1fcc08..HEAD -- index.html public/js app.js
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`** — six of seven views live, and what 3b still owes.
+- [x] **Step 2: Update `CLAUDE.md`** — six of seven views live, and what 3b still owes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ## Definition of done
 

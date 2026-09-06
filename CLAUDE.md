@@ -24,7 +24,7 @@ powershell -File check_syntax.ps1   # node --check every file under public/js/ (
 
 Verification is a four-part story, and each part covers a different slice of the code:
 
-- `npm test` — Vitest unit tests (2,246 tests across 120 files), including Vue component and database tests.
+- `npm test` — Vitest unit tests (2,364 tests across 127 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit` over `src/` **only**, single-file components included; it does not see `public/js/`.
 - `node --check <file>` (or `check_syntax.ps1`, which runs it over every file under `public/js/`) — the syntax gate for the classic scripts, since typecheck doesn't reach them.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. `npm run typecheck` and `npm test` can both pass while an import is unresolvable at bundle time; only a real build catches that.
@@ -48,9 +48,24 @@ There are **two HTML entry points**, and `npm run build` emits both:
 | Entry | App |
 | --- | --- |
 | `index.html` | The **legacy** app, and the one Vercel serves at the root. Loads `src/main.ts` plus 22 classic scripts from `./js/*`. |
-| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. Five of the seven nav views are real there: Home, Roster, Schedule, Coaching Staff and Help, plus sign-in. Player Ratings and Coach Planner are still placeholders, built in Phases 3 and 4. |
+| `app.html` | The **Vue rebuild**, in progress. Loads `src/vue-main.ts` → `src/App.vue`. Reachable at `/app.html`. Six of the seven nav views are real there: Home, Roster, Schedule, Player Ratings, Coaching Staff and Help, plus sign-in. Coach Planner is still a placeholder, built in Phase 4. |
 
 They never share a document. Cutover is Phase 7 of the migration, when `app.html` becomes `index.html` and the legacy files are deleted.
+
+Player Ratings landed in Phase 3a as the board, the per-exercise leaderboard,
+the logged-results panel and the player breakdown. **Phase 3b still owes the
+write paths**: the session grid for keyboard entry, the drill weights editor,
+the standards and time-bands editor, and session history. Until those exist,
+results are still entered through the legacy app.
+
+One distinction in that screen is worth stating outright, because it is not
+obvious from the data and a later tidy-up would quietly erase it. Four of the
+five measures — `head_to_head`, `win_loss`, `count_high` and `time_low` — rank
+players against each other. **`time_bands` does not: it is a match-readiness
+standard**, so the board reports how many fell below it and marks them, rather
+than treating a bunched result as a problem. That emphasis is strictly
+additive; it must never narrow the table or disable a sort. See
+`src/domain/matrix-threshold.ts` and the tests that pin exactly this.
 
 | Location | Status |
 | --- | --- |
@@ -76,13 +91,28 @@ Consequences worth respecting:
 
 ## `src/domain/` — the extracted logic
 
-Eighteen framework-free modules. Thirteen hold logic that used to live on the
-`BHSSoccerApp` prototype — `schedule`, `matrix`, `matrix-session`, `lineup`,
-`plus-minus-court`, `round-robin`, `season`, `progress`, `report`,
-`recording-numbers`, `roster`, `csv` and `upsert` — and five were added by the
-Vue rebuild as it needed them: `season-record`, `theme` (an organization's
-branding), `roster-view` (the position filters), and the two table read
-mappings, `schedule-row` and `player-row`.
+Twenty-five framework-free modules, in two groups.
+
+**Thirteen were cut off the `BHSSoccerApp` prototype** — `schedule`, `matrix`,
+`matrix-session`, `lineup`, `plus-minus-court`, `round-robin`, `season`,
+`progress`, `report`, `recording-numbers`, `roster`, `csv` and `upsert`. These
+are the ones both apps use, so `src/main.ts` publishes each on `window` (see
+below) and the legacy prototype method is a one-line delegation.
+
+**Twelve were added by the Vue rebuild** as it needed them, and are imported
+directly rather than published: `season-record`, `theme` (an organization's
+branding), `roster-view` (the position filters), `schedule-view`, `help-search`,
+the four table read mappings `schedule-row`, `player-row`, `coach-row` and
+`matrix-standings`, and the three the Matrix needed — `matrix-threshold`
+(which measures are standards rather than rankings), `matrix-breakdown` (how a
+result reads in words) and `time`.
+
+`time.ts` deserves a note, because a second implementation of it is the easy
+mistake: `parseTimeToSeconds` treats `.` as `:`, so `"4.30"` is four minutes
+thirty and not four-point-three, and it **refuses** a single-digit seconds
+field because `"4:5"` could be either `4:05` or `4:50`. `src/data/supabase.ts`
+has its own copy that must agree, and `time.test.ts` runs both over the same
+inputs to prove it.
 
 `src/domain/test-globals.ts` sits alongside them but is a test helper, not a
 domain module.
@@ -91,12 +121,14 @@ They are **side-effect free** — no DOM, no `localStorage`, no Supabase, no
 `this` — which is the whole point: they can be tested without booting the app,
 and Phase 1 of the Vue migration can import them directly.
 
-`public/js/` cannot import, so `src/main.ts` publishes each as a `window`
-namespace (`window.scheduleDomain`, `window.matrixDomain`, …) and the
-corresponding prototype method is a one-line delegation. This is the same
-mechanism `window.plusMinus` already used for the plus/minus replay engine.
-Adding a module means adding both the import and the `window` assignment in
-`main.ts`; only `npm run build` catches a missed one.
+`public/js/` cannot import, so `src/main.ts` publishes the thirteen shared
+modules as `window` namespaces (`window.scheduleDomain`, `window.matrixDomain`,
+…). This is the same mechanism `window.plusMinus` already used for the
+plus/minus replay engine. Extracting more logic out of `public/js/` means
+adding both the import and the `window` assignment in `main.ts`; only
+`npm run build` catches a missed one. A module only the Vue app uses needs
+neither — publish one on `window` only when a classic script actually reads
+it.
 
 Two things follow from that:
 
