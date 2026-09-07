@@ -20,7 +20,7 @@ import { useAuthStore } from '../stores/auth';
 import { useRosterStore } from '../stores/roster';
 import { useLineupStore } from '../stores/lineup';
 import { fixturesWithoutLineup } from '../domain/lineup';
-import { displayDate, matchDirectionsUrl } from '../domain/schedule-view';
+import { displayDate, matchDirectionsUrl, matchOutcome } from '../domain/schedule-view';
 import type { Match } from '../domain/schedule-row';
 
 const schedule = useScheduleStore();
@@ -84,6 +84,15 @@ const upcoming = computed(() =>
 const played = computed(() =>
   schedule.matches.filter(m => m.status === 'COMPLETED').slice().reverse());
 
+/** The upcoming fixtures other than the next one, which gets its own card. */
+const later = computed(() =>
+  schedule.nextMatch ? upcoming.value.filter(m => m.id !== schedule.nextMatch!.id) : upcoming.value);
+
+function outcomeWord(m: Match): string {
+  const o = matchOutcome(m);
+  return o === 'won' ? 'Won' : o === 'drawn' ? 'Drawn' : o === 'lost' ? 'Lost' : '';
+}
+
 function openAdd(): void {
   editing.value = null;
   formError.value = null;
@@ -133,21 +142,14 @@ async function onRemove(m: Match): Promise<void> {
     <header class="sched__head">
       <div>
         <h1 class="sched__title">Schedule &amp; Results</h1>
-        <p v-if="org.branding.name" class="sched__org">
-          {{ org.branding.name }}
-          <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
+        <p v-if="org.branding.name" class="sched__org kicker tnum">
+          {{ org.branding.name }}<span v-if="org.activeTeam"> · {{ org.activeTeam.name }}</span>
         </p>
       </div>
       <div v-if="canEdit" class="sched__acts">
-        <button type="button" class="btn btn--go" data-add-match @click="openAdd">
-          + Add fixture
-        </button>
-        <button type="button" class="btn" data-open-lineup @click="openLineup(null)">
-          Lineup
-        </button>
-        <button type="button" class="btn" data-open-season @click="seasonOpen = true">
-          Season report
-        </button>
+        <button type="button" class="btn btn--go" data-add-match @click="openAdd">Add fixture</button>
+        <button type="button" class="btn" data-open-lineup @click="openLineup(null)">Lineup</button>
+        <button type="button" class="btn" data-open-season @click="seasonOpen = true">Season report</button>
       </div>
     </header>
 
@@ -166,75 +168,82 @@ async function onRemove(m: Match): Promise<void> {
 
     <template v-else>
       <section v-if="upcoming.length" class="group">
-        <h2 class="group__title">Upcoming</h2>
+        <p class="kicker kicker--accent">Upcoming</p>
+
+        <article v-if="schedule.nextMatch" class="next" data-next-fixture data-fixture>
+          <div class="next__top">
+            <h2 class="next__opp">{{ schedule.nextMatch.opponent }}</h2>
+            <span class="pill">{{ schedule.nextMatch.isHome ? 'Home' : 'Away' }}</span>
+          </div>
+          <p class="next__when tnum">
+            {{ displayDate(schedule.nextMatch) }}<template v-if="schedule.nextMatch.time"> · {{ schedule.nextMatch.time }}</template><template v-if="schedule.nextMatch.location"> · {{ schedule.nextMatch.location }}</template>
+          </p>
+          <div class="next__links">
+            <a v-if="matchDirectionsUrl(schedule.nextMatch)" class="textlink" data-directions
+               :href="matchDirectionsUrl(schedule.nextMatch)!" target="_blank" rel="noopener">Directions</a>
+            <template v-if="canEdit">
+              <button type="button" class="textlink" data-match-edit @click="openEdit(schedule.nextMatch)">Edit</button>
+              <button type="button" class="textlink" data-fixture-lineup @click="openLineup(schedule.nextMatch)">
+                Lineup<span v-if="missingLineup.has(schedule.nextMatch.id)" class="dot" data-lineup-missing>•</span>
+              </button>
+              <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(schedule.nextMatch)">Live ±</button>
+              <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(schedule.nextMatch)">Delete</button>
+            </template>
+          </div>
+        </article>
+
         <ul class="list">
-          <li v-for="m in upcoming" :key="m.id" class="row" data-fixture>
+          <li v-for="m in later" :key="m.id" class="row" data-fixture>
             <div class="row__main">
-              <span class="row__when">{{ displayDate(m) }}</span>
-              <span class="row__who">
-                <span class="row__ha">{{ m.isHome ? 'vs' : 'at' }}</span>
-                {{ m.opponent }}
-              </span>
-              <span class="row__where">
-                {{ m.location }}
-                <template v-if="m.time"> · {{ m.time }}</template>
-              </span>
+              <p class="row__opp">{{ m.opponent }}</p>
+              <p class="row__when tnum">{{ displayDate(m) }}<template v-if="m.time"> · {{ m.time }}</template></p>
+              <div v-if="canEdit || matchDirectionsUrl(m)" class="row__links">
+                <a v-if="matchDirectionsUrl(m)" class="textlink" data-directions
+                   :href="matchDirectionsUrl(m)!" target="_blank" rel="noopener">Directions</a>
+                <template v-if="canEdit">
+                  <button type="button" class="textlink" data-match-edit @click="openEdit(m)">Edit</button>
+                  <button type="button" class="textlink" data-fixture-lineup @click="openLineup(m)">
+                    Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
+                  </button>
+                  <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
+                  <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
+                </template>
+              </div>
             </div>
-            <div class="row__side">
-              <a v-if="matchDirectionsUrl(m)" class="row__link" data-directions
-                 :href="matchDirectionsUrl(m)!" target="_blank" rel="noopener">Directions</a>
-              <template v-if="canEdit">
-                <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
-                  Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
-                </button>
-                <button type="button" class="row__btn" data-fixture-pm @click="openPlusMinus(m)">
-                  &plusmn;
-                </button>
-                <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
-                <button type="button" class="row__btn row__btn--danger" data-match-remove
-                        @click="onRemove(m)">Delete</button>
-              </template>
-            </div>
+            <span class="row__side">{{ m.isHome ? 'Home' : 'Away' }}</span>
           </li>
         </ul>
       </section>
 
       <section v-if="played.length" class="group">
-        <h2 class="group__title">
+        <p class="kicker">
           Results
-          <span v-if="schedule.record.gamesPlayed" class="group__record">
-            {{ schedule.record.recordText }}
-          </span>
-        </h2>
+          <span v-if="schedule.record.gamesPlayed" class="tnum">· {{ schedule.record.recordText }}</span>
+        </p>
         <ul class="list">
           <li v-for="m in played" :key="m.id" class="row" data-fixture>
             <div class="row__main">
-              <span class="row__when">{{ displayDate(m) }}</span>
-              <span class="row__who">
-                <span class="row__ha">{{ m.isHome ? 'vs' : 'at' }}</span>
-                {{ m.opponent }}
-              </span>
-              <span class="row__where">{{ m.location }}</span>
+              <p class="row__opp">{{ m.opponent }}</p>
+              <p class="row__when tnum">{{ displayDate(m) }} · {{ m.isHome ? 'home' : 'away' }}</p>
+              <div v-if="canEdit" class="row__links">
+                <button type="button" class="textlink" data-match-edit @click="openEdit(m)">Edit</button>
+                <button type="button" class="textlink" data-fixture-lineup @click="openLineup(m)">
+                  Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
+                </button>
+                <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
+                <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
+              </div>
             </div>
-            <div class="row__side">
-              <span v-if="m.score" class="row__score" data-score>{{ m.score }}</span>
-              <template v-if="canEdit">
-                <button type="button" class="row__btn" data-fixture-lineup @click="openLineup(m)">
-                  Lineup<span v-if="missingLineup.has(m.id)" class="row__dot" data-lineup-missing>•</span>
-                </button>
-                <button type="button" class="row__btn" data-fixture-pm @click="openPlusMinus(m)">
-                  &plusmn;
-                </button>
-                <button type="button" class="row__btn" data-match-edit @click="openEdit(m)">Edit</button>
-                <button type="button" class="row__btn row__btn--danger" data-match-remove
-                        @click="onRemove(m)">Delete</button>
-              </template>
+            <div class="row__result tnum">
+              <p v-if="m.score" class="row__score" data-score>{{ m.score }}</p>
+              <p v-if="outcomeWord(m)" class="row__word" data-outcome>{{ outcomeWord(m) }}</p>
             </div>
           </li>
         </ul>
       </section>
     </template>
 
+    <!-- The four modals, unchanged. -->
     <LineupModal
       v-if="canEdit"
       :open="lineupOpen" :match-id="lineupMatch?.id ?? null"
@@ -263,142 +272,108 @@ async function onRemove(m: Match): Promise<void> {
 </template>
 
 <style scoped>
-.sched { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.sched { padding: var(--space-4) var(--space-4) var(--space-8); }
 
 .sched__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
 }
 
-.sched__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.sched__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.sched__org { margin-top: var(--space-1); }
+.sched__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-.sched__org {
-  margin: 0.25rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+.group { margin-top: var(--space-6); }
+.group:first-child { margin-top: 0; }
+.kicker--accent { color: var(--rule-strong); }
+
+/* The next fixture, carried out of the list. */
+.next {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
 }
 
-.group { margin-bottom: 2rem; }
+.next__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.next__opp { font-family: var(--heading-face); font-weight: 500; font-size: 21px; line-height: 1.1; color: var(--ink); }
+.next__when { margin-top: 6px; font-size: 12.5px; color: var(--ink-muted); }
+.next__links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--rule); }
 
-.group__title {
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin: 0 0 0.75rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
+.pill {
+  padding: 3px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
-.group__record {
-  color: var(--text-muted, #94a3b8);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+/* Text links, underlined in the accent, as the canvas draws them. */
+.textlink {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--live);
+  background: none;
+  color: var(--live);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.6;
+  text-decoration: none;
+  cursor: pointer;
 }
+.textlink:hover, .textlink:focus-visible { color: var(--ink); border-bottom-color: var(--ink); }
+.textlink--danger { color: var(--ink-muted); border-bottom-color: var(--rule); }
+.textlink--danger:hover, .textlink--danger:focus-visible { color: var(--color-danger); border-bottom-color: var(--color-danger); }
+.dot { margin-left: 3px; color: var(--color-warning); }
 
 .list { margin: 0; padding: 0; list-style: none; }
 
 .row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
-  background: var(--bhs-navy-card);
-  margin-bottom: 0.5rem;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.row__main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.row__main { min-width: 0; }
+.row__opp { font-size: 14.5px; color: var(--ink); }
+.row__when { margin-top: 2px; font-size: 11.5px; color: var(--ink-muted); }
+.row__links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
+.row__side { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; }
+.row__result { text-align: right; }
+.row__score { font-family: var(--heading-face); font-size: 16px; color: var(--ink); }
+.row__word { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
 
-.row__when {
-  color: var(--bhs-gold-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.row__who { color: var(--ink); font-size: 1rem; font-weight: 600; }
-.row__ha { color: var(--text-muted, #94a3b8); font-weight: 400; font-size: 0.85rem; }
-.row__where { color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
-
-.row__side { display: flex; gap: 0.4rem; align-items: center; }
-
-.row__score {
-  color: var(--ink);
-  font-size: 1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.row__link {
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 5px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.74rem;
-  text-decoration: none;
-}
-
-.row__btn {
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted, #94a3b8);
-  font: inherit;
-  font-size: 0.74rem;
-  cursor: pointer;
-}
-
-.row__btn:hover { color: var(--ink); }
-.row__btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-
-.empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
-
-.sched__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
-
-.row__dot { margin-left: 0.25rem; color: var(--bhs-gold-accent); }
+.empty { padding: var(--space-8) var(--space-3); color: var(--ink-muted); text-align: center; }
 
 .notice {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  color: var(--bhs-cyan-accent);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink);
   font-size: 0.85rem;
 }
+.notice--bad { border-left-color: var(--color-warning); }
+.notice__x { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-
-.notice__x {
-  border: 0; background: none; color: inherit;
-  font-size: 1.2rem; line-height: 1; cursor: pointer;
+@media (min-width: 768px) {
+  .sched { max-width: 64rem; margin: 0 auto; }
 }
-
-.btn {
-  padding: 0.55rem 1rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
 </style>

@@ -6,11 +6,16 @@
  * an away fixture whose address a coach actually stated, because a map query
  * of "Redlands" lands in the middle of a city rather than at a school.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import ScheduleView from './ScheduleView.vue';
 import { toMatch } from '../domain/schedule-row';
+
+// Pinned before the Yucaipa fixture below, as HomeView.test.ts does for the
+// same fixture data — otherwise "the next fixture" drifts into the past as
+// real time passes Sep 4, 2026 and schedule.nextMatch goes null.
+const NOW = new Date(2026, 8, 1, 12, 0);
 
 const row = (over: any = {}) => toMatch({
   id: 'm1', match_date: 'SEP 4, 2026', match_time: '6:00 PM',
@@ -56,7 +61,8 @@ function mountSchedule(opts: {
   });
 }
 
-beforeEach(() => { document.body.innerHTML = ''; });
+beforeEach(() => { document.body.innerHTML = ''; vi.useFakeTimers(); vi.setSystemTime(NOW); });
+afterEach(() => { vi.useRealTimers(); });
 
 describe('the fixtures', () => {
   it('renders upcoming and completed fixtures', () => {
@@ -99,6 +105,15 @@ describe('the fixtures', () => {
   it('surfaces a load failure', () => {
     expect(mountSchedule({ loadError: 'offline' }).find('[data-load-error]').text())
       .toContain('offline');
+  });
+
+  it('lifts the next fixture into its own card and says the result in words', () => {
+    const w = mountSchedule();
+    const next = w.find('[data-next-fixture]');
+    expect(next.exists()).toBe(true);
+    expect(next.text()).toContain('Yucaipa');
+    // The word carries the outcome; colour never does alone.
+    expect(w.find('[data-outcome]').text()).toMatch(/won/i);
   });
 });
 
