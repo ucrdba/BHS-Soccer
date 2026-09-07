@@ -20,20 +20,17 @@
  * memory of the match.
  */
 import { ref, computed, watch } from 'vue';
-import BaseModal from '../ui/BaseModal.vue';
+import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { seasonColumns, seasonFullMatchMinutes } from '../../domain/season';
 import { replay, orderEvents } from '../../data/plus-minus';
 import { seasonTotals, toMinutes, type MatchStats } from '../../data/season-stats';
 
 const props = defineProps<{
-  open: boolean;
   teamId: string | null;
   teams: any[];
   players: any[];
 }>();
-
-const emit = defineEmits<{ close: [] }>();
 
 const rows = ref<any[]>([]);
 const loading = ref(false);
@@ -80,7 +77,7 @@ async function load(): Promise<void> {
   }
 }
 
-watch(() => [props.open, props.teamId] as const, () => { if (props.open) load(); }, { immediate: true });
+watch(() => props.teamId, () => { load(); }, { immediate: true });
 
 const sorted = computed(() => {
   const col = columns.find(c => c.key === sortKey.value) || columns[2];
@@ -110,7 +107,10 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
 </script>
 
 <template>
-  <BaseModal :open="open" title="Season report" wide @close="emit('close')">
+  <ToolScreen
+    title="Season report" :kicker="`${fullMatch}-minute match`"
+    :back-to="{ name: 'schedule' }" back-label="Schedule"
+  >
     <p class="lede">
       Every player who has taken the pitch this season. Per-match rates are
       scaled to this squad's own {{ fullMatch }}-minute match, and the minutes
@@ -156,59 +156,55 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
         </tbody>
       </table>
     </div>
-
-    <template #footer>
-      <button type="button" class="btn" @click="emit('close')">Close</button>
-    </template>
-  </BaseModal>
+  </ToolScreen>
 </template>
 
 <style scoped>
 .lede {
-  margin: 0 0 0.9rem;
   max-width: 44rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-muted);
 }
 
-.state { padding: 2rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: var(--space-8) 0; text-align: center; font-size: 13px; color: var(--ink-muted); }
+.state--bad { color: var(--color-warning); }
 
-.wrap { overflow-x: auto; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.wrap { overflow-x: auto; margin-top: var(--space-4); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .tbl th, .tbl td {
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
   text-align: right;
+  white-space: nowrap;
 }
 
+.tbl th { border-bottom-color: var(--rule-strong); }
 .tbl th.is-text, .tbl td.is-text { text-align: left; }
+.tbl td.is-text { font-family: var(--font-body); }
 
 .th {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--bhs-cyan-accent);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
 }
 
-.tabular { font-variant-numeric: tabular-nums; }
+.th:hover { color: var(--ink); }
+.tabular { font-variant-numeric: tabular-nums; font-family: var(--heading-face); font-size: 15px; }
 
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
+/* The name column stays put while the figures scroll under a narrow screen. */
+@media (max-width: 767.98px) {
+  .tbl td.is-text, .tbl th.is-text {
+    position: sticky;
+    left: 0;
+    background: var(--ground);
+  }
 }
 </style>

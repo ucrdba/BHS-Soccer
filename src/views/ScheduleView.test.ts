@@ -236,6 +236,11 @@ describe('the match tools', () => {
     expect(w.find('[data-open-lineup]').exists()).toBe(true);
   });
 
+  it('links the header to the season report', () => {
+    expect(mountSchedule({ coach: true }).find('[data-open-season]').attributes('href'))
+      .toBe('/schedule/report');
+  });
+
   it('offers a guest none of it, absent rather than hidden', () => {
     const w = mountSchedule({ coach: false });
     expect(w.find('[data-fixture-lineup]').exists()).toBe(false);

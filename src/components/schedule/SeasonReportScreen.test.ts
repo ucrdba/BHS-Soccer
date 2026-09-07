@@ -18,7 +18,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import SeasonReportModal from './SeasonReportModal.vue';
+import SeasonReportScreen from './SeasonReportScreen.vue';
 
 const fetchSeasonStats = vi.fn();
 
@@ -62,9 +62,12 @@ const flush = async () => {
 
 async function mountSeason(opts: { teams?: any[] } = {}) {
   const { teams = [{ id: TEAM, name: 'Varsity', match_minutes: 80 }] } = opts;
-  const w = mount(SeasonReportModal, {
-    props: { open: true, teamId: TEAM, teams, players: PLAYERS },
-    attachTo: document.body
+  const w = mount(SeasonReportScreen, {
+    props: { teamId: TEAM, teams, players: PLAYERS },
+    attachTo: document.body,
+    global: {
+      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
+    }
   });
   await flush();
   await w.vm.$nextTick();
@@ -209,5 +212,12 @@ describe('when the read fails', () => {
 
     expect(w.find('[data-season-empty]').text()).toMatch(/plus\/minus/i);
     expect(w.find('[data-season-error]').exists()).toBe(false);
+  });
+});
+
+describe('the frame', () => {
+  it('offers a way back to the schedule', async () => {
+    const w = await mountSeason();
+    expect(w.find('[data-tool-back]').exists()).toBe(true);
   });
 });

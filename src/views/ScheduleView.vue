@@ -11,7 +11,6 @@
  */
 import { ref, computed, watch } from 'vue';
 import MatchFormModal from '../components/schedule/MatchFormModal.vue';
-import SeasonReportModal from '../components/schedule/SeasonReportModal.vue';
 import { useScheduleStore, type MatchForm } from '../stores/schedule';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -34,8 +33,6 @@ const formOpen = ref(false);
 const busy = ref(false);
 const formError = ref<string | null>(null);
 const notice = ref<string | null>(null);
-
-const seasonOpen = ref(false);
 
 const schoolId = computed(() => org.school?.id ?? null);
 
@@ -128,7 +125,7 @@ async function onRemove(m: Match): Promise<void> {
       <div v-if="canEdit" class="sched__acts">
         <button type="button" class="btn btn--go" data-add-match @click="openAdd">Add fixture</button>
         <RouterLink class="btn" data-open-lineup :to="{ name: 'lineup' }">Lineup</RouterLink>
-        <button type="button" class="btn" data-open-season @click="seasonOpen = true">Season report</button>
+        <RouterLink class="btn" data-open-season :to="{ name: 'season-report' }">Season report</RouterLink>
       </div>
     </header>
 
@@ -228,13 +225,7 @@ async function onRemove(m: Match): Promise<void> {
       </section>
     </template>
 
-    <!-- The two remaining modals, unchanged. Live ± moved to its own route. -->
-    <SeasonReportModal
-      v-if="canEdit"
-      :open="seasonOpen" :team-id="org.activeTeamId"
-      :teams="org.teams" :players="roster.players"
-      @close="seasonOpen = false" />
-
+    <!-- The one remaining modal. Live ± and the season report each moved to their own route. -->
     <MatchFormModal
       v-if="canEdit"
       :open="formOpen" :match="editing" :busy="busy" :error="formError"
