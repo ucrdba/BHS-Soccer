@@ -67,4 +67,25 @@ describe('the router', () => {
     expect(paths).toContain('/admin');
     expect(paths).toContain('/quiz');
   });
+
+  it('puts the touchline tools on the pitch and the report on the ledger', () => {
+    const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
+    expect(byName.get('lineup')?.meta.ground).toBe('pitch');
+    expect(byName.get('live')?.meta.ground).toBe('pitch');
+    expect(byName.get('season-report')?.meta.ground).toBe('ledger');
+  });
+
+  it('marks all three as tool chrome, so the shell steps aside', () => {
+    const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
+    for (const name of ['lineup', 'live', 'season-report']) {
+      expect(byName.get(name)?.meta.chrome, name).toBe('tool');
+    }
+  });
+
+  it('takes a lineup with or without a fixture', () => {
+    const paths = router.getRoutes().map(r => r.path);
+    expect(paths).toContain('/schedule/lineup/:matchId?');
+    expect(paths).toContain('/schedule/:matchId/live');
+    expect(paths).toContain('/schedule/report');
+  });
 });

@@ -54,6 +54,15 @@ describe('routeAllowed', () => {
     expect(routeAllowed('nonsense', guest)).toBe(true);
     expect(routeAllowed('', guest)).toBe(true);
   });
+
+  it('keeps the touchline tools to coaches and admins', () => {
+    for (const name of ['lineup', 'live', 'season-report']) {
+      expect(routeAllowed(name, coach), name).toBe(true);
+      expect(routeAllowed(name, admin), name).toBe(true);
+      expect(routeAllowed(name, player), name).toBe(false);
+      expect(routeAllowed(name, guest), name).toBe(false);
+    }
+  });
 });
 
 describe('NAV_ITEMS', () => {

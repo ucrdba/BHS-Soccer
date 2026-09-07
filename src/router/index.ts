@@ -23,6 +23,9 @@ import MatrixView from '../views/MatrixView.vue';
 import PlannerView from '../views/PlannerView.vue';
 import AdminView from '../views/AdminView.vue';
 import QuizView from '../views/QuizView.vue';
+import LineupView from '../views/LineupView.vue';
+import LiveMatchView from '../views/LiveMatchView.vue';
+import SeasonReportView from '../views/SeasonReportView.vue';
 import { groundFor, applyGround } from './ground';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
@@ -73,6 +76,10 @@ export function routeAllowed(name: string, a: AuthLike): boolean {
   if (name === 'matrix') return a.canAccessRatings();
   if (name === 'planner') return a.isCoach();
   if (name === 'coaches') return a.isCoach() || a.isAdmin();
+  // The touchline tools write to the match record, so they are a coach's.
+  if (name === 'lineup' || name === 'live' || name === 'season-report') {
+    return a.isCoach() || a.isAdmin();
+  }
   // Coach OR admin, deliberately. Gating this on can_access_admin_dashboard
   // would be tighter and wrong: schema_roles.sql grants that to admin alone,
   // while the legacy panel shows the categories, the unassigned players and
@@ -92,6 +99,16 @@ export const router: Router = createRouter({
     { path: '/',         name: 'home',     component: HomeView,     meta: { ground: 'paper' } },
     { path: '/roster',   name: 'roster',   component: RosterView,   meta: { ground: 'paper' } },
     { path: '/schedule', name: 'schedule', component: ScheduleView, meta: { ground: 'paper' } },
+    // The touchline tools. `chrome: 'tool'` drops the header and nav — a
+    // masthead over a match clock is in the way — and the ground makes them
+    // navy. Registered before the catch-all, and the lineup before the live
+    // board so `/schedule/lineup/...` is never read as a fixture id.
+    { path: '/schedule/lineup/:matchId?', name: 'lineup', component: LineupView,
+      meta: { ground: 'pitch', chrome: 'tool' } },
+    { path: '/schedule/:matchId/live', name: 'live', component: LiveMatchView,
+      meta: { ground: 'pitch', chrome: 'tool' } },
+    { path: '/schedule/report', name: 'season-report', component: SeasonReportView,
+      meta: { ground: 'ledger', chrome: 'tool' } },
     // The ratings move to the ledger ground in phase 4 of the restyle.
     { path: '/matrix',   name: 'matrix',   component: MatrixView,   meta: { ground: 'paper' } },
     { path: '/planner',  name: 'planner',  component: PlannerView,  meta: { ground: 'paper' } },
