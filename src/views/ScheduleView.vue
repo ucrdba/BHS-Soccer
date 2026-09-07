@@ -350,7 +350,7 @@ async function onRemove(m: Match): Promise<void> {
 .row__opp { font-size: 14.5px; color: var(--ink); }
 .row__when { margin-top: 2px; font-size: 11.5px; color: var(--ink-muted); }
 .row__links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
-.row__side { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; }
+.row__side { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); white-space: nowrap; }
 .row__result { text-align: right; }
 .row__score { font-family: var(--heading-face); font-size: 16px; color: var(--ink); }
 .row__word { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }

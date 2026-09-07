@@ -98,7 +98,7 @@ const grade = computed(() => lineupGrade(props.player));
 }
 
 .plate__img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.22) saturate(0.82) contrast(1.05); }
-.plate__label { display: none; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.plate__label { display: none; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 /* A plate with no photograph. The label only fits at card size (the canvas
    draws an unlabeled box in the squad rows), so at row size the dashed edge
@@ -111,7 +111,7 @@ const grade = computed(() => lineupGrade(props.player));
 .card__text { display: flex; flex-direction: column; min-width: 0; }
 .card__name { font-size: 13.5px; color: var(--ink); }
 .card__meta { font-size: 11px; color: var(--ink-muted); }
-.card__grade { color: var(--ink-soft); }
+.card__grade { color: var(--ink-muted); }
 .card__grade::before { content: ' '; }
 
 .card__admin { display: flex; gap: var(--space-3); flex: none; }

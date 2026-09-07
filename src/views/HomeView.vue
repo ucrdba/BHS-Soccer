@@ -97,7 +97,7 @@ const lastResult = computed(() => {
             <p class="when__date tnum">{{ displayDate(schedule.nextMatch) }}</p>
             <p v-if="schedule.nextMatch.time" class="when__time tnum">Kick-off {{ schedule.nextMatch.time }}</p>
           </div>
-          <div class="when__count">
+          <div class="when__count" aria-label="Time until the next match">
             <p class="when__figure tnum" data-countdown>{{ countdown }}</p>
             <p class="when__label">to kick-off</p>
           </div>
@@ -193,7 +193,7 @@ const lastResult = computed(() => {
 .when__time { margin-top: 3px; font-size: 13px; color: var(--ink-muted); }
 .when__count { text-align: right; }
 .when__figure { font-family: var(--heading-face); font-size: 23px; line-height: 1; color: var(--rule-strong); }
-.when__label { margin-top: 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.when__label { margin-top: 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 .last {
   display: flex;
@@ -236,7 +236,7 @@ const lastResult = computed(() => {
 }
 
 .stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--ink); }
-.stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 @media (min-width: 768px) {
   .fixture, .stats { max-width: 40rem; margin-inline: auto; }
