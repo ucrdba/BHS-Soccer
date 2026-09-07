@@ -13,7 +13,7 @@
  * bar renders every item once, with the overflowed ones marked, so the
  * split is a matter of CSS rather than two lists.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { NAV_ITEMS, routeAllowed, type NavItem } from '../../router';
 import { barItems } from '../../domain/nav-bar';
 import { useAuthStore } from '../../stores/auth';
@@ -39,13 +39,35 @@ function isOverflow(item: NavItem): boolean {
   return overflowNames.value.has(item.name);
 }
 
-function toggleSheet(): void {
+const toggleEl = ref<HTMLButtonElement | null>(null);
+const sheetEl = ref<HTMLElement | null>(null);
+
+/**
+ * Opening the sheet moves focus into it; closing it gives focus back to the
+ * toggle. Without this a keyboard user opens the sheet and is still standing
+ * on the More tab with the links somewhere behind them.
+ */
+async function toggleSheet(): Promise<void> {
   sheetOpen.value = !sheetOpen.value;
+  await nextTick();
+  if (sheetOpen.value) {
+    sheetEl.value?.querySelector<HTMLElement>('[data-nav-sheet-item]')?.focus();
+  } else {
+    toggleEl.value?.focus();
+  }
 }
 
 /** A sheet left open over the page it just navigated to reads as a bug. */
 function closeSheet(): void {
   sheetOpen.value = false;
+}
+
+/** Escape closes the sheet and returns focus, the way a dialog does. */
+async function onSheetKeydown(e: KeyboardEvent): Promise<void> {
+  if (e.key !== 'Escape') return;
+  closeSheet();
+  await nextTick();
+  toggleEl.value?.focus();
 }
 </script>
 
@@ -68,6 +90,7 @@ function closeSheet(): void {
 
       <li v-if="hasMore" class="nav__item nav__item--more">
         <button
+          ref="toggleEl"
           type="button"
           class="nav__link nav__more"
           data-nav-toggle
@@ -80,10 +103,12 @@ function closeSheet(): void {
 
     <div
       v-if="hasMore"
+      ref="sheetEl"
       id="nav-more"
       class="sheet"
       :class="{ 'is-open': sheetOpen }"
       data-nav-drawer
+      @keydown="onSheetKeydown"
     >
       <div class="sheet__backdrop" data-nav-backdrop @click="closeSheet" />
       <ul class="sheet__list">

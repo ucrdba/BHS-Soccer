@@ -118,4 +118,35 @@ describe('AppNav', () => {
     const roster = w.findAll('[data-nav-item]')[1];
     expect(roster.attributes('title')).toBe('Roster & Bios');
   });
+
+  it('closes the sheet on Escape', async () => {
+    const w = mountAs({ isCoach: true, canAccessRatings: true, isGuest: false });
+    await w.find('[data-nav-toggle]').trigger('click');
+    expect(w.find('[data-nav-drawer]').classes()).toContain('is-open');
+    await w.find('[data-nav-drawer]').trigger('keydown', { key: 'Escape' });
+    expect(w.find('[data-nav-drawer]').classes()).not.toContain('is-open');
+  });
+
+  it('moves focus into the sheet on open and back to the toggle on close', async () => {
+    // Mounted with attachTo so document.activeElement follows .focus().
+    const live = mount(AppNav, {
+      attachTo: document.body,
+      global: {
+        plugins: [createTestingPinia({
+          createSpy: vi.fn, stubActions: false,
+          initialState: { auth: { isCoach: true, isAdmin: false, canAccessRatings: true, isGuest: false, isLoggedIn: true, role: 'coach', user: null } }
+        })],
+        stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } }
+      }
+    });
+
+    await live.find('[data-nav-toggle]').trigger('click');
+    await live.vm.$nextTick();
+    expect(document.activeElement).toBe(live.find('[data-nav-sheet-item]').element);
+
+    await live.find('[data-nav-drawer]').trigger('keydown', { key: 'Escape' });
+    await live.vm.$nextTick();
+    expect(document.activeElement).toBe(live.find('[data-nav-toggle]').element);
+    live.unmount();
+  });
 });

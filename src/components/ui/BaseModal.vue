@@ -149,6 +149,10 @@ function onKeydown(e: KeyboardEvent): void {
 
 .modal__panel--wide { max-width: 48rem; }
 
+/* index.css clears :focus so :focus-visible can own the ring; the panel is
+   focused programmatically when a dialog has no control, and must show one. */
+.modal__panel:focus { outline: 2px solid var(--live); outline-offset: -2px; }
+
 .modal__head {
   display: flex;
   align-items: center;

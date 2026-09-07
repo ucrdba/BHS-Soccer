@@ -139,4 +139,11 @@ describe('AppHeader', () => {
     expect(coach.find('[data-account-btn]').text()).toBe('Sign out');
     expect(coach.find('[data-role-badge]').text()).toBe('COACH');
   });
+
+  it('names the record for assistive tech on a real group', () => {
+    const w = mountWith({ loadedTeamId: 't1', matches: [{ status: 'COMPLETED', score: '2-0' }] });
+    const record = w.find('[data-season-record]');
+    expect(record.attributes('role')).toBe('group');
+    expect(record.attributes('aria-label')).toBe('Season record');
+  });
 });

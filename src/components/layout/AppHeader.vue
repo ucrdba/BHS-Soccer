@@ -100,7 +100,7 @@ async function onAccountClick(): Promise<void> {
       <span v-else-if="activeTeamText" class="switcher__static" data-team-name>{{ activeTeamText }}</span>
       <span v-else />
 
-      <span v-if="showRecord" class="record tnum" data-season-record aria-label="Season record">
+      <span v-if="showRecord" class="record tnum" data-season-record role="group" aria-label="Season record">
         <span>{{ record!.wins }}<em>W</em></span>
         <span>{{ record!.losses }}<em>L</em></span>
         <span>{{ record!.draws }}<em>D</em></span>
