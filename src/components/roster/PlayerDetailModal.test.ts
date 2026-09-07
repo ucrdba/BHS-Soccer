@@ -16,7 +16,8 @@ const PLAYER = {
   ratings: { technical: 80, tactical: 70, physical: 90, mental: 70 }
 };
 
-const mountWith = (player: any) => mount(PlayerDetailModal, { props: { open: true, player } });
+const mountWith = (player: any, canSeeRatings = true) =>
+  mount(PlayerDetailModal, { props: { open: true, player, canSeeRatings } });
 
 describe('PlayerDetailModal', () => {
   it('reads number and class year as the kicker, and position and height under the name', () => {
@@ -65,5 +66,23 @@ describe('PlayerDetailModal', () => {
     expect(img.attributes('src')).toBe('https://example.test/marcus.jpg');
     // The plate says "Photo" only when there is not one.
     expect(w.find('[data-photo-missing]').exists()).toBe(false);
+  });
+
+  it('hides the ratings from a viewer who may not see them', () => {
+    // A coach's assessment of a minor is not public. The roster decides who
+    // qualifies; the bio only obeys.
+    const w = mountWith(PLAYER, false);
+    expect(w.findAll('[data-skill-bar]')).toHaveLength(0);
+    expect(w.text()).not.toMatch(/skill ratings/i);
+    // The rest of the bio is unaffected.
+    expect(w.text()).toContain('Marcus Delgado');
+    expect(w.findAll('[data-season-stat]').length).toBeGreaterThan(0);
+  });
+
+  it('hides them when nobody says otherwise', () => {
+    // The prop defaults to false, so a screen that forgets it shows nothing
+    // rather than everything.
+    const w = mount(PlayerDetailModal, { props: { open: true, player: PLAYER } });
+    expect(w.findAll('[data-skill-bar]')).toHaveLength(0);
   });
 });

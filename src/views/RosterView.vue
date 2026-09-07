@@ -18,6 +18,7 @@ import RecordingNumbersModal from '../components/roster/RecordingNumbersModal.vu
 import { useRosterStore, type PlayerForm } from '../stores/roster';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
+import { canSeeTeamRatings } from '../domain/ratings-visibility';
 import type { Player } from '../domain/player-row';
 
 const roster = useRosterStore();
@@ -25,6 +26,20 @@ const org = useOrganizationStore();
 const auth = useAuthStore();
 
 const canEdit = computed(() => auth.isCoach || auth.isAdmin);
+
+/**
+ * Whether this viewer may see the ratings on a bio.
+ *
+ * The roster is the right place to decide it: it knows which people are on
+ * the team being looked at, which is what "a player of this team" means.
+ */
+const canSeeRatings = computed(() => canSeeTeamRatings({
+  isCoach: auth.isCoach,
+  isAdmin: auth.isAdmin,
+  canAccessRatings: auth.canAccessRatings,
+  viewerPlayerId: auth.user?.playerId ?? null,
+  teamPlayerIds: roster.players.map((p: any) => p.id)
+}));
 
 const numbersOpen = ref(false);
 
@@ -156,7 +171,8 @@ async function onRemove(p: Player): Promise<void> {
     </template>
 
     <PlayerDetailModal
-      :open="detailFor !== null" :player="detailFor" @close="detailFor = null" />
+      :open="detailFor !== null" :player="detailFor"
+      :can-see-ratings="canSeeRatings" @close="detailFor = null" />
 
     <PlayerFormModal
       v-if="canEdit"

@@ -3,9 +3,10 @@
  * A player's bio, as anyone may see it.
  *
  * Photo plate, number and class year, name, position and height, the season
- * figures, and the four skill ratings as bars. The ratings are on the public
- * bio because the functional specification puts them there; a rating that is
- * not set is left out rather than drawn at zero.
+ * figures, and the four skill ratings as bars. The ratings are shown only to
+ * the team's own coaches, admins and players — see
+ * `domain/ratings-visibility.ts`; a rating that is not set is left out rather
+ * than drawn at zero.
  */
 import { computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
@@ -13,7 +14,16 @@ import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain
 import { lineupGrade } from '../../domain/lineup';
 import { skillBars } from '../../domain/player-skills';
 
-const props = defineProps<{ open: boolean; player: Player | null }>();
+const props = withDefaults(defineProps<{
+  open: boolean;
+  player: Player | null;
+  /**
+   * Whether this viewer may see the skill ratings. Decided by the roster,
+   * which knows who is on the team; false by default so a screen that
+   * forgets the prop shows nothing rather than everything.
+   */
+  canSeeRatings?: boolean;
+}>(), { canSeeRatings: false });
 const emit = defineEmits<{ close: [] }>();
 
 const photo = computed(() => photoOrPlaceholder(props.player?.photo));
@@ -72,7 +82,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
         </li>
       </ul>
 
-      <section v-if="skills.length" class="skills">
+      <section v-if="canSeeRatings && skills.length" class="skills">
         <p class="kicker kicker--accent">Skill ratings</p>
         <div v-for="s in skills" :key="s.key" class="skill" data-skill-bar>
           <div class="skill__row">
