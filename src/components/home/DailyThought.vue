@@ -104,11 +104,13 @@ async function onCopy(t: any): Promise<void> {
     <!-- Only when there is one. An empty box on the front page every day
          teaches the squad to stop looking at it. -->
     <template v-if="active">
-      <h2 class="thought__h">
-        {{ active.title || "Coach's message" }}
-      </h2>
+      <p class="thought__kicker kicker">
+        <template v-if="active.coach_name">From {{ active.coach_name }}</template>
+        <template v-else>Coach's message</template>
+      </p>
+      <h2 class="thought__h">{{ active.title || "Coach's message" }}</h2>
       <p class="thought__text" data-thought-text>{{ active.thoughts_text }}</p>
-      <p v-if="active.coach_name" class="thought__by" data-thought-by>{{ active.coach_name }}</p>
+      <p v-if="active.coach_name" class="thought__by sr-only" data-thought-by>{{ active.coach_name }}</p>
     </template>
 
     <template v-if="canEdit">
@@ -180,88 +182,105 @@ async function onCopy(t: any): Promise<void> {
 
 <style scoped>
 .thought {
-  margin-bottom: 1.5rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  margin: var(--space-6) var(--space-4) 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--rule-strong);
+  border-radius: var(--radius-md);
 }
+
+.thought__kicker { color: var(--ink-muted); }
 
 .thought__h {
-  margin: 0 0 0.4rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  margin: var(--space-2) 0 0;
+  font-family: var(--heading-face);
+  font-weight: 500;
+  font-size: 21px;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
-.thought__text { margin: 0; color: var(--ink); font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; }
-.thought__by { margin: 0.4rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
+.thought__text {
+  margin: var(--space-2) 0 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.65;
+  text-align: justify;
+  hyphens: auto;
+  white-space: pre-wrap;
+}
 
-.acts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.7rem; }
+.acts { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-3); }
 
 .sub {
-  margin: 1rem 0 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
-  padding: 0.3rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--rule);
   font-size: 0.82rem;
 }
 
 .row__title { color: var(--ink); }
-.row__acts { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.row__acts { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
-.form { margin-top: 0.7rem; }
-.fld { display: block; margin-bottom: 0.5rem; }
+.form { margin-top: var(--space-3); }
+.fld { display: block; margin-bottom: var(--space-2); }
 
 .fld__label {
   display: block;
-  margin-bottom: 0.2rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
 .inp {
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.84rem;
-}
-
-.inp--wide { width: 100%; }
-
-.note { margin: 0.5rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.8rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn, .mini {
-  padding: 0.26rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 14px;
+}
+
+.inp:focus-visible { border-color: var(--live); outline-offset: 0; }
+.inp--wide { width: 100%; }
+
+.note { margin: var(--space-2) 0 0; color: var(--ink-muted); font-size: 0.8rem; line-height: 1.5; }
+.note--bad { color: var(--color-danger); }
+.note--good { color: var(--live); }
+
+.btn, .mini {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--heading-face);
+  font-size: 14px;
   cursor: pointer;
 }
 
-.mini { color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.mini { min-height: 30px; font-size: 13px; color: var(--ink-muted); }
+.btn--go { border-color: var(--live); color: var(--live); }
+.btn:hover, .mini:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+
+@media (min-width: 768px) {
+  .thought { max-width: 40rem; margin-inline: auto; }
+}
 </style>
