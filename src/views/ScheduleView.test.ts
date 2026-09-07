@@ -218,12 +218,9 @@ describe('plus / minus', () => {
     expect(mountSchedule({ coach: false }).find('[data-fixture-pm]').exists()).toBe(false);
   });
 
-  it('opens the board on the fixture it was asked about', async () => {
+  it('links each fixture to its live board', () => {
     const w = mountSchedule({ coach: true });
-    await w.findAll('[data-fixture-pm]')[0].trigger('click');
-    await w.vm.$nextTick();
-
-    expect(w.find('[data-pm-clock]').exists()).toBe(true);
+    expect(w.findAll('[data-fixture-pm]')[0].attributes('href')).toMatch(/^\/schedule\/.+\/live$/);
   });
 });
 

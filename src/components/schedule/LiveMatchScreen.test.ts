@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
-import PlusMinusModal from './PlusMinusModal.vue';
+import LiveMatchScreen from './LiveMatchScreen.vue';
 
 const openStatMatch = vi.fn();
 const fetchStatEvents = vi.fn();
@@ -42,13 +42,14 @@ const flush = async () => {
 };
 
 async function mountBoard() {
-  const w = mount(PlusMinusModal, {
+  const w = mount(LiveMatchScreen, {
     props: {
-      open: true, matchId: MATCH, matchLabel: 'vs Redlands',
+      matchId: MATCH, matchLabel: 'vs Redlands',
       teamId: TEAM, schoolId: 's1', players: PLAYERS
     },
     global: {
-      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })]
+      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })],
+      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
     },
     attachTo: document.body
   });
@@ -98,8 +99,10 @@ describe('the clock', () => {
   });
 
   it('shows the period and the running score', async () => {
+    // Screen redesign: the kicker reads "1st half" rather than "Period 1"
+    // for the first two periods (still "Period N" for extra time).
     const w = await mountBoard();
-    expect(w.text()).toContain('Period 1');
+    expect(w.text()).toMatch(/1st half/i);
     expect(w.find('[data-pm-score]').text()).toBe('0 – 0');
   });
 
@@ -304,7 +307,8 @@ describe('the running figures', () => {
     await flush();
     await w.vm.$nextTick();
 
-    expect(w.find('[data-pm-score-for="p1"]').text().trim()).toBe('0');
+    // The row now carries minutes alongside the net score in one string.
+    expect(w.find('[data-pm-score-for="p1"]').text()).toContain('net 0');
   });
 });
 
@@ -319,5 +323,63 @@ describe('opening', () => {
     const w = await mountBoard();
 
     expect(w.find('[data-pm-open-error]').text()).toMatch(/must coach this team/i);
+  });
+});
+
+describe('the screen at its own URL', () => {
+  it('says the clock is not started before kick-off, and says it differently once stopped', async () => {
+    const w = await mountBoard();
+    expect(w.find('[data-pm-status]').text()).toMatch(/not started/i);
+
+    await startClock(w);
+    expect(w.find('[data-pm-status]').text()).toMatch(/running/i);
+
+    await w.find('[data-pm-clock-toggle]').trigger('click');
+    await flush();
+    await w.vm.$nextTick();
+    expect(w.find('[data-pm-status]').text()).toMatch(/stopped/i);
+  });
+
+  it('shows the refusal as a card headed for the case it is', async () => {
+    // Before kick-off the mistake is different from a mid-match stoppage,
+    // and the coach is told which one they are in.
+    const w = await mountBoard();
+    await sendOn(w, 'p1');
+    await w.find('[data-pm-plus="p1"]').trigger('click');
+    await flush();
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-pm-refusal]').exists()).toBe(true);
+    expect(w.find('[data-pm-refusal-title]').text()).toMatch(/hasn't kicked off|has not kicked off/i);
+    // The words are the store's, not the screen's.
+    expect(w.find('[data-pm-notice]').text()).toMatch(/start the clock/i);
+  });
+
+  it('heads the refusal differently once the match has started', async () => {
+    const w = await mountBoard();
+    await sendOn(w, 'p1');
+    await startClock(w);
+    await w.find('[data-pm-clock-toggle]').trigger('click');
+    await flush();
+    await w.vm.$nextTick();
+
+    await w.find('[data-pm-plus="p1"]').trigger('click');
+    await flush();
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-pm-refusal-title]').text()).toMatch(/stopped/i);
+  });
+
+  it('offers a way back to the schedule', async () => {
+    const w = await mountBoard();
+    expect(w.find('[data-tool-back]').exists()).toBe(true);
+  });
+
+  it('arms an event kind from the footer bar', async () => {
+    const w = await mountBoard();
+    await startClock(w);
+    await w.find('[data-pm-arm="goal"]').trigger('click');
+    await w.vm.$nextTick();
+    expect(w.find('[data-pm-arm="goal"]').classes()).toContain('is-armed');
   });
 });

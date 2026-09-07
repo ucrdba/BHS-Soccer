@@ -12,7 +12,6 @@
 import { ref, computed, watch } from 'vue';
 import MatchFormModal from '../components/schedule/MatchFormModal.vue';
 import SeasonReportModal from '../components/schedule/SeasonReportModal.vue';
-import PlusMinusModal from '../components/schedule/PlusMinusModal.vue';
 import { useScheduleStore, type MatchForm } from '../stores/schedule';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -37,13 +36,6 @@ const formError = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
 const seasonOpen = ref(false);
-const pmOpen = ref(false);
-const pmMatch = ref<Match | null>(null);
-
-function openPlusMinus(m: Match): void {
-  pmMatch.value = m;
-  pmOpen.value = true;
-}
 
 const schoolId = computed(() => org.school?.id ?? null);
 
@@ -174,7 +166,8 @@ async function onRemove(m: Match): Promise<void> {
                           :to="{ name: 'lineup', params: { matchId: schedule.nextMatch.id } }">
                 Lineup<span v-if="missingLineup.has(schedule.nextMatch.id)" class="dot" data-lineup-missing>•</span>
               </RouterLink>
-              <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(schedule.nextMatch)">Live ±</button>
+              <RouterLink class="textlink" data-fixture-pm
+                          :to="{ name: 'live', params: { matchId: schedule.nextMatch.id } }">Live ±</RouterLink>
               <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(schedule.nextMatch)">Delete</button>
             </template>
           </div>
@@ -194,7 +187,8 @@ async function onRemove(m: Match): Promise<void> {
                               :to="{ name: 'lineup', params: { matchId: m.id } }">
                     Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
                   </RouterLink>
-                  <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
+                  <RouterLink class="textlink" data-fixture-pm
+                              :to="{ name: 'live', params: { matchId: m.id } }">Live ±</RouterLink>
                   <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
                 </template>
               </div>
@@ -220,7 +214,8 @@ async function onRemove(m: Match): Promise<void> {
                             :to="{ name: 'lineup', params: { matchId: m.id } }">
                   Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
                 </RouterLink>
-                <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
+                <RouterLink class="textlink" data-fixture-pm
+                            :to="{ name: 'live', params: { matchId: m.id } }">Live ±</RouterLink>
                 <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
               </div>
             </div>
@@ -233,14 +228,7 @@ async function onRemove(m: Match): Promise<void> {
       </section>
     </template>
 
-    <!-- The three remaining modals, unchanged. -->
-    <PlusMinusModal
-      v-if="canEdit"
-      :open="pmOpen" :match-id="pmMatch?.id ?? null"
-      :match-label="pmMatch ? `${pmMatch.opponent}` : ''"
-      :team-id="org.activeTeamId" :school-id="schoolId" :players="roster.players"
-      @close="pmOpen = false" />
-
+    <!-- The two remaining modals, unchanged. Live ± moved to its own route. -->
     <SeasonReportModal
       v-if="canEdit"
       :open="seasonOpen" :team-id="org.activeTeamId"
