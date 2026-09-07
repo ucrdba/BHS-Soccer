@@ -249,6 +249,8 @@ const grade = lineupGrade;
   margin: 0 auto;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 8px;
+  /* The pitch canvas is always dark, regardless of ground, so its text is always light. */
+  --pitch-ink: #F8FAFC;
   background:
     linear-gradient(to top, color-mix(in srgb, var(--ink) 5%, transparent) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
     #163d16;
@@ -263,10 +265,10 @@ const grade = lineupGrade;
   align-items: center;
   min-width: 3.6rem;
   padding: 0.2rem 0.3rem;
-  border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--pitch-ink) 40%, transparent);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.35);
-  color: var(--ink);
+  color: var(--pitch-ink);
   font: inherit;
   font-size: 0.7rem;
   cursor: pointer;
@@ -286,7 +288,7 @@ const grade = lineupGrade;
   border: 0;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.7);
-  color: var(--ink);
+  color: var(--pitch-ink);
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.1rem 0.28rem;
