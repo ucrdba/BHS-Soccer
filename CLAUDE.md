@@ -44,7 +44,7 @@ The two are separate databases: the harness uses the standalone Postgres on **54
 
 | Location | Holds |
 | --- | --- |
-| `index.html` | The only entry document. Mounts `#vue-app`, loads `src/vue-main.ts` and the two CDN libraries. |
+| `index.html` | The only entry document. Mounts `#vue-app`, loads `src/vue-main.ts`, the fonts and the two CDN libraries. `data-ground="paper"` on `<html>` so the first paint has tokens. |
 | `src/vue-main.ts`, `src/App.vue` | The app shell. |
 | `src/router/index.ts` | Seven nav routes plus `/admin` and `/quiz`, and the nav list itself. |
 | `src/views/*.vue` | One per route. |
@@ -264,7 +264,8 @@ The Supabase SQL editor may run as a role that is a **member** of `postgres` wit
 
 ## Conventions
 
-- Component styles are scoped; shared design tokens are CSS custom properties in `index.css` (`--bhs-cyan-accent`, `--text-muted`, …), with the organization's colours painted onto them at runtime by the organization store.
+- **Component styles are scoped and style against the ground tokens in `index.css`** — `--ground`, `--surface`, `--surface-deep`, `--ink`, `--ink-muted`, `--ink-soft`, `--rule`, `--rule-strong`, `--live`, `--mark`, `--heading-face`, `--shadow-md` — never a literal colour. The same names are defined for three grounds (`paper`, `pitch`, `ledger`) under `data-ground` on `<html>`, which the router sets from `meta.ground` (`src/router/ground.ts`). The organization's colours arrive as `--org-primary` / `--org-secondary` (raw, for stroke) and `--org-mark-paper` / `--org-mark-dark` (after the 3:1 contrast guard in `domain/theme.ts`); `--mark` reads the right one per ground. **The `--bhs-*` names are temporary aliases** from the restyle's phase 1 and are deleted in phase 5 — do not use them in new work. `src/design-tokens.test.ts` guards all of this, including that no component style hardcodes a white.
+- **Routes carry `meta.chrome: 'tool'`** to render without the header, nav and footer; the touchline and session screens draw their own bars. Spec: `docs/superpowers/specs/2026-09-07-mobile-restyle-design.md`.
 - `tsconfig.json` is deliberately loose (`strict: false`, `noImplicitAny: false`) so the ported code type-checks without a rewrite. Don't tighten it as a side effect of another change.
 - **`typescript` is pinned to 5.x on purpose — do not upgrade to 7.** TypeScript 7 is the native Go rewrite and exports only `.` and `./unstable/*`; `vue-tsc` resolves `typescript/lib/tsc`, which that layout does not have, so it dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` and cannot run at all. Without it nothing type-checks a `.vue` file's script block or its templates. Deferred until `vue-tsc` supports TypeScript 7, not abandoned.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `refactor:`).
