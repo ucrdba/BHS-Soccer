@@ -33,7 +33,10 @@ export interface AuthLike {
 export interface NavItem {
   name: string;
   path: string;
+  /** The full name, for the router tests and a link's title. */
   label: string;
+  /** What a bottom-bar tab has room for. */
+  short: string;
   icon: string;
 }
 
@@ -45,13 +48,13 @@ export interface NavItem {
  * hand-written `<li>` per view that nothing kept in step with the router.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { name: 'home',     path: '/',          label: 'Home',               icon: '⚽' },
-  { name: 'roster',   path: '/roster',    label: 'Roster & Bios',      icon: '👥' },
-  { name: 'schedule', path: '/schedule',  label: 'Schedule & Results', icon: '📅' },
-  { name: 'matrix',   path: '/matrix',    label: 'Player Ratings',     icon: '🏆' },
-  { name: 'planner',  path: '/planner',   label: 'Coach Planner',      icon: '📋' },
-  { name: 'coaches',  path: '/coaches',   label: 'Coaching Staff',     icon: '👔' },
-  { name: 'help',     path: '/help',      label: 'Help',               icon: '📖' }
+  { name: 'home',     path: '/',          label: 'Home',               short: 'Home',     icon: '⚽' },
+  { name: 'roster',   path: '/roster',    label: 'Roster & Bios',      short: 'Roster',   icon: '👥' },
+  { name: 'schedule', path: '/schedule',  label: 'Schedule & Results', short: 'Schedule', icon: '📅' },
+  { name: 'matrix',   path: '/matrix',    label: 'Player Ratings',     short: 'Ratings',  icon: '🏆' },
+  { name: 'planner',  path: '/planner',   label: 'Coach Planner',      short: 'Planner',  icon: '📋' },
+  { name: 'coaches',  path: '/coaches',   label: 'Coaching Staff',     short: 'Staff',    icon: '👔' },
+  { name: 'help',     path: '/help',      label: 'Help',               short: 'Help',     icon: '📖' }
 ];
 
 /**

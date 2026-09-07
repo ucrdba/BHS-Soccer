@@ -1,19 +1,25 @@
 <script setup lang="ts">
 /**
- * The main navigation: a bar on desktop, a drawer under 640px.
+ * The main navigation: a bottom bar on a phone, a hairline top nav on a desk.
  *
  * The items come from NAV_ITEMS, the same list the router is built from, and
- * are filtered through the same routeAllowed() the navigation guard uses. In
- * the legacy app the menu was hand-written <li> elements in index.html that
- * updateAuthUI() hid by setting style.display -- two sources of truth, and an
- * item a visitor could not reach still sat in the document.
+ * are filtered through the same routeAllowed() the navigation guard uses, so
+ * an item a visitor cannot reach is not in the document at all.
+ *
+ * Under 768px the bar holds five. `barItems` decides which sit in it and
+ * which go behind More — a sheet that also carries the admin screen, which is
+ * not in NAV_ITEMS because most visitors cannot open it. Above 768px every
+ * item is in the bar and the More tab and the sheet are display:none; the
+ * bar renders every item once, with the overflowed ones marked, so the
+ * split is a matter of CSS rather than two lists.
  */
 import { ref, computed } from 'vue';
-import { NAV_ITEMS, routeAllowed } from '../../router';
+import { NAV_ITEMS, routeAllowed, type NavItem } from '../../router';
+import { barItems } from '../../domain/nav-bar';
 import { useAuthStore } from '../../stores/auth';
 
 const auth = useAuthStore();
-const drawerOpen = ref(false);
+const sheetOpen = ref(false);
 
 const visibleItems = computed(() =>
   NAV_ITEMS.filter(item => routeAllowed(item.name, {
@@ -22,136 +28,216 @@ const visibleItems = computed(() =>
     canAccessRatings: () => auth.canAccessRatings
   })));
 
-function toggleDrawer(): void {
-  drawerOpen.value = !drawerOpen.value;
+const split = computed(() => barItems(visibleItems.value));
+const overflowNames = computed(() => new Set(split.value.overflow.map(i => i.name)));
+const hasMore = computed(() => split.value.overflow.length > 0);
+
+/** The admin screen is reached on purpose; it lives in the sheet, not the bar. */
+const showAdmin = computed(() => auth.isCoach || auth.isAdmin);
+
+function isOverflow(item: NavItem): boolean {
+  return overflowNames.value.has(item.name);
 }
 
-/** A drawer left open over the page it just navigated to reads as a bug. */
-function closeDrawer(): void {
-  drawerOpen.value = false;
+function toggleSheet(): void {
+  sheetOpen.value = !sheetOpen.value;
+}
+
+/** A sheet left open over the page it just navigated to reads as a bug. */
+function closeSheet(): void {
+  sheetOpen.value = false;
 }
 </script>
 
 <template>
   <nav class="nav" aria-label="Main">
-    <button
-      class="nav__toggle"
-      type="button"
-      data-nav-toggle
-      :aria-expanded="drawerOpen ? 'true' : 'false'"
-      aria-controls="nav-items"
-      @click="toggleDrawer"
-    >
-      <span aria-hidden="true">{{ drawerOpen ? '✕' : '☰' }}</span>
-      <span class="nav__toggle-label">Menu</span>
-    </button>
-
-    <ul
-      id="nav-items"
-      class="nav__list"
-      :class="{ 'is-open': drawerOpen }"
-      data-nav-drawer
-    >
-      <li v-for="item in visibleItems" :key="item.name" class="nav__item">
+    <ul class="nav__bar">
+      <li
+        v-for="item in visibleItems" :key="item.name"
+        class="nav__item" :class="{ 'nav__item--overflow': isOverflow(item) }"
+      >
         <RouterLink
           :to="item.path"
           class="nav__link"
+          :title="item.label"
           data-nav-item
-          @click="closeDrawer"
-        >
-          <span class="nav__icon" aria-hidden="true">{{ item.icon }}</span>
-          {{ item.label }}
-        </RouterLink>
+          :data-nav-overflow="isOverflow(item) ? '' : undefined"
+          @click="closeSheet"
+        >{{ item.short }}</RouterLink>
+      </li>
+
+      <li v-if="hasMore" class="nav__item nav__item--more">
+        <button
+          type="button"
+          class="nav__link nav__more"
+          data-nav-toggle
+          :aria-expanded="sheetOpen ? 'true' : 'false'"
+          aria-controls="nav-more"
+          @click="toggleSheet"
+        >More</button>
       </li>
     </ul>
+
+    <div
+      v-if="hasMore"
+      id="nav-more"
+      class="sheet"
+      :class="{ 'is-open': sheetOpen }"
+      data-nav-drawer
+    >
+      <div class="sheet__backdrop" data-nav-backdrop @click="closeSheet" />
+      <ul class="sheet__list">
+        <li v-for="item in split.overflow" :key="item.name" class="sheet__item">
+          <RouterLink
+            :to="item.path" class="sheet__link" :title="item.label"
+            data-nav-sheet-item @click="closeSheet"
+          >{{ item.short }}</RouterLink>
+        </li>
+        <li v-if="showAdmin" class="sheet__item">
+          <RouterLink
+            to="/admin" class="sheet__link" title="Admin"
+            data-nav-sheet-item data-nav-admin @click="closeSheet"
+          >Admin</RouterLink>
+        </li>
+      </ul>
+    </div>
   </nav>
 </template>
 
 <style scoped>
-.nav {
-  background: var(--bhs-navy-card);
-  border-bottom: 1px solid var(--bhs-navy-border);
-  position: sticky;
-  top: 0;
-  z-index: 40;
-}
+/* ── The bar ── */
 
-.nav__toggle {
-  display: none;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.85rem 1rem;
-  background: none;
-  border: 0;
-  color: var(--bhs-cyan-accent);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.nav__list {
+.nav__bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
   margin: 0;
-  padding: 0 1rem;
+  padding: 0;
   list-style: none;
 }
 
+.nav__item { flex: 1; min-width: 0; }
+
 .nav__link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.85rem 0.9rem;
-  color: var(--text-muted, #94a3b8);
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-top: 2px solid transparent;
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 10px;
+  line-height: 1.3;
   text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
   white-space: nowrap;
-  border-bottom: 2px solid transparent;
+  cursor: pointer;
 }
 
 .nav__link:hover,
-.nav__link:focus-visible {
-  color: #fff;
-}
+.nav__link:focus-visible { color: var(--ink); }
 
-/* router-link-active is applied by Vue Router to the current route. */
+/* router-link-exact-active is applied by Vue Router to the current route. */
 .nav__link.router-link-exact-active {
-  color: var(--bhs-cyan-accent);
-  border-bottom-color: var(--bhs-cyan-accent);
-}
-
-.nav__icon {
-  font-size: 1rem;
+  color: var(--ink);
+  border-top-color: var(--live);
 }
 
 /*
- * Under 640px the bar becomes a drawer. What this replaced was a strip that
- * scrolled sideways with its scrollbar hidden -- the items past the edge were
- * there and nothing on screen said so.
+ * Under 768px: fixed to the bottom, on the surface, with the overflowed
+ * items hidden and the More tab shown. The safe-area inset keeps the bar
+ * above a phone's home indicator.
  */
-@media (max-width: 640px) {
-  .nav__toggle { display: flex; }
-
-  .nav__list {
-    display: none;
-    flex-direction: column;
-    padding: 0 0 0.5rem;
+@media (max-width: 767.98px) {
+  .nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
   }
 
-  .nav__list.is-open { display: flex; }
+  .nav__item--overflow { display: none; }
+}
+
+/* 768px and above: a hairline top nav, every item in a row, no More. */
+@media (min-width: 768px) {
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--ground);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .nav__bar {
+    gap: var(--space-4);
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 0 var(--space-4);
+  }
+
+  .nav__item { flex: none; }
 
   .nav__link {
-    width: 100%;
-    padding: 0.9rem 1.25rem;
-    border-bottom: 1px solid var(--bhs-navy-border);
+    min-height: 44px;
+    padding: 0;
+    border-top: 0;
+    border-bottom: 1px solid transparent;
+    font-size: 14px;
   }
 
   .nav__link.router-link-exact-active {
-    border-bottom-color: var(--bhs-navy-border);
-    border-left: 3px solid var(--bhs-cyan-accent);
+    border-top-color: transparent;
+    border-bottom-color: var(--live);
+    color: var(--live);
   }
+
+  .nav__item--more,
+  .sheet { display: none; }
 }
+
+/* ── The More sheet ── */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+}
+
+.sheet.is-open { display: block; }
+
+.sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+.sheet__list {
+  position: absolute;
+  inset: auto 0 0 0;
+  margin: 0;
+  padding: var(--space-2) 0 calc(var(--space-8) + 48px + env(safe-area-inset-bottom));
+  list-style: none;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  box-shadow: var(--shadow-md);
+}
+
+.sheet__link {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  font-size: 15px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sheet__link:hover,
+.sheet__link:focus-visible { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+
+.sheet__link.router-link-exact-active { color: var(--live); }
 </style>
