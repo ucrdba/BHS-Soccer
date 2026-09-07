@@ -1,13 +1,15 @@
 /**
  * Routing for the Vue app.
  *
- * The seven nav routes, in the order the menu reads. The strategy settled that
- * only these get URLs; the app's thirty-six modals stay as component state.
+ * The seven nav routes, in the order the menu reads, plus `/admin` and
+ * `/quiz`. The strategy settled that only these get URLs; the app's other
+ * modals stay as component state.
  *
- * `/admin` is the one deliberate exception, and it is not in the nav. It was
- * never really a modal — several unrelated sections, deep-linkable, and long
- * enough that a dialog fights it — but it is reached on purpose rather than
- * browsed to, and a menu item most visitors cannot open is noise.
+ * Neither `/admin` nor `/quiz` is in the nav. `/admin` was never really a
+ * modal — several unrelated sections, deep-linkable, and long enough that a
+ * dialog fights it — but it is reached on purpose rather than browsed to, and
+ * a menu item most visitors cannot open is noise. `/quiz` is a player's
+ * screen, linked from the daily message rather than from the menu.
  */
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 import { auth } from '../auth';
