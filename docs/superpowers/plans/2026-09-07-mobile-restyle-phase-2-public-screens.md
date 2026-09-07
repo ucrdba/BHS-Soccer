@@ -22,7 +22,7 @@
 - **Empty, loading and refused states keep their present wording.** The Home tests pin "coming soon", "add them from", "season complete", the last opponent's name; the Schedule and Roster tests pin "No fixtures yet", "No players on this team yet" and the load-error text.
 - **Low-minute players, recording numbers and the clock gate are untouched** — none of these screens carry them, and nothing here may add a filter that hides a player.
 - `tsconfig.json` stays loose; `typescript` stays on 5.x. `.at()` is unavailable at this `lib` target.
-- Conventional Commits, one commit per task, trailer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Git prints CRLF warnings on this machine; they are not errors.
+- Conventional Commits, one commit per task, trailer `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`. Git prints CRLF warnings on this machine; they are not errors.
 
 ---
 
@@ -121,7 +121,7 @@ Run: `npx vitest run src/design-tokens.test.ts` → PASS. Then the three gates b
 git add src/design-tokens.test.ts
 git commit -m "test: the white guard catches shorthand white and alpha hex
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -264,7 +264,7 @@ git commit -m "fix: keyboard and focus in the shell
 Escape closes the More sheet and focus follows it in and out; the record
 is a named group; a dialog focused on its panel shows a ring.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -591,7 +591,7 @@ Three framework-free functions the public screens need. parseScore is
 lifted out of seasonRecord so the result word and the record cannot read
 a score two different ways.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -744,7 +744,7 @@ Run: `npx vitest run src/components/home/DailyThought.test.ts src/views/HomeView
 git add src/components/home/DailyThought.vue
 git commit -m "feat: the coach's message as the canvas card
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1044,7 +1044,7 @@ git commit -m "feat: Home on the paper ground
 The next match with one countdown figure, the last result in words, the
 message card and the record strip. The hero goes; the crest is the shell's.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1367,7 +1367,7 @@ The next fixture in its own card, hairline rows, and the result in words
 beside the score. The coach's controls become text links; the modals are
 untouched.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1717,7 +1717,7 @@ git commit -m "feat: Roster on the paper ground
 Pills, the sort as text, and the squad as hairline rows on a phone or a
 card grid on a desk. A missing photo is a plate that says so.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1959,7 +1959,7 @@ Open a player from the roster at the mobile preset: the plate on the left, the k
 git add src/components/roster/PlayerDetailModal.vue src/components/roster/PlayerDetailModal.test.ts
 git commit -m "feat: the player bio with the four skill bars
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1996,7 +1996,7 @@ In the spec's §9 list, change the line `2. **Public screens.** Home, Schedule, 
 git add docs/superpowers/specs/2026-09-07-mobile-restyle-design.md
 git commit -m "docs: phase 2 of the restyle is done
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
