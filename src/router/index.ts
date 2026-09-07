@@ -21,6 +21,7 @@ import MatrixView from '../views/MatrixView.vue';
 import PlannerView from '../views/PlannerView.vue';
 import AdminView from '../views/AdminView.vue';
 import QuizView from '../views/QuizView.vue';
+import { groundFor, applyGround } from './ground';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
 export interface AuthLike {
@@ -83,13 +84,16 @@ const placeholder = (title: string, phase: string) => ({
 export const router: Router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/',         name: 'home',     component: HomeView },
-    { path: '/roster',   name: 'roster',   component: RosterView },
-    { path: '/schedule', name: 'schedule', component: ScheduleView },
-    { path: '/matrix',   name: 'matrix',   component: MatrixView },
-    { path: '/planner',  name: 'planner',  component: PlannerView },
-    { path: '/coaches',  name: 'coaches',  component: CoachesView },
-    { path: '/help',     name: 'help',     component: HelpView },
+    { path: '/',         name: 'home',     component: HomeView,     meta: { ground: 'paper' } },
+    { path: '/roster',   name: 'roster',   component: RosterView,   meta: { ground: 'paper' } },
+    { path: '/schedule', name: 'schedule', component: ScheduleView, meta: { ground: 'paper' } },
+    // The ratings move to the ledger ground in phase 4 of the restyle.
+    { path: '/matrix',   name: 'matrix',   component: MatrixView,   meta: { ground: 'paper' } },
+    { path: '/planner',  name: 'planner',  component: PlannerView,  meta: { ground: 'paper' } },
+    { path: '/coaches',  name: 'coaches',  component: CoachesView,  meta: { ground: 'paper' } },
+    { path: '/help',     name: 'help',     component: HelpView,     meta: { ground: 'paper' } },
+    { path: '/admin',    name: 'admin',    component: AdminView,    meta: { ground: 'paper' } },
+    { path: '/quiz',     name: 'quiz',     component: QuizView,     meta: { ground: 'paper' } },
     // Anything else is the home page rather than a dead end.
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ],
@@ -100,4 +104,12 @@ export const router: Router = createRouter({
 router.beforeEach((to) => {
   if (routeAllowed(String(to.name || ''), auth)) return true;
   return { name: 'home' };
+});
+
+/**
+ * The ground follows the route. Set after navigation rather than before so a
+ * refused navigation never repaints the page it stayed on.
+ */
+router.afterEach((to) => {
+  applyGround(typeof document === 'undefined' ? undefined : document, groundFor(to.meta));
 });
