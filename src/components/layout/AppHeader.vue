@@ -1,34 +1,53 @@
 <script setup lang="ts">
 /**
- * The masthead: who you are looking at, and who you are.
+ * The crest: who you are looking at, and who you are.
  *
- * Every word of the branding comes from the organization's row. The legacy
- * hero read "BEAUMONT HIGH SCHOOL" and "HOME OF THE COUGARS" from literals in
- * a template string, which is wrong the moment a club coach opens it.
+ * Every word of the branding comes from the organization's row. The mark is
+ * the organization's initial inside a keyline drawn in its own colour — the
+ * one place on the paper ground the organization's primary appears, as
+ * stroke. The team switcher groups teams by organization because that
+ * distinction is the point: a person may coach a school team and a club
+ * team, and confusing the two is the failure the control exists to prevent.
  */
 import { computed, ref } from 'vue';
 import AuthModal from '../auth/AuthModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { useOrganizationStore } from '../../stores/organization';
+import { useScheduleStore } from '../../stores/schedule';
+import { teamGroups } from '../../domain/team-switcher';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
+const schedule = useScheduleStore();
 const authOpen = ref(false);
 
+/** The first letter of the organization's name; nothing before it loads. */
+const initial = computed(() => (org.branding.name || '').trim().charAt(0).toUpperCase());
+
+const groups = computed(() => teamGroups(org.teams, org.schools));
+const showSwitcher = computed(() => org.teams.length > 1);
+
+const activeTeamText = computed(() => {
+  const t: any = org.activeTeam;
+  if (!t) return '';
+  return t.season ? `${t.name} · ${t.season}` : String(t.name || '');
+});
+
 /**
- * The account button says what it does.
- *
- * A guest signs in. Everyone else signs out -- the admin centre and the
- * account screen are Phase 6, and a button that opens nothing is worse than
- * one that is not there.
+ * Nothing is claimed about the season until the schedule has actually been
+ * read for this team. The header does not load it: the home and schedule
+ * screens do, and a record that appears as you reach them is honest.
  */
-const accountLabel = computed(() =>
-  auth.isGuest ? '🔑 Sign In / Register' : '🚪 Sign Out');
+const record = computed(() => schedule.loadedTeamId ? schedule.record : null);
+const showRecord = computed(() => !!record.value && record.value.gamesPlayed > 0);
 
-const badgeText = computed(() =>
-  auth.user ? String(auth.role || '').toUpperCase() : 'GUEST');
+const accountLabel = computed(() => auth.isGuest ? 'Sign in' : 'Sign out');
+const badgeText = computed(() => String(auth.role || '').toUpperCase());
 
-const displayName = computed(() => auth.user?.name || 'Public Visitor');
+function onTeamChange(e: Event): void {
+  const value = (e.target as HTMLSelectElement).value;
+  org.setActiveTeam(value || null);
+}
 
 async function onAccountClick(): Promise<void> {
   if (auth.isGuest) { authOpen.value = true; return; }
@@ -37,25 +56,50 @@ async function onAccountClick(): Promise<void> {
 </script>
 
 <template>
-  <header class="masthead">
-    <div class="masthead__brand">
-      <span class="masthead__org">{{ org.branding.name || ' ' }}</span>
-      <span v-if="org.branding.mascot" class="masthead__mascot">
-        {{ org.branding.mascot }}
-      </span>
-      <span v-if="org.activeTeam" class="masthead__team">
-        {{ org.activeTeam.name }}
-      </span>
+  <header class="crest">
+    <div class="crest__row">
+      <span v-if="initial" class="crest__mark" aria-hidden="true" data-crest-mark>{{ initial }}</span>
+
+      <div class="crest__names">
+        <p class="crest__org kicker tnum" data-org-name>{{ org.branding.name || ' ' }}</p>
+        <p v-if="org.branding.mascot" class="crest__mascot" data-org-mascot>
+          {{ org.branding.mascot }}
+        </p>
+      </div>
+
+      <div class="crest__account">
+        <span v-if="!auth.isGuest" class="crest__badge" data-role-badge>{{ badgeText }}</span>
+        <button type="button" class="crest__btn" data-account-btn @click="onAccountClick">
+          {{ accountLabel }}
+        </button>
+      </div>
     </div>
 
-    <div class="masthead__account">
-      <span class="masthead__who">
-        <span class="masthead__name">{{ displayName }}</span>
-        <span class="masthead__badge">{{ badgeText }}</span>
+    <div class="crest__row crest__row--meta">
+      <label v-if="showSwitcher" class="switcher">
+        <span class="sr-only">Team</span>
+        <select
+          class="switcher__select"
+          data-team-switcher
+          :value="org.activeTeamId || ''"
+          @change="onTeamChange"
+        >
+          <optgroup v-for="g in groups" :key="g.id" :label="g.label">
+            <option v-for="t in g.teams" :key="t.id" :value="t.id">
+              {{ t.season ? `${t.name} · ${t.season}` : t.name }}
+            </option>
+          </optgroup>
+        </select>
+        <span class="switcher__caret" aria-hidden="true">▾</span>
+      </label>
+      <span v-else-if="activeTeamText" class="switcher__static" data-team-name>{{ activeTeamText }}</span>
+      <span v-else />
+
+      <span v-if="showRecord" class="record tnum" data-season-record aria-label="Season record">
+        <span>{{ record!.wins }}<em>W</em></span>
+        <span>{{ record!.losses }}<em>L</em></span>
+        <span>{{ record!.draws }}<em>D</em></span>
       </span>
-      <button type="button" class="masthead__btn" @click="onAccountClick">
-        {{ accountLabel }}
-      </button>
     </div>
 
     <AuthModal :open="authOpen" @close="authOpen = false" />
@@ -63,87 +107,127 @@ async function onAccountClick(): Promise<void> {
 </template>
 
 <style scoped>
-.masthead {
+.crest {
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  background: var(--ground);
+}
+
+.crest__row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
   align-items: center;
+  gap: var(--space-3);
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
+.crest__row--meta {
   justify-content: space-between;
-  padding: 0.9rem 1rem;
-  background: var(--bhs-navy-bg);
-  border-bottom: 1px solid var(--bhs-navy-border);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
 }
 
-.masthead__brand {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  min-width: 0;
-}
-
-.masthead__org {
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: 0.01em;
-}
-
-.masthead__mascot {
-  color: var(--bhs-cyan-accent);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.masthead__team {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-}
-
-.masthead__account {
+/* The organization's initial in a keyline of its own colour. Stroke only. */
+.crest__mark {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid var(--mark);
+  border-radius: var(--radius-sm);
+  color: var(--mark);
+  font-family: var(--heading-face);
+  font-size: 19px;
+  line-height: 1;
 }
 
-.masthead__who {
+.crest__names { flex: 1; min-width: 0; }
+
+.crest__org {
+  line-height: 1.3;
+  color: var(--ink-muted);
+  letter-spacing: 0.14em;
+}
+
+.crest__mascot {
+  font-family: var(--heading-face);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.crest__account {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.25;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.masthead__name {
-  color: #fff;
-  font-size: 0.85rem;
+.crest__badge {
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-.masthead__badge {
-  color: var(--bhs-gold-accent);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.masthead__btn {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 6px;
+.crest__btn {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--bhs-gold-accent);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
+  color: var(--ink);
+  font-family: var(--heading-face);
+  font-size: 14px;
   cursor: pointer;
 }
 
-.masthead__btn:hover,
-.masthead__btn:focus-visible {
-  background: var(--bhs-gold-accent);
-  color: var(--bhs-navy-bg);
+.crest__btn:hover,
+.crest__btn:focus-visible { border-color: var(--live); color: var(--live); }
+
+/* The switcher reads as text with a caret, not as a form control. */
+.switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12.5px;
 }
 
-@media (max-width: 640px) {
-  .masthead { padding: 0.75rem 1rem; }
-  .masthead__who { display: none; }
+.switcher__select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 18px 6px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.switcher__caret {
+  position: absolute;
+  right: 0;
+  color: var(--live);
+  pointer-events: none;
+}
+
+.switcher__static { font-size: 12.5px; color: var(--ink); }
+
+.record {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.record em {
+  font-style: normal;
+  color: var(--ink-muted);
 }
 </style>
