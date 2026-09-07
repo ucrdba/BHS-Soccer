@@ -1,89 +1,233 @@
-/* Beaumont High School Cougars Soccer Design System */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@500;600;700&display=swap');
+/*
+ * The design system: fixed tokens, three grounds, the base elements.
+ *
+ * Every component styles against the ground tokens (--ink, --rule, --live …)
+ * and never against a literal, so the same component is correct on the light
+ * paper ground and on the two dark ones. Which ground applies is decided by
+ * `data-ground` on <html>, which the router sets from route meta — see
+ * src/router/ground.ts. Spec: docs/superpowers/specs/2026-09-07-mobile-restyle-design.md §2.
+ */
 
 :root {
-  /* Brand Colors - Beaumont High Royal Blue & White */
-  --bhs-blue-primary: #0047AB;
-  --bhs-blue-dark: #002D62;
-  --bhs-navy-bg: #0A1428;
-  --bhs-navy-card: #112240;
-  --bhs-navy-border: #233554;
-  --bhs-blue-electric: #1E90FF;
-  --bhs-cyan-accent: #00F0FF;
-  --bhs-gold-accent: #FFD700;
-  --bhs-silver: #E2E8F0;
-  
-  /* Status Colors */
+  /* Status — fixed on every ground. */
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
-  
-  /* Text */
-  --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
+
+  /* Spacing and radii, from the Classical system (4.6px step, 4px radius). */
+  --space-1: 4.6px;
+  --space-2: 9.2px;
+  --space-3: 13.8px;
+  --space-4: 18.4px;
+  --space-6: 27.6px;
+  --space-8: 36.8px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 7px;
+
+  /* The three faces. Which one headings use is per ground (--heading-face). */
+  --font-heading: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-body: "Lora", Georgia, "Times New Roman", serif;
+  --font-display: "Oswald", "Arial Narrow", system-ui, sans-serif;
+
+  /*
+   * The organization's colours. The organization store paints these at
+   * runtime from the schools row (src/domain/theme.ts); the values here are
+   * only the cold-load fallbacks, and they are the app's historical defaults
+   * so an organization that never set colours looks as it always did.
+   * The two -mark- values are the same colours after the contrast guard.
+   */
+  --org-primary: #0047AB;
+  --org-secondary: #FFD700;
+  --org-mark-paper: #0047AB;
+  --org-mark-dark: #FFD700;
+
+  /* Dark text for the rare light surface on a dark ground (a gold button). */
   --text-dark: #0F172A;
-
-  /* Glassmorphism */
-  --glass-bg: rgba(17, 34, 64, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-
-  /* Fonts */
-  --font-heading: 'Oswald', sans-serif;
-  --font-body: 'Inter', sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ── Grounds ─────────────────────────────────────────────────────────── */
+
+/* paper: the light editorial ground. Also the default, should the attribute
+   ever be missing, so the page is never unstyled. */
+:root,
+[data-ground="paper"] {
+  --ground: #f3f2f2;
+  --surface: #eae9e9;
+  --surface-deep: #e0dede;
+  --ink: #201f1d;
+  --ink-muted: #605d5d;
+  --ink-soft: #9b9797;
+  --rule: color-mix(in srgb, #201f1d 16%, transparent);
+  --rule-strong: #7d5411;
+  --live: #7d5411;
+  --mark: var(--org-mark-paper);
+  --heading-face: var(--font-heading);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  color-scheme: light;
 }
+
+/* pitch: the touchline ground. Navy, the display face, cyan for what is live. */
+[data-ground="pitch"] {
+  --ground: #0A1428;
+  --surface: #112240;
+  --surface-deep: #0d1b33;
+  --ink: #F8FAFC;
+  --ink-muted: #94A3B8;
+  --ink-soft: #4a5b78;
+  --rule: #233554;
+  --rule-strong: #FFD700;
+  --live: #00F0FF;
+  --mark: var(--org-mark-dark);
+  --heading-face: var(--font-display);
+  --shadow-md: 0 8px 32px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+/* ledger: the ratings ground. Navy with the editorial faces, gold as stroke. */
+[data-ground="ledger"] {
+  --ground: #0A1428;
+  --surface: #112240;
+  --surface-deep: #0d1b33;
+  --ink: #F8FAFC;
+  --ink-muted: #94A3B8;
+  --ink-soft: #4a5b78;
+  --rule: #233554;
+  --rule-strong: #FFD700;
+  --live: #00F0FF;
+  --mark: var(--org-mark-dark);
+  --heading-face: var(--font-heading);
+  --shadow-md: 0 8px 32px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+/* ── Temporary aliases ───────────────────────────────────────────────── */
+
+/*
+ * The names the pre-restyle components use, resolved onto the tokens so that
+ * every view renders while phases 2–5 rewrite them one at a time. Phase 5
+ * deletes this block; `grep -r -- '--bhs-' src/` returning nothing is its exit
+ * condition. Do not use these names in new work.
+ */
+:root {
+  --bhs-navy-bg: var(--ground);
+  --bhs-navy-card: var(--surface);
+  --bhs-navy-border: var(--rule);
+  --bhs-blue-primary: var(--org-primary);
+  --bhs-blue-dark: var(--surface-deep);
+  --bhs-blue-electric: var(--live);
+  --bhs-cyan-accent: var(--live);
+  --bhs-gold-accent: var(--rule-strong);
+  --bhs-silver: var(--ink);
+  --text-main: var(--ink);
+  --text-muted: var(--ink-muted);
+  --glass-bg: var(--surface);
+  --glass-border: var(--rule);
+  --glass-shadow: var(--shadow-md);
+}
+
+/* ── Base elements ───────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
-  font-family: var(--font-body);
-  background-color: var(--bhs-navy-bg);
-  color: var(--text-main);
-  line-height: 1.5;
+  margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bhs-navy-bg);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--bhs-navy-border);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--bhs-blue-electric);
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--heading-face);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
 }
 
-/* Typography Helpers */
-h1, h2, h3, h4, .brand-font {
-  font-family: var(--font-heading);
-  letter-spacing: 0.5px;
+/* The touchline face is a condensed sans, and it sets in caps. */
+[data-ground="pitch"] h1,
+[data-ground="pitch"] h2,
+[data-ground="pitch"] h3 {
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
-.text-gradient {
-  background: linear-gradient(135deg, #FFFFFF 0%, var(--bhs-blue-electric) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+p { margin: 0; }
+
+a { color: var(--live); text-underline-offset: 3px; }
+
+img { display: block; max-width: 100%; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--live) 30%, transparent); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--ground); }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+
+/* ── Shared primitives ───────────────────────────────────────────────── */
+
+/* Figures that stand in columns. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* A section label: small caps, letterspaced, quiet. */
+.kicker {
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-.text-gold {
-  color: var(--bhs-gold-accent);
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-.text-cyan {
-  color: var(--bhs-cyan-accent);
+/*
+ * The outlined button. Colour is stroke, never fill (spec §2, the Classical
+ * rule). Components that define their own scoped `.btn` override this; the
+ * few that do not get a correct button from here.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 calc(var(--space-3) * 1.2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--heading-face);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
 }
+.btn:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.btn:active { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.text-muted {
-  color: var(--text-muted);
-}
+/* The one action a screen most wants: outlined in the live colour. */
+.btn--go { border-color: var(--live); color: var(--live); }
+.btn--go:hover { background: color-mix(in srgb, var(--live) 12%, transparent); }
+.btn--go:active { background: color-mix(in srgb, var(--live) 22%, transparent); }

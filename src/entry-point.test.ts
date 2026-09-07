@@ -47,6 +47,16 @@ describe('the one entry point', () => {
     // it would be a second URL serving the same thing.
     expect(existsSync(join(root, 'app.html'))).toBe(false);
   });
+
+  it('ships the paper ground on the document so the first paint has tokens', () => {
+    expect(index).toMatch(/<html[^>]*data-ground="paper"/);
+  });
+
+  it('loads the three faces from Google Fonts', () => {
+    expect(index).toMatch(/fonts\.googleapis\.com\/css2\?[^"]*Cormorant\+Garamond/);
+    expect(index).toMatch(/Lora/);
+    expect(index).toMatch(/Oswald/);
+  });
 });
 
 describe('THE TITLE NAMES NO SINGLE ORGANIZATION', () => {
