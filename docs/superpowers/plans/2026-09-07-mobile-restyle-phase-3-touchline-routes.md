@@ -2186,7 +2186,7 @@ All three print `0`. Then run `npm test 2>&1 | tail -6` and record the counts.
 - [ ] **Step 2: Confirm the exit conditions**
 
 - `grep -rn "Modal" src/views/ScheduleView.vue` names only `MatchFormModal`.
-- `grep -rln -- '--bhs-\|--text-muted' src/components/schedule src/components/layout src/views/LineupView.vue src/views/LiveMatchView.vue src/views/SeasonReportView.vue` returns nothing.
+- `grep -rln -- '--bhs-\|--text-muted' src/components/layout/ToolScreen.vue src/components/schedule/LineupScreen.vue src/components/schedule/LiveMatchScreen.vue src/components/schedule/SeasonReportScreen.vue src/views/LineupView.vue src/views/LiveMatchView.vue src/views/SeasonReportView.vue` returns nothing. (`MatchFormModal.vue` still carries the aliases and correctly so: the spec's §4 does not convert it and its §9 removes the alias block in phase 5.)
 - `git grep -n "PlusMinusModal\|LineupModal\|SeasonReportModal" src | wc -l` is 0.
 
 - [ ] **Step 3: Note the phase in the spec and the guide**
