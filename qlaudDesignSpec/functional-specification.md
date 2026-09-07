@@ -256,6 +256,8 @@ Public. The squad, as cards.
 Each card shows the player's photo (or a placeholder), shirt number, name and
 position. Opening one shows a fuller view: class year, height, season
 statistics, and the four skill ratings.
+The four skill ratings are not public: they are shown to the team's own
+coaches, admins and players, and to nobody else.
 
 **Filtering** is by position group, as a small set of chips: All, Keepers,
 Defence, Midfield, Attack. Positions are stored as free text — "Center Back",

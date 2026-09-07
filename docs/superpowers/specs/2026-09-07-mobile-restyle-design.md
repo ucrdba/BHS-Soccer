@@ -287,6 +287,11 @@ deployment change is needed.
   then "Skill ratings" as four labelled 3px bars. The canvas puts this inline
   at the top of the roster; keeping it a modal keeps the existing tests and
   the coach's edit and remove controls where they are.
+  The bars are shown only to the team's own coaches, admins and players
+  (`domain/ratings-visibility.ts`): a rating is a coach's assessment of a
+  player, most of whom are minors, so it is not public. This overrules the
+  earlier reading of the functional specification, on the user's decision of
+  2026-09-07.
 - `PlayerFormModal` and `RecordingNumbersModal` are restyled to the paper
   dialog (section 5.4) with no layout change.
 
