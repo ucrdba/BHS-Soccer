@@ -252,7 +252,7 @@ const grade = lineupGrade;
   /* The pitch canvas is always dark, regardless of ground, so its text is always light. */
   --pitch-ink: #F8FAFC;
   background:
-    linear-gradient(to top, color-mix(in srgb, var(--ink) 5%, transparent) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
+    linear-gradient(to top, color-mix(in srgb, var(--pitch-ink) 5%, transparent) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
     #163d16;
   overflow: hidden;
 }
