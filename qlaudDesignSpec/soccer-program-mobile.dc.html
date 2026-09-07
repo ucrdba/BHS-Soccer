@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/classical-38674cd2-2147-4741-b28c-a0346f112f71/styles.css">
+<script src="_ds/classical-38674cd2-2147-4741-b28c-a0346f112f71/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Oswald:wght@300;400;500;600&display=swap">
+<style>
+body{margin:0;background:#f0eee9;font-family:"Lora",Georgia,serif}
+a{color:var(--color-accent-700);text-decoration:none}
+a:hover{color:var(--color-accent-600)}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:400 15px/1.2 "Cormorant Garamond",serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:44px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12.5px/1.35 "Lora",serif;color:rgba(0,0,0,.6);max-width:1340px}
+.dv-opt:target .dv-oid{background:#8c3b3b;color:#fff}
+.dv-row{display:flex;gap:22px;align-items:flex-start}
+.dv-cap{font:400 11px/1.4 "Lora",serif;color:rgba(0,0,0,.5);margin-top:8px;max-width:412px}
+.dv-next{margin:26px 0 0;font:400 12.5px/1.6 "Lora",serif;color:rgba(0,0,0,.55)}
+.tnum{font-variant-numeric:tabular-nums}
+</style></helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Session entry, in <a class="dv-oid" href="#1c">1c</a>'s style — both fields are live, type in them</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Banded exercise, entered as m:ss. The grid is the whole screen: recording number, name, one field. Enter moves to the next field in the order shown; typing a time marks the player present and outranks the attendance control; nothing interrupts between one player and the next.</div>
+<div class="dv-row">
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:var(--font-body);display:flex;flex-direction:column">
+  <div style="padding:14px 18px 12px;border-bottom:1px solid #233554">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:#94A3B8">Session entry · 11 Sept</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+      <div style="font-family:var(--font-heading);font-weight:400;font-size:24px;line-height:1.1;flex:1">1.5-Mile Run</div>
+      <div onClick="{{ band.toggleSort }}" style="border:1px solid #233554;border-radius:4px;padding:6px 10px;font-size:11px;color:#00F0FF;cursor:pointer">Sort: {{ band.sortLabel }} ▾</div>
+    </div>
+    <div style="margin-top:10px;padding:8px 10px;border:1px solid #FFD700;border-radius:4px;display:flex;align-items:baseline;gap:8px">
+      <span class="tnum" style="font-family:var(--font-heading);font-size:19px;color:#FFD700">m:ss</span>
+      <span style="font-size:11.5px;line-height:1.4;color:#E2E8F0">Minutes and seconds — <span class="tnum">10:41</span>. This exercise is banded, not a sprint.</span>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:0 18px">
+    <div class="tnum" style="display:flex;gap:10px;align-items:baseline;padding:11px 0 8px;border-bottom:1px solid #FFD700;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8">
+      <span style="width:24px">No</span><span style="flex:1">Player</span><span style="width:84px;text-align:right">Time</span>
+    </div>
+    <sc-for list="{{ band.rows }}" as="r" hint-placeholder-count="14">
+      <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #233554">
+        <span class="tnum" style="width:24px;font-family:var(--font-heading);font-size:16px;color:#94A3B8">{{ r.rec }}</span>
+        <span style="flex:1;min-width:0"><span style="font-size:13.5px;line-height:1.25">{{ r.name }}</span><span style="display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:{{ r.stateColor }}">{{ r.state }}</span></span>
+        <input value="{{ r.value }}" onChange="{{ r.onChange }}" onKeyDown="{{ r.onKey }}" ref="{{ r.ref }}" inputMode="numeric" placeholder="—" style="{{ r.inputStyle }}">
+      </div>
+    </sc-for>
+    <div style="padding:12px 0;font-size:11.5px;line-height:1.55;color:#94A3B8;font-style:italic">Tab order follows this list, so re-sorting re-sorts the typing order too. Absent players keep their row — an absence is dropped from the progress chart, never plotted as a zero.</div>
+  </div>
+  <div style="border-top:1px solid #233554;padding:11px 18px 13px;display:flex;align-items:center;gap:12px">
+    <div class="tnum" style="flex:1;font-size:11.5px;line-height:1.4;color:#94A3B8"><span style="color:#F8FAFC">{{ band.entered }} timed</span> · {{ band.absentCount }} absent · {{ band.remaining }} to go</div>
+    <div style="min-height:48px;padding:0 16px;border:1.5px solid #00F0FF;border-radius:4px;color:#00F0FF;display:flex;align-items:center;font-family:var(--font-heading);font-size:16px;letter-spacing:.04em">Save session</div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">Format is stated once, in the exercise's own units, because <span class="tnum">4:30</span> and <span class="tnum">4.85</span> are both plausible numbers and reading one as the other is wrong without looking wrong.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:var(--font-body);display:flex;flex-direction:column">
+  <div style="padding:14px 18px 12px;border-bottom:1px solid #233554">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:#94A3B8">Session entry · 11 Sept</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+      <div style="font-family:var(--font-heading);font-weight:400;font-size:24px;line-height:1.1;flex:1">40-Yard Sprint</div>
+      <div onClick="{{ sprint.toggleSort }}" style="border:1px solid #233554;border-radius:4px;padding:6px 10px;font-size:11px;color:#00F0FF;cursor:pointer">Sort: {{ sprint.sortLabel }} ▾</div>
+    </div>
+    <div style="margin-top:10px;padding:8px 10px;border:1px solid #FFD700;border-radius:4px;display:flex;align-items:baseline;gap:8px">
+      <span class="tnum" style="font-family:var(--font-heading);font-size:19px;color:#FFD700">0.00</span>
+      <span style="font-size:11.5px;line-height:1.4;color:#E2E8F0">Decimal seconds — <span class="tnum">4.85</span>. A colon is refused here, not silently read as a time.</span>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:0 18px">
+    <div class="tnum" style="display:flex;gap:10px;align-items:baseline;padding:11px 0 8px;border-bottom:1px solid #FFD700;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8">
+      <span style="width:24px">No</span><span style="flex:1">Player · sorted by {{ sprint.sortLabel }}</span><span style="width:84px;text-align:right">Secs</span>
+    </div>
+    <sc-for list="{{ sprint.rows }}" as="r" hint-placeholder-count="14">
+      <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #233554">
+        <span class="tnum" style="width:24px;font-family:var(--font-heading);font-size:16px;color:#94A3B8">{{ r.rec }}</span>
+        <span style="flex:1;min-width:0"><span style="font-size:13.5px;line-height:1.25">{{ r.name }}</span><span style="display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:{{ r.stateColor }}">{{ r.state }}</span></span>
+        <input value="{{ r.value }}" onChange="{{ r.onChange }}" onKeyDown="{{ r.onKey }}" ref="{{ r.ref }}" inputMode="decimal" placeholder="—" style="{{ r.inputStyle }}">
+      </div>
+    </sc-for>
+  </div>
+  <div style="border-top:1px solid #233554;padding:0 0 13px">
+    <div style="margin:12px 18px;border:1px solid #F59E0B;border-left:4px solid #F59E0B;border-radius:4px;background:#241c07;padding:12px 13px">
+      <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:#F59E0B">Partly written</div>
+      <p style="font-size:12.5px;line-height:1.55;margin:7px 0 0"><span class="tnum">12 rows written, 2 refused.</span> The database declined the two rows for Wes Lindqvist and Isaiah Boateng — <span style="font-style:italic">"new row violates row-level security policy for table matrix_results"</span>.</p>
+      <p style="font-size:12px;line-height:1.5;margin:8px 0 0;color:#94A3B8">Their times are still in the fields above. Retry, or send this wording to your admin.</p>
+    </div>
+    <div style="padding:0 18px;display:flex;align-items:center;gap:12px">
+      <div class="tnum" style="flex:1;font-size:11.5px;line-height:1.4;color:#94A3B8"><span style="color:#F8FAFC">{{ sprint.entered }} timed</span> · {{ sprint.remaining }} to go</div>
+      <div style="min-height:48px;padding:0 16px;border:1.5px solid #00F0FF;border-radius:4px;color:#00F0FF;display:flex;align-items:center;font-family:var(--font-heading);font-size:16px;letter-spacing:.04em">Retry 2 rows</div>
+    </div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">The same grid for a decimal-seconds exercise, and the state usually left undesigned: a partial write reported as a partial write, in the database's own words.</div></div>
+
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "add the attendance toggle to <a class="dv-oid" href="#2a">2a</a>" · "show <a class="dv-oid" href="#2a">2a</a> with the keyboard up" · "now the standards & bands editor"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Three end-to-end flows, one palette each — Android, tappable</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Parent / visitor, pure Classical. Light editorial ground, Cormorant over Lora, hairline rules, colour as stroke. Org colours enter as the crest keyline and the fixture rule only, so a club with a pale primary still reads.</div>
+<div class="dv-row">
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);display:flex;flex-direction:column">
+  <div style="padding:18px 20px 14px;border-bottom:1px solid var(--color-divider)">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:38px;height:38px;border:1.5px solid #1b3a6b;border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:19px;color:#1b3a6b">R</div>
+      <div style="flex:1;min-width:0">
+        <div style="font:400 9.5px/1.3 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--color-neutral-700)" class="tnum">Northgate High School</div>
+        <div style="font-family:var(--font-heading);font-weight:500;font-size:26px;line-height:1.1;color:var(--color-text)">Ravens</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--color-divider)">
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--color-neutral-800)">Varsity · 2026 <span style="color:var(--color-accent-700)">▾</span></div>
+      <div class="tnum" style="display:flex;gap:10px;font-size:12.5px;color:var(--color-neutral-800)"><span>8<span style="color:var(--color-neutral-600)">W</span></span><span>3<span style="color:var(--color-neutral-600)">L</span></span><span>2<span style="color:var(--color-neutral-600)">D</span></span></div>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:20px">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-accent-700)">Next match</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px">
+      <div style="font-family:var(--font-heading);font-weight:400;font-size:32px;line-height:1.05">Cedar Ridge</div>
+    </div>
+    <div style="font-size:13px;color:var(--color-neutral-700);margin-top:4px">Away · Cedar Ridge HS, Fairview</div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--color-accent-500)">
+      <div>
+        <div class="tnum" style="font-family:var(--font-heading);font-size:23px;line-height:1">Fri 11 Sept</div>
+        <div class="tnum" style="font-size:13px;color:var(--color-neutral-700);margin-top:3px">Kick-off 7:00 PM</div>
+      </div>
+      <div style="text-align:right">
+        <div class="tnum" style="font-family:var(--font-heading);font-size:23px;line-height:1;color:var(--color-accent-700)">{{ countdown }}</div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600);margin-top:4px">to kick-off</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:22px;padding:12px 0;border-top:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+      <div style="font-size:12px;color:var(--color-neutral-700)">Last out · <span style="font-style:italic">Millbrook, home</span></div>
+      <div class="tnum" style="font-family:var(--font-heading);font-size:17px">Won 3–1</div>
+    </div>
+    <div style="margin-top:22px;border:1px solid var(--color-divider);border-left:2px solid var(--color-accent-500);padding:16px 16px 18px;border-radius:var(--radius-md)">
+      <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-neutral-700)">From Coach Ellis · today</div>
+      <div style="font-family:var(--font-heading);font-weight:500;font-size:21px;line-height:1.2;margin-top:9px">Win the second ball</div>
+      <p style="font-size:13.5px;line-height:1.65;text-align:justify;hyphens:auto;color:var(--color-neutral-800);margin:9px 0 0">Cedar Ridge play long and fight for knock-downs. Everything Thursday is about the second ball — get bodies underneath it, then play forward early. Boots on the grass at 5:45.</p>
+    </div>
+  </div>
+  <div style="display:flex;border-top:1px solid var(--color-divider);background:var(--color-neutral-100)">
+    <div style="flex:1;padding:11px 0 13px;text-align:center;border-top:2px solid var(--color-accent-500);font:400 10px/1.3 var(--font-body);color:var(--color-text)">Home</div>
+    <div style="flex:1;padding:11px 0 13px;text-align:center;border-top:2px solid transparent;font:400 10px/1.3 var(--font-body);color:var(--color-neutral-700)">Roster</div>
+    <div style="flex:1;padding:11px 0 13px;text-align:center;border-top:2px solid transparent;font:400 10px/1.3 var(--font-body);color:var(--color-neutral-700)">Schedule</div>
+    <div style="flex:1;padding:11px 0 13px;text-align:center;border-top:2px solid transparent;font:400 10px/1.3 var(--font-body);color:var(--color-neutral-700)">Staff</div>
+    <div style="flex:1;padding:11px 0 13px;text-align:center;border-top:2px solid transparent;font:400 10px/1.3 var(--font-body);color:var(--color-neutral-700)">Help</div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">1 · Home. Record, next fixture with countdown, last result, the coach's daily message. Nothing here is literal — org name, mascot, colours, record and match length all come from the org and team records.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);display:flex;flex-direction:column">
+  <div style="padding:16px 20px 12px;border-bottom:1px solid var(--color-divider);display:flex;align-items:baseline;justify-content:space-between">
+    <div style="font-family:var(--font-heading);font-weight:500;font-size:24px">Schedule</div>
+    <div style="font-size:11.5px;color:var(--color-neutral-700)">Varsity · 2026 ▾</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:18px 20px">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-accent-700)">Upcoming</div>
+    <div style="margin-top:12px;border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:14px 15px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-family:var(--font-heading);font-size:21px;line-height:1.1">Cedar Ridge</div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700);border:1px solid var(--color-divider);border-radius:99px;padding:3px 8px">Away</div>
+      </div>
+      <div class="tnum" style="font-size:12.5px;color:var(--color-neutral-700);margin-top:6px">Fri 11 Sept · 7:00 PM · Cedar Ridge HS</div>
+      <div style="display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--color-divider)">
+        <div style="font-size:11.5px;color:var(--color-accent-700);border-bottom:1px solid var(--color-accent-500)">Directions</div>
+        <div style="font-size:11.5px;color:var(--color-accent-700);border-bottom:1px solid var(--color-accent-500)">Add to calendar</div>
+      </div>
+    </div>
+    <sc-for list="{{ upcoming }}" as="f" hint-placeholder-count="3">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--color-divider)">
+        <div><div style="font-size:14.5px">{{ f.opp }}</div><div class="tnum" style="font-size:11.5px;color:var(--color-neutral-700);margin-top:2px">{{ f.when }}</div></div>
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600)">{{ f.side }}</div>
+      </div>
+    </sc-for>
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:22px">Completed</div>
+    <sc-for list="{{ played }}" as="f" hint-placeholder-count="4">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--color-divider)">
+        <div><div style="font-size:14.5px">{{ f.opp }}</div><div class="tnum" style="font-size:11.5px;color:var(--color-neutral-700);margin-top:2px">{{ f.when }}</div></div>
+        <div class="tnum" style="text-align:right"><div style="font-family:var(--font-heading);font-size:16px">{{ f.score }}</div><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-700)">{{ f.result }}</div></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="border-top:1px solid var(--color-divider);background:var(--color-neutral-100);padding:11px 20px 13px;display:flex;justify-content:space-between;font-size:10px;color:var(--color-neutral-700)"><span>Home</span><span>Roster</span><span style="color:var(--color-text);border-bottom:2px solid var(--color-accent-500);padding-bottom:2px">Schedule</span><span>Staff</span><span>Help</span></div>
+</div>
+</x-import>
+<div class="dv-cap">2 · Schedule. Next fixture carried out of the list and given the emphasis; won/lost is spelled out in words as well as the score, never colour alone.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);display:flex;flex-direction:column">
+  <div style="padding:16px 20px 12px;border-bottom:1px solid var(--color-divider)">
+    <div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font-family:var(--font-heading);font-weight:500;font-size:24px">Roster</div><div style="font-size:11.5px;color:var(--color-neutral-700)">Sort: number ▾</div></div>
+    <div style="display:flex;gap:7px;margin-top:12px">
+      <sc-for list="{{ posChips }}" as="c" hint-placeholder-count="5">
+        <div onClick="{{ c.tap }}" style="{{ c.style }}">{{ c.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:18px 20px">
+    <div style="display:flex;gap:14px">
+      <div class="plate" style="width:104px;flex:none"><div style="height:128px;background:var(--color-neutral-200);display:flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600)">Photo</div></div>
+      <div style="flex:1;min-width:0">
+        <div class="tnum" style="font:400 10px/1 var(--font-body);letter-spacing:.14em;color:var(--color-neutral-700)">NO. 9 · SENIOR</div>
+        <div style="font-family:var(--font-heading);font-weight:500;font-size:27px;line-height:1.1;margin-top:6px">Marcus Delgado</div>
+        <div style="font-size:13px;color:var(--color-neutral-700);margin-top:3px;font-style:italic">Striker · 5′ 11″</div>
+        <div class="tnum" style="display:flex;gap:16px;margin-top:12px;padding-top:11px;border-top:1px solid var(--color-divider)">
+          <div><div style="font-family:var(--font-heading);font-size:20px">11</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600)">Goals</div></div>
+          <div><div style="font-family:var(--font-heading);font-size:20px">6</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600)">Assists</div></div>
+          <div><div style="font-family:var(--font-heading);font-size:20px">742′</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-600)">Minutes</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-accent-700);margin-top:22px">Skill ratings</div>
+    <sc-for list="{{ skills }}" as="s" hint-placeholder-count="4">
+      <div style="padding:11px 0;border-bottom:1px solid var(--color-divider)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:13.5px">{{ s.name }}</div><div class="tnum" style="font-family:var(--font-heading);font-size:15px">{{ s.val }}<span style="font-size:11px;color:var(--color-neutral-600)">/10</span></div></div>
+        <div style="height:3px;background:var(--color-neutral-300);margin-top:7px"><div style="height:3px;background:var(--color-accent-600);width:{{ s.pct }}"></div></div>
+      </div>
+    </sc-for>
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--color-neutral-700);margin-top:20px">Squad · {{ rosterCount }} shown</div>
+    <sc-for list="{{ roster }}" as="p" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--color-divider)">
+        <div class="tnum" style="width:26px;font-family:var(--font-heading);font-size:16px;color:var(--color-neutral-700)">{{ p.shirt }}</div>
+        <div style="width:30px;height:30px;border:1px solid var(--color-divider);border-radius:2px;background:var(--color-neutral-200)"></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13.5px">{{ p.name }}</div><div style="font-size:11px;color:var(--color-neutral-700)">{{ p.pos }}</div></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="border-top:1px solid var(--color-divider);background:var(--color-neutral-100);padding:11px 20px 13px;display:flex;justify-content:space-between;font-size:10px;color:var(--color-neutral-700)"><span>Home</span><span style="color:var(--color-text);border-bottom:2px solid var(--color-accent-500);padding-bottom:2px">Roster</span><span>Schedule</span><span>Staff</span><span>Help</span></div>
+</div>
+</x-import>
+<div class="dv-cap">3 · Roster & bios. Position chips are live — tap one. Free-text positions are keyword-matched, and an unrecognised filter shows everyone rather than nobody. Missing photo and missing number are ordinary, not broken.</div></div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Coach on the touchline, the spec's palette as written. Deep navy ground, cyan used only for what is live, gold for the org mark; condensed display face, oversized tap targets, one-handed reach. The clock gate is real here — try tapping a stat with the clock stopped.</div>
+<div class="dv-row">
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:system-ui,sans-serif;display:flex;flex-direction:column">
+  <div style="padding:14px 18px;border-bottom:1px solid #233554;display:flex;align-items:center;gap:12px">
+    <div style="font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;letter-spacing:.02em;text-transform:uppercase;flex:1">Lineup</div>
+    <div style="font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;color:#FFD700">4–3–3 ▾</div>
+  </div>
+  <div style="padding:14px 18px 10px;font-size:12px;color:#94A3B8">vs. Cedar Ridge · away · <span style="color:#F8FAFC">80-minute match</span></div>
+  <div style="margin:0 18px;border:1px solid #233554;border-radius:6px;background:linear-gradient(#0d1b33,#0A1428);position:relative;height:330px;overflow:hidden">
+    <div style="position:absolute;left:12px;right:12px;top:12px;bottom:12px;border:1px solid #1d3a63"></div>
+    <div style="position:absolute;left:12px;right:12px;top:50%;border-top:1px solid #1d3a63"></div>
+    <div style="position:absolute;left:50%;top:50%;width:64px;height:64px;border:1px solid #1d3a63;border-radius:50%;transform:translate(-50%,-50%)"></div>
+    <sc-for list="{{ pitch }}" as="p" hint-placeholder-count="11">
+      <div style="{{ p.style }}"><span style="font-family:'Oswald',sans-serif;font-size:15px;line-height:1">{{ p.shirt }}</span><span style="font-size:8.5px;color:#0A1428;background:#00F0FF;border-radius:2px;padding:1px 3px;margin-top:2px">{{ p.pos }}</span></div>
+    </sc-for>
+  </div>
+  <div style="padding:14px 18px 0;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">Bench · tap to place</div>
+  <div style="flex:1;overflow:hidden;padding:10px 18px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start">
+    <sc-for list="{{ bench }}" as="b" hint-placeholder-count="6">
+      <div style="min-height:52px;border:1px solid #233554;border-radius:6px;background:#112240;padding:8px 10px;display:flex;align-items:center;gap:9px">
+        <span class="tnum" style="font-family:'Oswald',sans-serif;font-size:17px;color:#FFD700">{{ b.shirt }}</span>
+        <span style="font-size:12px;line-height:1.25;min-width:0">{{ b.name }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="padding:12px 18px 14px;border-top:1px solid #233554;display:flex;gap:10px">
+    <div style="flex:1;min-height:52px;border:1.5px solid #00F0FF;border-radius:6px;color:#00F0FF;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.1em;text-transform:uppercase">Save lineup</div>
+    <div style="flex:1;min-height:52px;border:1px solid #233554;border-radius:6px;color:#94A3B8;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.1em;text-transform:uppercase">Go live</div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">1 · Lineup. Formation from the team record; drag on a desktop, tap-to-place on the phone. Match length is stated on the screen because every per-match rate downstream divides by it.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:system-ui,sans-serif;display:flex;flex-direction:column">
+  <div style="padding:12px 18px;border-bottom:1px solid #233554;display:flex;align-items:center;gap:12px">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">2nd half · vs Cedar Ridge</div>
+      <div class="tnum" style="font-family:'Oswald',sans-serif;font-weight:500;font-size:33px;line-height:1.15;margin-top:2px;color:{{ clockColor }}">{{ clock }}</div>
+    </div>
+    <div onClick="{{ toggleClock }}" style="{{ clockBtnStyle }}">{{ clockBtnLabel }}</div>
+  </div>
+  <div style="padding:9px 18px;border-bottom:1px solid #233554;display:flex;align-items:center;gap:8px;background:{{ statusBg }}">
+    <span style="width:9px;height:9px;border-radius:50%;background:{{ clockColor }};flex:none"></span>
+    <span style="font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:{{ clockColor }}">{{ clockState }}</span>
+    <span style="font-size:11.5px;color:#94A3B8;margin-left:auto">{{ gateHint }}</span>
+  </div>
+  <sc-if value="{{ refusal }}" hint-placeholder-val="{{ false }}">
+    <div style="margin:12px 18px 0;border:1px solid #F59E0B;border-left:4px solid #F59E0B;border-radius:6px;background:#241c07;padding:12px 14px">
+      <div style="font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#F59E0B">{{ refusalTitle }}</div>
+      <div style="font-size:13px;line-height:1.5;color:#F8FAFC;margin-top:6px">{{ refusalBody }}</div>
+    </div>
+  </sc-if>
+  <div style="flex:1;overflow:hidden;padding:12px 18px 0">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">On the pitch</div>
+      <div class="tnum" style="font-size:11px;color:#94A3B8">tap ± · long-press to undo</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+      <sc-for list="{{ onPitch }}" as="p" hint-placeholder-count="6">
+        <div style="border:1px solid #233554;border-radius:6px;background:#112240;padding:9px 10px;display:flex;align-items:center;gap:10px">
+          <span class="tnum" style="font-family:'Oswald',sans-serif;font-size:19px;color:#FFD700;width:26px">{{ p.shirt }}</span>
+          <span style="flex:1;min-width:0;font-size:13px;line-height:1.2">{{ p.name }}<span class="tnum" style="display:block;font-size:10.5px;color:#94A3B8">{{ p.mins }}′ on · net {{ p.net }}</span></span>
+          <span onClick="{{ p.minus }}" style="width:54px;height:54px;border:1.5px solid #233554;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:24px;color:#E2E8F0;flex:none">−</span>
+          <span onClick="{{ p.plus }}" style="{{ p.plusStyle }}">+</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="padding:10px 18px 14px;border-top:1px solid #233554;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+    <div onClick="{{ tapShot }}" style="{{ eventBtnStyle }}">Shot</div>
+    <div onClick="{{ tapGoal }}" style="{{ eventBtnStyle }}">Goal</div>
+    <div onClick="{{ tapAssist }}" style="{{ eventBtnStyle }}">Assist</div>
+    <div style="min-height:56px;border:1.5px solid #00F0FF;border-radius:6px;color:#00F0FF;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.06em;text-transform:uppercase">Sub</div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">2 · Live plus/minus, clock running. Every tap stamps against the match clock; the figures beside each name are replayed from the event log, never a stored tally. Stop the clock and the ± and event buttons go dead — with a reason.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:system-ui,sans-serif;display:flex;flex-direction:column">
+  <div style="padding:12px 18px;border-bottom:1px solid #233554;display:flex;align-items:center;gap:12px">
+    <div style="flex:1">
+      <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">Pre kick-off · vs Cedar Ridge</div>
+      <div class="tnum" style="font-family:'Oswald',sans-serif;font-weight:500;font-size:33px;line-height:1.15;margin-top:2px;color:#94A3B8">0:00</div>
+    </div>
+    <div style="min-height:56px;padding:0 16px;border:1.5px solid #00F0FF;border-radius:6px;color:#00F0FF;display:flex;align-items:center;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase">Start</div>
+  </div>
+  <div style="padding:9px 18px;border-bottom:1px solid #233554;display:flex;align-items:center;gap:8px">
+    <span style="width:9px;height:9px;border-radius:50%;background:#94A3B8"></span>
+    <span style="font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8">Not started</span>
+  </div>
+  <div style="margin:14px 18px 0;border:1px solid #F59E0B;border-left:4px solid #F59E0B;border-radius:6px;background:#241c07;padding:14px 15px">
+    <div style="font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#F59E0B">The match hasn't kicked off</div>
+    <p style="font-size:13.5px;line-height:1.55;margin:7px 0 0">Nothing can be recorded yet. Anything logged now would stamp at 0:00, and every player would finish the match credited with zero minutes — the sheet would add up and still be wrong.</p>
+    <p style="font-size:13.5px;line-height:1.55;margin:9px 0 0;color:#94A3B8">Start the clock at kick-off. Substitutions are available now.</p>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:16px 18px 0">
+    <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">Starting eleven · locked in</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+      <sc-for list="{{ onPitch }}" as="p" hint-placeholder-count="6">
+        <div style="border:1px solid #233554;border-radius:6px;background:#0e1c35;padding:9px 10px;display:flex;align-items:center;gap:10px;opacity:.72">
+          <span class="tnum" style="font-family:'Oswald',sans-serif;font-size:19px;color:#FFD700;width:26px">{{ p.shirt }}</span>
+          <span style="flex:1;min-width:0;font-size:13px">{{ p.name }}<span class="tnum" style="display:block;font-size:10.5px;color:#94A3B8">0′ on · net 0</span></span>
+          <span style="width:54px;height:54px;border:1.5px dashed #233554;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:24px;color:#4a5b78">−</span>
+          <span style="width:54px;height:54px;border:1.5px dashed #233554;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:24px;color:#4a5b78">+</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="padding:10px 18px 14px;border-top:1px solid #233554;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+    <div style="min-height:56px;border:1.5px dashed #233554;border-radius:6px;color:#4a5b78;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase">Shot</div>
+    <div style="min-height:56px;border:1.5px dashed #233554;border-radius:6px;color:#4a5b78;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase">Goal</div>
+    <div style="min-height:56px;border:1.5px dashed #233554;border-radius:6px;color:#4a5b78;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase">Assist</div>
+    <div style="min-height:56px;border:1.5px solid #00F0FF;border-radius:6px;color:#00F0FF;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase">Sub</div>
+  </div>
+</div>
+</x-import>
+<div class="dv-cap">3 · The other refusal. Before kick-off the wording is different from a mid-match stoppage, because the mistake it prevents is different. Subs and starting the clock stay live; everything else is dashed out.</div></div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Coach at the desk — Classical's type and hairline structure on the deep ground, so the heaviest screen in the app reads like a printed results table rather than a dashboard. Gold as stroke, cyan reserved for what is live, and time bands reported as pass/fail rather than a ranking.</div>
+<div class="dv-row">
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:var(--font-body);display:flex;flex-direction:column">
+  <div style="padding:16px 20px 13px;border-bottom:1px solid #233554">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:#FFD700">Competitive matrix</div>
+    <div style="font-family:var(--font-heading);font-weight:400;font-size:28px;line-height:1.1;margin-top:6px">Player Ratings</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:11px;padding-top:10px;border-top:1px solid #233554;font-size:11.5px;color:#94A3B8">
+      <span>Legends FC · U16 Reds ▾</span><span class="tnum">9 exercises · 24 players</span>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div class="tnum" style="display:flex;gap:10px;padding:11px 0 9px;border-bottom:1px solid #FFD700;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8">
+      <span style="width:24px">#</span><span style="width:22px">No</span><span style="flex:1">Player</span><span style="width:44px;text-align:right">Points</span><span style="width:38px;text-align:right">Sess</span>
+    </div>
+    <sc-for list="{{ board }}" as="r" hint-placeholder-count="10">
+      <div class="tnum" style="display:flex;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid #233554;font-size:13px">
+        <span style="width:24px;font-family:var(--font-heading);font-size:15px;color:#FFD700">{{ r.rank }}</span>
+        <span style="width:22px;color:#94A3B8">{{ r.rec }}</span>
+        <span style="flex:1;min-width:0;font-family:var(--font-body)">{{ r.name }}</span>
+        <span style="width:44px;text-align:right;font-family:var(--font-heading);font-size:16px">{{ r.pts }}</span>
+        <span style="width:38px;text-align:right;color:#94A3B8">{{ r.sessions }}</span>
+      </div>
+    </sc-for>
+    <div style="padding:12px 0;font-size:11.5px;line-height:1.5;color:#94A3B8;font-style:italic">Sorted on recording number, not shirt number. Sessions attended sit beside the points so a small sample is visible rather than hidden.</div>
+  </div>
+  <div style="border-top:1px solid #233554;padding:11px 20px 13px;display:flex;justify-content:space-between;font-size:10.5px;color:#94A3B8"><span style="color:#00F0FF;border-bottom:1px solid #00F0FF;padding-bottom:2px">Board</span><span>Exercise</span><span>Session entry</span><span>Standards</span><span>Report</span></div>
+</div>
+</x-import>
+<div class="dv-cap">1 · The board. Every player, standing, points, and the session count that lets a reader weigh them. No cut-off, no minimum, nobody collapsed into an "others" row.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:var(--font-body);display:flex;flex-direction:column">
+  <div style="padding:15px 20px 12px;border-bottom:1px solid #233554">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:#94A3B8">Exercise · time bands</div>
+    <div style="font-family:var(--font-heading);font-weight:400;font-size:25px;line-height:1.15;margin-top:6px">1.5-Mile Run</div>
+    <div class="tnum" style="font-size:11.5px;color:#94A3B8;margin-top:5px">Entered as m:ss · weight 3 · standard 11:30</div>
+  </div>
+  <div style="margin:14px 20px 0;border:1px solid #FFD700;border-radius:4px;padding:13px 15px">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:#FFD700">Match-readiness standard, not a ranking</div>
+    <div style="display:flex;align-items:baseline;gap:9px;margin-top:8px">
+      <span class="tnum" style="font-family:var(--font-heading);font-size:34px;line-height:1">4</span>
+      <span style="font-size:13.5px;line-height:1.4;color:#E2E8F0">of 24 players are below the standard. The other twenty have cleared it.</span>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div class="tnum" style="display:flex;gap:10px;padding:13px 0 9px;border-bottom:1px solid #233554;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8">
+      <span style="width:22px">No</span><span style="flex:1">Player · sorted by time ▾</span><span style="width:52px;text-align:right">Time</span><span style="width:60px;text-align:right">Standard</span>
+    </div>
+    <sc-for list="{{ bands }}" as="b" hint-placeholder-count="9">
+      <div class="tnum" style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #233554;font-size:13px">
+        <span style="width:22px;color:#94A3B8">{{ b.rec }}</span>
+        <span style="flex:1;min-width:0;font-family:var(--font-body)">{{ b.name }}</span>
+        <span style="width:52px;text-align:right;font-family:var(--font-heading);font-size:16px">{{ b.time }}</span>
+        <span style="width:60px;text-align:right;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:{{ b.color }}">{{ b.mark }}</span>
+      </div>
+    </sc-for>
+    <div style="padding:12px 0 0;font-size:11.5px;line-height:1.55;color:#94A3B8;font-style:italic">Below-standard players are marked in words as well as colour, and stay in place in the sort. The table is never narrowed — a squad where everyone passes is a fit squad, not a broken exercise.</div>
+  </div>
+  <div style="border-top:1px solid #233554;padding:11px 20px 13px;display:flex;justify-content:space-between;font-size:10.5px;color:#94A3B8"><span>Board</span><span style="color:#00F0FF;border-bottom:1px solid #00F0FF;padding-bottom:2px">Exercise</span><span>Session entry</span><span>Standards</span><span>Report</span></div>
+</div>
+</x-import>
+<div class="dv-cap">2 · Per-exercise leaderboard for a banded exercise. The band summary is additive: the full squad, the full sort, plus a count of who fell short.</div></div>
+
+<div><x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="{{ w412 }}" height="{{ h892 }}" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;overflow:hidden;background:#0A1428;color:#F8FAFC;font-family:var(--font-body);display:flex;flex-direction:column">
+  <div style="padding:15px 20px 13px;border-bottom:1px solid #233554">
+    <div class="tnum" style="font:400 9.5px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">Recording no. 07 · shirt 9</div>
+    <div style="font-family:var(--font-heading);font-weight:400;font-size:27px;line-height:1.1;margin-top:6px">Marcus Delgado</div>
+    <div class="tnum" style="display:flex;gap:18px;margin-top:12px;padding-top:11px;border-top:1px solid #233554">
+      <div><div style="font-family:var(--font-heading);font-size:20px;color:#FFD700">3rd</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8">Standing</div></div>
+      <div><div style="font-family:var(--font-heading);font-size:20px">148</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8">Points</div></div>
+      <div><div style="font-family:var(--font-heading);font-size:20px">7</div><div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8">Sessions</div></div>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:14px 20px 0">
+    <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:#FFD700">Across the exercises</div>
+    <sc-for list="{{ breakdown }}" as="e" hint-placeholder-count="6">
+      <div style="padding:11px 0;border-bottom:1px solid #233554">
+        <div class="tnum" style="display:flex;align-items:baseline;gap:10px">
+          <span style="flex:1;min-width:0;font-size:13.5px">{{ e.name }}</span>
+          <span style="font-family:var(--font-heading);font-size:16px">{{ e.value }}</span>
+          <span style="width:56px;text-align:right;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:{{ e.color }}">{{ e.mark }}</span>
+        </div>
+        <div style="font-size:11.5px;line-height:1.45;color:#94A3B8;margin-top:4px">{{ e.note }}</div>
+      </div>
+    </sc-for>
+    <div style="margin-top:16px;border:1px solid #233554;border-left:2px solid #FFD700;border-radius:4px;padding:13px 14px">
+      <div style="font:400 9.5px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:#94A3B8">Progress · beep test</div>
+      <p style="font-size:13px;line-height:1.6;margin:8px 0 0">One reading only. There isn't a trend to read yet — run it again on the 18th and this becomes a line.</p>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;line-height:1.55;color:#94A3B8;font-style:italic">Sessions he missed are absent from the chart, not plotted as zero.</div>
+  </div>
+  <div style="border-top:1px solid #233554;padding:11px 20px 13px;display:flex;justify-content:space-between;font-size:10.5px;color:#94A3B8"><span>Board</span><span>Exercise</span><span>Session entry</span><span>Standards</span><span style="color:#00F0FF;border-bottom:1px solid #00F0FF;padding-bottom:2px">Report</span></div>
+</div>
+</x-import>
+<div class="dv-cap">3 · Player breakdown, in words a coach can act on — and honest about a single reading rather than labelling him "level".</div></div>
+
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "build out session entry in <a class="dv-oid" href="#1c">1c</a>'s style" · "take <a class="dv-oid" href="#1b">1b</a>'s touchline screens onto <a class="dv-oid" href="#1a">1a</a>'s light ground for daylight" · "show the empty and refused states for <a class="dv-oid" href="#1a">1a</a>"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1100}}">
+const CY = '#00F0FF', MUT = '#94A3B8', BRD = '#233554';
+
+class Component extends DCLogic {
+  state = { pos: 'All', running: true, secs: 34 * 60 + 12, refusal: null,
+    seSort: 'rec', seVals: { '03': '9:48', '05': '10:02', '06': '10:15', '07': '10:41' }, seAbsent: { '13': true }, sprintAbsent: {},
+    sprintSort: 'rec', sprintVals: { '02': '4.71', '03': '5.02', '05': '4.88', '06': '4.9', '07': '4.85' } };
+
+  _els = [];
+  _sprintEls = [];
+
+  seRoster = [
+    { rec: '01', name: 'Ade Fashanu' }, { rec: '02', name: 'Theo Kaminski' }, { rec: '03', name: 'Bo Whitfield' },
+    { rec: '04', name: 'Nathan Oyelaran' }, { rec: '05', name: 'Silas Brennan' }, { rec: '06', name: 'Ruben Castellanos' },
+    { rec: '07', name: 'Marcus Delgado' }, { rec: '08', name: 'Emeka Nwosu' }, { rec: '09', name: 'Jonah Pike' },
+    { rec: '10', name: 'Caleb Ruiz' }, { rec: '11', name: 'Dami Alabi', }, { rec: '12', name: 'Wes Lindqvist' },
+    { rec: '13', name: 'Tobias Marchetti' }, { rec: '14', name: 'Isaiah Boateng' }
+  ];
+
+  buildEntry(kind) {
+    const isBand = kind === 'band';
+    const sortKey = isBand ? 'seSort' : 'sprintSort';
+    const valKey = isBand ? 'seVals' : 'sprintVals';
+    const els = isBand ? this._els : this._sprintEls;
+    const absentMap = isBand ? this.state.seAbsent : this.state.sprintAbsent;
+    const sort = this.state[sortKey];
+    const vals = this.state[valKey];
+    const list = [...this.seRoster].sort((a, b) =>
+      sort === 'name' ? a.name.localeCompare(b.name) : a.rec.localeCompare(b.rec));
+    const ok = isBand ? /^\d{1,2}:[0-5]\d$/ : /^\d{1,2}\.\d{1,2}$/;
+    const loose = isBand ? /^[\d:]*$/ : /^[\d.]*$/;
+
+    const rows = list.map((p, i) => {
+      const v = vals[p.rec] || '';
+      const timed = v.length > 0;
+      const absent = !timed && !!absentMap[p.rec];
+      const bad = timed && !ok.test(v) && !loose.test(v);
+      const wrongShape = timed && !ok.test(v) && loose.test(v);
+      return {
+        rec: p.rec, name: p.name, value: v,
+        ref: (el) => { els[i] = el; },
+        onChange: (e) => {
+          const next = { ...this.state[valKey] };
+          if (e.target.value) next[p.rec] = e.target.value; else delete next[p.rec];
+          this.setState({ [valKey]: next });
+        },
+        onKey: (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const n = els[i + 1];
+            if (n) n.focus();
+          }
+        },
+        inputStyle: 'width:84px;height:48px;box-sizing:border-box;text-align:right;padding:0 9px;border-radius:4px;' +
+          'background:#0d1b33;color:#F8FAFC;font-family:var(--font-heading);font-size:18px;font-variant-numeric:tabular-nums;' +
+          'border:1px solid ' + (bad ? '#EF4444' : timed ? CY : BRD) + ';outline:none',
+        state: timed ? (bad ? 'reads as text' : wrongShape ? 'incomplete' : 'present · timed') : absent ? 'absent' : 'present',
+        stateColor: bad ? '#EF4444' : timed ? CY : absent ? '#F59E0B' : MUT
+      };
+    });
+    const entered = rows.filter(r => r.value).length;
+    return {
+      rows, entered,
+      absentCount: Object.keys(absentMap).length,
+      remaining: rows.length - entered - Object.keys(absentMap).length,
+      sortLabel: sort === 'name' ? 'name' : 'recording no.',
+      toggleSort: () => this.setState({ [sortKey]: sort === 'name' ? 'rec' : 'name' })
+    };
+  }
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      if (this.state.running) this.setState(s => ({ secs: s.secs + 1 }));
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  squad = [
+    { shirt: 1, rec: '01', name: 'Ade Fashanu', pos: 'Goalkeeper', g: 'Keepers' },
+    { shirt: 2, rec: '02', name: 'Theo Kaminski', pos: 'Right Back', g: 'Defence' },
+    { shirt: 4, rec: '03', name: 'Bo Whitfield', pos: 'Center Back', g: 'Defence' },
+    { shirt: 5, rec: '04', name: 'Nathan Oyelaran', pos: 'CB', g: 'Defence' },
+    { shirt: 6, rec: '05', name: 'Silas Brennan', pos: 'Left Back', g: 'Defence' },
+    { shirt: 8, rec: '06', name: 'Ruben Castellanos', pos: 'Central Midfield', g: 'Midfield' },
+    { shirt: 9, rec: '07', name: 'Marcus Delgado', pos: 'Striker', g: 'Attack' },
+    { shirt: 10, rec: '08', name: 'Emeka Nwosu', pos: 'Attacking Mid', g: 'Midfield' },
+    { shirt: 11, rec: '09', name: 'Jonah Pike', pos: 'Right Wing', g: 'Attack' },
+    { shirt: 14, rec: '10', name: 'Caleb Ruiz', pos: 'Holding Mid', g: 'Midfield' },
+    { shirt: 17, rec: '11', name: 'Dami Alabi', pos: 'Left Wing', g: 'Attack' },
+    { shirt: 21, rec: '12', name: 'Wes Lindqvist', pos: 'Center Back', g: 'Defence' },
+    { shirt: 23, rec: '13', name: 'Tobias Marchetti', pos: 'Forward', g: 'Attack' },
+    { shirt: null, rec: '14', name: 'Isaiah Boateng', pos: '', g: '' }
+  ];
+
+  renderVals() {
+    const pos = this.state.pos;
+    const chipBase = 'min-height:34px;display:flex;align-items:center;padding:0 12px;border-radius:99px;font-size:12px;cursor:pointer;';
+    const posChips = ['All', 'Keepers', 'Defence', 'Midfield', 'Attack'].map(label => ({
+      label,
+      tap: () => this.setState({ pos: label }),
+      style: chipBase + (label === pos
+        ? 'border:1px solid var(--color-accent-600);color:var(--color-accent-800);background:var(--color-accent-100)'
+        : 'border:1px solid var(--color-divider);color:var(--color-neutral-800)')
+    }));
+    const filtered = pos === 'All' ? this.squad : this.squad.filter(p => p.g === pos);
+    const roster = [...filtered].sort((a, b) => (a.shirt ?? 999) - (b.shirt ?? 999))
+      .map(p => ({ ...p, shirt: p.shirt ?? '—', pos: p.pos || 'Position not recorded' }));
+
+    const m = Math.floor(this.state.secs / 60), s = this.state.secs % 60;
+    const running = this.state.running;
+    const clockColor = running ? CY : '#F59E0B';
+    const gate = (label) => () => this.setState({
+      refusal: running ? null : {
+        title: 'The clock is stopped',
+        body: 'A ' + label + ' recorded now would stamp at ' + m + ':' + String(s).padStart(2, '0') +
+          ' — a minute that has already passed — and be credited to whoever was on the pitch then. Restart the clock first.'
+      }
+    });
+    const evt = 'min-height:56px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;' +
+      "font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.06em;text-transform:uppercase;" +
+      (running ? 'border:1.5px solid ' + BRD + ';color:#E2E8F0;background:#112240' : 'border:1.5px dashed ' + BRD + ';color:#4a5b78');
+
+    const live = [
+      { shirt: 9, name: 'Marcus Delgado', mins: 62, net: '+4' },
+      { shirt: 8, name: 'Ruben Castellanos', mins: 62, net: '+3' },
+      { shirt: 10, name: 'Emeka Nwosu', mins: 41, net: '+1' },
+      { shirt: 4, name: 'Bo Whitfield', mins: 62, net: '+2' },
+      { shirt: 17, name: 'Dami Alabi', mins: 9, net: '0' },
+      { shirt: 1, name: 'Ade Fashanu', mins: 62, net: '+4' }
+    ].map(p => ({
+      ...p,
+      plus: gate('plus'),
+      minus: gate('minus'),
+      plusStyle: 'width:54px;height:54px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;' +
+        "font-family:'Oswald',sans-serif;font-size:24px;" +
+        (running ? 'border:1.5px solid ' + CY + ';color:' + CY : 'border:1.5px dashed ' + BRD + ';color:#4a5b78')
+    }));
+
+    const spots = [[50, 88, 'GK', 1], [20, 70, 'LB', 6], [40, 74, 'CB', 4], [62, 74, 'CB', 21], [82, 70, 'RB', 2],
+      [28, 48, 'CM', 14], [50, 44, 'CM', 8], [72, 48, 'AM', 10], [22, 20, 'LW', 17], [50, 15, 'ST', 9], [78, 20, 'RW', 11]];
+    const pitch = spots.map(([x, y, p, n]) => ({
+      pos: p, shirt: n,
+      style: 'position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;' +
+        'border:1.5px solid ' + CY + ';background:#0d2143;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#F8FAFC'
+    }));
+
+    const board = [
+      ['1', '03', 'Bo Whitfield', 171, 9], ['2', '05', 'Silas Brennan', 156, 8], ['3', '07', 'Marcus Delgado', 148, 7],
+      ['4', '06', 'Ruben Castellanos', 140, 9], ['5', '08', 'Emeka Nwosu', 133, 6], ['6', '02', 'Theo Kaminski', 121, 8],
+      ['7', '11', 'Dami Alabi', 118, 4], ['8', '09', 'Jonah Pike', 104, 7], ['9', '10', 'Caleb Ruiz', 97, 5],
+      ['10', '14', 'Isaiah Boateng', 62, 2], ['11', '13', 'Tobias Marchetti', 48, 2]
+    ].map(([rank, rec, name, pts, sessions]) => ({ rank, rec, name, pts, sessions }));
+
+    const bandRows = [
+      ['03', 'Bo Whitfield', '9:48'], ['05', 'Silas Brennan', '10:02'], ['06', 'Ruben Castellanos', '10:15'],
+      ['07', 'Marcus Delgado', '10:41'], ['11', 'Dami Alabi', '11:04'], ['02', 'Theo Kaminski', '11:22'],
+      ['09', 'Jonah Pike', '11:47'], ['10', 'Caleb Ruiz', '12:03'], ['13', 'Tobias Marchetti', '12:30'], ['01', 'Ade Fashanu', '13:16']
+    ].map(([rec, name, time]) => {
+      const [mm, ss] = time.split(':').map(Number);
+      const below = mm * 60 + ss > 11 * 60 + 30;
+      return { rec, name, time, mark: below ? '△ below' : 'met', color: below ? '#F59E0B' : MUT };
+    });
+
+    const breakdown = [
+      { name: '1.5-Mile Run · bands', value: '10:41', mark: 'met', color: MUT, note: 'Clears the 11:30 standard by 49 seconds. Third session running.' },
+      { name: '40-Yard Sprint · time', value: '4.85', mark: '2nd', color: '#FFD700', note: 'Decimal seconds. Best of three attempts on 4 Sept.' },
+      { name: 'Keep-Ups · count', value: '184', mark: '4th', color: MUT, note: 'Up from 121 in August.' },
+      { name: '1v1 Round Robin · h2h', value: '17–6', mark: '1st', color: '#FFD700', note: 'Beat every forward in the squad at least once.' },
+      { name: 'Shooting Ladder · win/loss', value: '5–2', mark: '3rd', color: MUT, note: 'Two losses both to keepers on the short side.' },
+      { name: 'Beep Test · bands', value: '11.4', mark: 'met', color: MUT, note: 'One reading. Recorded 28 Aug.' }
+    ];
+
+    return {
+      w412: 412, h892: 892,
+      countdown: '3d 04h',
+      posChips, roster, rosterCount: roster.length,
+      skills: [
+        { name: 'Technical', val: 8, pct: '80%' }, { name: 'Tactical', val: 7, pct: '70%' },
+        { name: 'Physical', val: 9, pct: '90%' }, { name: 'Mental', val: 7, pct: '70%' }
+      ],
+      upcoming: [
+        { opp: 'Kingsley Academy', when: 'Tue 15 Sept · 4:30 PM', side: 'Home' },
+        { opp: 'St Aubin', when: 'Fri 18 Sept · 7:00 PM', side: 'Home' },
+        { opp: 'Fairview East', when: 'Tue 22 Sept · 5:00 PM', side: 'Away' }
+      ],
+      played: [
+        { opp: 'Millbrook', when: 'Fri 4 Sept · home', score: '3–1', result: 'Won' },
+        { opp: 'Harlow Ridge', when: 'Tue 1 Sept · away', score: '1–1', result: 'Drawn' },
+        { opp: 'Grantham Prep', when: 'Fri 28 Aug · away', score: '0–2', result: 'Lost' },
+        { opp: 'Oakmont', when: 'Tue 25 Aug · home', score: '4–0', result: 'Won' }
+      ],
+      pitch,
+      bench: [
+        { shirt: 23, name: 'Tobias Marchetti' }, { shirt: 5, name: 'Nathan Oyelaran' },
+        { shirt: 12, name: 'Isaiah Boateng' }, { shirt: 15, name: 'Rory Mabaso' },
+        { shirt: 18, name: 'Kit Lindgren' }, { shirt: 22, name: 'Sam Achebe' }
+      ],
+      clock: m + ':' + String(s).padStart(2, '0'),
+      clockColor,
+      clockState: running ? 'Clock running · recording live' : 'Clock stopped',
+      gateHint: running ? '' : '± and events are held',
+      statusBg: running ? 'transparent' : '#1c1608',
+      clockBtnLabel: running ? 'Stop' : 'Restart',
+      clockBtnStyle: 'min-height:56px;padding:0 16px;border-radius:6px;display:flex;align-items:center;cursor:pointer;' +
+        "font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;" +
+        (running ? 'border:1.5px solid #F59E0B;color:#F59E0B' : 'border:1.5px solid ' + CY + ';color:' + CY),
+      toggleClock: () => this.setState(s => ({ running: !s.running, refusal: null })),
+      tapShot: gate('shot'), tapGoal: gate('goal'), tapAssist: gate('assist'),
+      eventBtnStyle: evt,
+      refusal: !!this.state.refusal,
+      refusalTitle: this.state.refusal && this.state.refusal.title,
+      refusalBody: this.state.refusal && this.state.refusal.body,
+      onPitch: live, board, bands: bandRows, breakdown,
+      band: this.buildEntry('band'), sprint: this.buildEntry('sprint')
+    };
+  }
+}
+</script>
+</body>
+</html>
