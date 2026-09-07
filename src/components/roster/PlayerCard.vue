@@ -35,7 +35,7 @@ const grade = computed(() => lineupGrade(props.player));
         <span class="card__meta">
           <template v-if="player.position">{{ player.position }}</template>
           <template v-else>Position not recorded</template>
-          <span v-if="grade" class="card__grade">· {{ grade }}</span>
+          <span v-if="grade" class="card__grade">&#183; {{ grade }}</span>
         </span>
       </span>
     </button>
@@ -112,6 +112,7 @@ const grade = computed(() => lineupGrade(props.player));
 .card__name { font-size: 13.5px; color: var(--ink); }
 .card__meta { font-size: 11px; color: var(--ink-muted); }
 .card__grade { color: var(--ink-soft); }
+.card__grade::before { content: ' '; }
 
 .card__admin { display: flex; gap: var(--space-3); flex: none; }
 
