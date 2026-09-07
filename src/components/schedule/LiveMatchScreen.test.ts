@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
+import { setActivePinia } from 'pinia';
 import LiveMatchScreen from './LiveMatchScreen.vue';
 import { usePlusMinusStore } from '../../stores/plus-minus';
 
@@ -41,6 +42,18 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
   await new Promise(r => setTimeout(r, 0));
 };
+
+/**
+ * Wait until the screen's own open() has settled.
+ *
+ * The component opens the match on mount, and open() resets the events and
+ * clears the notice. A test that drives the store before that lands has its
+ * work wiped — which is a race, not a failure, and shows up only under load.
+ */
+async function openSettled(pm: any, tries = 20): Promise<void> {
+  for (let i = 0; i < tries && !pm.statMatchId; i++) await flush();
+  if (!pm.statMatchId) throw new Error('the board never opened');
+}
 
 async function mountBoard() {
   const w = mount(LiveMatchScreen, {
@@ -393,7 +406,19 @@ describe('the screen at its own URL', () => {
     await flush();
     await w.vm.$nextTick();
 
+    // Pinia's `useStore(pinia)` ignores the explicit argument whenever it is
+    // called outside a component's setup context while a *testing* pinia is
+    // active (see pinia's own useStore: it substitutes `null` for the
+    // passed-in pinia in that case and falls back to the ambient
+    // `activePinia`). Left alone, that fallback can resolve to whichever
+    // pinia instance happened to be active most recently -- other tests in
+    // this file never unmount their screens, so their tickers keep running
+    // and can flip the ambient active pinia between this mount and this
+    // line. Reasserting it immediately before the lookup closes that gap and
+    // guarantees `pm` is the exact store this screen already created.
+    setActivePinia(pinia);
     const pm = usePlusMinusStore(pinia as any);
+    await openSettled(pm);
     await startClock(w);
     for (let i = 0; i < 11; i++) await pm.append('on', `x${i}`);
     await pm.append('on', 'x11');
