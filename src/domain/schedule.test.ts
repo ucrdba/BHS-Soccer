@@ -178,6 +178,12 @@ describe('shortCountdown', () => {
   it('is empty when there is nothing to count down to', () => {
     expect(shortCountdown(null)).toBe('');
   });
+
+  it('reads a countdown whose parts are not numbers as zero rather than NaN', () => {
+    // Countdown holds strings, and a malformed one must not print "NaNd".
+    expect(shortCountdown({ days: 'abc', hours: 'xx', mins: 'zz' } as any)).toBe('0m');
+    expect(shortCountdown({ days: '', hours: '', mins: '' } as any)).toBe('0m');
+  });
 });
 
 describe('lastCompletedMatch', () => {
@@ -200,5 +206,14 @@ describe('lastCompletedMatch', () => {
   it('is null with nothing completed', () => {
     expect(lastCompletedMatch([m({ status: 'SCHEDULED' })])).toBeNull();
     expect(lastCompletedMatch([])).toBeNull();
+  });
+
+  it('ignores a completed fixture whose date cannot be read', () => {
+    // An unparseable date sorts as no date at all; a result with no date
+    // cannot be called the most recent one.
+    const good = { id: 'good', status: 'COMPLETED', score: '1 - 0', date: 'AUG 21 2026', matchOn: '2026-08-21' };
+    const undated = { id: 'undated', status: 'COMPLETED', score: '9 - 0', date: 'sometime', matchOn: null };
+    expect(lastCompletedMatch([undated, good])?.id).toBe('good');
+    expect(lastCompletedMatch([undated])).toBeNull();
   });
 });

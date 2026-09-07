@@ -112,7 +112,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
   overflow: hidden;
 }
 .plate__img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.22) saturate(0.82) contrast(1.05); }
-.plate__label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.plate__label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 /* A plate with no photograph: the dashed edge says "no photograph yet"
    rather than "this image failed". Matches PlayerCard's empty plate. */

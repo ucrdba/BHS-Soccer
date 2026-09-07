@@ -107,4 +107,15 @@ describe('parseScore', () => {
     expect(parseScore('')).toBeNull();
     expect(parseScore(null)).toBeNull();
   });
+
+  it('reads the first two numbers and ignores any after them', () => {
+    // "3 - 1 (aet 2)" and similar happen; the first two are the score.
+    expect(parseScore('3 - 1 - 2')).toEqual({ goalsFor: 3, goalsAgainst: 1 });
+  });
+
+  it('does not read a leading minus as a negative goal count', () => {
+    // Only digits are matched, so the sign is dropped rather than producing
+    // a negative score, which no match has.
+    expect(parseScore('-3 - 1')).toEqual({ goalsFor: 3, goalsAgainst: 1 });
+  });
 });
