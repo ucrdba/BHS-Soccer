@@ -2,9 +2,10 @@
  * The four skill ratings as bars for the bio.
  *
  * `team_players.ratings` is a loose object. The bio shows the four skills the
- * program rates, in a fixed order, out of ten. A rating that is not set is
- * left out rather than drawn at zero, because an empty bar reads as a
- * judgement the coach never made.
+ * program rates, in a fixed order, out of a hundred, which is what
+ * `team_players.ratings` holds. A rating that is not set is left out rather
+ * than drawn at zero, because an empty bar reads as a judgement the coach
+ * never made.
  */
 export const SKILLS = ['technical', 'tactical', 'physical', 'mental'] as const;
 
@@ -12,7 +13,7 @@ const NAMES: Record<string, string> = {
   technical: 'Technical', tactical: 'Tactical', physical: 'Physical', mental: 'Mental'
 };
 
-export const SKILL_SCALE = 10;
+export const SKILL_SCALE = 100;
 
 export interface SkillBar {
   key: string;

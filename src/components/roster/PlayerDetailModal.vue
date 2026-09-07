@@ -77,7 +77,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
         <div v-for="s in skills" :key="s.key" class="skill" data-skill-bar>
           <div class="skill__row">
             <span class="skill__name">{{ s.name }}</span>
-            <span class="skill__value tnum">{{ s.value }} <span class="skill__of">/10</span></span>
+            <span class="skill__value tnum">{{ s.value }} <span class="skill__of">/100</span></span>
           </div>
           <div class="skill__track"><div class="skill__fill" :style="{ width: s.pct + '%' }" data-skill-fill /></div>
         </div>
@@ -127,7 +127,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
 }
 .figure { display: flex; flex-direction: column; }
 .figure__value { font-family: var(--heading-face); font-size: 20px; color: var(--ink); }
-.figure__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.figure__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 .skills { margin-top: var(--space-6); }
 .kicker--accent { color: var(--rule-strong); }
@@ -135,7 +135,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
 .skill__row { display: flex; align-items: baseline; justify-content: space-between; }
 .skill__name { font-size: 13.5px; color: var(--ink); }
 .skill__value { font-family: var(--heading-face); font-size: 15px; color: var(--ink); }
-.skill__of { font-size: 11px; color: var(--ink-soft); }
+.skill__of { font-size: 11px; color: var(--ink-muted); }
 .skill__track { height: 3px; margin-top: 7px; background: var(--rule); }
 .skill__fill { height: 3px; background: var(--live); }
 </style>
