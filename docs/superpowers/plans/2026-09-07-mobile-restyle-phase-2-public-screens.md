@@ -280,7 +280,7 @@ Framework-free, tested on their own: the countdown as one figure, the result wor
 - Create: `src/domain/player-skills.ts`, `src/domain/player-skills.test.ts`
 
 **Interfaces:**
-- Produces: `shortCountdown(c: Countdown | null): string`; `parseScore(score: unknown): { goalsFor: number; goalsAgainst: number } | null`; `matchOutcome(m: any): 'won' | 'drawn' | 'lost' | null`; `SKILLS: readonly string[]`; `skillBars(ratings: unknown): { key: string; name: string; value: number; pct: number }[]`.
+- Produces: `shortCountdown(c: Countdown | null): string`; `lastCompletedMatch(schedule: any[]): any | null`; `parseScore(score: unknown): { goalsFor: number; goalsAgainst: number } | null`; `matchOutcome(m: any): 'won' | 'drawn' | 'lost' | null`; `SKILLS: readonly string[]`; `skillBars(ratings: unknown): { key: string; name: string; value: number; pct: number }[]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -308,9 +308,32 @@ describe('shortCountdown', () => {
     expect(shortCountdown(null)).toBe('');
   });
 });
+
+describe('lastCompletedMatch', () => {
+  const m = (over: any) => ({ id: 'x', status: 'COMPLETED', score: '1 - 0', date: 'AUG 21 2026', matchOn: '2026-08-21', ...over });
+
+  it('is the most recent completed fixture, not the most recent dated one', () => {
+    // lastPlayedMatch answers "what was the latest fixture on the calendar",
+    // which includes next week. A result is only a completed fixture.
+    const done = m({ id: 'done' });
+    const next = m({ id: 'next', status: 'SCHEDULED', score: null, date: 'SEP 4 2026', matchOn: '2026-09-04' });
+    expect(lastCompletedMatch([next, done])?.id).toBe('done');
+  });
+
+  it('prefers the later of two completed fixtures', () => {
+    const early = m({ id: 'early', date: 'AUG 7 2026', matchOn: '2026-08-07' });
+    const late = m({ id: 'late' });
+    expect(lastCompletedMatch([early, late])?.id).toBe('late');
+  });
+
+  it('is null with nothing completed', () => {
+    expect(lastCompletedMatch([m({ status: 'SCHEDULED' })])).toBeNull();
+    expect(lastCompletedMatch([])).toBeNull();
+  });
+});
 ```
 
-(If `schedule.test.ts` already imports from `./schedule` at the top, add `shortCountdown` to that import instead of a second import line.)
+(`schedule.test.ts` already has a multi-line import from `./schedule`; add `shortCountdown` and `lastCompletedMatch` to it rather than a second import line.)
 
 Append to `src/domain/season-record.test.ts`:
 
@@ -429,6 +452,22 @@ export function shortCountdown(c: Countdown | null): string {
   if (days > 0) return `${days}d ${two(hours)}h`;
   if (hours > 0) return `${two(hours)}h ${two(mins)}m`;
   return `${mins}m`;
+}
+
+/**
+ * The most recent completed fixture, or null.
+ *
+ * Not `lastPlayedMatch`: that is the latest fixture on the calendar, which
+ * includes next week's, and is what the "stale schedule" state wants. A
+ * result is only ever a completed fixture.
+ */
+export function lastCompletedMatch(schedule: any[]): any | null {
+  const done = (schedule || [])
+    .filter(m => m && m.status === 'COMPLETED')
+    .map(m => ({ m, t: matchDateTime(m) }))
+    .filter(x => x.t)
+    .sort((a, b) => (b.t as Date).getTime() - (a.t as Date).getTime());
+  return done.length ? done[0].m : null;
 }
 ```
 
@@ -719,7 +758,7 @@ Canvas 1a·1. The shell's crest carries the organization, so the view's own hero
 - Modify: `src/views/HomeView.test.ts` (the countdown case, one new case)
 
 **Interfaces:**
-- Consumes: `shortCountdown`, `matchOutcome` (Task 3); `schedule.nextMatch`, `schedule.lastPlayed`, `schedule.record`, `schedule.state`; `displayDate` from `domain/schedule-view.ts`.
+- Consumes: `shortCountdown`, `lastCompletedMatch`, `matchOutcome` (Task 3); `schedule.matches`, `schedule.nextMatch`, `schedule.lastPlayed` (for the stale state's wording only), `schedule.record`, `schedule.state`; `displayDate` from `domain/schedule-view.ts`.
 - Produces: hooks `data-countdown`, `data-next-fixture`, `data-last-result`.
 
 - [ ] **Step 1: Change the countdown test and add the last-result case**
@@ -762,7 +801,7 @@ Expected: the countdown case and the last-result case fail; everything else pass
 In `src/views/HomeView.vue`'s `<script setup>`, change the imports and add two computeds:
 
 ```ts
-import { nextMatchCountdown, shortCountdown } from '../domain/schedule';
+import { nextMatchCountdown, shortCountdown, lastCompletedMatch } from '../domain/schedule';
 import { displayDate, matchOutcome } from '../domain/schedule-view';
 ```
 
@@ -788,11 +827,11 @@ const noFixtureLine = computed(() => {
 
 /**
  * The most recent completed fixture with a readable score, in words.
- * `lastPlayed` is the most recent dated fixture, which may not be written
- * up; only a result is a result.
+ * Not `schedule.lastPlayed`: that is the latest fixture on the calendar,
+ * which includes next week's. Only a result is a result.
  */
 const lastResult = computed(() => {
-  const m = schedule.lastPlayed;
+  const m = lastCompletedMatch(schedule.matches);
   const outcome = matchOutcome(m);
   if (!m || !outcome) return null;
   const word = outcome === 'won' ? 'Won' : outcome === 'drawn' ? 'Drew' : 'Lost';
