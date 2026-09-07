@@ -1832,7 +1832,8 @@ describe('AppHeader', () => {
         { status: 'SCHEDULED' }
       ]
     });
-    expect(w.find('[data-season-record]').text().replace(/\s+/g, ' ')).toBe('1W 1L 1D');
+    // Vue condenses the whitespace between the spans, so compare without it.
+    expect(w.find('[data-season-record]').text().replace(/\s+/g, '')).toBe('1W1L1D');
   });
 
   it('claims nothing about the season until the schedule has loaded', () => {
