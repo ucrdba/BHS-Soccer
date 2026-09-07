@@ -12,7 +12,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useAuthStore } from '../stores/auth';
-import { nextMatchCountdown } from '../domain/schedule';
+import { nextMatchCountdown, shortCountdown, lastCompletedMatch } from '../domain/schedule';
+import { displayDate, matchOutcome } from '../domain/schedule-view';
 import DailyThought from '../components/home/DailyThought.vue';
 
 const org = useOrganizationStore();
@@ -43,243 +44,203 @@ watch(() => org.activeTeamId, (id) => { schedule.load(id); }, { immediate: true 
 const countdown = computed(() => {
   // Referenced so the tick invalidates this.
   void now.value;
-  return nextMatchCountdown(schedule.matches) || { days: '00', hours: '00', mins: '00' };
+  return shortCountdown(nextMatchCountdown(schedule.matches));
 });
 
 /** Nothing is claimed about the season until a load has actually happened. */
 const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
 
-const headline = computed(() => {
-  if (schedule.nextMatch) return `NEXT MATCH vs ${String(schedule.nextMatch.opponent || '').toUpperCase()}`;
-  if (schedule.state === 'empty') return 'SCHEDULE COMING SOON';
-  if (schedule.state === 'stale') return 'NO UPCOMING FIXTURES';
-  return 'SEASON COMPLETE';
+/** What the fixture block says when there is no next match. */
+const noFixtureLine = computed(() => {
+  if (schedule.state === 'empty') return 'Schedule coming soon';
+  if (schedule.state === 'stale') return 'No upcoming fixtures';
+  return 'Season complete';
+});
+
+/**
+ * The most recent completed fixture with a readable score, in words.
+ * Not `schedule.lastPlayed`: that is the latest fixture on the calendar,
+ * which includes next week's. Only a result is a result.
+ */
+const lastResult = computed(() => {
+  const m = lastCompletedMatch(schedule.matches);
+  const outcome = matchOutcome(m);
+  if (!m || !outcome) return null;
+  const word = outcome === 'won' ? 'Won' : outcome === 'drawn' ? 'Drew' : 'Lost';
+  return { opponent: m.opponent, side: m.isHome ? 'home' : 'away', word, score: m.score };
 });
 </script>
 
 <template>
-  <section class="hero">
-    <p v-if="org.branding.name" class="hero__org">
-      {{ org.branding.name }}
-      <span v-if="org.activeTeam" class="hero__team">· {{ org.activeTeam.name }}</span>
-    </p>
-
-    <h1 v-if="org.branding.mascot" class="hero__title">
-      HOME OF THE <span class="hero__mascot">{{ org.branding.mascot.toUpperCase() }}</span>
-    </h1>
-
+  <section class="home">
     <div class="fixture">
-      <div class="fixture__detail">
-        <p v-if="schedule.loadError" class="fixture__error" role="alert">
-          {{ schedule.loadError }}
+      <p v-if="org.branding.name" class="home__org kicker tnum">
+        {{ org.branding.name }}<template v-if="org.branding.mascot"> · {{ org.branding.mascot }}</template><template v-if="org.activeTeam"> · {{ org.activeTeam.name }}</template>
+      </p>
+
+      <p v-if="schedule.loadError" class="refused" role="alert">{{ schedule.loadError }}</p>
+
+      <template v-else-if="!settled">
+        <p class="kicker">Next match</p>
+        <p class="fixture__opp fixture__opp--quiet">Loading the schedule…</p>
+      </template>
+
+      <template v-else-if="schedule.nextMatch">
+        <p class="kicker kicker--accent">Next match</p>
+        <h1 class="fixture__opp" data-next-fixture>{{ schedule.nextMatch.opponent }}</h1>
+        <p class="fixture__where">
+          {{ schedule.nextMatch.isHome ? 'Home' : 'Away' }}
+          <template v-if="schedule.nextMatch.location"> · {{ schedule.nextMatch.location }}</template>
         </p>
-
-        <template v-else-if="!settled">
-          <h2 class="fixture__headline">LOADING THE SCHEDULE…</h2>
-        </template>
-
-        <template v-else>
-          <h2 class="fixture__headline">{{ headline }}</h2>
-
-          <p v-if="schedule.nextMatch" class="fixture__line">
-            {{ schedule.nextMatch.isHome ? 'Home' : 'Away' }}
-            <template v-if="schedule.nextMatch.location"> · {{ schedule.nextMatch.location }}</template>
-            <template v-if="schedule.nextMatch.date"> | {{ schedule.nextMatch.date }}</template>
-            <template v-if="schedule.nextMatch.time">, {{ schedule.nextMatch.time }}</template>
-          </p>
-
-          <p v-else-if="schedule.state === 'empty'" class="fixture__line">
-            No fixtures have been added yet.<template v-if="auth.isCoach"> Add them from the Schedule tab.</template>
-          </p>
-
-          <p v-else-if="schedule.state === 'stale'" class="fixture__line">
-            <template v-if="schedule.lastPlayed">
-              Last match: {{ schedule.lastPlayed.opponent }} on {{ schedule.lastPlayed.date }}.
-            </template>
-            <template v-if="auth.isCoach">
-              Add the next fixture, or record the result of the last one.
-            </template>
-            <template v-else>Check back soon for the next match.</template>
-          </p>
-
-          <p v-else class="fixture__line">
-            All scheduled matches have been played. Final record:
-            {{ schedule.record.recordText }}
-          </p>
-        </template>
-      </div>
-
-      <div class="countdown" aria-label="Time until the next match">
-        <div class="countdown__unit">
-          <span class="countdown__num" data-countdown-unit>{{ countdown.days }}</span>
-          <span class="countdown__label">Days</span>
+        <div class="when">
+          <div>
+            <p class="when__date tnum">{{ displayDate(schedule.nextMatch) }}</p>
+            <p v-if="schedule.nextMatch.time" class="when__time tnum">Kick-off {{ schedule.nextMatch.time }}</p>
+          </div>
+          <div class="when__count">
+            <p class="when__figure tnum" data-countdown>{{ countdown }}</p>
+            <p class="when__label">to kick-off</p>
+          </div>
         </div>
-        <div class="countdown__unit">
-          <span class="countdown__num" data-countdown-unit>{{ countdown.hours }}</span>
-          <span class="countdown__label">Hrs</span>
-        </div>
-        <div class="countdown__unit">
-          <span class="countdown__num" data-countdown-unit>{{ countdown.mins }}</span>
-          <span class="countdown__label">Min</span>
-        </div>
+      </template>
+
+      <template v-else>
+        <p class="kicker">Next match</p>
+        <h1 class="fixture__opp fixture__opp--quiet">{{ noFixtureLine }}</h1>
+        <p v-if="schedule.state === 'empty'" class="fixture__where">
+          No fixtures have been added yet.<template v-if="auth.isCoach"> Add them from the Schedule tab.</template>
+        </p>
+        <p v-else-if="schedule.state === 'stale'" class="fixture__where">
+          <template v-if="schedule.lastPlayed">
+            Last match: {{ schedule.lastPlayed.opponent }} on {{ schedule.lastPlayed.date }}.
+          </template>
+          <template v-if="auth.isCoach"> Add the next fixture, or record the result of the last one.</template>
+          <template v-else> Check back soon for the next match.</template>
+        </p>
+        <p v-else class="fixture__where">
+          All scheduled matches have been played. Final record: {{ schedule.record.recordText }}
+        </p>
+      </template>
+
+      <div v-if="settled && lastResult" class="last" data-last-result>
+        <p class="last__who">Last out · <em>{{ lastResult.opponent }}, {{ lastResult.side }}</em></p>
+        <p class="last__score tnum">{{ lastResult.word }} {{ lastResult.score }}</p>
       </div>
     </div>
-  </section>
 
-  <!-- Directly after the hero: it is the coach speaking to the squad, and
-       the squad reads this page first. -->
-  <DailyThought :team-id="org.activeTeamId" :can-edit="canWriteThought" />
+    <!-- Directly after the fixture: it is the coach speaking to the squad, and
+         the squad reads this page first. -->
+    <DailyThought :team-id="org.activeTeamId" :can-edit="canWriteThought" />
 
-  <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats">
-    <div class="stat">
-      <span class="stat__value">{{ schedule.record.recordText }}</span>
-      <span class="stat__label">Record (W&ndash;L&ndash;D)</span>
-    </div>
-    <div class="stat">
-      <span class="stat__value">{{ schedule.record.gamesPlayed }}</span>
-      <span class="stat__label">Played</span>
-    </div>
-    <div class="stat">
-      <span class="stat__value">{{ schedule.record.goalsPerGame }}</span>
-      <span class="stat__label">Goals / game</span>
-    </div>
-    <div class="stat">
-      <span class="stat__value">{{ schedule.record.cleanSheets }}</span>
-      <span class="stat__label">Clean sheets</span>
-    </div>
+    <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats tnum">
+      <div class="stat">
+        <span class="stat__value">{{ schedule.record.recordText }}</span>
+        <span class="stat__label">Record (W&ndash;L&ndash;D)</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value">{{ schedule.record.gamesPlayed }}</span>
+        <span class="stat__label">Played</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value">{{ schedule.record.goalsPerGame }}</span>
+        <span class="stat__label">Goals / game</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value">{{ schedule.record.cleanSheets }}</span>
+        <span class="stat__label">Clean sheets</span>
+      </div>
+    </section>
   </section>
 </template>
 
 <style scoped>
-.hero {
-  padding: 3rem 1.25rem 2rem;
-  background:
-    linear-gradient(160deg,
-      color-mix(in srgb, var(--bhs-blue-primary) 35%, transparent),
-      transparent 60%),
-    var(--bhs-navy-bg);
-  border-bottom: 1px solid var(--bhs-navy-border);
+.home { padding: 0 0 var(--space-8); }
+
+.fixture { padding: var(--space-4); }
+
+.home__org { margin-bottom: var(--space-3); }
+@media (max-width: 767.98px) {
+  .home__org { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 }
 
-.hero__org {
-  margin: 0 0 0.5rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
+.kicker--accent { color: var(--rule-strong); }
 
-.hero__team { color: var(--text-muted, #94a3b8); letter-spacing: 0.06em; }
-
-.hero__title {
-  margin: 0 0 2rem;
+.fixture__opp {
+  margin-top: var(--space-2);
+  font-family: var(--heading-face);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.05;
   color: var(--ink);
-  font-size: clamp(1.75rem, 5vw, 3rem);
-  line-height: 1.1;
-  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 
-.hero__mascot { color: var(--bhs-cyan-accent); }
+.fixture__opp--quiet { font-size: 24px; color: var(--ink-muted); }
 
-.fixture {
+.fixture__where { margin-top: 4px; font-size: 13px; color: var(--ink-muted); }
+
+.when {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  max-width: 60rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bhs-navy-card) 85%, transparent);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule-strong);
 }
 
-.fixture__detail { min-width: 0; }
+.when__date { font-family: var(--heading-face); font-size: 23px; line-height: 1; color: var(--ink); }
+.when__time { margin-top: 3px; font-size: 13px; color: var(--ink-muted); }
+.when__count { text-align: right; }
+.when__figure { font-family: var(--heading-face); font-size: 23px; line-height: 1; color: var(--rule-strong); }
+.when__label { margin-top: 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 
-.fixture__headline {
-  margin: 0 0 0.35rem;
-  color: var(--ink);
-  font-size: 1.05rem;
-  letter-spacing: 0.04em;
-}
-
-.fixture__line {
-  margin: 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.fixture__error {
-  margin: 0;
-  color: var(--bhs-gold-accent);
-  font-size: 0.88rem;
-}
-
-.countdown { display: flex; gap: 0.75rem; }
-
-.countdown__unit {
+.last {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 3.25rem;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
 
-.countdown__num {
-  color: var(--bhs-cyan-accent);
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
+.last__who { font-size: 12px; color: var(--ink-muted); }
+.last__who em { font-style: italic; }
+.last__score { font-family: var(--heading-face); font-size: 17px; color: var(--ink); }
 
-.countdown__label {
-  margin-top: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.refused {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 0.9rem;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 1rem;
-  max-width: 60rem;
-  margin: 2rem auto;
-  padding: 0 1.25rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 var(--space-4);
+  margin: var(--space-6) var(--space-4) 0;
+  border-top: 1px solid var(--rule);
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 1rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 10px;
-  background: var(--bhs-navy-card);
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.stat__value {
-  color: var(--ink);
-  font-size: 1.35rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
+.stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--ink); }
+.stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 
-.stat__label {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-@media (max-width: 640px) {
-  .hero { padding: 2rem 1rem 1.5rem; }
-  .fixture { padding: 1rem; }
+@media (min-width: 768px) {
+  .fixture, .stats { max-width: 40rem; margin-inline: auto; }
+  .fixture { padding: var(--space-8) var(--space-4) 0; }
+  .stats { grid-template-columns: repeat(4, 1fr); }
 }
 </style>

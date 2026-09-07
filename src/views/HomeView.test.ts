@@ -64,11 +64,24 @@ describe('an upcoming fixture', () => {
     expect(w.text()).toContain('Home Field');
   });
 
-  it('counts down rather than reading all zeroes', () => {
+  it('counts down as one figure rather than reading all zeroes', () => {
+    // NOW is Sep 1 12:00; kick-off is Sep 4 18:00 — three days and six hours.
     const w = mountHome({ matches: [row()] });
-    const digits = w.findAll('[data-countdown-unit]').map(n => n.text());
-    expect(digits).toHaveLength(3);
-    expect(digits.join('')).not.toBe('000000');
+    expect(w.find('[data-countdown]').text()).toBe('3d 06h');
+  });
+
+  it('shows the last result in words beside the score', () => {
+    const w = mountHome({
+      matches: [
+        row({ id: 'p', match_date: 'AUG 21 2026', match_on: '2026-08-21', opponent: 'Millbrook',
+              status: 'COMPLETED', score: '3 - 1', is_home: true }),
+        row()
+      ]
+    });
+    const last = w.find('[data-last-result]');
+    expect(last.text()).toContain('Millbrook');
+    expect(last.text()).toMatch(/won/i);
+    expect(last.text()).toContain('3 - 1');
   });
 });
 
