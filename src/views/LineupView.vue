@@ -9,8 +9,7 @@
  * not there.
  */
 import { computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { RouterLink } from 'vue-router';
+import { useRoute, useRouter, RouterLink } from 'vue-router';
 import LineupScreen from '../components/schedule/LineupScreen.vue';
 import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
@@ -19,6 +18,7 @@ import { matchById } from '../domain/match-lookup';
 import { seasonFullMatchMinutes } from '../domain/season';
 
 const route = useRoute();
+const router = useRouter();
 const org = useOrganizationStore();
 const schedule = useScheduleStore();
 const roster = useRosterStore();
@@ -38,6 +38,17 @@ watch(() => org.activeTeamId, (id) => {
   schedule.load(id);
   roster.load(id);
 }, { immediate: true });
+
+/**
+ * A saved sheet returns to the schedule.
+ *
+ * The screen has no in-place close now that it is a route, so the view owns
+ * what "done" means: the coach lands back on the fixture list, where the
+ * marker for a fixture still missing a sheet is re-read on arrival.
+ */
+function onDone(): void {
+  router.push({ name: 'schedule' });
+}
 </script>
 
 <template>
@@ -56,6 +67,8 @@ watch(() => org.activeTeamId, (id) => {
     :team-id="org.activeTeamId"
     :school-id="schoolId"
     :players="roster.players"
+    @saved="onDone"
+    @close="onDone"
   />
 </template>
 
