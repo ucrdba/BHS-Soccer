@@ -104,8 +104,10 @@ describe('the organization store', () => {
     await store.load();
     await Promise.resolve();
 
-    expect(document.documentElement.style.getPropertyValue('--bhs-blue-primary'))
+    expect(document.documentElement.style.getPropertyValue('--org-primary'))
       .toBe('#123456');
+    expect(document.documentElement.style.getPropertyValue('--org-secondary'))
+      .toBe('#abcdef');
   });
 
   it('PUTS THE ORGANIZATION IN THE BROWSER TAB', async () => {
