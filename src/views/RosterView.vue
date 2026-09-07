@@ -94,27 +94,22 @@ async function onRemove(p: Player): Promise<void> {
 <template>
   <section class="roster">
     <header class="roster__head">
-      <div>
+      <div class="roster__titles">
         <h1 class="roster__title">Roster &amp; Bios</h1>
-        <p v-if="org.branding.name" class="roster__org">
-          {{ org.branding.name }}
-          <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
+        <p v-if="org.branding.name" class="roster__org kicker tnum">
+          {{ org.branding.name }}<span v-if="org.activeTeam"> · {{ org.activeTeam.name }}</span>
         </p>
       </div>
-      <button
-        v-if="canEdit" type="button" class="btn" data-open-numbers
-        @click="numbersOpen = true"
-      >Recording numbers</button>
-      <button v-if="canEdit" type="button" class="btn btn--go" data-add-player @click="openAdd">
-        + Add player
-      </button>
+      <div v-if="canEdit" class="roster__acts">
+        <button type="button" class="btn" data-open-numbers @click="numbersOpen = true">Recording numbers</button>
+        <button type="button" class="btn btn--go" data-add-player @click="openAdd">Add player</button>
+      </div>
     </header>
 
     <p v-if="notice" class="notice" role="status" data-notice>
       {{ notice }}
       <button type="button" class="notice__x" aria-label="Dismiss" @click="notice = null">&times;</button>
     </p>
-
     <p v-if="roster.loadError" class="notice notice--bad" role="alert" data-load-error>
       {{ roster.loadError }}
     </p>
@@ -126,14 +121,16 @@ async function onRemove(p: Player): Promise<void> {
           class="chip" :class="{ 'is-on': roster.filter === f.key }"
           data-filter-chip
           @click="roster.setFilter(f.key)"
-        >{{ f.label }} <span class="chip__n">{{ f.count }}</span></button>
+        >{{ f.label }} <span class="chip__n tnum">{{ f.count }}</span></button>
       </div>
 
-      <div class="chips" role="group" aria-label="Sort">
-        <button type="button" class="chip" :class="{ 'is-on': roster.sortBy === 'number' }"
-                data-sort-number @click="roster.setSort('number')">Number</button>
-        <button type="button" class="chip" :class="{ 'is-on': roster.sortBy === 'name' }"
-                data-sort-name @click="roster.setSort('name')">Name</button>
+      <div class="sort" role="group" aria-label="Sort">
+        <span class="sort__label">Sort:</span>
+        <button type="button" class="sort__opt" :class="{ 'is-on': roster.sortBy === 'number' }"
+                data-sort-number @click="roster.setSort('number')">number</button>
+        <span class="sort__sep" aria-hidden="true">·</span>
+        <button type="button" class="sort__opt" :class="{ 'is-on': roster.sortBy === 'name' }"
+                data-sort-name @click="roster.setSort('name')">name</button>
       </div>
     </div>
 
@@ -145,15 +142,18 @@ async function onRemove(p: Player): Promise<void> {
       No players in that position group.
     </p>
 
-    <div v-else class="grid">
-      <PlayerCard
-        v-for="p in roster.visible" :key="p.id"
-        :player="p" :can-edit="canEdit"
-        @open="detailFor = $event"
-        @edit="openEdit"
-        @remove="onRemove"
-      />
-    </div>
+    <template v-else>
+      <p class="kicker squad__kicker tnum">Squad · {{ roster.visible.length }} shown</p>
+      <div class="grid">
+        <PlayerCard
+          v-for="p in roster.visible" :key="p.id"
+          :player="p" :can-edit="canEdit"
+          @open="detailFor = $event"
+          @edit="openEdit"
+          @remove="onRemove"
+        />
+      </div>
+    </template>
 
     <PlayerDetailModal
       :open="detailFor !== null" :player="detailFor" @close="detailFor = null" />
@@ -162,106 +162,87 @@ async function onRemove(p: Player): Promise<void> {
       v-if="canEdit"
       :open="formOpen" :player="editing" :busy="busy" :error="formError"
       @close="formOpen = false" @save="onSave" />
-  
+
     <RecordingNumbersModal
       v-if="canEdit"
       :open="numbersOpen" :team-id="org.activeTeamId" :players="roster.players"
       @close="numbersOpen = false" />
-</section>
+  </section>
 </template>
 
 <style scoped>
-.roster { max-width: 72rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.roster { padding: var(--space-4) var(--space-4) var(--space-8); }
 
 .roster__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
 }
 
-.roster__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.roster__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.roster__org { margin-top: var(--space-1); }
+.roster__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-.roster__org {
-  margin: 0.25rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
+.controls { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) 0; }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
-}
-
-.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
 
 .chip {
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12px;
   cursor: pointer;
 }
-
-.chip.is-on { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.chip__n { opacity: 0.65; font-variant-numeric: tabular-nums; }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.85rem;
+.chip:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.chip.is-on {
+  border-color: var(--live);
+  color: var(--live);
+  background: color-mix(in srgb, var(--live) 10%, transparent);
 }
+.chip__n { color: var(--ink-muted); }
+.chip.is-on .chip__n { color: inherit; }
 
-.empty {
-  padding: 3rem 1rem;
-  color: var(--text-muted, #94a3b8);
-  text-align: center;
-}
+.sort { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; color: var(--ink-muted); }
+.sort__opt { padding: 0; border: 0; background: none; color: var(--ink-muted); font: inherit; cursor: pointer; }
+.sort__opt.is-on { color: var(--live); border-bottom: 1px solid var(--live); }
+.sort__sep { color: var(--ink-soft); }
+
+.squad__kicker { margin-top: var(--space-2); }
+.grid { display: flex; flex-direction: column; }
+
+.empty { padding: var(--space-8) var(--space-3); color: var(--ink-muted); text-align: center; }
 
 .notice {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  color: var(--bhs-cyan-accent);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink);
   font-size: 0.85rem;
 }
+.notice--bad { border-left-color: var(--color-warning); }
+.notice__x { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-
-.notice__x {
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
+@media (min-width: 768px) {
+  .roster { max-width: 64rem; margin: 0 auto; }
+  .controls { flex-direction: row; justify-content: space-between; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: var(--space-3); }
 }
-
-.btn {
-  padding: 0.55rem 1rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
 </style>
