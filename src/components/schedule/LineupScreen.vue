@@ -12,17 +12,18 @@
  * stylesheet guesses.
  */
 import { ref, computed, watch } from 'vue';
-import BaseModal from '../ui/BaseModal.vue';
+import ToolScreen from '../layout/ToolScreen.vue';
 import { useLineupStore } from '../../stores/lineup';
 import {
   lineupSquad, lineupBench, lineupShortName, lineupGrade
 } from '../../domain/lineup';
 
 const props = defineProps<{
-  open: boolean;
   /** The fixture, or null for a sheet not tied to one. */
   matchId: string | null;
   matchLabel?: string;
+  /** This squad's own full-match length, from the team record. */
+  matchMinutes: number;
   teamId: string | null;
   schoolId: string | null;
   players: any[];
@@ -47,11 +48,11 @@ const bench = computed(() =>
   lineupBench(lineup.assignments, squad.value, lineup.formation, lineup.dressed));
 const byId = computed(() => new Map(squad.value.map((p: any) => [p.id, p])));
 
-const title = computed(() =>
-  props.matchLabel ? `Lineup — ${props.matchLabel}` : 'Lineup');
+const title = computed(() => 'Lineup');
+const kicker = computed(() =>
+  props.matchLabel ? `vs ${props.matchLabel}` : 'No fixture');
 
-watch(() => [props.open, props.matchId] as const, () => {
-  if (!props.open) return;
+watch(() => props.matchId, () => {
   picked.value = null;
   notice.value = null;
   lineup.load(props.teamId, props.matchId);
@@ -129,23 +130,27 @@ const grade = lineupGrade;
 </script>
 
 <template>
-  <BaseModal :open="open" :title="title" wide @close="emit('close')">
-    <div class="head">
+  <ToolScreen
+    :title="title" :kicker="kicker"
+    :back-to="{ name: 'schedule' }" back-label="Schedule"
+  >
+    <template #top-right>
       <label class="fld">
-        <span class="fld__label">Formation</span>
+        <span class="sr-only">Formation</span>
         <select
-          class="inp" data-formation
+          class="formation" data-formation
           :value="lineup.formation"
           @change="lineup.setFormation(($event.target as HTMLSelectElement).value)"
         >
           <option v-for="f in FORMATIONS" :key="f" :value="f">{{ f }}</option>
         </select>
       </label>
+    </template>
 
-      <p class="hint" data-lineup-hint>
-        Tap a player, then tap a position. Dragging works too.
-      </p>
-    </div>
+    <p class="length" data-lineup-length>
+      {{ matchMinutes }}-minute match. Every per-match rate divides by it.
+    </p>
+    <p class="hint" data-lineup-hint>Tap a player, then tap a position. Dragging works too.</p>
 
     <div class="pitch" data-lineup-pitch @dragover.prevent>
       <div
@@ -174,10 +179,7 @@ const grade = lineupGrade;
       </div>
     </div>
 
-    <h3 class="bench__h">
-      Bench
-      <span class="bench__n">{{ bench.length }}</span>
-    </h3>
+    <p class="kicker bench__h">Bench · tap to place <span class="tnum">{{ bench.length }}</span></p>
 
     <div class="bench" data-lineup-bench @dragover.prevent @drop.prevent="onDropBench">
       <button
@@ -188,8 +190,8 @@ const grade = lineupGrade;
         @click="onBenchPlayer(p.id)"
         @dragstart="onDragStart(p.id, null)"
       >
-        <span v-if="p.number != null" class="chip__no">{{ p.number }}</span>
-        {{ shortName(p) }}
+        <span v-if="p.number != null" class="chip__no tnum">{{ p.number }}</span>
+        <span class="chip__name">{{ shortName(p) }}</span>
         <span v-if="grade(p)" class="chip__grade">{{ grade(p) }}</span>
       </button>
 
@@ -203,53 +205,75 @@ const grade = lineupGrade;
 
     <p v-if="notice" class="hint hint--bad" role="alert" data-lineup-error>{{ notice }}</p>
 
-    <template #footer>
-      <button type="button" class="btn" @click="emit('close')">Cancel</button>
+    <template #foot>
       <button
-        type="button" class="btn btn--primary" :disabled="saving"
+        type="button" class="toolbtn toolbtn--go" :disabled="saving"
         data-lineup-save @click="onSave"
       >{{ saving ? 'Saving…' : 'Save lineup' }}</button>
+      <RouterLink
+        v-if="matchId" class="toolbtn" data-lineup-golive
+        :to="{ name: 'live', params: { matchId } }"
+      >Go live</RouterLink>
     </template>
-  </BaseModal>
+  </ToolScreen>
 </template>
 
 <style scoped>
-.head { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: flex-end; margin-bottom: 0.7rem; }
-
 .fld { display: block; }
-.fld--wide { margin-top: 0.7rem; }
+.fld--wide { margin-top: var(--space-3); }
 
 .fld__label {
   display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.formation {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--mark);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
 }
 
 .inp {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 14px;
 }
 
 .inp--wide { width: 100%; }
+.inp:focus-visible { border-color: var(--live); outline-offset: 0; }
 
+.length { font-size: 12px; color: var(--ink-muted); }
+.length::first-line { color: var(--ink); }
+
+/*
+ * The pitch is a fixed dark green whatever ground the page is on, so its own
+ * text colour is pinned rather than taken from --ink. The grid line is the
+ * halfway line.
+ */
 .pitch {
   position: relative;
   width: 100%;
   aspect-ratio: 2 / 3;
-  max-height: 60vh;
-  margin: 0 auto;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
-  /* The pitch canvas is always dark, regardless of ground, so its text is always light. */
+  max-height: 46vh;
+  margin: var(--space-3) auto 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
   --pitch-ink: #F8FAFC;
   background:
     linear-gradient(to top, color-mix(in srgb, var(--pitch-ink) 5%, transparent) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
@@ -263,82 +287,97 @@ const grade = lineupGrade;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 3.6rem;
-  padding: 0.2rem 0.3rem;
-  border: 1px dashed color-mix(in srgb, var(--pitch-ink) 40%, transparent);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px 4px;
+  border: 1.5px dashed color-mix(in srgb, var(--pitch-ink) 40%, transparent);
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
   color: var(--pitch-ink);
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 11px;
   cursor: pointer;
 }
 
-.slot.is-filled { border-style: solid; border-color: var(--bhs-cyan-accent); }
-.slot.is-target { border-color: var(--bhs-gold-accent); }
+.slot.is-filled { border-style: solid; border-color: var(--live); }
+.slot.is-target { border-color: var(--mark); }
 
-.slot__pos { color: var(--text-muted, #94a3b8); font-size: 0.6rem; letter-spacing: 0.06em; }
-.slot__name { font-size: 0.72rem; }
-.slot__meta { color: var(--text-muted, #94a3b8); font-size: 0.6rem; }
+.slot__pos { font-size: 8.5px; letter-spacing: 0.06em; color: color-mix(in srgb, var(--pitch-ink) 70%, transparent); }
+.slot__name { font-family: var(--font-display); font-size: 12px; }
+.slot__meta { font-size: 9px; color: color-mix(in srgb, var(--pitch-ink) 70%, transparent); }
 
 .slot__x {
   position: absolute;
-  top: -0.4rem;
-  right: -0.4rem;
+  top: -6px;
+  right: -6px;
+  padding: 1px 5px;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgb(0 0 0 / 0.7);
   color: var(--pitch-ink);
-  font-size: 0.7rem;
+  font-size: 11px;
   line-height: 1;
-  padding: 0.1rem 0.28rem;
   cursor: pointer;
 }
 
-.bench__h {
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-  margin: 0.9rem 0 0.4rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.72rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+.bench__h { margin-top: var(--space-4); color: var(--ink-muted); }
+
+.bench {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
-
-.bench__n { color: var(--text-muted, #94a3b8); font-size: 0.7rem; }
-
-.bench { display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 2.2rem; }
 
 .chip {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
-  font-size: 0.76rem;
+  text-align: left;
   cursor: pointer;
 }
 
-.chip.is-picked { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
-.chip__no { color: var(--bhs-cyan-accent); font-variant-numeric: tabular-nums; }
-.chip__grade { color: var(--text-muted, #94a3b8); font-size: 0.68rem; }
+.chip.is-picked { border-color: var(--mark); }
+.chip__no { font-family: var(--font-display); font-size: 17px; color: var(--mark); }
+.chip__name { font-size: 12px; line-height: 1.25; min-width: 0; }
+.chip__grade { margin-left: auto; font-size: 10px; color: var(--ink-muted); }
 
-.hint { margin: 0; color: var(--text-muted, #94a3b8); font-size: 0.78rem; line-height: 1.5; }
-.hint--bad { margin-top: 0.6rem; color: var(--color-danger, #f87171); }
+.hint { margin-top: var(--space-2); font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
+.hint--bad { color: var(--color-warning); }
 
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+/* The footer bar's buttons: big enough for a coach watching the game. */
+.toolbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
+  color: var(--ink-muted);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
   cursor: pointer;
 }
 
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
+.toolbtn--go { border: 1.5px solid var(--live); color: var(--live); }
+.toolbtn:disabled { opacity: 0.55; cursor: default; }
+
+@media (min-width: 768px) {
+  .bench { grid-template-columns: repeat(3, 1fr); }
+  .pitch { max-height: 52vh; }
+}
 </style>

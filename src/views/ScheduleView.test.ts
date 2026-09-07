@@ -56,7 +56,25 @@ function mountSchedule(opts: {
           },
           auth: { isCoach: coach, isAdmin: false, isGuest: !coach, canAccessRatings: coach }
         }
-      })]
+      })],
+      stubs: {
+        RouterLink: {
+          props: ['to'],
+          template: '<a :href="href"><slot /></a>',
+          computed: {
+            href(): string {
+              const to: any = (this as any).to;
+              if (typeof to === 'string') return to;
+              if (to?.name === 'lineup') {
+                return to.params?.matchId ? `/schedule/lineup/${to.params.matchId}` : '/schedule/lineup';
+              }
+              if (to?.name === 'live') return `/schedule/${to.params?.matchId}/live`;
+              if (to?.name === 'season-report') return '/schedule/report';
+              return '#';
+            }
+          }
+        }
+      }
     }
   });
 }
@@ -251,11 +269,10 @@ describe('the match tools', () => {
     expect(w.findAll('[data-lineup-missing]')).toHaveLength(1);
   });
 
-  it('opens the lineup on the fixture it was asked about', async () => {
+  it('links each fixture to its lineup, and the header to a sheet with no fixture', () => {
     const w = mountSchedule({ coach: true });
-    await w.findAll('[data-fixture-lineup]')[0].trigger('click');
-    await w.vm.$nextTick();
-
-    expect(w.find('[data-lineup-pitch]').exists()).toBe(true);
+    const first = w.findAll('[data-fixture-lineup]')[0];
+    expect(first.attributes('href')).toContain('/schedule/lineup/');
+    expect(w.find('[data-open-lineup]').attributes('href')).toBe('/schedule/lineup');
   });
 });

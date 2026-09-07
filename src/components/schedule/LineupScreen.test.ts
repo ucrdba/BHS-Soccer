@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
-import LineupModal from './LineupModal.vue';
+import LineupScreen from './LineupScreen.vue';
 
 const fetchLineup = vi.fn();
 const saveLineup = vi.fn();
@@ -37,13 +37,14 @@ const PLAYERS = [
 const flush = () => new Promise(r => setTimeout(r, 0));
 
 async function mountLineup(props: any = {}) {
-  const w = mount(LineupModal, {
+  const w = mount(LineupScreen, {
     props: {
-      open: true, matchId: MATCH, matchLabel: 'vs Redlands',
+      matchId: MATCH, matchLabel: 'vs Redlands', matchMinutes: 80,
       teamId: TEAM, schoolId: 's1', players: PLAYERS, ...props
     },
     global: {
-      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })]
+      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })],
+      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
     },
     attachTo: document.body
   });
@@ -248,5 +249,17 @@ describe('saving', () => {
 
     expect(saveLineup).not.toHaveBeenCalled();
     expect(w.find('[data-lineup-error]').text()).toMatch(/organization/i);
+  });
+});
+
+describe('the screen', () => {
+  it('states this squad\'s own match length, because every rate divides by it', async () => {
+    const w = await mountLineup({ matchMinutes: 80 });
+    expect(w.find('[data-lineup-length]').text()).toContain('80');
+  });
+
+  it('offers a way back to the schedule', async () => {
+    const w = await mountLineup();
+    expect(w.find('[data-tool-back]').exists()).toBe(true);
   });
 });

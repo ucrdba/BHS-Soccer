@@ -11,7 +11,6 @@
  */
 import { ref, computed, watch } from 'vue';
 import MatchFormModal from '../components/schedule/MatchFormModal.vue';
-import LineupModal from '../components/schedule/LineupModal.vue';
 import SeasonReportModal from '../components/schedule/SeasonReportModal.vue';
 import PlusMinusModal from '../components/schedule/PlusMinusModal.vue';
 import { useScheduleStore, type MatchForm } from '../stores/schedule';
@@ -37,8 +36,6 @@ const busy = ref(false);
 const formError = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
-const lineupOpen = ref(false);
-const lineupMatch = ref<Match | null>(null);
 const seasonOpen = ref(false);
 const pmOpen = ref(false);
 const pmMatch = ref<Match | null>(null);
@@ -58,16 +55,6 @@ const schoolId = computed(() => org.school?.id ?? null);
  */
 const missingLineup = computed(() => new Set(
   fixturesWithoutLineup(schedule.matches, lineup.index).map((m: any) => m.id)));
-
-function openLineup(m: Match | null): void {
-  lineupMatch.value = m;
-  lineupOpen.value = true;
-}
-
-async function onLineupSaved(): Promise<void> {
-  notice.value = 'Lineup saved.';
-  await lineup.loadIndex(org.activeTeamId);
-}
 
 const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
 
@@ -148,7 +135,7 @@ async function onRemove(m: Match): Promise<void> {
       </div>
       <div v-if="canEdit" class="sched__acts">
         <button type="button" class="btn btn--go" data-add-match @click="openAdd">Add fixture</button>
-        <button type="button" class="btn" data-open-lineup @click="openLineup(null)">Lineup</button>
+        <RouterLink class="btn" data-open-lineup :to="{ name: 'lineup' }">Lineup</RouterLink>
         <button type="button" class="btn" data-open-season @click="seasonOpen = true">Season report</button>
       </div>
     </header>
@@ -183,9 +170,10 @@ async function onRemove(m: Match): Promise<void> {
                :href="matchDirectionsUrl(schedule.nextMatch)!" target="_blank" rel="noopener">Directions</a>
             <template v-if="canEdit">
               <button type="button" class="textlink" data-match-edit @click="openEdit(schedule.nextMatch)">Edit</button>
-              <button type="button" class="textlink" data-fixture-lineup @click="openLineup(schedule.nextMatch)">
+              <RouterLink class="textlink" data-fixture-lineup
+                          :to="{ name: 'lineup', params: { matchId: schedule.nextMatch.id } }">
                 Lineup<span v-if="missingLineup.has(schedule.nextMatch.id)" class="dot" data-lineup-missing>•</span>
-              </button>
+              </RouterLink>
               <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(schedule.nextMatch)">Live ±</button>
               <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(schedule.nextMatch)">Delete</button>
             </template>
@@ -202,9 +190,10 @@ async function onRemove(m: Match): Promise<void> {
                    :href="matchDirectionsUrl(m)!" target="_blank" rel="noopener">Directions</a>
                 <template v-if="canEdit">
                   <button type="button" class="textlink" data-match-edit @click="openEdit(m)">Edit</button>
-                  <button type="button" class="textlink" data-fixture-lineup @click="openLineup(m)">
+                  <RouterLink class="textlink" data-fixture-lineup
+                              :to="{ name: 'lineup', params: { matchId: m.id } }">
                     Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
-                  </button>
+                  </RouterLink>
                   <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
                   <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
                 </template>
@@ -227,9 +216,10 @@ async function onRemove(m: Match): Promise<void> {
               <p class="row__when tnum">{{ displayDate(m) }} · {{ m.isHome ? 'home' : 'away' }}</p>
               <div v-if="canEdit" class="row__links">
                 <button type="button" class="textlink" data-match-edit @click="openEdit(m)">Edit</button>
-                <button type="button" class="textlink" data-fixture-lineup @click="openLineup(m)">
+                <RouterLink class="textlink" data-fixture-lineup
+                            :to="{ name: 'lineup', params: { matchId: m.id } }">
                   Lineup<span v-if="missingLineup.has(m.id)" class="dot" data-lineup-missing>•</span>
-                </button>
+                </RouterLink>
                 <button type="button" class="textlink" data-fixture-pm @click="openPlusMinus(m)">Live ±</button>
                 <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
               </div>
@@ -243,14 +233,7 @@ async function onRemove(m: Match): Promise<void> {
       </section>
     </template>
 
-    <!-- The four modals, unchanged. -->
-    <LineupModal
-      v-if="canEdit"
-      :open="lineupOpen" :match-id="lineupMatch?.id ?? null"
-      :match-label="lineupMatch ? `${lineupMatch.opponent}` : ''"
-      :team-id="org.activeTeamId" :school-id="schoolId" :players="roster.players"
-      @close="lineupOpen = false" @saved="onLineupSaved" />
-
+    <!-- The three remaining modals, unchanged. -->
     <PlusMinusModal
       v-if="canEdit"
       :open="pmOpen" :match-id="pmMatch?.id ?? null"
