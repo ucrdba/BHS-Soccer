@@ -228,12 +228,12 @@ function jumpTo(id: string): void {
    styles cannot reach because it carries no scope attribute. */
 .section__body h4 {
   margin: 1.25rem 0 0.4rem;
-  color: #fff;
+  color: var(--ink);
   font-size: 0.95rem;
 }
 
 .section__body p { margin: 0 0 0.7rem; }
-.section__body b, .section__body strong { color: #fff; }
+.section__body b, .section__body strong { color: var(--ink); }
 .section__body ol, .section__body ul { margin: 0 0 0.8rem; padding-left: 1.3rem; }
 .section__body li { margin-bottom: 0.3rem; }
 
@@ -242,34 +242,34 @@ function jumpTo(id: string): void {
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 6px;
   font-size: 0.84rem;
 }
 
-.help-path span { color: var(--text-muted, #94a3b8); }
+.help-path span { color: var(--ink-muted); }
 
 .help-note, .help-warn {
   margin: 0.8rem 0;
   padding: 0.7rem 0.85rem;
-  border-left: 3px solid var(--bhs-cyan-accent);
+  border-left: 3px solid var(--live);
   border-radius: 0 6px 6px 0;
-  background: rgb(255 255 255 / 0.03);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
-.help-warn { border-left-color: var(--bhs-gold-accent); }
+.help-warn { border-left-color: var(--color-warning); }
 
 .help-note-label, .help-warn-label {
   display: block;
   margin-bottom: 0.3rem;
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.help-warn-label { color: var(--bhs-gold-accent); }
+.help-warn-label { color: var(--color-warning); }
 
 .help-tablewrap { overflow-x: auto; margin: 0.8rem 0; }
 
@@ -281,10 +281,58 @@ function jumpTo(id: string): void {
 
 .help-table th, .help-table td {
   padding: 0.45rem 0.6rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   text-align: left;
   vertical-align: top;
 }
 
-.help-table th { color: var(--bhs-cyan-accent); font-size: 0.72rem; text-transform: uppercase; }
+.help-table th { color: var(--live); font-size: 0.72rem; text-transform: uppercase; }
+
+/* Numbered because these genuinely are sequences: do this, then this. */
+.help-steps { list-style: none; counter-reset: hstep; padding-left: 0 !important; }
+.help-steps > li {
+  counter-increment: hstep;
+  position: relative;
+  padding-left: 34px;
+  margin-bottom: 10px;
+}
+.help-steps > li::before {
+  content: counter(hstep);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--live);
+  border-radius: 50%;
+  color: var(--live);
+  font-family: var(--heading-face);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A worked calculation, set as a figure. */
+.help-calc {
+  margin: 0 0 14px;
+  padding: 13px 15px;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface-deep);
+  color: var(--ink-muted);
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.75;
+  font-variant-numeric: tabular-nums;
+}
+.help-calc-hl { color: var(--live); }
+
+.section__body mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--rule-strong) 28%, transparent);
+  color: var(--ink);
+}
 </style>

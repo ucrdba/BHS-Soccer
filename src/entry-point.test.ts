@@ -57,6 +57,13 @@ describe('the one entry point', () => {
     expect(index).toMatch(/Lora/);
     expect(index).toMatch(/Oswald/);
   });
+
+  it('loads one stylesheet, the token sheet', () => {
+    // styles.css was the legacy app's 2,205-line sheet. Its surviving rules
+    // moved into the components that use them.
+    expect(index).toContain('./index.css');
+    expect(index).not.toContain('styles.css');
+  });
 });
 
 describe('THE TITLE NAMES NO SINGLE ORGANIZATION', () => {

@@ -9,7 +9,7 @@
  * "inherit" and looks like a bug in whichever component hits it first.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const css = readFileSync(join(process.cwd(), 'index.css'), 'utf8');
@@ -90,4 +90,10 @@ describe('the temporary aliases', () => {
       expect(css).toMatch(new RegExp(`${legacy}\\s*:\\s*var\\(${token}\\)`));
     });
   }
+});
+
+describe('the legacy stylesheet', () => {
+  it('is gone', () => {
+    expect(existsSync(join(process.cwd(), 'styles.css'))).toBe(false);
+  });
 });
