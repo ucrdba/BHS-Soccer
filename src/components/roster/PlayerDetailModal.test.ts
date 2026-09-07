@@ -57,4 +57,13 @@ describe('PlayerDetailModal', () => {
     expect(w.find('[data-photo-missing]').exists()).toBe(true);
     expect(w.find('[data-bio-kicker]').exists()).toBe(false);
   });
+
+  it('shows the photograph when the player has one', () => {
+    const w = mountWith({ ...PLAYER, photo: 'https://example.test/marcus.jpg' });
+    const img = w.find('.plate__img');
+    expect(img.exists()).toBe(true);
+    expect(img.attributes('src')).toBe('https://example.test/marcus.jpg');
+    // The plate says "Photo" only when there is not one.
+    expect(w.find('[data-photo-missing]').exists()).toBe(false);
+  });
 });
