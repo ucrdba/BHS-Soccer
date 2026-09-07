@@ -197,7 +197,7 @@ input { padding: 0.4rem; }
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.5rem 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   font-size: 0.85rem;
 }
 .muted { color: var(--text-muted); font-size: 0.85rem; }

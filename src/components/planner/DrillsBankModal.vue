@@ -202,7 +202,7 @@ async function onDelete(drill: any): Promise<void> {
 }
 
 .row__what { flex: 1; min-width: 14rem; }
-.row__name { color: #fff; font-size: 0.9rem; }
+.row__name { color: var(--ink); font-size: 0.9rem; }
 
 .row__notes {
   margin: 0.25rem 0 0;
@@ -250,7 +250,7 @@ async function onDelete(drill: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
 }
@@ -271,7 +271,7 @@ async function onDelete(drill: any): Promise<void> {
   cursor: pointer;
 }
 
-.btn { color: #fff; padding: 0.3rem 0.65rem; font-size: 0.78rem; }
+.btn { color: var(--ink); padding: 0.3rem 0.65rem; font-size: 0.78rem; }
 .btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
 .btn:disabled { opacity: 0.55; cursor: default; }
 .mini--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }

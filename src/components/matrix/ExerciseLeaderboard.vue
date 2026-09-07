@@ -145,9 +145,9 @@ function standing(row: any): string {
   padding: 0.6rem 0.8rem;
   border-left: 3px solid var(--bhs-cyan-accent);
   border-radius: 0 6px 6px 0;
-  background: rgb(255 255 255 / 0.03);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
   font-size: 0.85rem;
-  color: #fff;
+  color: var(--ink);
 }
 
 .standard--short { border-left-color: var(--bhs-gold-accent); }
@@ -184,7 +184,7 @@ function standing(row: any): string {
   font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
 }
 
-.th-btn:hover { color: #fff; }
+.th-btn:hover { color: var(--ink); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-muted, #94a3b8); }

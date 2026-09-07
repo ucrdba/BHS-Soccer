@@ -274,7 +274,7 @@ async function onAdoptStray(stray: any): Promise<void> {
 }
 
 .row__what { display: flex; gap: 0.4rem; align-items: baseline; }
-.row__name { color: #fff; font-size: 0.88rem; }
+.row__name { color: var(--ink); font-size: 0.88rem; }
 .row__acts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 
 .tag {
@@ -294,7 +294,7 @@ async function onAdoptStray(stray: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
 }
@@ -308,7 +308,7 @@ async function onAdoptStray(stray: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.76rem;
   cursor: pointer;

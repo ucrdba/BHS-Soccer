@@ -160,7 +160,7 @@ function onKeydown(e: KeyboardEvent): void {
 
 .modal__title {
   margin: 0;
-  color: #fff;
+  color: var(--ink);
   font-size: 1.05rem;
 }
 
@@ -175,7 +175,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .modal__close:hover,
-.modal__close:focus-visible { color: #fff; }
+.modal__close:focus-visible { color: var(--ink); }
 
 .modal__body {
   padding: 1.25rem;

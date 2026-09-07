@@ -256,7 +256,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 }
 
 .row__what { flex: 1; min-width: 15rem; }
-.row__name { color: #fff; font-size: 0.9rem; }
+.row__name { color: var(--ink); font-size: 0.9rem; }
 
 .row__coaches { margin: 0.3rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem; font-size: 0.78rem; }
 
@@ -267,7 +267,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
   padding: 0.05rem 0.4rem;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 999px;
-  color: #fff;
+  color: var(--ink);
 }
 
 .coach__x { border: 0; background: none; color: var(--text-muted, #94a3b8); cursor: pointer; }
@@ -314,7 +314,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
 }
@@ -330,7 +330,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

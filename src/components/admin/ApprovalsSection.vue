@@ -173,7 +173,7 @@ async function onReject(u: any): Promise<void> {
 }
 
 .row__who { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
-.row__name { color: #fff; font-size: 0.9rem; }
+.row__name { color: var(--ink); font-size: 0.9rem; }
 .row__email { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
 
 .tag {
@@ -195,7 +195,7 @@ async function onReject(u: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

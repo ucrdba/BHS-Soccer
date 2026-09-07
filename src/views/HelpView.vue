@@ -106,7 +106,7 @@ function jumpTo(id: string): void {
 .help { max-width: 72rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
 
 .help__head { margin-bottom: 1.5rem; }
-.help__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.help__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .help__sub {
   margin: 0.3rem 0 1rem;
@@ -133,7 +133,7 @@ function jumpTo(id: string): void {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
 }
@@ -201,7 +201,7 @@ function jumpTo(id: string): void {
   margin-bottom: 0.6rem;
 }
 
-.section__title { margin: 0; color: #fff; font-size: 1.1rem; }
+.section__title { margin: 0; color: var(--ink); font-size: 1.1rem; }
 
 .section__role {
   padding: 0.1rem 0.45rem;

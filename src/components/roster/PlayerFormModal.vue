@@ -147,7 +147,7 @@ const title = computed(() => (props.player ? 'Edit player' : 'Add a player'));
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
 }

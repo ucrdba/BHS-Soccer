@@ -129,7 +129,7 @@ function arrow(key: string): string {
   padding: 0;
 }
 
-.th-btn:hover { color: #fff; }
+.th-btn:hover { color: var(--ink); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-muted, #94a3b8); }
@@ -155,7 +155,7 @@ function arrow(key: string): string {
   border: 0;
   padding: 0;
   background: none;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-weight: 600;
   text-align: left;

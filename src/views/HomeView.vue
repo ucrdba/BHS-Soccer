@@ -174,7 +174,7 @@ const headline = computed(() => {
 
 .hero__title {
   margin: 0 0 2rem;
-  color: #fff;
+  color: var(--ink);
   font-size: clamp(1.75rem, 5vw, 3rem);
   line-height: 1.1;
   letter-spacing: 0.01em;
@@ -199,7 +199,7 @@ const headline = computed(() => {
 
 .fixture__headline {
   margin: 0 0 0.35rem;
-  color: #fff;
+  color: var(--ink);
   font-size: 1.05rem;
   letter-spacing: 0.04em;
 }
@@ -265,7 +265,7 @@ const headline = computed(() => {
 }
 
 .stat__value {
-  color: #fff;
+  color: var(--ink);
   font-size: 1.35rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

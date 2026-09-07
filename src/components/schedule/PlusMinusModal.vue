@@ -232,7 +232,7 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
 
 .clock__time { color: var(--bhs-cyan-accent); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
 .clock__period, .clock__score { color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
-.clock__score { color: #fff; font-size: 0.95rem; }
+.clock__score { color: var(--ink); font-size: 0.95rem; }
 .spacer { flex: 1; }
 
 .goals { display: flex; gap: 0.4rem; margin: 0.6rem 0; }
@@ -260,7 +260,7 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
   border: 1px solid var(--bhs-navy-border);
   border-radius: 8px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
   cursor: pointer;
@@ -319,7 +319,7 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

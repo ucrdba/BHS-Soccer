@@ -69,7 +69,7 @@ const grade = computed(() => lineupGrade(props.player));
 }
 
 .card__open:hover,
-.card__open:focus-visible { background: rgb(255 255 255 / 0.03); }
+.card__open:focus-visible { background: color-mix(in srgb, var(--ink) 3%, transparent); }
 
 .card__photo {
   grid-row: 1 / 3;
@@ -90,7 +90,7 @@ const grade = computed(() => lineupGrade(props.player));
 
 .card__name {
   grid-column: 2;
-  color: #fff;
+  color: var(--ink);
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -123,6 +123,6 @@ const grade = computed(() => lineupGrade(props.player));
   cursor: pointer;
 }
 
-.card__btn:hover { color: #fff; }
+.card__btn:hover { color: var(--ink); }
 .card__btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
 </style>

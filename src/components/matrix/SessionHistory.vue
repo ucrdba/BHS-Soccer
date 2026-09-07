@@ -115,7 +115,7 @@ async function onDelete(s: any): Promise<void> {
   font-size: 0.82rem;
 }
 
-.row__name { flex: 1; color: #fff; }
+.row__name { flex: 1; color: var(--ink); }
 .row__date { color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
 
 .btn {

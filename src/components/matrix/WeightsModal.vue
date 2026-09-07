@@ -211,7 +211,7 @@ async function onSave(): Promise<void> {
 
 .row { padding: 0.4rem 0; border-bottom: 1px solid var(--bhs-navy-border); }
 .row__top { display: flex; gap: 0.5rem; align-items: center; }
-.row__name { flex: 1; color: #fff; font-size: 0.85rem; }
+.row__name { flex: 1; color: var(--ink); font-size: 0.85rem; }
 .row__cat { margin-left: 0.4rem; color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
 
 .inp {
@@ -219,7 +219,7 @@ async function onSave(): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
 }
@@ -236,7 +236,7 @@ async function onSave(): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

@@ -185,7 +185,7 @@ function outcomeFor(questionId: string): boolean | null {
 .quiz { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 
 .quiz__head { margin-bottom: 1.2rem; }
-.quiz__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.quiz__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .quiz__sub {
   margin: 0.3rem 0 0;
@@ -214,7 +214,7 @@ function outcomeFor(questionId: string): boolean | null {
   border-bottom: 1px solid var(--bhs-navy-border);
 }
 
-.q__text { margin: 0 0 0.5rem; color: #fff; font-size: 0.95rem; }
+.q__text { margin: 0 0 0.5rem; color: var(--ink); font-size: 0.95rem; }
 .q__none { margin: 0; color: var(--color-danger, #f87171); font-size: 0.8rem; }
 
 .opt {
@@ -225,7 +225,7 @@ function outcomeFor(questionId: string): boolean | null {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   margin-bottom: 0.3rem;
-  color: #fff;
+  color: var(--ink);
   font-size: 0.86rem;
   cursor: pointer;
 }
@@ -257,7 +257,7 @@ function outcomeFor(questionId: string): boolean | null {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
   cursor: pointer;

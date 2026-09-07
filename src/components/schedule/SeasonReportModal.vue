@@ -206,7 +206,7 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

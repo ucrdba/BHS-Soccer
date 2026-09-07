@@ -284,7 +284,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 }
 
 .row__what { flex: 1; min-width: 15rem; }
-.row__q { margin: 0; color: #fff; font-size: 0.86rem; }
+.row__q { margin: 0; color: var(--ink); font-size: 0.86rem; }
 .row__meta { margin: 0.3rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .row__acts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 
@@ -322,7 +322,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
 }
@@ -340,7 +340,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.76rem;
   cursor: pointer;

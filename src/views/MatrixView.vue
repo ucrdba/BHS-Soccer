@@ -221,7 +221,7 @@ watch(
 .matrix { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 
 .matrix__head { margin-bottom: 1.25rem; }
-.matrix__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.matrix__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .matrix__sub {
   margin: 0.3rem 0 0;
@@ -262,7 +262,7 @@ watch(
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
 }
@@ -277,7 +277,7 @@ watch(
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
 }

@@ -123,7 +123,7 @@ const title = computed(() => (props.coach ? 'Edit coach' : 'Add a coach'));
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
 }

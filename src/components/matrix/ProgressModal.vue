@@ -187,7 +187,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
 }
@@ -222,14 +222,14 @@ watch(() => [props.open, props.teamId] as const, async () => {
 }
 
 .readings__on { color: var(--text-muted, #94a3b8); }
-.readings__v { color: #fff; font-variant-numeric: tabular-nums; }
+.readings__v { color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .btn {
   padding: 0.3rem 0.65rem;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

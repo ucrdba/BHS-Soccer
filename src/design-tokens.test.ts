@@ -9,7 +9,7 @@
  * "inherit" and looks like a bug in whichever component hits it first.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const css = readFileSync(join(process.cwd(), 'index.css'), 'utf8');
@@ -95,5 +95,30 @@ describe('the temporary aliases', () => {
 describe('the legacy stylesheet', () => {
   it('is gone', () => {
     expect(existsSync(join(process.cwd(), 'styles.css'))).toBe(false);
+  });
+});
+
+/** Every .vue file under src/. */
+function vueFiles(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) vueFiles(p, out);
+    else if (p.endsWith('.vue')) out.push(p);
+  }
+  return out;
+}
+
+/** The style blocks of a single-file component, joined. */
+function styleOf(path: string): string {
+  const src = readFileSync(path, 'utf8');
+  return Array.from(src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)).map(m => m[1]).join('\n');
+}
+
+describe('component styles', () => {
+  const files = vueFiles(join(process.cwd(), 'src'));
+
+  it('set no hardcoded white — the ground is not always dark any more', () => {
+    const offenders = files.filter(f => /#fff\b|#ffffff\b|:\s*white\b|rgba?\(\s*255\s*,?\s*255\s*,?\s*255/i.test(styleOf(f)));
+    expect(offenders.map(f => f.replace(process.cwd(), '')), 'use var(--ink) or a color-mix of it').toEqual([]);
   });
 });

@@ -88,7 +88,7 @@ const stats = computed(() => {
   text-transform: uppercase;
 }
 
-.bio__facts dd { margin: 0; color: #fff; }
+.bio__facts dd { margin: 0; color: var(--ink); }
 
 .season { margin-top: 1.25rem; }
 
@@ -118,7 +118,7 @@ const stats = computed(() => {
 }
 
 .season__value {
-  color: #fff;
+  color: var(--ink);
   font-size: 1.1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

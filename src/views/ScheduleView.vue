@@ -274,7 +274,7 @@ async function onRemove(m: Match): Promise<void> {
   margin-bottom: 1.25rem;
 }
 
-.sched__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.sched__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .sched__org {
   margin: 0.25rem 0 0;
@@ -328,14 +328,14 @@ async function onRemove(m: Match): Promise<void> {
   letter-spacing: 0.04em;
 }
 
-.row__who { color: #fff; font-size: 1rem; font-weight: 600; }
+.row__who { color: var(--ink); font-size: 1rem; font-weight: 600; }
 .row__ha { color: var(--text-muted, #94a3b8); font-weight: 400; font-size: 0.85rem; }
 .row__where { color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
 
 .row__side { display: flex; gap: 0.4rem; align-items: center; }
 
 .row__score {
-  color: #fff;
+  color: var(--ink);
   font-size: 1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -361,7 +361,7 @@ async function onRemove(m: Match): Promise<void> {
   cursor: pointer;
 }
 
-.row__btn:hover { color: #fff; }
+.row__btn:hover { color: var(--ink); }
 .row__btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
 
 .empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }

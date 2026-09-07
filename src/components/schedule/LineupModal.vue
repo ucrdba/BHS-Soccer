@@ -234,7 +234,7 @@ const grade = lineupGrade;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
 }
@@ -250,7 +250,7 @@ const grade = lineupGrade;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 8px;
   background:
-    linear-gradient(to top, rgba(255,255,255,0.05) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
+    linear-gradient(to top, color-mix(in srgb, var(--ink) 5%, transparent) 0 1px, transparent 1px) center 50% / 100% 100% no-repeat,
     #163d16;
   overflow: hidden;
 }
@@ -263,10 +263,10 @@ const grade = lineupGrade;
   align-items: center;
   min-width: 3.6rem;
   padding: 0.2rem 0.3rem;
-  border: 1px dashed rgba(255, 255, 255, 0.4);
+  border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.35);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.7rem;
   cursor: pointer;
@@ -286,7 +286,7 @@ const grade = lineupGrade;
   border: 0;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.7);
-  color: #fff;
+  color: var(--ink);
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.1rem 0.28rem;
@@ -313,7 +313,7 @@ const grade = lineupGrade;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 999px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.76rem;
   cursor: pointer;
@@ -331,7 +331,7 @@ const grade = lineupGrade;
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

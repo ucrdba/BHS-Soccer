@@ -158,7 +158,7 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
   border: 1px solid var(--bhs-navy-border);
   border-radius: 6px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
 }

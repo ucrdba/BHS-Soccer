@@ -195,7 +195,7 @@ async function onCopy(t: any): Promise<void> {
   text-transform: uppercase;
 }
 
-.thought__text { margin: 0; color: #fff; font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; }
+.thought__text { margin: 0; color: var(--ink); font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; }
 .thought__by { margin: 0.4rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
 
 .acts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.7rem; }
@@ -219,7 +219,7 @@ async function onCopy(t: any): Promise<void> {
   font-size: 0.82rem;
 }
 
-.row__title { color: #fff; }
+.row__title { color: var(--ink); }
 .row__acts { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
 .form { margin-top: 0.7rem; }
@@ -240,7 +240,7 @@ async function onCopy(t: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.84rem;
 }
@@ -256,7 +256,7 @@ async function onCopy(t: any): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.76rem;
   cursor: pointer;

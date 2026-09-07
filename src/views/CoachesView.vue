@@ -172,7 +172,7 @@ async function onReject(userId: string, name: string): Promise<void> {
   margin-bottom: 1.25rem;
 }
 
-.staff__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.staff__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .staff__org {
   margin: 0.25rem 0 0;
@@ -209,7 +209,7 @@ async function onReject(userId: string, name: string): Promise<void> {
   padding: 0.45rem 0;
 }
 
-.queue__who { display: flex; flex-direction: column; color: #fff; font-size: 0.9rem; }
+.queue__who { display: flex; flex-direction: column; color: var(--ink); font-size: 0.9rem; }
 .queue__meta { color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
 .queue__acts { display: flex; gap: 0.4rem; }
 
@@ -238,7 +238,7 @@ async function onReject(userId: string, name: string): Promise<void> {
   background: var(--bhs-navy-bg);
 }
 
-.card__name { margin: 0; color: #fff; font-size: 1.05rem; }
+.card__name { margin: 0; color: var(--ink); font-size: 1.05rem; }
 
 .card__level {
   margin: 0.15rem 0 0;

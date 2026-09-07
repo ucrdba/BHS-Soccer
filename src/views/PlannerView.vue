@@ -353,7 +353,7 @@ async function onDrop(index: number): Promise<void> {
   margin-bottom: 1.25rem;
 }
 
-.planner__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.planner__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .planner__sub {
   margin: 0.3rem 0 0;
@@ -406,14 +406,14 @@ async function onDrop(index: number): Promise<void> {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
 }
 
-.picker__row:hover { background: rgba(255, 255, 255, 0.05); }
+.picker__row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .picker__meta { color: var(--text-muted, #94a3b8); font-size: 0.75rem; }
 
 .bar {
@@ -455,11 +455,11 @@ async function onDrop(index: number): Promise<void> {
 .drill.is-selected { border-color: var(--bhs-gold-accent); background: rgba(0, 71, 171, 0.18); }
 
 .drill__when { min-width: 9.5rem; }
-.drill__slot { display: block; color: #fff; font-size: 0.8rem; white-space: nowrap; }
+.drill__slot { display: block; color: var(--ink); font-size: 0.8rem; white-space: nowrap; }
 .drill__dur { color: var(--bhs-cyan-accent); font-size: 0.74rem; }
 
 .drill__what { flex: 1; }
-.drill__name { margin: 0; color: #fff; font-size: 0.95rem; }
+.drill__name { margin: 0; color: var(--ink); font-size: 0.95rem; }
 
 .drill__notes {
   margin: 0.25rem 0 0;

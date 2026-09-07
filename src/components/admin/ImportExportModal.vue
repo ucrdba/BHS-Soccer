@@ -445,7 +445,7 @@ async function onApply(): Promise<void> {
   font-size: 0.8rem;
 }
 
-.table__name, .row__name { flex: 1; color: #fff; }
+.table__name, .row__name { flex: 1; color: var(--ink); }
 .row__n { color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
 
 .tag {
@@ -461,7 +461,7 @@ async function onApply(): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: var(--bhs-navy-bg);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
 }
@@ -471,7 +471,7 @@ async function onApply(): Promise<void> {
   border: 1px solid var(--bhs-navy-border);
   border-radius: 5px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

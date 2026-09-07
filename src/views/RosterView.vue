@@ -182,7 +182,7 @@ async function onRemove(p: Player): Promise<void> {
   margin-bottom: 1.25rem;
 }
 
-.roster__title { margin: 0; color: #fff; font-size: 1.4rem; }
+.roster__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
 
 .roster__org {
   margin: 0.25rem 0 0;
