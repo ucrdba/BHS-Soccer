@@ -42,13 +42,6 @@ onMounted(() => org.load());
   min-height: 60vh;
 }
 
-/* Room for the fixed bottom bar on a phone. A tool route has no bar. */
-@media (max-width: 767.98px) {
-  .shell__main:not(.shell__main--tool) {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
-  }
-}
-
 .shell__error {
   margin: var(--space-3);
   padding: var(--space-3) var(--space-4);

@@ -117,6 +117,19 @@ describe('AppHeader', () => {
     expect(mountWith({ loadedTeamId: 't1', matches: [] }).find('[data-season-record]').exists()).toBe(false);
   });
 
+  it('hides a record left over from the team the switcher just left', () => {
+    const w = mountWith({
+      activeTeamId: 't3',
+      loadedTeamId: 't1',
+      matches: [
+        { status: 'COMPLETED', score: '3-1' },
+        { status: 'COMPLETED', score: '1-1' },
+        { status: 'COMPLETED', score: '0-2' }
+      ]
+    });
+    expect(w.find('[data-season-record]').exists()).toBe(false);
+  });
+
   it('offers a guest sign-in and a member sign-out with their role', () => {
     const guest = mountWith();
     expect(guest.find('[data-account-btn]').text()).toBe('Sign in');

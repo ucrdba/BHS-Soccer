@@ -36,9 +36,14 @@ const activeTeamText = computed(() => {
 /**
  * Nothing is claimed about the season until the schedule has actually been
  * read for this team. The header does not load it: the home and schedule
- * screens do, and a record that appears as you reach them is honest.
+ * screens do, and a record that appears as you reach them is honest. The
+ * record is shown only for the team the schedule was actually read for —
+ * after a switch, a stale record for the previous team must not linger
+ * under the new organization's crest.
  */
-const record = computed(() => schedule.loadedTeamId ? schedule.record : null);
+const record = computed(() => (
+  schedule.loadedTeamId && schedule.loadedTeamId === org.activeTeamId ? schedule.record : null
+));
 const showRecord = computed(() => !!record.value && record.value.gamesPlayed > 0);
 
 const accountLabel = computed(() => auth.isGuest ? 'Sign in' : 'Sign out');

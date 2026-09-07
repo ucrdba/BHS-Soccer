@@ -43,4 +43,11 @@ const year = new Date().getFullYear();
   font-variant-numeric: tabular-nums;
   cursor: help;
 }
+
+/* Room for the fixed bottom bar on a phone. The footer is the last thing
+   in the document, so the reservation belongs here, not on main. Tool
+   routes render no footer and no bar. */
+@media (max-width: 767.98px) {
+  .foot { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
 </style>

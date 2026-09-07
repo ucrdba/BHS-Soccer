@@ -171,7 +171,7 @@ The existing hooks are kept so the current tests need only small changes:
 `data-nav-item` on every rendered link (bar and sheet), `data-nav-toggle` on the
 More tab, `data-nav-drawer` on the sheet, `aria-expanded` on the toggle.
 
-`main` gets `padding-bottom: 72px` under 768px so the bar never covers content.
+The footer, the last element in the document, gets `padding-bottom: 72px` plus the safe-area inset under 768px so the bar never covers it or the content above it.
 
 Coaching Staff stays gated to coaches and admins, as the app and its tests have
 it. The functional specification lists it as public; that is a behaviour
