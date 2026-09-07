@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import LiveMatchScreen from './LiveMatchScreen.vue';
+import { usePlusMinusStore } from '../../stores/plus-minus';
 
 const openStatMatch = vi.fn();
 const fetchStatEvents = vi.fn();
@@ -368,6 +369,41 @@ describe('the screen at its own URL', () => {
     await w.vm.$nextTick();
 
     expect(w.find('[data-pm-refusal-title]').text()).toMatch(/stopped/i);
+  });
+
+  it('does not blame the clock for a refusal that happened while it ran', async () => {
+    // The fixture only carries three players -- short of the eleven-player
+    // limit that trips this refusal from the bench -- so the full-pitch
+    // refusal is driven straight through the store's own door (the one a
+    // bench tap goes through) instead. `usePlusMinusStore` is called with
+    // this test's own pinia instance so it resolves to the same store the
+    // mounted screen reads.
+    const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: false });
+    const w = mount(LiveMatchScreen, {
+      props: {
+        matchId: MATCH, matchLabel: 'vs Redlands',
+        teamId: TEAM, schoolId: 's1', players: PLAYERS
+      },
+      global: {
+        plugins: [pinia],
+        stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
+      },
+      attachTo: document.body
+    });
+    await flush();
+    await w.vm.$nextTick();
+
+    const pm = usePlusMinusStore(pinia as any);
+    await startClock(w);
+    for (let i = 0; i < 11; i++) await pm.append('on', `x${i}`);
+    await pm.append('on', 'x11');
+    await flush();
+    await w.vm.$nextTick();
+
+    expect(pm.running).toBe(true);
+    expect(w.find('[data-pm-refusal]').exists()).toBe(true);
+    expect(w.find('[data-pm-refusal-title]').text()).toMatch(/not recorded/i);
+    expect(w.find('[data-pm-refusal-title]').text()).not.toMatch(/clock is stopped/i);
   });
 
   it('offers a way back to the schedule', async () => {

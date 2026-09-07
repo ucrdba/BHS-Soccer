@@ -31,8 +31,6 @@ const props = defineProps<{
   players: any[];
 }>();
 
-const emit = defineEmits<{ close: [] }>();
-
 const pm = usePlusMinusStore();
 
 const openError = ref<string | null>(null);
@@ -67,12 +65,15 @@ const gateHint = computed(() => (pm.running ? '' : '± and events are held'));
 /**
  * The refusal's heading.
  *
- * The store decides whether an event is refused and words the reason; this
- * only says which of the two situations the coach is in, because the mistake
- * each prevents is different.
+ * The store decides whether something is refused and words the reason; this
+ * only says which situation the coach is in. A notice while the clock is
+ * running is not a clock refusal at all — it is a full pitch, or a write the
+ * database turned down — so it must not claim otherwise.
  */
-const refusalTitle = computed(() =>
-  pm.everStarted ? 'The clock is stopped' : "The match hasn't kicked off");
+const refusalTitle = computed(() => {
+  if (pm.running) return 'Not recorded';
+  return pm.everStarted ? 'The clock is stopped' : "The match hasn't kicked off";
+});
 
 /** Whether a clock-gated control should read as dead. */
 const held = computed(() => !pm.running);
@@ -346,7 +347,7 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
 .overflow { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 
 .minor {
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 var(--space-3);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -405,10 +406,10 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
 }
 
 .tap--plus { border-color: var(--live); color: var(--live); }
-.tap.is-held { border-style: dashed; border-color: var(--rule); color: var(--ink-soft); }
+.tap.is-held { border-style: dashed; border-color: var(--rule); color: var(--ink-muted); }
 
 .off {
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -481,7 +482,7 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
   cursor: pointer;
 }
 
-.eventbtn.is-held { border-style: dashed; background: transparent; color: var(--ink-soft); }
+.eventbtn.is-held { border-style: dashed; background: transparent; color: var(--ink-muted); }
 .eventbtn.is-armed { border-color: var(--mark); color: var(--mark); }
 .eventbtn--go { border: 1.5px solid var(--live); background: transparent; color: var(--live); }
 

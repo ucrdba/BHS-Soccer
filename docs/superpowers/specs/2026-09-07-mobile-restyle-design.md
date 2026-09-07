@@ -337,8 +337,9 @@ untouched; only their surrounding chrome takes the tokens.
   two cases differently and is the one place the rule lives.
 - "On the pitch" rows: shirt number in `--mark`, name with "{mins}′ on · net
   {score}" beneath, then 54px minus and plus buttons. While the clock is not
-  running the buttons render with a dashed `--rule` border and `--ink-soft`
-  text. They remain buttons: a tap still goes through `pm.append`, which
+  running the buttons render with a dashed `--rule` border and `--ink-muted`
+  text (`--ink-soft` fails the contrast floor on this ground, and the screen
+  is read outdoors). They remain buttons: a tap still goes through `pm.append`, which
   refuses and sets the notice, so the card appears. Nothing here duplicates
   the guard.
 - Bench rows below, each with an On control. Sub (in the footer) scrolls to the
