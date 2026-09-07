@@ -508,7 +508,7 @@ and passes at the end of every phase.
    on paper with the new tokens and its old layout.
 2. **Public screens.** Home, Schedule, Roster, the player detail, and the short countdown. — done 2026-09-07; the result word and the skill bars landed with it, and the white guard and the More sheet's keyboard handling from phase 1's review.
 3. **Touchline routes.** Lineup, Live plus/minus and Season report as routes
-   and screens on their grounds; Schedule links to them.
+   and screens on their grounds; Schedule links to them. — done 2026-09-07; the three screens share one ToolScreen frame, and matchById answers a stale bookmark.
 4. **Ratings.** The board, the segmented control, the exercise leaderboard,
    the breakdown, the remaining ledger panels, and Session entry as a route.
 5. **The rest.** Planner, Coaching Staff, Help, Quiz, Admin and the remaining

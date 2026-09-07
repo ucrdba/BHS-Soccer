@@ -47,7 +47,7 @@ The two are separate databases: the harness uses the standalone Postgres on **54
 | `index.html` | The only entry document. Mounts `#vue-app`, loads `src/vue-main.ts`, the fonts and the two CDN libraries. `data-ground="paper"` on `<html>` so the first paint has tokens. |
 | `src/vue-main.ts`, `src/App.vue` | The app shell. |
 | `src/router/index.ts` | Seven nav routes plus `/admin` and `/quiz`, and the nav list itself. |
-| `src/views/*.vue` | One per route. |
+| `src/views/*.vue` | One per route. The seven nav routes, `/admin`, `/quiz`, and the three touchline tools (`LineupView`, `LiveMatchView`, `SeasonReportView`), which resolve their subject from the route and render a screen inside `components/layout/ToolScreen.vue`. |
 | `src/components/` | `admin`, `auth`, `coaches`, `home`, `layout`, `matrix`, `planner`, `roster`, `schedule`, `ui`. |
 | `src/stores/` | Pinia: `auth`, `coaches`, `lineup`, `matrix`, `organization`, `planner`, `plus-minus`, `roster`, `schedule`, `session`, `thoughts`. |
 | `src/domain/` | 34 framework-free modules. Its own section below. |
