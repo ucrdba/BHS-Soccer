@@ -2,20 +2,38 @@
 /**
  * A player's bio, as anyone may see it.
  *
- * Season statistics are shown, ratings are not: ratings are the Competitive
- * Matrix's business and are gated on canAccessRatings(), which this public
- * screen does not check. Player Ratings is Phase 3 and is where they belong.
+ * Photo plate, number and class year, name, position and height, the season
+ * figures, and the four skill ratings as bars. The ratings are on the public
+ * bio because the functional specification puts them there; a rating that is
+ * not set is left out rather than drawn at zero.
  */
 import { computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
-import { photoOrPlaceholder, type Player } from '../../domain/player-row';
+import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain/player-row';
 import { lineupGrade } from '../../domain/lineup';
+import { skillBars } from '../../domain/player-skills';
 
 const props = defineProps<{ open: boolean; player: Player | null }>();
 const emit = defineEmits<{ close: [] }>();
 
 const photo = computed(() => photoOrPlaceholder(props.player?.photo));
+const hasPhoto = computed(() => photo.value !== PLAYER_SILHOUETTE);
 const grade = computed(() => (props.player ? lineupGrade(props.player) : ''));
+
+/** "NO. 9 · SENIOR", or whichever half exists; nothing when neither does. */
+const kicker = computed(() => {
+  const parts: string[] = [];
+  if (props.player?.number != null) parts.push(`No. ${props.player.number}`);
+  if (props.player?.classYear) parts.push(String(props.player.classYear));
+  return parts.join(' · ');
+});
+
+const line = computed(() => {
+  const parts: string[] = [];
+  if (props.player?.position) parts.push(props.player.position);
+  if (props.player?.height) parts.push(String(props.player.height));
+  return parts.join(' · ');
+});
 
 /** Whatever season_stats holds, since it differs for a keeper. */
 const stats = computed(() => {
@@ -28,106 +46,89 @@ const stats = computed(() => {
       value: String(v)
     }));
 });
+
+const skills = computed(() => skillBars(props.player?.ratings));
 </script>
 
 <template>
   <BaseModal :open="open" :title="player?.name || 'Player'" @close="emit('close')">
     <div v-if="player" class="bio">
-      <img class="bio__photo" :src="photo" :alt="''" />
-      <dl class="bio__facts">
-        <template v-if="player.number != null">
-          <dt>Shirt</dt><dd>{{ player.number }}</dd>
-        </template>
-        <template v-if="player.position">
-          <dt>Position</dt><dd>{{ player.position }}</dd>
-        </template>
-        <template v-if="grade">
-          <dt>Year</dt><dd>{{ grade }}</dd>
-        </template>
-        <template v-if="player.height">
-          <dt>Height</dt><dd>{{ player.height }}</dd>
-        </template>
-      </dl>
-    </div>
+      <div class="bio__top">
+        <span class="plate" :class="{ 'plate--empty': !hasPhoto }">
+          <img v-if="hasPhoto" class="plate__img" :src="photo" :alt="''" />
+          <span v-else class="plate__label" data-photo-missing>Photo</span>
+        </span>
+        <div class="bio__text">
+          <p v-if="kicker" class="kicker tnum" data-bio-kicker>{{ kicker }}</p>
+          <p class="bio__name">{{ player.name }}</p>
+          <p v-if="line" class="bio__line">{{ line }}<span v-if="grade" class="bio__grade"> · {{ grade }}</span></p>
+        </div>
+      </div>
 
-    <section v-if="stats.length" class="season">
-      <h3 class="season__title">This season</h3>
-      <ul class="season__list">
-        <li v-for="s in stats" :key="s.label" class="season__item" data-season-stat>
-          <span class="season__value">{{ s.value }}</span>
-          <span class="season__label">{{ s.label }}</span>
+      <ul v-if="stats.length" class="figures tnum">
+        <li v-for="s in stats" :key="s.label" class="figure" data-season-stat>
+          <span class="figure__value">{{ s.value }}</span>
+          <span class="figure__label">{{ s.label }}</span>
         </li>
       </ul>
-    </section>
+
+      <section v-if="skills.length" class="skills">
+        <p class="kicker kicker--accent">Skill ratings</p>
+        <div v-for="s in skills" :key="s.key" class="skill" data-skill-bar>
+          <div class="skill__row">
+            <span class="skill__name">{{ s.name }}</span>
+            <span class="skill__value tnum">{{ s.value }} <span class="skill__of">/10</span></span>
+          </div>
+          <div class="skill__track"><div class="skill__fill" :style="{ width: s.pct + '%' }" data-skill-fill /></div>
+        </div>
+      </section>
+    </div>
   </BaseModal>
 </template>
 
 <style scoped>
-.bio { display: flex; gap: 1rem; align-items: center; }
+.bio__top { display: flex; gap: 14px; }
 
-.bio__photo {
-  width: 5rem;
-  height: 5rem;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--bhs-navy-bg);
+.plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 104px;
+  height: 128px;
+  border: 6px solid var(--surface);
+  outline: 1px solid var(--rule);
+  background: var(--surface-deep);
+  overflow: hidden;
 }
+.plate__img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.22) saturate(0.82) contrast(1.05); }
+.plate__label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 
-.bio__facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.2rem 0.9rem;
-  margin: 0;
-  font-size: 0.85rem;
-}
+.bio__text { flex: 1; min-width: 0; }
+.bio__name { margin-top: 6px; font-family: var(--heading-face); font-weight: 500; font-size: 27px; line-height: 1.1; color: var(--ink); }
+.bio__line { margin-top: 3px; font-size: 13px; font-style: italic; color: var(--ink-muted); }
+.bio__grade { font-style: normal; }
 
-.bio__facts dt {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.bio__facts dd { margin: 0; color: var(--ink); }
-
-.season { margin-top: 1.25rem; }
-
-.season__title {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.75rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.season__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0;
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--rule);
   list-style: none;
 }
+.figure { display: flex; flex-direction: column; }
+.figure__value { font-family: var(--heading-face); font-size: 20px; color: var(--ink); }
+.figure__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 
-.season__item {
-  display: flex;
-  flex-direction: column;
-  padding: 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
-}
-
-.season__value {
-  color: var(--ink);
-  font-size: 1.1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.season__label {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
+.skills { margin-top: var(--space-6); }
+.kicker--accent { color: var(--rule-strong); }
+.skill { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); }
+.skill__row { display: flex; align-items: baseline; justify-content: space-between; }
+.skill__name { font-size: 13.5px; color: var(--ink); }
+.skill__value { font-family: var(--heading-face); font-size: 15px; color: var(--ink); }
+.skill__of { font-size: 11px; color: var(--ink-soft); }
+.skill__track { height: 3px; margin-top: 7px; background: var(--rule); }
+.skill__fill { height: 3px; background: var(--live); }
 </style>
