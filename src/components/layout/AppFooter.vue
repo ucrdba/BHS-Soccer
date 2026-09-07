@@ -27,18 +27,20 @@ const year = new Date().getFullYear();
 .foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
-  margin-top: 3rem;
-  padding: 1.25rem 1rem;
-  border-top: 1px solid var(--bhs-navy-border);
-  color: var(--text-muted, #94a3b8);
+  max-width: 64rem;
+  margin: var(--space-8) auto 0;
+  padding: var(--space-4);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-muted);
   font-size: 0.78rem;
 }
 
 .foot__build {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   cursor: help;
 }
 </style>
