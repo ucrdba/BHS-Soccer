@@ -13,6 +13,7 @@
  */
 
 import { matchDateTime } from './schedule';
+import { parseScore } from './season-record';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -133,4 +134,22 @@ export function matchDirectionsUrl(match: any): string | null {
   if (!address) return null;
   return 'https://www.google.com/maps/dir/?api=1&destination='
     + encodeURIComponent(address);
+}
+
+export type Outcome = 'won' | 'drawn' | 'lost';
+
+/**
+ * The word for a completed fixture's result.
+ *
+ * The word, not a colour, carries the outcome on the schedule (spec §18):
+ * "Won 3–1" reads in sunlight and to a screen reader. Nothing for a fixture
+ * not yet played or whose score does not parse.
+ */
+export function matchOutcome(m: any): Outcome | null {
+  if (!m || m.status !== 'COMPLETED') return null;
+  const parsed = parseScore(m.score);
+  if (!parsed) return null;
+  if (parsed.goalsFor > parsed.goalsAgainst) return 'won';
+  if (parsed.goalsFor === parsed.goalsAgainst) return 'drawn';
+  return 'lost';
 }

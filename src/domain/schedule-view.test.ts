@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatIsoToDisplayDate, formatDisplayDateToIso,
-  format24hTo12h, format12hTo24h, matchDirectionsUrl, displayDate
+  format24hTo12h, format12hTo24h, matchDirectionsUrl, displayDate,
+  matchOutcome
 } from './schedule-view';
 
 describe('formatIsoToDisplayDate', () => {
@@ -161,5 +162,19 @@ describe('format12hTo24h', () => {
   it('gives nothing back for text that is not a time', () => {
     expect(format12hTo24h('')).toBe('');
     expect(format12hTo24h('kickoff')).toBe('');
+  });
+});
+
+describe('matchOutcome', () => {
+  it('reads the word from the score of a completed fixture', () => {
+    expect(matchOutcome({ status: 'COMPLETED', score: '3 - 1' })).toBe('won');
+    expect(matchOutcome({ status: 'COMPLETED', score: '1 - 1' })).toBe('drawn');
+    expect(matchOutcome({ status: 'COMPLETED', score: '0 - 2' })).toBe('lost');
+  });
+
+  it('says nothing for a fixture not yet played or with no readable score', () => {
+    expect(matchOutcome({ status: 'SCHEDULED', score: null })).toBeNull();
+    expect(matchOutcome({ status: 'COMPLETED', score: 'W' })).toBeNull();
+    expect(matchOutcome(null)).toBeNull();
   });
 });

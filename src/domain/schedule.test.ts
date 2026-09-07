@@ -8,7 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseMatchDateTime, matchDateTime, getNextMatch,
-  scheduleState, lastPlayedMatch, nextMatchCountdown
+  scheduleState, lastPlayedMatch, nextMatchCountdown,
+  shortCountdown, lastCompletedMatch
 } from './schedule';
 
 const at = (iso: string) => new Date(iso).getTime();
@@ -156,5 +157,48 @@ describe('nextMatchCountdown', () => {
 
   it('is null when there is no next match', () => {
     expect(nextMatchCountdown([], new Date(2026, 8, 2))).toBeNull();
+  });
+});
+
+describe('shortCountdown', () => {
+  it('reads days and hours when a day or more remains', () => {
+    expect(shortCountdown({ days: '03', hours: '04', mins: '12' })).toBe('3d 04h');
+    expect(shortCountdown({ days: '12', hours: '00', mins: '00' })).toBe('12d 00h');
+  });
+
+  it('reads hours and minutes inside a day', () => {
+    expect(shortCountdown({ days: '00', hours: '04', mins: '12' })).toBe('04h 12m');
+  });
+
+  it('reads minutes inside an hour, and zero as zero minutes', () => {
+    expect(shortCountdown({ days: '00', hours: '00', mins: '12' })).toBe('12m');
+    expect(shortCountdown({ days: '00', hours: '00', mins: '00' })).toBe('0m');
+  });
+
+  it('is empty when there is nothing to count down to', () => {
+    expect(shortCountdown(null)).toBe('');
+  });
+});
+
+describe('lastCompletedMatch', () => {
+  const m = (over: any) => ({ id: 'x', status: 'COMPLETED', score: '1 - 0', date: 'AUG 21 2026', matchOn: '2026-08-21', ...over });
+
+  it('is the most recent completed fixture, not the most recent dated one', () => {
+    // lastPlayedMatch answers "what was the latest fixture on the calendar",
+    // which includes next week. A result is only a completed fixture.
+    const done = m({ id: 'done' });
+    const next = m({ id: 'next', status: 'SCHEDULED', score: null, date: 'SEP 4 2026', matchOn: '2026-09-04' });
+    expect(lastCompletedMatch([next, done])?.id).toBe('done');
+  });
+
+  it('prefers the later of two completed fixtures', () => {
+    const early = m({ id: 'early', date: 'AUG 7 2026', matchOn: '2026-08-07' });
+    const late = m({ id: 'late' });
+    expect(lastCompletedMatch([early, late])?.id).toBe('late');
+  });
+
+  it('is null with nothing completed', () => {
+    expect(lastCompletedMatch([m({ status: 'SCHEDULED' })])).toBeNull();
+    expect(lastCompletedMatch([])).toBeNull();
   });
 });

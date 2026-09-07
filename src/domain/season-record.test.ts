@@ -7,7 +7,7 @@
  * fictional result in the record, and a wrong record is worse than a short one.
  */
 import { describe, it, expect } from 'vitest';
-import { seasonRecord } from './season-record';
+import { seasonRecord, parseScore } from './season-record';
 
 const match = (score: string, status = 'COMPLETED') => ({ status, score });
 
@@ -87,5 +87,24 @@ describe('seasonRecord', () => {
   it('counts only the fixtures it could actually read', () => {
     const r = seasonRecord([match('3 - 1'), match('postponed'), match('1 - 0')]);
     expect(r.gamesPlayed).toBe(2);
+  });
+});
+
+describe('parseScore', () => {
+  it('reads the two numbers whatever the separator', () => {
+    expect(parseScore('3 - 1')).toEqual({ goalsFor: 3, goalsAgainst: 1 });
+    expect(parseScore('3–1')).toEqual({ goalsFor: 3, goalsAgainst: 1 });
+    expect(parseScore('0:2')).toEqual({ goalsFor: 0, goalsAgainst: 2 });
+  });
+
+  it('strips a leading team name rather than one organization\'s', () => {
+    expect(parseScore('Legends 2-2')).toEqual({ goalsFor: 2, goalsAgainst: 2 });
+  });
+
+  it('refuses anything that does not yield two numbers', () => {
+    expect(parseScore('W')).toBeNull();
+    expect(parseScore('3')).toBeNull();
+    expect(parseScore('')).toBeNull();
+    expect(parseScore(null)).toBeNull();
   });
 });

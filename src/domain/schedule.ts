@@ -159,3 +159,36 @@ export function nextMatchCountdown(schedule: any[], now: Date = new Date()): Cou
     mins: String(mins).padStart(2, '0')
   };
 }
+
+/**
+ * The countdown as one figure: "3d 04h", "04h 12m" inside a day, "12m"
+ * inside an hour. The canvas shows a single figure beside the kick-off time
+ * rather than three boxes, because a parent glancing at a phone wants one
+ * number.
+ */
+export function shortCountdown(c: Countdown | null): string {
+  if (!c) return '';
+  const days = Number(c.days) || 0;
+  const hours = Number(c.hours) || 0;
+  const mins = Number(c.mins) || 0;
+  const two = (n: number) => String(n).padStart(2, '0');
+  if (days > 0) return `${days}d ${two(hours)}h`;
+  if (hours > 0) return `${two(hours)}h ${two(mins)}m`;
+  return `${mins}m`;
+}
+
+/**
+ * The most recent completed fixture, or null.
+ *
+ * Not `lastPlayedMatch`: that is the latest fixture on the calendar, which
+ * includes next week's, and is what the "stale schedule" state wants. A
+ * result is only ever a completed fixture.
+ */
+export function lastCompletedMatch(schedule: any[]): any | null {
+  const done = (schedule || [])
+    .filter(m => m && m.status === 'COMPLETED')
+    .map(m => ({ m, t: matchDateTime(m) }))
+    .filter(x => x.t)
+    .sort((a, b) => (b.t as Date).getTime() - (a.t as Date).getTime());
+  return done.length ? done[0].m : null;
+}
