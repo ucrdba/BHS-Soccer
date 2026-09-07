@@ -114,11 +114,41 @@ function styleOf(path: string): string {
   return Array.from(src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)).map(m => m[1]).join('\n');
 }
 
+/**
+ * A white literal in a style block, in any of the shapes CSS allows.
+ *
+ * `\b` is not enough on its own: it cannot fall between two hex digits, so
+ * `#ffffffaa` slips past `#ffffff\b`, and `white` in a shorthand such as
+ * `1px dashed white` has no colon before it. The lookarounds keep
+ * `white-space` and custom-property names out.
+ */
+const WHITE_LITERAL =
+  /#fff(?:fff)?(?:[0-9a-f]{2})?\b|(?<![\w-])white\b(?!-)|rgba?\(\s*255\s*,?\s*255\s*,?\s*255/i;
+
+describe('the white guard pattern', () => {
+  const caught = [
+    'color: #fff;', 'color: #FFF;', 'color:#ffffff;', 'border-color: #ffffffaa;',
+    'color: white;', 'border: 1px dashed white;', 'background: rgb(255 255 255 / 0.1);',
+    'background: rgba(255,255,255,.5);'
+  ];
+  const allowed = [
+    'white-space: nowrap;', 'color: var(--white-ish);', 'color: #fffbe6;',
+    'background: #ffd700;', 'content: "whiteboard";', 'color: var(--ink);'
+  ];
+
+  for (const s of caught) {
+    it(`catches ${s}`, () => { expect(WHITE_LITERAL.test(s)).toBe(true); });
+  }
+  for (const s of allowed) {
+    it(`allows ${s}`, () => { expect(WHITE_LITERAL.test(s)).toBe(false); });
+  }
+});
+
 describe('component styles', () => {
   const files = vueFiles(join(process.cwd(), 'src'));
 
   it('set no hardcoded white — the ground is not always dark any more', () => {
-    const offenders = files.filter(f => /#fff\b|#ffffff\b|:\s*white\b|rgba?\(\s*255\s*,?\s*255\s*,?\s*255/i.test(styleOf(f)));
+    const offenders = files.filter(f => WHITE_LITERAL.test(styleOf(f)));
     expect(offenders.map(f => f.replace(process.cwd(), '')), 'use var(--ink) or a color-mix of it').toEqual([]);
   });
 });
