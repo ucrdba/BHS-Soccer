@@ -104,7 +104,7 @@ describe('editing', () => {
     await w.findAll('[data-history-edit]')[0].trigger('click');
     await flush();
 
-    expect(w.emitted('edit')![0]).toEqual(['d-small']);
+    expect(w.emitted('edit')![0]).toEqual(['d-small', 's2']);
   });
 });
 

@@ -63,6 +63,14 @@ describe('routeAllowed', () => {
       expect(routeAllowed(name, guest), name).toBe(false);
     }
   });
+
+  it('keeps session entry to coaches and admins', () => {
+    // A player may read the ratings; recording a session is a coach's.
+    expect(routeAllowed('session-entry', coach)).toBe(true);
+    expect(routeAllowed('session-entry', admin)).toBe(true);
+    expect(routeAllowed('session-entry', player)).toBe(false);
+    expect(routeAllowed('session-entry', guest)).toBe(false);
+  });
 });
 
 describe('NAV_ITEMS', () => {

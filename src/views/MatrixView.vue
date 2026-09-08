@@ -11,11 +11,11 @@
  * A player does, and sees the board without the coach controls.
  */
 import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import MatrixBoard from '../components/matrix/MatrixBoard.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
 import ResultsPanel from '../components/matrix/ResultsPanel.vue';
 import PlayerBreakdownModal from '../components/matrix/PlayerBreakdownModal.vue';
-import SessionModal from '../components/matrix/SessionModal.vue';
 import SessionHistory from '../components/matrix/SessionHistory.vue';
 import WeightsModal from '../components/matrix/WeightsModal.vue';
 import SquadReportModal from '../components/matrix/SquadReportModal.vue';
@@ -29,6 +29,7 @@ const matrix = useMatrixStore();
 const session = useSessionStore();
 const org = useOrganizationStore();
 const auth = useAuthStore();
+const router = useRouter();
 
 const isCoach = computed(() => auth.isCoach || auth.isAdmin);
 const schoolId = computed(() => org.school?.id ?? null);
@@ -37,7 +38,6 @@ const settled = computed(() => !matrix.loading && matrix.loadedTeamId !== null);
 const openPlayerId = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
-const sessionOpen = ref(false);
 const weightsOpen = ref(false);
 const squadOpen = ref(false);
 const progressOpen = ref(false);
@@ -57,19 +57,9 @@ async function openSessions(): Promise<void> {
   await session.loadHistory(org.activeTeamId);
 }
 
-async function onRecordSession(): Promise<void> {
-  const drillId = sessionDrillId.value || sessionDrills.value[0]?.id || '';
-  if (!drillId) { notice.value = 'Add an exercise in the practice planner first.'; return; }
-  sessionDrillId.value = drillId;
-  await session.openNew(drillId, org.activeTeamId);
-  sessionOpen.value = true;
-}
-
-async function onEditSession(drillId: string): Promise<void> {
-  // openExisting has already loaded the results and the bands; the grid reads
-  // them off the store.
-  sessionDrillId.value = drillId;
-  sessionOpen.value = true;
+/** Editing a recorded session reopens the grid at its own URL. */
+function onEditSession(drillId: string, sessionId: string): void {
+  router.push({ name: 'session-entry', params: { drillId }, query: { session: sessionId } });
 }
 
 /**
@@ -140,9 +130,11 @@ watch(
         >
           <option v-for="d in sessionDrills" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
-        <button type="button" class="act" data-record-session @click="onRecordSession">
-          Record a session
-        </button>
+        <RouterLink
+          v-if="sessionDrills.length" class="act" data-record-session
+          :to="{ name: 'session-entry', params: { drillId: sessionDrillId || sessionDrills[0].id } }"
+        >Record a session</RouterLink>
+        <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
         <button type="button" class="act" data-open-weights @click="weightsOpen = true">
           Weights &amp; standards
         </button>
@@ -195,12 +187,6 @@ watch(
     <PlayerBreakdownModal
       :player-id="openPlayerId" :team-id="org.activeTeamId"
       @close="openPlayerId = null" />
-
-    <SessionModal
-      v-if="isCoach"
-      :open="sessionOpen" :team-id="org.activeTeamId" :school-id="schoolId"
-      :players="matrix.players" :drill-id="sessionDrillId"
-      @close="sessionOpen = false" @saved="reload" />
 
     <SquadReportModal
       v-if="isCoach"
@@ -290,7 +276,15 @@ watch(
   color: var(--bhs-cyan-accent);
   font: inherit;
   font-size: 0.8rem;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.act--dead {
+  margin: 0;
+  border-color: var(--bhs-navy-border);
+  color: var(--text-muted, #94a3b8);
+  cursor: default;
 }
 
 .empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }

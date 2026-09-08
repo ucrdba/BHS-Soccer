@@ -14,7 +14,7 @@ import { computed, ref } from 'vue';
 import { useSessionStore } from '../../stores/session';
 
 const props = defineProps<{ canEdit: boolean; teamId: string | null }>();
-const emit = defineEmits<{ edit: [string]; changed: [] }>();
+const emit = defineEmits<{ edit: [string, string]; changed: [] }>();
 
 const session = useSessionStore();
 const error = ref<string | null>(null);
@@ -29,8 +29,11 @@ function nameOf(s: any): string {
 
 async function onEdit(s: any): Promise<void> {
   error.value = null;
+  // The route carries the session id, so the grid reopens this sheet rather
+  // than starting a blank one. Loading it here as well is harmless and keeps
+  // the store warm for the navigation.
   await session.openExisting(s.id, props.teamId);
-  emit('edit', s.drill_id);
+  emit('edit', s.drill_id, s.id);
 }
 
 /**

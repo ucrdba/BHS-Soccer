@@ -17,12 +17,13 @@
  * entered for the whole squad and hiding the rest makes it easy to save with
  * players silently left out.
  */
-import { ref, computed, watch, nextTick } from 'vue';
-import BaseModal from '../ui/BaseModal.vue';
+import { ref, computed, watch } from 'vue';
+import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { useSessionStore } from '../../stores/session';
 import { compareSessionPlayers } from '../../domain/matrix-session';
 import { bandFeedback } from '../../domain/band-score';
+import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
   toSessionResults, presentWithoutResult,
@@ -30,11 +31,10 @@ import {
 } from '../../domain/session-entry';
 
 const props = defineProps<{
-  open: boolean;
   teamId: string | null;
   schoolId: string | null;
   players: any[];
-  /** The exercise being recorded. Chosen before the grid opens. */
+  /** The exercise being recorded. Chosen before the screen opens. */
   drillId: string;
 }>();
 
@@ -75,15 +75,20 @@ function setSort(by: string): void {
 
 /** Rebuild the grid whenever the exercise or the stored results change. */
 watch(
-  () => [props.open, props.drillId, props.players, session.results] as const,
+  () => [props.drillId, props.players, session.results] as const,
   () => {
-    if (!props.open) return;
     entries.value = session.results.length
       ? entriesFromResults(props.players, session.results, measure.value)
       : blankEntries(props.players, measure.value);
   },
   { immediate: true, deep: true }
 );
+
+const format = computed(() => entryFormat(measure.value));
+const tally = computed(() => entryTally(props.players, entries.value, measure.value));
+
+const title = computed(() =>
+  session.editingId ? `Edit ${drill.value?.name || 'session'}` : (drill.value?.name || 'Session'));
 
 function onValue(playerId: string, value: string): void {
   const row = entries.value[playerId];
@@ -222,22 +227,25 @@ async function onSave(): Promise<void> {
     saving.value = false;
   }
 }
-
-watch(() => props.open, async (open) => {
-  if (!open) return;
-  error.value = null;
-  jumpError.value = '';
-  await nextTick();
-});
 </script>
 
 <template>
-  <BaseModal
-    :open="open"
-    :title="session.editingId ? `Edit session — ${drill?.name || 'exercise'}` : `Record ${drill?.name || 'a session'}`"
-    wide
-    @close="emit('close')"
+  <ToolScreen
+    :title="title" kicker="Session entry"
+    :back-to="{ name: 'matrix' }" back-label="Ratings"
   >
+    <template #top-right>
+      <button
+        type="button" class="sortbtn" data-grid-sort="name"
+        @click="setSort(sort.by === 'name' ? 'recordingNumber' : 'name')"
+      >Sort: {{ sort.by === 'name' ? 'name' : 'recording no.' }} ▾</button>
+    </template>
+
+    <p v-if="format" class="format" data-entry-format>
+      <span class="format__figure tnum">{{ format.figure }}</span>
+      <span class="format__note">{{ format.note }}</span>
+    </p>
+
     <div class="head">
       <label class="fld">
         <span class="fld__label">Date</span>
@@ -338,92 +346,184 @@ watch(() => props.open, async (open) => {
       </table>
     </div>
 
-    <p v-if="error" class="hint hint--bad" role="alert" data-session-error>{{ error }}</p>
+    <div v-if="error" class="refused" role="alert" data-session-refused>
+      <p class="refused__title">Not saved</p>
+      <p class="refused__body" data-session-error>{{ error }}</p>
+      <p class="refused__note">Your entries are still in the fields above.</p>
+    </div>
 
-    <template #footer>
-      <button type="button" class="btn" @click="emit('close')">Cancel</button>
+    <template #foot>
+      <p class="tally tnum" data-entry-tally>
+        <span class="tally__done">{{ tally.timed }} recorded</span>
+        · {{ tally.absent }} absent · {{ tally.remaining }} to go
+      </p>
       <button
-        ref="saveBtn" type="button" class="btn btn--primary"
+        ref="saveBtn" type="button" class="savebtn"
         :disabled="saving" data-session-save
         @click="onSave"
       >{{ saving ? 'Saving…' : 'Save session' }}</button>
     </template>
-  </BaseModal>
+  </ToolScreen>
 </template>
 
 <style scoped>
-.head { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 0.8rem; }
+.format {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+}
 
-.fld { display: flex; flex-direction: column; gap: 0.25rem; }
+.format__figure { font-family: var(--heading-face); font-size: 19px; color: var(--rule-strong); }
+.format__note { font-size: 11.5px; line-height: 1.4; color: var(--ink); }
+
+.head { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+
+.fld { display: flex; flex-direction: column; gap: 4px; }
 .fld--wide { flex: 1; min-width: 14rem; }
 
 .fld__label {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-.fld__input, .inp {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
+.fld__input {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 14px;
 }
 
-.inp { max-width: 8.5rem; }
-.jump { display: flex; gap: 0.4rem; }
+.fld__input:focus-visible { border-color: var(--live); outline-offset: 0; }
+.jump { display: flex; gap: var(--space-2); }
 
-.hint { margin: 0.5rem 0; color: var(--text-muted, #94a3b8); font-size: 0.8rem; line-height: 1.5; }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .tbl th, .tbl td {
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--rule);
   text-align: right;
 }
 
+.tbl th { border-bottom-color: var(--rule-strong); }
 .tbl th.is-text, .tbl td.is-text { text-align: left; }
 
 .th {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--bhs-cyan-accent);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
 }
 
+.th:hover { color: var(--ink); }
 .tabular { font-variant-numeric: tabular-nums; }
 
-.earned { margin-left: 0.4rem; font-size: 0.74rem; }
-.earned--good { color: var(--bhs-cyan-accent); }
-.earned--none { color: var(--text-muted, #94a3b8); }
-.earned--bad { color: var(--color-danger, #f87171); }
+/*
+ * 48px, right-aligned, in the heading face: a coach enters twenty-five of
+ * these one-handed while holding a clipboard, and the field is the whole
+ * point of the screen.
+ */
+.inp {
+  width: 84px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface-deep);
+  color: var(--ink);
+  font-family: var(--heading-face);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.inp:focus-visible { border-color: var(--live); outline-offset: 0; }
+select.inp { width: auto; min-width: 96px; font-size: 14px; text-align: left; }
+
+.earned { margin-left: var(--space-2); font-size: 11px; }
+.earned--good { color: var(--live); }
+.earned--none { color: var(--ink-muted); }
+.earned--bad { color: var(--color-warning); }
+
+.hint { margin: var(--space-2) 0; font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
+.hint--bad { color: var(--color-warning); }
+
+.refused {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+}
+
+.refused__title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-warning);
+}
+
+.refused__body { margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--ink); }
+.refused__note { margin-top: 6px; font-size: 12px; color: var(--ink-muted); }
 
 .btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.btn--quiet { color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
+.btn--quiet { color: var(--ink-muted); font-size: 12px; }
+
+.sortbtn {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--live);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tally { flex: 1; align-self: center; font-size: 11.5px; line-height: 1.4; color: var(--ink-muted); }
+.tally__done { color: var(--ink); }
+
+.savebtn {
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 1.5px solid var(--live);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--live);
+  font-family: var(--heading-face);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.savebtn:disabled { opacity: 0.55; cursor: default; }
 </style>

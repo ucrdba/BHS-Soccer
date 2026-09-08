@@ -26,6 +26,7 @@ import QuizView from '../views/QuizView.vue';
 import LineupView from '../views/LineupView.vue';
 import LiveMatchView from '../views/LiveMatchView.vue';
 import SeasonReportView from '../views/SeasonReportView.vue';
+import SessionEntryView from '../views/SessionEntryView.vue';
 import { groundFor, applyGround } from './ground';
 
 /** The subset of the auth manager the guards need, so they can be tested. */
@@ -76,8 +77,10 @@ export function routeAllowed(name: string, a: AuthLike): boolean {
   if (name === 'matrix') return a.canAccessRatings();
   if (name === 'planner') return a.isCoach();
   if (name === 'coaches') return a.isCoach() || a.isAdmin();
-  // The touchline tools write to the match record, so they are a coach's.
-  if (name === 'lineup' || name === 'live' || name === 'season-report') {
+  // The touchline tools and session entry write to the record, so they are
+  // a coach's. A player may read the ratings board but not record against it.
+  if (name === 'lineup' || name === 'live' || name === 'season-report'
+      || name === 'session-entry') {
     return a.isCoach() || a.isAdmin();
   }
   // Coach OR admin, deliberately. Gating this on can_access_admin_dashboard
@@ -108,6 +111,8 @@ export const router: Router = createRouter({
     { path: '/schedule/:matchId/live', name: 'live', component: LiveMatchView,
       meta: { ground: 'pitch', chrome: 'tool' } },
     { path: '/schedule/report', name: 'season-report', component: SeasonReportView,
+      meta: { ground: 'ledger', chrome: 'tool' } },
+    { path: '/matrix/session/:drillId', name: 'session-entry', component: SessionEntryView,
       meta: { ground: 'ledger', chrome: 'tool' } },
     // The ratings move to the ledger ground in phase 4 of the restyle.
     { path: '/matrix',   name: 'matrix',   component: MatrixView,   meta: { ground: 'paper' } },

@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
-import SessionModal from './SessionModal.vue';
+import SessionEntryScreen from './SessionEntryScreen.vue';
 
 const saveMatrixSession = vi.fn();
 const fetchTimeBands = vi.fn();
@@ -58,23 +58,32 @@ const BANDS = [
 
 const flush = () => new Promise(r => setTimeout(r, 0));
 
-async function mountGrid(opts: { drillId?: string; open?: boolean } = {}) {
-  const { drillId = COOPERS, open = true } = opts;
+/**
+ * `measure` overrides the measure of the drill under test (COOPERS by
+ * default), the way the fixed DRILLS list already seeds one per id — it lets
+ * a test choose a measure without inventing a fourth drill.
+ */
+async function mountGrid(opts: { drillId?: string; measure?: string } = {}) {
+  const { drillId = COOPERS, measure } = opts;
   vi.clearAllMocks();
   saveMatrixSession.mockResolvedValue({ ok: true, id: 's9' });
   fetchTimeBands.mockResolvedValue(BANDS);
   fetchMatrixSessionResults.mockResolvedValue([]);
   fetchTeamSessionHistory.mockResolvedValue([]);
-  fetchDrillsForWeighting.mockResolvedValue(DRILLS);
+  const drills = measure
+    ? DRILLS.map(d => (d.id === drillId ? { ...d, measure } : d))
+    : DRILLS;
+  fetchDrillsForWeighting.mockResolvedValue(drills);
 
-  const w = mount(SessionModal, {
-    props: { open, teamId: 't1', schoolId: 's1', players: PLAYERS, drillId },
+  const w = mount(SessionEntryScreen, {
+    props: { teamId: 't1', schoolId: 's1', players: PLAYERS, drillId },
     global: {
       plugins: [createTestingPinia({
         createSpy: vi.fn,
         stubActions: false,
-        initialState: { session: { drills: DRILLS, bands: BANDS } }
-      })]
+        initialState: { session: { drills, bands: BANDS } }
+      })],
+      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
     },
     attachTo: document.body
   });
@@ -348,5 +357,34 @@ describe('saving', () => {
     await flush();
 
     expect(w.emitted('saved')).toBeTruthy();
+  });
+});
+
+describe('the screen', () => {
+  it('states the unit a banded exercise is entered in', async () => {
+    const w = await mountGrid({ measure: 'time_bands' });
+    expect(w.find('[data-entry-format]').text()).toContain('m:ss');
+    expect(w.find('[data-entry-format]').text()).toMatch(/minutes and seconds/i);
+  });
+
+  it('states decimal seconds for a sprint instead', async () => {
+    const w = await mountGrid({ measure: 'time_low' });
+    expect(w.find('[data-entry-format]').text()).toContain('0.00');
+    expect(w.find('[data-entry-format]').text()).toMatch(/colon/i);
+  });
+
+  it('states no unit for a result that is chosen rather than typed', async () => {
+    const w = await mountGrid({ measure: 'win_loss' });
+    expect(w.find('[data-entry-format]').exists()).toBe(false);
+  });
+
+  it('counts what is entered, who is out and what is left', async () => {
+    const w = await mountGrid({ measure: 'count_high' });
+    expect(w.find('[data-entry-tally]').text()).toMatch(/to go/i);
+  });
+
+  it('offers a way back to the ratings', async () => {
+    const w = await mountGrid({ measure: 'count_high' });
+    expect(w.find('[data-tool-back]').exists()).toBe(true);
   });
 });

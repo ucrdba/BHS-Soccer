@@ -88,4 +88,11 @@ describe('the router', () => {
     expect(paths).toContain('/schedule/:matchId/live');
     expect(paths).toContain('/schedule/report');
   });
+
+  it('puts session entry on the ledger ground as a tool', () => {
+    const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
+    expect(byName.get('session-entry')?.meta.ground).toBe('ledger');
+    expect(byName.get('session-entry')?.meta.chrome).toBe('tool');
+    expect(router.getRoutes().map(r => r.path)).toContain('/matrix/session/:drillId');
+  });
 });
