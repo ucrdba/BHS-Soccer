@@ -252,6 +252,7 @@ describe('a competitive exercise', () => {
 
   it('shows no standard summary, because spread is the point there', async () => {
     const w = await mountMatrix({ filter: SMALL, points: [point({ drill_id: SMALL })] });
+    await switchTo(w, 'Exercise');
     expect(w.find('[data-standard-summary]').exists()).toBe(false);
     expect(w.find('[data-below-standard]').exists()).toBe(false);
   });
