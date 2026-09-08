@@ -341,7 +341,9 @@ untouched; only their surrounding chrome takes the tokens.
   text (`--ink-soft` fails the contrast floor on this ground, and the screen
   is read outdoors). They remain buttons: a tap still goes through `pm.append`, which
   refuses and sets the notice, so the card appears. Nothing here duplicates
-  the guard.
+  the guard. The same failure holds on the ledger ground: `MatrixBoard.vue`'s
+  never-attempted rank dash and `ExerciseLeaderboard.vue`'s never-attempted
+  mark use `--ink-muted` for the identical reason.
 - Bench rows below, each with an On control. Sub (in the footer) scrolls to the
   bench. Taking a player off keeps its Off control on the row.
 - Footer bar: Shot, Goal, Assist and Sub as 56px targets, the first three dashed

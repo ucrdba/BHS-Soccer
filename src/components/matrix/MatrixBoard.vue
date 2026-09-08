@@ -129,7 +129,7 @@ function arrow(key: string): string {
 .muted { color: var(--ink-muted); }
 
 .rank { font-family: var(--heading-face); font-size: 15px; color: var(--mark); }
-.rank--none { color: var(--ink-soft); }
+.rank--none { color: var(--ink-muted); }
 
 .who {
   padding: 0;

@@ -205,7 +205,7 @@ function standing(row: any): string {
 /* Marked, never moved: the row stays exactly where the chosen sort puts it. */
 .mark { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); }
 .mark--short { color: var(--color-warning); }
-.mark--none { color: var(--ink-soft); }
+.mark--none { color: var(--ink-muted); }
 
 .foot {
   padding: var(--space-3) 0 0;
