@@ -7,7 +7,7 @@
  * loads the exercises and the squad itself rather than assuming the ratings
  * screen filled the stores first.
  */
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ToolNotice from '../components/layout/ToolNotice.vue';
 import SessionEntryScreen from '../components/matrix/SessionEntryScreen.vue';
@@ -30,11 +30,32 @@ const drill = computed(() =>
   session.drills.find((d: any) => String(d.id) === String(drillId.value)) || null);
 
 /**
- * Settled means the exercises have actually been read, so "no such exercise"
- * is an answer rather than a race.
+ * True once the whole open sequence for the CURRENT drill/session has
+ * resolved: the roster has loaded, the exercise library has been read, and
+ * (when there is an id to open) `openExisting`/`openNew` has returned.
+ *
+ * Reset to false at the top of every watch run, so a change of drill or
+ * session re-gates the screen rather than leaving it open on stale data.
+ * Without this, `SessionEntryScreen` mounts as soon as `session.drills` is
+ * non-empty -- true on the very first render whenever `MatrixView` already
+ * filled it -- while `roster.load` and `session.openNew`/`openExisting` are
+ * still in flight. Both of those assign fresh objects the screen's own watch
+ * rebuilds from, so anything the coach has already typed is silently
+ * discarded.
+ */
+const opened = ref(false);
+
+/**
+ * Settled means the exercises have actually been read and the sheet has
+ * actually finished opening, so "no such exercise" is an answer rather than
+ * a race, and the screen never renders over data that is still being
+ * replaced out from under it.
  */
 const state = computed(() => subjectState({
-  settled: !session.loading && session.drills.length > 0,
+  settled: !session.loading
+    && session.drills.length > 0
+    && roster.loadedTeamId === org.activeTeamId
+    && opened.value,
   id: drillId.value,
   found: drill.value
 }));
@@ -47,12 +68,15 @@ const state = computed(() => subjectState({
 watch(
   () => [org.activeTeamId, drillId.value, sessionId.value] as const,
   async ([teamId, id, existing]) => {
+    opened.value = false;
     if (!teamId) return;
-    roster.load(teamId);
+    await roster.load(teamId);
     await session.loadDrills(schoolId.value);
-    if (!id) return;
-    if (existing) await session.openExisting(existing, teamId);
-    else await session.openNew(id, teamId);
+    if (id) {
+      if (existing) await session.openExisting(existing, teamId);
+      else await session.openNew(id, teamId);
+    }
+    opened.value = true;
   },
   { immediate: true }
 );

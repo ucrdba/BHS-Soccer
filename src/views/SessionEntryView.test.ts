@@ -10,6 +10,8 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import SessionEntryView from './SessionEntryView.vue';
+import { useSessionStore } from '../stores/session';
+import { useRosterStore } from '../stores/roster';
 
 const DRILLS = [{ id: 'd1', name: '1.5-Mile Run', measure: 'time_bands' }];
 
@@ -75,5 +77,58 @@ describe('SessionEntryView', () => {
     const store = (w.vm as any).$pinia._s.get('session');
     expect(store.openNew).toHaveBeenCalled();
     expect(store.openExisting).not.toHaveBeenCalled();
+  });
+
+  it('does not render the grid until the open sequence has resolved, even with drills pre-populated', async () => {
+    // session.drills is filled before mount, the way MatrixView leaves it on
+    // the normal Ratings -> Record a session path. The grid must still wait
+    // for openNew (and the roster) to resolve, or a coach's keystrokes land
+    // in a screen that is about to be rebuilt out from under them.
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/matrix', name: 'matrix', component: { template: '<p />' } },
+        { path: '/matrix/session/:drillId', name: 'session-entry', component: SessionEntryView }
+      ]
+    });
+    await router.push('/matrix/session/d1');
+    await router.isReady();
+
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        session: { drills: DRILLS, sessions: [], results: [], bands: [], editingId: null, loading: false, loadError: null },
+        organization: {
+          schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions' }],
+          teams: [{ id: 't1', name: 'U16', school_id: 's1' }],
+          activeTeamId: 't1'
+        },
+        roster: { players: [{ id: 'p1', name: 'Cesar Alva', recordingNumber: 1 }], loadedTeamId: 't1' }
+      }
+    });
+
+    const sessionStore = useSessionStore(pinia);
+    const rosterStore = useRosterStore(pinia);
+    let resolveOpen!: () => void;
+    const openPromise = new Promise<void>(resolve => { resolveOpen = resolve; });
+    (sessionStore.openNew as any).mockReturnValue(openPromise);
+    (rosterStore.load as any).mockResolvedValue(undefined);
+
+    const w = mount(SessionEntryView, {
+      global: {
+        plugins: [router, pinia],
+        stubs: { SessionEntryScreen: { props: ['drillId'], template: '<div data-screen :data-drill="drillId" />' } }
+      }
+    });
+    await flushPromises();
+
+    // Still waiting on openNew: the screen must not be up yet.
+    expect(w.find('[data-screen]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(true);
+
+    resolveOpen();
+    await flushPromises();
+
+    expect(w.find('[data-screen]').exists()).toBe(true);
   });
 });
