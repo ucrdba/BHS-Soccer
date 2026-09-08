@@ -236,7 +236,7 @@ async function onSave(): Promise<void> {
   >
     <template #top-right>
       <button
-        type="button" class="sortbtn" data-grid-sort="name"
+        type="button" class="sortbtn" data-grid-sort-toggle
         @click="setSort(sort.by === 'name' ? 'recordingNumber' : 'name')"
       >Sort: {{ sort.by === 'name' ? 'name' : 'recording no.' }} ▾</button>
     </template>
