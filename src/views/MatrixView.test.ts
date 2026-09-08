@@ -7,10 +7,38 @@
  * and it is the kind of thing a later tidy-up would quietly undo.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
+import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import MatrixView from './MatrixView.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
+
+/**
+ * A real router, so useRouter() inside the view actually returns something
+ * and RouterLink resolves. The RouterLink stub keeps the resolved href
+ * readable without a full route match, the way ScheduleView.test.ts's does.
+ */
+function createTestRouter(): Router {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/matrix', name: 'matrix', component: { template: '<p />' } },
+      { path: '/matrix/session/:drillId', name: 'session-entry', component: { template: '<p />' } }
+    ]
+  });
+}
+
+const routerLinkStub = {
+  props: ['to'],
+  template: '<a :href="href"><slot /></a>',
+  computed: {
+    href(): string {
+      const to: any = (this as any).to;
+      if (to?.name === 'session-entry') return `/matrix/session/${to.params?.drillId}`;
+      return '#';
+    }
+  }
+};
 
 // The store's real load() runs on mount. Mocked so it populates from these
 // fixtures rather than wiping the seeded state with empty results.
@@ -88,10 +116,12 @@ async function switchTo(w: any, label: 'Board' | 'Exercise' | 'Results' | 'Histo
 async function mountMatrix(opts: {
   roster?: any[]; points?: any[]; filter?: string;
   coach?: boolean; failWith?: string | null; logs?: any[]; drills?: any[];
+  router?: Router; stubs?: Record<string, any>;
 } = {}) {
   const {
     roster = ROSTER_ROWS, points = [point()], filter = '',
-    coach = false, failWith = null, logs = [], drills = DRILLS
+    coach = false, failWith = null, logs = [], drills = DRILLS,
+    router = createTestRouter(), stubs = {}
   } = opts;
 
   vi.clearAllMocks();
@@ -108,9 +138,12 @@ async function mountMatrix(opts: {
   svc.fetchMatrixSessionResults.mockResolvedValue([]);
   svc.fetchTimeBands.mockResolvedValue([]);
 
+  await router.push('/matrix');
+  await router.isReady();
+
   const w = mount(MatrixView, {
     global: {
-      plugins: [createTestingPinia({
+      plugins: [router, createTestingPinia({
         createSpy: vi.fn,
         // The real actions run: sorting is the behaviour under test, and the
         // client above is what is faked instead.
@@ -124,7 +157,8 @@ async function mountMatrix(opts: {
           },
           auth: { isCoach: coach, isAdmin: false, isGuest: false, canAccessRatings: true }
         }
-      })]
+      })],
+      stubs: { RouterLink: routerLinkStub, ...stubs }
     }
   });
 
@@ -144,7 +178,7 @@ async function mountMatrix(opts: {
 function mountMatrixWithBandedExercise() {
   return mount(ExerciseLeaderboard, {
     global: {
-      plugins: [createTestingPinia({
+      plugins: [createTestRouter(), createTestingPinia({
         createSpy: vi.fn,
         stubActions: false,
         initialState: {
@@ -160,7 +194,8 @@ function mountMatrixWithBandedExercise() {
           },
           auth: { isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
         }
-      })]
+      })],
+      stubs: { RouterLink: routerLinkStub }
     }
   });
 }
@@ -397,6 +432,33 @@ describe('recording a session', () => {
     expect(svc.fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
     await switchTo(w, 'History');
     expect(w.find('[data-history]').exists()).toBe(true);
+  });
+
+  it('links "Record a session" to the session-entry route for the chosen exercise', async () => {
+    const w = await mountMatrix({ coach: true });
+    // sessionDrillId starts blank, so the link falls back to the first
+    // offered exercise -- LAPS, since DRILLS lists it before SMALL.
+    expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${LAPS}`);
+  });
+
+  it('pushes the recorded session\'s id in the query when a coach edits it', async () => {
+    // This is the exact wiring the plan's pre-flight scan flagged: without
+    // the session id in the query, opening a recorded session for editing
+    // hands the coach a blank sheet over their saved results.
+    const router = createTestRouter();
+    const w = await mountMatrix({
+      coach: true, router,
+      stubs: { SessionHistory: { name: 'SessionHistory', template: '<div data-history-stub />' } }
+    });
+    const push = vi.spyOn(router, 'push');
+
+    await switchTo(w, 'History');
+    w.findComponent({ name: 'SessionHistory' }).vm.$emit('edit', LAPS, 's9');
+    await flushPromises();
+
+    expect(push).toHaveBeenCalledWith({
+      name: 'session-entry', params: { drillId: LAPS }, query: { session: 's9' }
+    });
   });
 });
 
