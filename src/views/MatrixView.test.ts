@@ -71,6 +71,19 @@ async function flush(): Promise<void> {
   await new Promise(r => setTimeout(r, 0));
 }
 
+/**
+ * Panels are behind a segmented control now, so a test after a specific one
+ * (the exercise picker, the results panel, the session history) must select
+ * its tab before looking for it. Order is fixed by PANELS: board, exercise,
+ * results, history — the latter two collapse away for a player.
+ */
+async function switchTo(w: any, label: 'Board' | 'Exercise' | 'Results' | 'History'): Promise<void> {
+  const tabs = w.findAll('[data-panel-tab]');
+  const tab = tabs.find((t: any) => t.text() === label);
+  if (!tab) throw new Error(`No "${label}" tab is offered`);
+  await tab.trigger('click');
+}
+
 async function mountMatrix(opts: {
   roster?: any[]; points?: any[]; filter?: string;
   coach?: boolean; failWith?: string | null; logs?: any[]; drills?: any[];
@@ -164,6 +177,7 @@ describe('the board', () => {
 describe('a competitive exercise', () => {
   it('shows the leaderboard instead of the board', async () => {
     const w = await mountMatrix({ filter: SMALL, points: [point({ drill_id: SMALL })] });
+    await switchTo(w, 'Exercise');
     expect(w.find('[data-exercise-leaderboard]').exists()).toBe(true);
     expect(w.find('[data-matrix-board]').exists()).toBe(false);
   });
@@ -180,6 +194,7 @@ describe('a fitness standard', () => {
 
   it('says how many fell below it, of those measured', async () => {
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     const summary = w.find('[data-standard-summary]');
     expect(summary.exists()).toBe(true);
     // One below; the player who never ran is not counted against the standard.
@@ -189,11 +204,13 @@ describe('a fitness standard', () => {
 
   it('marks the rows that fell short', async () => {
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     expect(w.findAll('[data-below-standard]')).toHaveLength(1);
   });
 
   it('does not mark a player who never attempted as failing', async () => {
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     const standings = w.findAll('[data-leaderboard-row]').map(r => r.attributes('data-standing'));
     expect(standings).toContain('none');
     expect(standings.filter(s => s === 'missed')).toHaveLength(0);
@@ -207,18 +224,21 @@ describe('a fitness standard', () => {
       points: [point({ player_id: 'p1', earned: 1, available: 1 }),
                point({ player_id: 'p2', earned: 1, available: 1 })]
     });
+    await switchTo(w, 'Exercise');
     expect(w.find('[data-standard-summary]').text()).toMatch(/all 2 measured/i);
   });
 
   it('KEEPS every player on the table', async () => {
     // Emphasis, never a filter.
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     expect(w.findAll('[data-leaderboard-row]')).toHaveLength(3);
   });
 
   it('KEEPS every column sortable', async () => {
     // This was the condition on introducing the emphasis at all.
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     for (const col of ['number', 'name', 'best', 'earned']) {
       const th = w.find(`[data-exercise-sort="${col}"]`);
       expect(th.exists(), col).toBe(true);
@@ -232,6 +252,7 @@ describe('a fitness standard', () => {
 
   it('shows a best time as a time, not a number of seconds', async () => {
     const w = await mountMatrix(opts);
+    await switchTo(w, 'Exercise');
     expect(w.text()).toContain('4:10');   // 250 seconds
   });
 });
@@ -253,11 +274,13 @@ describe('the results panel', () => {
 
   it('lists every logged result for a coach', async () => {
     const w = await mountMatrix({ coach: true, logs: LOGS });
+    await switchTo(w, 'Results');
     expect(w.findAll('[data-result-row]')).toHaveLength(2);
   });
 
   it('marks the winner rather than leaving a reader to decode a and b', async () => {
     const w = await mountMatrix({ coach: true, logs: LOGS });
+    await switchTo(w, 'Results');
     const first = w.findAll('[data-result-row]')[0];
     expect(first.text()).toContain('beat');
     expect(first.find('.won').text()).toContain('Alva');
@@ -265,23 +288,27 @@ describe('the results panel', () => {
 
   it('names a draw without inventing a winner', async () => {
     const w = await mountMatrix({ coach: true, logs: LOGS });
+    await switchTo(w, 'Results');
     expect(w.findAll('[data-result-row]')[1].text()).toContain('drew with');
   });
 
   it('uses the recording number beside a name', async () => {
     // The Matrix is read alongside paper sheets, which carry those numbers.
     const w = await mountMatrix({ coach: true, logs: LOGS });
+    await switchTo(w, 'Results');
     expect(w.find('[data-result-row]').text()).toContain('(1)');
   });
 
   it('says what an empty panel is for', async () => {
     const w = await mountMatrix({ coach: true, logs: [] });
+    await switchTo(w, 'Results');
     expect(w.find('[data-results-empty]').text()).toMatch(/leaderboard is calculated from/i);
   });
 
   it('warns that deleting recalculates every rank', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const w = await mountMatrix({ coach: true, logs: LOGS });
+    await switchTo(w, 'Results');
     await w.find('[data-result-remove]').trigger('click');
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/recalculated/i));
@@ -317,6 +344,7 @@ describe('recording a session', () => {
   it('reads the session history for the team', async () => {
     const w = await mountMatrix({ coach: true });
     expect(svc.fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    await switchTo(w, 'History');
     expect(w.find('[data-history]').exists()).toBe(true);
   });
 });
@@ -350,5 +378,25 @@ describe('the reports', () => {
     await flush();
 
     expect(w.find('[data-modal]').text()).toMatch(/progress/i);
+  });
+});
+
+describe('the panels', () => {
+  it('offers a coach four panels and a player two', async () => {
+    const coach = await mountMatrix({ coach: true });
+    expect(coach.findAll('[data-panel-tab]').map(t => t.text()))
+      .toEqual(['Board', 'Exercise', 'Results', 'History']);
+
+    const player = await mountMatrix({ coach: false });
+    expect(player.findAll('[data-panel-tab]').map(t => t.text()))
+      .toEqual(['Board', 'Exercise']);
+  });
+
+  it('shows the board first and switches on a tab', async () => {
+    const w = await mountMatrix({ coach: true });
+    expect(w.find('[data-panel]').attributes('data-panel')).toBe('board');
+
+    await w.findAll('[data-panel-tab]')[1].trigger('click');
+    expect(w.find('[data-panel]').attributes('data-panel')).toBe('exercise');
   });
 });

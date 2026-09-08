@@ -18,6 +18,7 @@ const emit = defineEmits<{ openPlayer: [string] }>();
 const COLUMNS = [
   { key: 'rank', label: 'Rank', sortable: true },
   { key: 'name', label: 'Player', sortable: true, text: true },
+  { key: 'recordingNumber', label: 'No', sortable: false, title: 'Recording number, not the shirt number' },
   { key: 'exercises', label: 'Ex', sortable: false, title: 'Exercises taken part in' },
   { key: 'wdl', label: 'W-D-L', sortable: false },
   { key: 'earned', label: 'Pts', sortable: true },
@@ -56,13 +57,8 @@ function arrow(key: string): string {
       <tbody>
         <tr v-for="m in matrix.boardRows" :key="m.playerId" data-board-row>
           <td>
-            <span
-              v-if="m.exercises === 0" class="rank rank--none"
-              title="Has not taken part in anything yet"
-            >—</span>
-            <span v-else class="rank" :class="`rank--${m.rank <= 3 ? m.rank : 'other'}`">
-              {{ m.rank }}
-            </span>
+            <span v-if="m.exercises === 0" class="rank rank--none" title="Has not taken part in anything yet">—</span>
+            <span v-else class="rank tnum">{{ m.rank }}</span>
           </td>
 
           <td class="is-text">
@@ -71,54 +67,52 @@ function arrow(key: string): string {
               title="See how these points were earned"
               @click="emit('openPlayer', m.playerId)"
             >{{ m.name }}</button>
-            <span class="num">{{ m.recordingNumber != null ? `(${m.recordingNumber})` : '—' }}</span>
           </td>
 
-          <td>{{ m.exercises }}</td>
-          <td class="tabular">{{ m.wins }} - {{ m.draws }} - {{ m.losses }}</td>
-          <td class="tabular"><strong>{{ m.earned.toFixed(2) }}</strong></td>
-          <td class="tabular muted">{{ m.available.toFixed(2) }}</td>
-          <td>
+          <td class="tnum muted">{{ m.recordingNumber != null ? m.recordingNumber : '—' }}</td>
+          <td class="tnum">{{ m.exercises }}</td>
+          <td class="tnum">{{ m.wins }} - {{ m.draws }} - {{ m.losses }}</td>
+          <td class="tnum points">{{ m.earned.toFixed(2) }}</td>
+          <td class="tnum muted">{{ m.available.toFixed(2) }}</td>
+          <td class="tnum">
             <span v-if="m.share === null" class="muted">—</span>
-            <span v-else class="tabular">{{ m.share.toFixed(1) }}%</span>
-            <!-- The bar tracks POINTS against the leader, because points are
-                 what the table is ordered by. A bar drawn from share would
-                 disagree with the ordering beside it. -->
-            <span class="meter"><span class="meter__fill" :style="{ width: `${m.barPct}%` }" /></span>
+            <span v-else>{{ m.share.toFixed(1) }}%</span>
           </td>
         </tr>
       </tbody>
     </table>
+
+    <p class="foot">
+      Sorted on the recording number, not the shirt. The exercises column sits
+      beside the points so a small sample is visible rather than hidden — no
+      player is left out for having taken part in little.
+    </p>
   </div>
 </template>
 
 <style scoped>
 .wrap { overflow-x: auto; }
-
-.board {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.86rem;
-}
+.board { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .board th, .board td {
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--rule);
   text-align: right;
   white-space: nowrap;
 }
 
+.board th { border-bottom-color: var(--rule-strong); }
 .board th.is-text, .board td.is-text { text-align: left; }
 
 .board th {
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .th-btn {
+  padding: 0;
   border: 0;
   background: none;
   color: inherit;
@@ -126,61 +120,44 @@ function arrow(key: string): string {
   letter-spacing: inherit;
   text-transform: inherit;
   cursor: pointer;
-  padding: 0;
 }
 
 .th-btn:hover { color: var(--ink); }
 
-.tabular { font-variant-numeric: tabular-nums; }
-.muted { color: var(--text-muted, #94a3b8); }
+.tnum { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-muted); }
 
-.rank {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.9rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid var(--bhs-navy-border);
-  font-size: 0.78rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.rank--1 { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
-.rank--2, .rank--3 { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.rank--none { color: var(--text-muted, #94a3b8); }
+.rank { font-family: var(--heading-face); font-size: 15px; color: var(--mark); }
+.rank--none { color: var(--ink-soft); }
 
 .who {
-  border: 0;
   padding: 0;
+  border: 0;
   background: none;
   color: var(--ink);
   font: inherit;
-  font-weight: 600;
   text-align: left;
   cursor: pointer;
-  border-bottom: 1px dotted var(--bhs-cyan-accent);
 }
 
-.num {
-  margin-left: 0.4rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.76rem;
+.who:hover, .who:focus-visible { color: var(--live); }
+
+.points { font-family: var(--heading-face); font-size: 16px; color: var(--ink); }
+
+.foot {
+  padding: var(--space-3) 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink-muted);
 }
 
-.meter {
-  display: block;
-  height: 3px;
-  margin-top: 0.3rem;
-  border-radius: 999px;
-  background: var(--bhs-navy-border);
-}
-
-.meter__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--bhs-cyan-accent);
+/* The name column stays put while the figures scroll on a narrow screen. */
+@media (max-width: 767.98px) {
+  .board td.is-text, .board th.is-text {
+    position: sticky;
+    left: 0;
+    background: var(--ground);
+  }
 }
 </style>

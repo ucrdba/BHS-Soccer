@@ -24,6 +24,7 @@ import { useMatrixStore } from '../stores/matrix';
 import { useSessionStore } from '../stores/session';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
+import { visiblePanels, panelFor } from '../domain/matrix-panels';
 
 const matrix = useMatrixStore();
 const session = useSessionStore();
@@ -34,6 +35,12 @@ const router = useRouter();
 const isCoach = computed(() => auth.isCoach || auth.isAdmin);
 const schoolId = computed(() => org.school?.id ?? null);
 const settled = computed(() => !matrix.loading && matrix.loadedTeamId !== null);
+
+/** Which panel the segmented control is showing. */
+const chosenPanel = ref<string>('board');
+const panels = computed(() => visiblePanels(isCoach.value));
+const panel = computed(() =>
+  panelFor(chosenPanel.value, isCoach.value, !!matrix.exerciseFilter));
 
 const openPlayerId = ref<string | null>(null);
 const notice = ref<string | null>(null);
@@ -110,41 +117,16 @@ watch(
 <template>
   <section class="matrix">
     <header class="matrix__head">
-      <div>
-        <h1 class="matrix__title">Player Ratings</h1>
-        <p class="matrix__sub">
-          Practice competition, tracked. Points are derived from every logged
-          result, so correcting one re-ranks everybody.
-        </p>
-        <p v-if="org.branding.name" class="matrix__org">
-          {{ org.branding.name }}
-          <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
-        </p>
-      </div>
-
-      <div v-if="isCoach" class="matrix__acts">
-        <select
-          v-if="sessionDrills.length" v-model="sessionDrillId"
-          class="acts__select" aria-label="Exercise to record"
-          data-session-drill
-        >
-          <option v-for="d in sessionDrills" :key="d.id" :value="d.id">{{ d.name }}</option>
-        </select>
-        <RouterLink
-          v-if="sessionDrills.length" class="act" data-record-session
-          :to="{ name: 'session-entry', params: { drillId: sessionDrillId || sessionDrills[0].id } }"
-        >Record a session</RouterLink>
-        <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
-        <button type="button" class="act" data-open-weights @click="weightsOpen = true">
-          Weights &amp; standards
-        </button>
-        <button type="button" class="act" data-open-squad @click="squadOpen = true">
-          Squad report
-        </button>
-        <button type="button" class="act" data-open-progress @click="progressOpen = true">
-          Progress
-        </button>
-      </div>
+      <p class="kicker kicker--accent">Competitive matrix</p>
+      <h1 class="matrix__title">Player Ratings</h1>
+      <p class="matrix__meta tnum">
+        <span v-if="org.branding.name">
+          {{ org.branding.name }}<span v-if="org.activeTeam"> · {{ org.activeTeam.name }}</span>
+        </span>
+        <span class="matrix__counts">
+          {{ matrix.exercises.length }} exercises · {{ matrix.players.length }} players
+        </span>
+      </p>
     </header>
 
     <p v-if="notice" class="notice" role="status" data-notice>
@@ -155,17 +137,29 @@ watch(
       {{ matrix.loadError }}
     </p>
 
-    <div class="picker">
-      <label class="picker__label" for="exercise-filter">Exercise</label>
+    <nav class="tabs" aria-label="Ratings panels">
+      <button
+        v-for="p in panels" :key="p.key"
+        type="button" class="tab" :class="{ 'is-on': panel === p.key }"
+        data-panel-tab @click="chosenPanel = p.key"
+      >{{ p.label }}</button>
+    </nav>
+
+    <div v-if="isCoach" class="acts">
       <select
-        id="exercise-filter" class="picker__select" data-exercise-filter
-        :value="matrix.exerciseFilter"
-        @change="matrix.setExerciseFilter(($event.target as HTMLSelectElement).value)"
+        v-if="sessionDrills.length" v-model="sessionDrillId"
+        class="acts__select" aria-label="Exercise to record" data-session-drill
       >
-        <option value="">All exercises — overall points</option>
-        <option v-for="d in matrix.exercises" :key="d.id" :value="d.id">{{ d.name }}</option>
+        <option v-for="d in sessionDrills" :key="d.id" :value="d.id">{{ d.name }}</option>
       </select>
-      <span class="picker__hint">Click a column heading to re-sort.</span>
+      <RouterLink
+        v-if="sessionDrills.length" class="act" data-record-session
+        :to="{ name: 'session-entry', params: { drillId: sessionDrillId || sessionDrills[0].id } }"
+      >Record a session</RouterLink>
+      <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
+      <button type="button" class="act" data-open-weights @click="weightsOpen = true">Weights &amp; standards</button>
+      <button type="button" class="act" data-open-squad @click="squadOpen = true">Squad report</button>
+      <button type="button" class="act" data-open-progress @click="progressOpen = true">Progress</button>
     </div>
 
     <p v-if="!settled" class="empty">Loading the ratings…</p>
@@ -173,20 +167,46 @@ watch(
       No players on this team yet.
     </p>
 
-    <template v-else>
-      <ExerciseLeaderboard v-if="matrix.exerciseFilter" />
-      <MatrixBoard v-else @open-player="openPlayerId = $event" />
+    <div v-else class="panel" :data-panel="panel">
+      <template v-if="panel === 'board'">
+        <MatrixBoard @open-player="openPlayerId = $event" />
+      </template>
 
-      <ResultsPanel :can-edit="isCoach" @remove="onRemoveResult" />
+      <template v-else-if="panel === 'exercise'">
+        <label class="picker">
+          <span class="picker__label kicker">Exercise</span>
+          <select
+            class="picker__select" data-exercise-filter
+            :value="matrix.exerciseFilter"
+            @change="matrix.setExerciseFilter(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Choose an exercise</option>
+            <option v-for="d in matrix.exercises" :key="d.id" :value="d.id">{{ d.name }}</option>
+          </select>
+        </label>
+        <ExerciseLeaderboard v-if="matrix.exerciseFilter" />
+        <p v-else class="empty">Pick an exercise to see it on its own.</p>
+      </template>
 
-      <SessionHistory
-        :can-edit="isCoach" :team-id="org.activeTeamId"
-        @edit="onEditSession" @changed="reload" />
-    </template>
+      <template v-else-if="panel === 'results'">
+        <ResultsPanel :can-edit="isCoach" @remove="onRemoveResult" />
+      </template>
+
+      <template v-else>
+        <SessionHistory
+          :can-edit="isCoach" :team-id="org.activeTeamId"
+          @edit="onEditSession" @changed="reload" />
+      </template>
+    </div>
 
     <PlayerBreakdownModal
       :player-id="openPlayerId" :team-id="org.activeTeamId"
       @close="openPlayerId = null" />
+
+    <WeightsModal
+      v-if="isCoach"
+      :open="weightsOpen" :team-id="org.activeTeamId" :school-id="schoolId"
+      @close="weightsOpen = false" @saved="reload" />
 
     <SquadReportModal
       v-if="isCoach"
@@ -195,108 +215,115 @@ watch(
     <ProgressModal
       v-if="isCoach"
       :open="progressOpen" :team-id="org.activeTeamId" @close="progressOpen = false" />
-
-    <WeightsModal
-      v-if="isCoach"
-      :open="weightsOpen" :team-id="org.activeTeamId" :school-id="schoolId"
-      @close="weightsOpen = false" @saved="reload" />
   </section>
 </template>
 
 <style scoped>
-.matrix { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.matrix { padding: var(--space-4) var(--space-4) var(--space-8); }
 
-.matrix__head { margin-bottom: 1.25rem; }
-.matrix__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.matrix__head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
+.kicker--accent { color: var(--rule-strong); }
 
-.matrix__sub {
-  margin: 0.3rem 0 0;
-  max-width: 44rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.88rem;
-  line-height: 1.5;
+.matrix__title {
+  margin-top: 6px;
+  font-family: var(--heading-face);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
 }
 
-.matrix__org {
-  margin: 0.4rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.picker {
+.matrix__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: center;
-  margin-bottom: 1rem;
+  gap: var(--space-2);
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule);
+  font-size: 11.5px;
+  color: var(--ink-muted);
 }
 
-.picker__label {
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+.tabs {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding-bottom: var(--space-2);
+  overflow-x: auto;
 }
 
-.picker__select {
-  min-width: 15rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
+.tab {
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: none;
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.picker__hint { color: var(--text-muted, #94a3b8); font-size: 0.74rem; }
+.tab.is-on { color: var(--live); border-bottom-color: var(--live); }
 
-.matrix__head { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; }
-.matrix__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
-
-.acts__select {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.8rem;
-}
+.acts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 
 .act {
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--bhs-cyan-accent);
+  color: var(--ink);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 12px;
   text-decoration: none;
   cursor: pointer;
 }
 
-.act--dead {
-  margin: 0;
-  border-color: var(--bhs-navy-border);
-  color: var(--text-muted, #94a3b8);
-  cursor: default;
+.act--dead { color: var(--ink-muted); cursor: default; }
+.act:hover { border-color: var(--live); color: var(--live); }
+.act--dead:hover { border-color: var(--rule); color: var(--ink-muted); }
+
+.acts__select, .picker__select {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
 }
 
-.empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
+.picker { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-3); }
+.picker__label { color: var(--ink-muted); }
+
+.panel { margin-top: var(--space-3); }
+
+.empty { padding: var(--space-8) var(--space-3); text-align: center; color: var(--ink-muted); }
 
 .notice {
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  color: var(--bhs-cyan-accent);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink);
   font-size: 0.85rem;
 }
 
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.notice--bad { border-left-color: var(--color-warning); }
+.notice__x { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+
+@media (min-width: 768px) {
+  .matrix { max-width: 64rem; margin: 0 auto; }
+}
 </style>

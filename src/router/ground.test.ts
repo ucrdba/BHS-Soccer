@@ -95,4 +95,11 @@ describe('the router', () => {
     expect(byName.get('session-entry')?.meta.chrome).toBe('tool');
     expect(router.getRoutes().map(r => r.path)).toContain('/matrix/session/:drillId');
   });
+
+  it('puts the ratings on the ledger ground, with the shell still on', () => {
+    const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
+    expect(byName.get('matrix')?.meta.ground).toBe('ledger');
+    // Not a tool: the ratings are browsed to, so they keep the header and nav.
+    expect(byName.get('matrix')?.meta.chrome).toBeUndefined();
+  });
 });

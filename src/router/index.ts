@@ -114,8 +114,7 @@ export const router: Router = createRouter({
       meta: { ground: 'ledger', chrome: 'tool' } },
     { path: '/matrix/session/:drillId', name: 'session-entry', component: SessionEntryView,
       meta: { ground: 'ledger', chrome: 'tool' } },
-    // The ratings move to the ledger ground in phase 4 of the restyle.
-    { path: '/matrix',   name: 'matrix',   component: MatrixView,   meta: { ground: 'paper' } },
+    { path: '/matrix',   name: 'matrix',   component: MatrixView,   meta: { ground: 'ledger' } },
     { path: '/planner',  name: 'planner',  component: PlannerView,  meta: { ground: 'paper' } },
     { path: '/coaches',  name: 'coaches',  component: CoachesView,  meta: { ground: 'paper' } },
     { path: '/help',     name: 'help',     component: HelpView,     meta: { ground: 'paper' } },
