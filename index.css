@@ -64,6 +64,9 @@
   --mark: var(--org-mark-paper);
   --heading-face: var(--font-heading);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  /* A modal/sheet backdrop. --ink is the dark colour on this ground, so
+     mixing it in actually dims what is behind the scrim. */
+  --scrim: color-mix(in srgb, var(--ink) 40%, transparent);
   color-scheme: light;
 }
 
@@ -81,6 +84,10 @@
   --mark: var(--org-mark-dark);
   --heading-face: var(--font-display);
   --shadow-md: 0 8px 32px rgb(0 0 0 / 0.45);
+  /* --ink is light on this ground, so mixing it in (as paper does) would
+     wash the page out instead of dimming it. --ground is the dark colour
+     here, so mix that in instead. */
+  --scrim: color-mix(in srgb, var(--ground) 70%, transparent);
   color-scheme: dark;
 }
 
@@ -98,6 +105,8 @@
   --mark: var(--org-mark-dark);
   --heading-face: var(--font-heading);
   --shadow-md: 0 8px 32px rgb(0 0 0 / 0.45);
+  /* Same reasoning as pitch: --ink is light here too. */
+  --scrim: color-mix(in srgb, var(--ground) 70%, transparent);
   color-scheme: dark;
 }
 

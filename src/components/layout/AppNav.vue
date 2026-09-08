@@ -238,7 +238,7 @@ async function onSheetKeydown(e: KeyboardEvent): Promise<void> {
 .sheet__backdrop {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: var(--scrim);
 }
 
 .sheet__list {
