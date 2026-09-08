@@ -162,7 +162,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .lede {
   margin: 0 0 0.9rem;
   max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -174,7 +174,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .fld__label {
   display: block;
   margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.07em;
@@ -184,31 +184,31 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .inp {
   min-width: 11rem;
   padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
-  background: var(--bhs-navy-bg);
+  background: var(--surface-deep);
   color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
 }
 
-.state { padding: 2rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: 2rem 0; color: var(--ink-muted); text-align: center; font-size: 0.88rem; }
+.state--bad { color: var(--color-danger); }
 
 .chart {
   display: block;
   width: 100%;
   height: 9rem;
-  color: var(--bhs-cyan-accent);
-  border: 1px solid var(--bhs-navy-border);
+  color: var(--live);
+  border: 1px solid var(--rule);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.25);
 }
 
-.trend { margin: 0.6rem 0; color: var(--text-muted, #94a3b8); font-size: 0.85rem; }
-.is-better { color: var(--bhs-cyan-accent); }
-.is-worse { color: var(--color-danger, #f87171); }
-.is-level { color: var(--bhs-gold-accent); }
+.trend { margin: 0.6rem 0; color: var(--ink-muted); font-size: 0.85rem; }
+.is-better { color: var(--live); }
+.is-worse { color: var(--color-danger); }
+.is-level { color: var(--rule-strong); }
 
 .readings { margin: 0; padding: 0; list-style: none; }
 
@@ -217,16 +217,16 @@ watch(() => [props.open, props.teamId] as const, async () => {
   gap: 0.8rem;
   justify-content: space-between;
   padding: 0.22rem 0.1rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   font-size: 0.8rem;
 }
 
-.readings__on { color: var(--text-muted, #94a3b8); }
+.readings__on { color: var(--ink-muted); }
 .readings__v { color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .btn {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
   color: var(--ink);

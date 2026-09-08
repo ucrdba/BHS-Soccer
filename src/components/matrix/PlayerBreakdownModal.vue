@@ -89,22 +89,22 @@ function detail(row: any): string {
 </template>
 
 <style scoped>
-.state { padding: 1.5rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: 1.5rem 0; color: var(--ink-muted); text-align: center; font-size: 0.88rem; }
+.state--bad { color: var(--color-danger); }
 
 .wrap { overflow-x: auto; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 
 .tbl th, .tbl td {
   padding: 0.45rem 0.6rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   text-align: right;
 }
 
 .tbl th.is-text, .tbl td.is-text { text-align: left; }
 
 .tbl th {
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -113,5 +113,5 @@ function detail(row: any): string {
 
 .nowrap { white-space: nowrap; }
 .tabular { font-variant-numeric: tabular-nums; }
-.muted { color: var(--text-muted, #94a3b8); }
+.muted { color: var(--ink-muted); }
 </style>

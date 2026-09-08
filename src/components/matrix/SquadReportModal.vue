@@ -178,13 +178,13 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .lede {
   margin: 0 0 0.9rem;
   max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
 
-.state { padding: 2rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: 2rem 0; color: var(--ink-muted); text-align: center; font-size: 0.88rem; }
+.state--bad { color: var(--color-danger); }
 
 .ex { margin-bottom: 1.4rem; }
 
@@ -194,43 +194,44 @@ watch(() => [props.open, props.teamId] as const, async () => {
   gap: 0.5rem;
   align-items: baseline;
   margin: 0 0 0.3rem;
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.ex__std { color: var(--bhs-gold-accent); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }
-.ex__none { color: var(--text-muted, #94a3b8); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }
+.ex__std { color: var(--rule-strong); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }
+.ex__none { color: var(--ink-muted); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }
 
-.ex__short { margin: 0 0 0.4rem; color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
+.ex__short { margin: 0 0 0.4rem; color: var(--ink-muted); font-size: 0.78rem; }
 
 .wrap { overflow-x: auto; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
 
 .tbl th, .tbl td {
   padding: 0.28rem 0.5rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   text-align: right;
 }
 
 .tbl th.is-text, .tbl td.is-text { text-align: left; }
 
 .tbl th {
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.tbl tr.is-short td { color: var(--bhs-gold-accent); }
+/* A row that fell short of the standard -- below-standard, not decorative. */
+.tbl tr.is-short td { color: var(--color-warning); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
 .btn {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
   color: var(--ink);

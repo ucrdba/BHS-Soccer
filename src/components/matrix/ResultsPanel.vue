@@ -91,7 +91,7 @@ const rows = computed(() => matrix.logs.map((l: any) => {
   gap: 0.6rem;
   align-items: baseline;
   margin: 0 0 0.7rem;
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -99,16 +99,16 @@ const rows = computed(() => matrix.logs.map((l: any) => {
 
 .results__count {
   padding: 0.05rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
 }
 
 .results__empty {
   margin: 0;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -118,14 +118,14 @@ const rows = computed(() => matrix.logs.map((l: any) => {
 
 .tbl th, .tbl td {
   padding: 0.45rem 0.6rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   text-align: right;
 }
 
 .tbl th.is-text, .tbl td.is-text { text-align: left; }
 
 .tbl th {
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -133,19 +133,19 @@ const rows = computed(() => matrix.logs.map((l: any) => {
 }
 
 .nowrap { white-space: nowrap; }
-.muted { color: var(--text-muted, #94a3b8); }
-.won { color: var(--bhs-gold-accent); }
+.muted { color: var(--ink-muted); }
+.won { color: var(--rule-strong); }
 
 .btn {
   padding: 0.25rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
   font-size: 0.72rem;
   cursor: pointer;
 }
 
-.btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.btn--danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
 </style>

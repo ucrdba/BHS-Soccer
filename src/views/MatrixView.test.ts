@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import MatrixView from './MatrixView.vue';
+import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
 
 // The store's real load() runs on mount. Mocked so it populates from these
 // fixtures rather than wiping the seeded state with empty results.
@@ -130,6 +131,38 @@ async function mountMatrix(opts: {
   // load() is async and fired by a watch on mount.
   await flush();
   return w;
+}
+
+/**
+ * The band emphasis is a property of the leaderboard's own inputs, not of a
+ * full load() — this mounts ExerciseLeaderboard directly, with the matrix
+ * store's raw state seeded synchronously, so a test can read it without
+ * waiting on a fetch that never happens here. It follows mountMatrix's own
+ * seeding (LAPS, BAND_POINTS): one row that met the standard (p1), one that
+ * fell below it (p2), and one that never attempted (p3).
+ */
+function mountMatrixWithBandedExercise() {
+  return mount(ExerciseLeaderboard, {
+    global: {
+      plugins: [createTestingPinia({
+        createSpy: vi.fn,
+        stubActions: false,
+        initialState: {
+          matrix: {
+            exerciseFilter: LAPS,
+            drillsBank: DRILLS,
+            players: [
+              { id: 'p1', name: 'Alva', recordingNumber: 1 },
+              { id: 'p2', name: 'Budde', recordingNumber: 2 },
+              { id: 'p3', name: 'Renteria', recordingNumber: 3 }
+            ],
+            exercisePoints: BAND_POINTS
+          },
+          auth: { isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
+        }
+      })]
+    }
+  });
 }
 
 beforeEach(() => { document.body.innerHTML = ''; });
@@ -254,6 +287,24 @@ describe('a fitness standard', () => {
     const w = await mountMatrix(opts);
     await switchTo(w, 'Exercise');
     expect(w.text()).toContain('4:10');   // 250 seconds
+  });
+
+  it('marks a below-standard player in words, not colour alone', () => {
+    // Status must never be carried by colour alone; the word is the signal.
+    const w = mountMatrixWithBandedExercise();
+    const flags = w.findAll('[data-below-standard]').map(f => f.text().toLowerCase());
+    expect(flags.length).toBeGreaterThan(0);
+    for (const f of flags) expect(f).toMatch(/below|no band/);
+  });
+
+  it('keeps every player on a banded exercise, and keeps the sort working', async () => {
+    // The band emphasis is additive: it may never narrow the table.
+    const w = mountMatrixWithBandedExercise();
+    const before = w.findAll('[data-leaderboard-row]').length;
+    expect(before).toBe(w.vm.$pinia._s.get('matrix').leaderboard.length);
+
+    await w.find('[data-exercise-sort="earned"]').trigger('click');
+    expect(w.findAll('[data-leaderboard-row]').length).toBe(before);
   });
 });
 

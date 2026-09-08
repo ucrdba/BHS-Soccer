@@ -57,31 +57,34 @@ function standing(row: any): string {
 
 <template>
   <div>
+    <header v-if="matrix.selectedDrill" class="lb__head">
+      <p class="kicker">Exercise · {{ matrix.measure.replace('_', ' ') }}</p>
+      <h2 class="lb__name">{{ matrix.selectedDrill.name }}</h2>
+    </header>
+
     <!--
       Only for a standard. A competitive exercise gets no summary, because
       spread across the squad is the point there rather than a shortfall.
     -->
-    <p
+    <div
       v-if="matrix.isThreshold && matrix.leaderboard.length"
-      class="standard"
-      :class="matrix.shortOfStandard.length ? 'standard--short' : 'standard--met'"
-      data-standard-summary
+      class="standard" data-standard-summary
     >
-      <template v-if="matrix.shortOfStandard.length">
-        <strong>{{ matrix.shortOfStandard.length }}</strong>
-        of {{ matrix.measuredCount }} measured
-        {{ matrix.shortOfStandard.length === 1 ? 'player is' : 'players are' }}
-        below the standard.
-      </template>
-      <template v-else>
-        All {{ matrix.measuredCount }} measured
-        {{ matrix.measuredCount === 1 ? 'player meets' : 'players meet' }}
-        the standard.
-      </template>
-      <span class="standard__note">
-        This exercise is a fitness standard, not a ranking — everyone is still listed.
-      </span>
-    </p>
+      <p class="kicker standard__kicker">Match-readiness standard, not a ranking</p>
+      <p class="standard__line">
+        <template v-if="matrix.shortOfStandard.length">
+          <span class="standard__count tnum">{{ matrix.shortOfStandard.length }}</span>
+          of {{ matrix.measuredCount }} measured
+          {{ matrix.shortOfStandard.length === 1 ? 'player is' : 'players are' }}
+          below the standard. The rest have cleared it.
+        </template>
+        <template v-else>
+          All {{ matrix.measuredCount }} measured
+          {{ matrix.measuredCount === 1 ? 'player meets' : 'players meet' }}
+          the standard.
+        </template>
+      </p>
+    </div>
 
     <p v-if="matrix.leaderboard.length === 0" class="empty" data-leaderboard-empty>
       No results recorded for
@@ -106,103 +109,115 @@ function standing(row: any): string {
               >{{ c.label }}{{ arrow(c.key) }}</button>
             </th>
             <th title="Points available from this exercise">Of</th>
+            <th v-if="matrix.isThreshold">Standard</th>
           </tr>
         </thead>
 
         <tbody>
           <tr
             v-for="r in matrix.leaderboard" :key="r.playerId"
-            :class="`row--${standing(r)}`"
             :data-standing="standing(r)"
             data-leaderboard-row
           >
-            <td class="muted">{{ r.recordingNumber != null ? `(${r.recordingNumber})` : '—' }}</td>
-            <td class="is-text">
-              <strong>{{ r.name }}</strong>
-              <span
-                v-if="matrix.isThreshold && (standing(r) === 'below' || standing(r) === 'missed')"
-                class="flag" data-below-standard
-              >{{ standing(r) === 'missed' ? 'no band' : 'below' }}</span>
-            </td>
-            <td class="tabular">
+            <td class="tnum muted">{{ r.recordingNumber != null ? r.recordingNumber : '—' }}</td>
+            <td class="is-text">{{ r.name }}</td>
+            <td class="tnum">
               <template v-if="isWinLoss">{{ r.wins }} - {{ r.draws }} - {{ r.losses }}</template>
               <template v-else>{{ best(r) }}</template>
             </td>
-            <td class="tabular"><strong>{{ r.earned.toFixed(2) }}</strong></td>
-            <td class="tabular muted">{{ r.available.toFixed(2) }}</td>
+            <td class="tnum points">{{ r.earned.toFixed(2) }}</td>
+            <td class="tnum muted">{{ r.available.toFixed(2) }}</td>
+            <td v-if="matrix.isThreshold" class="tnum">
+              <span
+                v-if="standing(r) === 'below' || standing(r) === 'missed'"
+                class="mark mark--short" data-below-standard
+              >{{ standing(r) === 'missed' ? 'no band' : '△ below' }}</span>
+              <span v-else-if="standing(r) === 'met'" class="mark">met</span>
+              <span v-else class="mark mark--none">—</span>
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <p class="foot">
+        Below-standard players are marked in words as well as colour, and stay
+        where the sort puts them. The table is never narrowed — a squad where
+        everyone passes is a fit squad, not a broken exercise.
+      </p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.wrap { overflow-x: auto; }
+.lb__head { margin-bottom: var(--space-3); }
 
-.standard {
-  margin: 0 0 0.9rem;
-  padding: 0.6rem 0.8rem;
-  border-left: 3px solid var(--bhs-cyan-accent);
-  border-radius: 0 6px 6px 0;
-  background: color-mix(in srgb, var(--ink) 3%, transparent);
-  font-size: 0.85rem;
+.lb__name {
+  margin-top: 6px;
+  font-family: var(--heading-face);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1.15;
   color: var(--ink);
 }
 
-.standard--short { border-left-color: var(--bhs-gold-accent); }
-.standard--met { border-left-color: var(--bhs-cyan-accent); }
-
-.standard__note {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.76rem;
+.standard {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
 }
 
-.lb { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.standard__kicker { color: var(--rule-strong); }
+.standard__line { margin-top: 8px; font-size: 13.5px; line-height: 1.4; color: var(--ink); }
+.standard__count { font-family: var(--heading-face); font-size: 34px; line-height: 1; margin-right: 6px; }
+
+.wrap { overflow-x: auto; }
+.lb { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .lb th, .lb td {
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--rule);
   text-align: right;
   white-space: nowrap;
 }
 
+.lb th { border-bottom-color: var(--rule-strong); }
 .lb th.is-text, .lb td.is-text { text-align: left; }
 
 .lb th {
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .th-btn {
-  border: 0; padding: 0; background: none; color: inherit;
+  padding: 0; border: 0; background: none; color: inherit;
   font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
 }
 
 .th-btn:hover { color: var(--ink); }
 
-.tabular { font-variant-numeric: tabular-nums; }
-.muted { color: var(--text-muted, #94a3b8); }
+.tnum { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-muted); }
+.points { font-family: var(--heading-face); font-size: 16px; color: var(--ink); }
 
-/* Marked, not moved. The row stays exactly where the chosen sort puts it. */
-.row--below td, .row--missed td { background: rgb(234 179 8 / 0.07); }
+/* Marked, never moved: the row stays exactly where the chosen sort puts it. */
+.mark { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); }
+.mark--short { color: var(--color-warning); }
+.mark--none { color: var(--ink-soft); }
 
-.flag {
-  margin-left: 0.5rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 999px;
-  color: var(--bhs-gold-accent);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.foot {
+  padding: var(--space-3) 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--ink-muted);
 }
 
-.empty { padding: 2rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
+.empty { padding: var(--space-8) var(--space-3); text-align: center; color: var(--ink-muted); }
+
+@media (max-width: 767.98px) {
+  .lb td.is-text, .lb th.is-text { position: sticky; left: 0; background: var(--ground); }
+}
 </style>

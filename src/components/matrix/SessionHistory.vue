@@ -85,7 +85,7 @@ async function onDelete(s: any): Promise<void> {
   gap: 0.6rem;
   align-items: baseline;
   margin: 0 0 0.7rem;
-  color: var(--bhs-cyan-accent);
+  color: var(--live);
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -93,44 +93,44 @@ async function onDelete(s: any): Promise<void> {
 
 .history__count {
   padding: 0.05rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
 }
 
 .history__empty, .history__error {
   margin: 0;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.85rem;
   line-height: 1.5;
 }
 
-.history__error { margin-top: 0.6rem; color: var(--color-danger, #f87171); }
+.history__error { margin-top: 0.6rem; color: var(--color-danger); }
 
 .row {
   display: flex;
   gap: 0.6rem;
   align-items: center;
   padding: 0.3rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  border-bottom: 1px solid var(--rule);
   font-size: 0.82rem;
 }
 
 .row__name { flex: 1; color: var(--ink); }
-.row__date { color: var(--text-muted, #94a3b8); font-size: 0.78rem; }
+.row__date { color: var(--ink-muted); font-size: 0.78rem; }
 
 .btn {
   padding: 0.2rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
   font-size: 0.72rem;
   cursor: pointer;
 }
 
-.btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.btn--danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
 </style>

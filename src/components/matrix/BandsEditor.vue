@@ -73,26 +73,26 @@ function remove(index: number): void {
 .bands {
   margin: 0.4rem 0 0.2rem 1rem;
   padding: 0.5rem 0.7rem;
-  border-left: 2px solid var(--bhs-navy-border);
+  border-left: 2px solid var(--rule);
 }
 
 .bands__head {
   margin: 0 0 0.45rem;
   max-width: 34rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.74rem;
   line-height: 1.5;
 }
 
 .bands__row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.35rem; }
-.arrow { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
+.arrow { color: var(--ink-muted); font-size: 0.8rem; }
 
 .inp {
   max-width: 6rem;
   padding: 0.28rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
-  background: var(--bhs-navy-bg);
+  background: var(--surface-deep);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
@@ -102,10 +102,10 @@ function remove(index: number): void {
 
 .btn {
   padding: 0.22rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
   font-size: 0.72rem;
   cursor: pointer;

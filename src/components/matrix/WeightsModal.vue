@@ -204,21 +204,21 @@ async function onSave(): Promise<void> {
 .lede {
   margin: 0 0 0.9rem;
   max-width: 40rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
 
-.row { padding: 0.4rem 0; border-bottom: 1px solid var(--bhs-navy-border); }
+.row { padding: 0.4rem 0; border-bottom: 1px solid var(--rule); }
 .row__top { display: flex; gap: 0.5rem; align-items: center; }
 .row__name { flex: 1; color: var(--ink); font-size: 0.85rem; }
-.row__cat { margin-left: 0.4rem; color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
+.row__cat { margin-left: 0.4rem; color: var(--ink-muted); font-size: 0.72rem; }
 
 .inp {
   padding: 0.3rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
-  background: var(--bhs-navy-bg);
+  background: var(--surface-deep);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
@@ -227,13 +227,13 @@ async function onSave(): Promise<void> {
 .inp--narrow { max-width: 5rem; }
 .inp--wide { max-width: 12rem; }
 
-.hint { margin: 0.7rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.8rem; line-height: 1.5; }
-.hint--good { color: var(--bhs-cyan-accent); }
-.hint--bad { color: var(--color-danger, #f87171); }
+.hint { margin: 0.7rem 0 0; color: var(--ink-muted); font-size: 0.8rem; line-height: 1.5; }
+.hint--good { color: var(--live); }
+.hint--bad { color: var(--color-danger); }
 
 .btn {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
+  border: 1px solid var(--rule);
   border-radius: 5px;
   background: transparent;
   color: var(--ink);
@@ -242,6 +242,6 @@ async function onSave(): Promise<void> {
   cursor: pointer;
 }
 
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.btn--primary { border-color: var(--live); color: var(--live); }
 .btn:disabled { opacity: 0.55; cursor: default; }
 </style>
