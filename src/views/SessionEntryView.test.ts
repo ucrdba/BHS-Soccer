@@ -131,4 +131,16 @@ describe('SessionEntryView', () => {
 
     expect(w.find('[data-screen]').exists()).toBe(true);
   });
+
+  it('gives the coach a way out when the drill library fails to load, rather than stranding them on the loading card', async () => {
+    const w = await mountAt('/matrix/session/d1', {
+      drills: [], loading: false, loadError: 'Could not load the exercises.'
+    });
+
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(false);
+    const notice = w.find('[data-tool-notice="missing"]');
+    expect(notice.exists()).toBe(true);
+    expect(notice.text()).toContain('Could not load the exercises.');
+    expect(w.find('[data-tool-notice-back]').exists()).toBe(true);
+  });
 });

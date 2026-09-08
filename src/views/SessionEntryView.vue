@@ -50,10 +50,15 @@ const opened = ref(false);
  * actually finished opening, so "no such exercise" is an answer rather than
  * a race, and the screen never renders over data that is still being
  * replaced out from under it.
+ *
+ * A failed `loadDrills` counts as settled too: it never touches
+ * `session.loading`, so without this a failed fetch is indistinguishable
+ * from a still-loading one and the coach is stranded on the loading card,
+ * which (being a tool route with no header or nav) offers no way out.
  */
 const state = computed(() => subjectState({
   settled: !session.loading
-    && session.drills.length > 0
+    && (session.drills.length > 0 || !!session.loadError)
     && roster.loadedTeamId === org.activeTeamId
     && opened.value,
   id: drillId.value,
@@ -94,7 +99,7 @@ function onDone(): void {
 
   <ToolNotice
     v-else-if="state === 'missing'" kind="missing"
-    message="That exercise is not in this organization's drill library."
+    :message="session.loadError || 'That exercise is not in this organization\'s drill library.'"
     :back-to="{ name: 'matrix' }" back-label="Back to the ratings"
   />
 
