@@ -202,7 +202,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
   color: var(--live);
   border: 1px solid var(--rule);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-deep);
 }
 
 .trend { margin: 0.6rem 0; color: var(--ink-muted); font-size: 0.85rem; }
