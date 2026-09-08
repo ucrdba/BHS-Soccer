@@ -15,7 +15,12 @@ import { useRosterStore } from '../stores/roster';
 
 const DRILLS = [{ id: 'd1', name: '1.5-Mile Run', measure: 'time_bands' }];
 
-async function mountAt(path: string, sessionState: Record<string, any> = {}) {
+async function mountAt(
+  path: string,
+  sessionState: Record<string, any> = {},
+  orgState: Record<string, any> = {},
+  rosterState: Record<string, any> = {}
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -35,9 +40,15 @@ async function mountAt(path: string, sessionState: Record<string, any> = {}) {
           organization: {
             schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions' }],
             teams: [{ id: 't1', name: 'U16', school_id: 's1' }],
-            activeTeamId: 't1'
+            activeTeamId: 't1',
+            ...orgState
           },
-          roster: { players: [{ id: 'p1', name: 'Cesar Alva', recordingNumber: 1 }], loadedTeamId: 't1' }
+          roster: {
+            players: [{ id: 'p1', name: 'Cesar Alva', recordingNumber: 1 }],
+            loadedTeamId: 't1',
+            loadError: null,
+            ...rosterState
+          }
         }
       })],
       stubs: { SessionEntryScreen: { props: ['drillId'], template: '<div data-screen :data-drill="drillId" />' } }
@@ -63,6 +74,28 @@ describe('SessionEntryView', () => {
     const w = await mountAt('/matrix/session/gone', { drills: [], loading: true });
     expect(w.find('[data-tool-notice="loading"]').exists()).toBe(true);
     expect(w.find('[data-tool-notice="missing"]').exists()).toBe(false);
+  });
+
+  /**
+   * Both of these leave the open sequence unfinished for good, so without a
+   * settled answer the coach sits on the loading card — and a tool route has
+   * no header and no bottom bar, so there is nothing to press.
+   */
+  it('offers a way back when there is no team to record against', async () => {
+    const w = await mountAt('/matrix/session/d1', {}, { activeTeamId: null });
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="missing"]').text()).toContain('Choose a team');
+    expect(w.find('[data-tool-notice-back]').exists()).toBe(true);
+    expect(w.find('[data-screen]').exists()).toBe(false);
+  });
+
+  it('offers a way back when the squad could not be read', async () => {
+    const w = await mountAt(
+      '/matrix/session/d1', {}, {}, { loadedTeamId: null, loadError: 'Could not load the roster.' }
+    );
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="missing"]').text()).toContain('Could not load the roster.');
+    expect(w.find('[data-tool-notice-back]').exists()).toBe(true);
   });
 
   it('reopens a named session rather than starting a blank one', async () => {

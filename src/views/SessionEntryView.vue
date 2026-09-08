@@ -46,6 +46,23 @@ const drill = computed(() =>
 const opened = ref(false);
 
 /**
+ * A reason the sheet can never open, as distinct from one that has not
+ * opened yet.
+ *
+ * Both of these leave `opened` false for good: the watch returns early when
+ * there is no active team, and a roster read that throws leaves
+ * `loadedTeamId` null. A tool route has no header and no bottom bar, so a
+ * coach parked on the loading card has no way back — the same stranding the
+ * failed-library case was fixed for. A reason is an answer: it settles the
+ * state, which shows the missing notice, which carries a back link.
+ */
+const blocker = computed<string | null>(() => {
+  if (!org.activeTeamId) return 'Choose a team before recording a session.';
+  if (roster.loadError) return roster.loadError;
+  return null;
+});
+
+/**
  * Settled means the exercises have actually been read and the sheet has
  * actually finished opening, so "no such exercise" is an answer rather than
  * a race, and the screen never renders over data that is still being
@@ -57,12 +74,16 @@ const opened = ref(false);
  * which (being a tool route with no header or nav) offers no way out.
  */
 const state = computed(() => subjectState({
-  settled: !session.loading
+  settled: !!blocker.value || (
+    !session.loading
     && (session.drills.length > 0 || !!session.loadError)
     && roster.loadedTeamId === org.activeTeamId
-    && opened.value,
+    && opened.value
+  ),
   id: drillId.value,
-  found: drill.value
+  // A blocker is not a lookup failure, but it reaches the reader the same
+  // way: the missing notice, carrying its own message and a way back.
+  found: blocker.value ? null : drill.value
 }));
 
 /**
@@ -99,7 +120,8 @@ function onDone(): void {
 
   <ToolNotice
     v-else-if="state === 'missing'" kind="missing"
-    :message="session.loadError || 'That exercise is not in this organization\'s drill library.'"
+    :message="blocker || session.loadError
+      || 'That exercise is not in this organization\'s drill library.'"
     :back-to="{ name: 'matrix' }" back-label="Back to the ratings"
   />
 
