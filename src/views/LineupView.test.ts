@@ -109,7 +109,11 @@ describe('LineupView', () => {
     await flushPromises();
 
     const push = vi.spyOn(router, 'push');
-    w.findComponent({ name: 'LineupScreen' }).vm.$emit('close');
+    // What a successful save really emits, in order. Binding both would
+    // navigate twice, which is the regression this case exists to catch.
+    const screen = w.findComponent({ name: 'LineupScreen' });
+    screen.vm.$emit('saved');
+    screen.vm.$emit('close');
     await flushPromises();
 
     expect(push).toHaveBeenCalledTimes(1);
