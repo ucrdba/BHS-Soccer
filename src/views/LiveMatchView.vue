@@ -7,12 +7,14 @@
  * always needs a fixture: a board with no match has nothing to write to.
  */
 import { computed, watch } from 'vue';
-import { useRoute, RouterLink } from 'vue-router';
+import { useRoute } from 'vue-router';
 import LiveMatchScreen from '../components/schedule/LiveMatchScreen.vue';
+import ToolNotice from '../components/layout/ToolNotice.vue';
 import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useRosterStore } from '../stores/roster';
 import { matchById } from '../domain/match-lookup';
+import { subjectState } from '../domain/tool-subject';
 
 const route = useRoute();
 const org = useOrganizationStore();
@@ -23,8 +25,11 @@ const matchId = computed(() => (route.params.matchId as string) || null);
 const match = computed(() => matchById(schedule.matches, matchId.value));
 const schoolId = computed(() => org.school?.id ?? null);
 
-const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
-const missing = computed(() => settled.value && !match.value);
+const state = computed(() => subjectState({
+  settled: !schedule.loading && schedule.loadedTeamId !== null,
+  id: matchId.value,
+  found: match.value
+}));
 
 watch(() => org.activeTeamId, (id) => {
   schedule.load(id);
@@ -33,12 +38,16 @@ watch(() => org.activeTeamId, (id) => {
 </script>
 
 <template>
-  <p v-if="!settled" class="state" data-live-loading>Loading the fixture…</p>
+  <ToolNotice
+    v-if="state === 'loading'" kind="loading"
+    message="Loading the fixture…" :back-to="{ name: 'schedule' }"
+  />
 
-  <section v-else-if="missing" class="state" data-live-missing>
-    <p>That fixture is not on this team's schedule.</p>
-    <RouterLink :to="{ name: 'schedule' }" class="state__back">Back to the schedule</RouterLink>
-  </section>
+  <ToolNotice
+    v-else-if="state === 'missing'" kind="missing"
+    message="That fixture is not on this team's schedule."
+    :back-to="{ name: 'schedule' }"
+  />
 
   <LiveMatchScreen
     v-else
@@ -49,22 +58,3 @@ watch(() => org.activeTeamId, (id) => {
     :players="roster.players"
   />
 </template>
-
-<style scoped>
-.state {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  height: 100dvh;
-  padding: var(--space-4);
-  background: var(--ground);
-  color: var(--ink-muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-.state__back { color: var(--live); border-bottom: 1px solid var(--live); text-decoration: none; }
-</style>

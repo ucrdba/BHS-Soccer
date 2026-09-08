@@ -9,13 +9,15 @@
  * not there.
  */
 import { computed, watch } from 'vue';
-import { useRoute, useRouter, RouterLink } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import LineupScreen from '../components/schedule/LineupScreen.vue';
+import ToolNotice from '../components/layout/ToolNotice.vue';
 import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useRosterStore } from '../stores/roster';
 import { matchById } from '../domain/match-lookup';
 import { seasonFullMatchMinutes } from '../domain/season';
+import { subjectState } from '../domain/tool-subject';
 
 const route = useRoute();
 const router = useRouter();
@@ -29,10 +31,16 @@ const schoolId = computed(() => org.school?.id ?? null);
 const matchMinutes = computed(() =>
   seasonFullMatchMinutes(org.teams, org.activeTeamId || ''));
 
-/** Settled means a load has happened, so "not found" is a real answer. */
-const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
-/** A lineup with no fixture is legitimate; a lineup for a missing one is not. */
-const missing = computed(() => !!matchId.value && settled.value && !match.value);
+/**
+ * A lineup may legitimately have no fixture, so a missing id is ready
+ * rather than missing; only an id that names nothing is a dead link.
+ */
+const state = computed(() => subjectState({
+  settled: !schedule.loading && schedule.loadedTeamId !== null,
+  id: matchId.value,
+  found: match.value,
+  idOptional: true
+}));
 
 watch(() => org.activeTeamId, (id) => {
   schedule.load(id);
@@ -52,13 +60,19 @@ function onDone(): void {
 </script>
 
 <template>
-  <p v-if="!settled" class="state" data-lineup-loading>Loading the fixture…</p>
+  <ToolNotice
+    v-if="state === 'loading'" kind="loading"
+    message="Loading the fixture…" :back-to="{ name: 'schedule' }"
+  />
 
-  <section v-else-if="missing" class="state" data-lineup-missing>
-    <p>That fixture is not on this team's schedule.</p>
-    <RouterLink :to="{ name: 'schedule' }" class="state__back">Back to the schedule</RouterLink>
-  </section>
+  <ToolNotice
+    v-else-if="state === 'missing'" kind="missing"
+    message="That fixture is not on this team's schedule."
+    :back-to="{ name: 'schedule' }"
+  />
 
+  <!-- Only @close: the screen emits `saved` and then `close` on a
+       successful save, so binding both would push the same route twice. -->
   <LineupScreen
     v-else
     :match-id="matchId"
@@ -67,26 +81,6 @@ function onDone(): void {
     :team-id="org.activeTeamId"
     :school-id="schoolId"
     :players="roster.players"
-    @saved="onDone"
     @close="onDone"
   />
 </template>
-
-<style scoped>
-.state {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  height: 100dvh;
-  padding: var(--space-4);
-  background: var(--ground);
-  color: var(--ink-muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-.state__back { color: var(--live); border-bottom: 1px solid var(--live); text-decoration: none; }
-</style>

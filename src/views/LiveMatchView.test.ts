@@ -53,13 +53,13 @@ describe('LiveMatchView', () => {
 
   it('says so when the id names no fixture this team has', async () => {
     const w = await mountAt('gone');
-    expect(w.find('[data-live-missing]').exists()).toBe(true);
+    expect(w.find('[data-tool-notice="missing"]').exists()).toBe(true);
     expect(w.find('[data-screen]').exists()).toBe(false);
   });
 
   it('claims nothing about a missing fixture before the schedule has loaded', async () => {
     const w = await mountAt('gone', { loadedTeamId: null, loading: true });
-    expect(w.find('[data-live-loading]').exists()).toBe(true);
-    expect(w.find('[data-live-missing]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(true);
+    expect(w.find('[data-tool-notice="missing"]').exists()).toBe(false);
   });
 });

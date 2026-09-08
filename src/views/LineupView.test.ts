@@ -60,18 +60,59 @@ describe('LineupView', () => {
   it('renders the screen with no fixture, which is a sheet not tied to one', async () => {
     const w = await mountAt(null);
     expect(w.find('[data-screen]').exists()).toBe(true);
-    expect(w.find('[data-lineup-missing]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="missing"]').exists()).toBe(false);
   });
 
   it('says so when the id names no fixture this team has', async () => {
     const w = await mountAt('gone');
-    expect(w.find('[data-lineup-missing]').exists()).toBe(true);
+    expect(w.find('[data-tool-notice="missing"]').exists()).toBe(true);
     expect(w.find('[data-screen]').exists()).toBe(false);
   });
 
   it('claims nothing about a missing fixture before the schedule has loaded', async () => {
     const w = await mountAt('gone', { loadedTeamId: null, loading: true });
-    expect(w.find('[data-lineup-loading]').exists()).toBe(true);
-    expect(w.find('[data-lineup-missing]').exists()).toBe(false);
+    expect(w.find('[data-tool-notice="loading"]').exists()).toBe(true);
+    expect(w.find('[data-tool-notice="missing"]').exists()).toBe(false);
+  });
+
+  it('returns to the schedule when the screen is done', async () => {
+    // Parked in phase 3: a saved sheet used to navigate twice and nothing
+    // tested that it navigated at all.
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/schedule', name: 'schedule', component: { template: '<p />' } },
+        { path: '/schedule/lineup/:matchId?', name: 'lineup', component: LineupView },
+        { path: '/schedule/:matchId/live', name: 'live', component: { template: '<p />' } }
+      ]
+    });
+    await router.push('/schedule/lineup/m1');
+    await router.isReady();
+
+    const w = mount(LineupView, {
+      global: {
+        plugins: [router, createTestingPinia({
+          createSpy: vi.fn,
+          initialState: {
+            schedule: { matches: MATCHES, loading: false, loadError: null, loadedTeamId: 't1' },
+            organization: {
+              schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions' }],
+              teams: [{ id: 't1', name: 'U16', school_id: 's1', match_minutes: 80 }],
+              activeTeamId: 't1'
+            },
+            roster: { players: [{ id: 'p1', name: 'Cesar Alva', number: 1 }], loadedTeamId: 't1' }
+          }
+        })],
+        stubs: { LineupScreen: { name: 'LineupScreen', template: '<div data-screen />' } }
+      }
+    });
+    await flushPromises();
+
+    const push = vi.spyOn(router, 'push');
+    w.findComponent({ name: 'LineupScreen' }).vm.$emit('close');
+    await flushPromises();
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith({ name: 'schedule' });
   });
 });
