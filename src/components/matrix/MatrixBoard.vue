@@ -83,9 +83,10 @@ function arrow(key: string): string {
     </table>
 
     <p class="foot">
-      Sorted on the recording number, not the shirt. The exercises column sits
-      beside the points so a small sample is visible rather than hidden — no
-      player is left out for having taken part in little.
+      The No column is the recording number — the one on the coach's paper
+      sheets — which is not the shirt number. The exercises column sits beside
+      the points so a small sample is visible rather than hidden: no player is
+      left out of this table for having taken part in little.
     </p>
   </div>
 </template>
