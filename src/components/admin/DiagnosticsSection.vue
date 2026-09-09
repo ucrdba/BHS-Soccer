@@ -109,12 +109,14 @@ async function onRunDiagnostic(): Promise<void> {
           An anon key is {{ hasStoredKey() ? 'stored on this device' : 'not stored on this device' }}.
         </p>
 
-        <label>Project URL
-          <input v-model="url" data-cred-url type="text"
+        <label class="field">
+          <span class="kicker">Project URL</span>
+          <input v-model="url" data-cred-url type="text" class="input"
                  placeholder="https://yourproject.supabase.co" />
         </label>
-        <label>Anon key
-          <input v-model="key" data-cred-key type="password"
+        <label class="field">
+          <span class="kicker">Anon key</span>
+          <input v-model="key" data-cred-key type="password" class="input"
                  placeholder="eyJ…" autocomplete="off" />
         </label>
 
@@ -197,8 +199,7 @@ async function onRunDiagnostic(): Promise<void> {
 }
 
 h4 { margin: 0 0 var(--space-1); }
-label { display: flex; flex-direction: column; font-size: 13px; gap: var(--space-1); margin-bottom: var(--space-2); }
-input { padding: var(--space-1); }
+.field { margin-bottom: var(--space-2); }
 .row {
   display: flex;
   flex-direction: column;

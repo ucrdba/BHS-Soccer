@@ -147,32 +147,41 @@ async function onSave(): Promise<void> {
       <p v-if="loading" class="note">Loading…</p>
 
       <div class="grid">
-        <label>Name
-          <input v-model="form.name" data-school-name type="text" />
+        <label class="field">
+          <span class="kicker">Name</span>
+          <input v-model="form.name" data-school-name type="text" class="input" />
         </label>
-        <label>Mascot
-          <input v-model="form.mascot" data-school-mascot type="text" />
+        <label class="field">
+          <span class="kicker">Mascot</span>
+          <input v-model="form.mascot" data-school-mascot type="text" class="input" />
         </label>
-        <label>City
-          <input v-model="form.city" data-school-city type="text" />
+        <label class="field">
+          <span class="kicker">City</span>
+          <input v-model="form.city" data-school-city type="text" class="input" />
         </label>
-        <label>League
-          <input v-model="form.league" data-school-league type="text" />
+        <label class="field">
+          <span class="kicker">League</span>
+          <input v-model="form.league" data-school-league type="text" class="input" />
         </label>
-        <label>Primary colour
-          <input v-model="form.primary" data-school-primary type="text" />
+        <label class="field">
+          <span class="kicker">Primary colour</span>
+          <input v-model="form.primary" data-school-primary type="text" class="input" />
         </label>
-        <label>Secondary colour
-          <input v-model="form.secondary" data-school-secondary type="text" />
+        <label class="field">
+          <span class="kicker">Secondary colour</span>
+          <input v-model="form.secondary" data-school-secondary type="text" class="input" />
         </label>
-        <label>Wins
-          <input v-model="form.wins" data-school-wins type="number" min="0" />
+        <label class="field">
+          <span class="kicker">Wins</span>
+          <input v-model="form.wins" data-school-wins type="number" min="0" class="input" />
         </label>
-        <label>Losses
-          <input v-model="form.losses" data-school-losses type="number" min="0" />
+        <label class="field">
+          <span class="kicker">Losses</span>
+          <input v-model="form.losses" data-school-losses type="number" min="0" class="input" />
         </label>
-        <label>Draws
-          <input v-model="form.draws" data-school-draws type="number" min="0" />
+        <label class="field">
+          <span class="kicker">Draws</span>
+          <input v-model="form.draws" data-school-draws type="number" min="0" class="input" />
         </label>
       </div>
 
@@ -206,8 +215,6 @@ async function onSave(): Promise<void> {
   gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
-label { display: flex; flex-direction: column; font-size: 13px; gap: var(--space-1); }
-input { padding: var(--space-1); }
 .error { color: var(--color-danger); }
 .ok { color: var(--live); }
 </style>
