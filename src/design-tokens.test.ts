@@ -140,6 +140,8 @@ const RESTYLED = [
   'src/views/CoachesView.vue',
   'src/components/coaches/CoachFormModal.vue',
   'src/views/HelpView.vue',
+  'src/views/QuizView.vue',
+  'src/views/PlaceholderView.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;

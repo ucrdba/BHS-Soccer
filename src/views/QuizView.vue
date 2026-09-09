@@ -107,7 +107,7 @@ function outcomeFor(questionId: string): boolean | null {
         A few questions on what the squad is working on. Your score is recorded
         against your name.
       </p>
-      <p v-if="org.branding.name" class="quiz__org">
+      <p v-if="org.branding.name" class="quiz__org kicker">
         {{ org.branding.name }}
         <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
       </p>
@@ -182,87 +182,63 @@ function outcomeFor(questionId: string): boolean | null {
 </template>
 
 <style scoped>
-.quiz { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.quiz { padding: var(--space-4) var(--space-4) var(--space-8); }
 
-.quiz__head { margin-bottom: 1.2rem; }
-.quiz__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.quiz__head { margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
+.quiz__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.quiz__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
+.quiz__org { margin-top: var(--space-1); }
 
-.quiz__sub {
-  margin: 0.3rem 0 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.quiz__org {
-  margin: 0.4rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.state { padding: 2rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: var(--space-6) 0; color: var(--ink-muted); text-align: center; font-size: 14px; }
+.state--bad { color: var(--color-danger); }
 
 .list { margin: 0; padding: 0; list-style: none; }
 
-.q {
-  margin-bottom: 1.2rem;
-  padding-bottom: 0.8rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
+.q { margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
+.q__text { margin: 0 0 var(--space-2); color: var(--ink); font-size: 15px; line-height: 1.5; }
+.q__none { margin: 0; color: var(--color-danger); font-size: 13px; }
 
-.q__text { margin: 0 0 0.5rem; color: var(--ink); font-size: 0.95rem; }
-.q__none { margin: 0; color: var(--color-danger, #f87171); font-size: 0.8rem; }
-
+/* An answer the player can pick: an outline that fills only with the live
+   colour's own light wash when chosen, so the choice is unmistakable without
+   becoming a filled control. */
 .opt {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: baseline;
-  padding: 0.32rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  margin-bottom: 0.3rem;
+  margin-bottom: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   color: var(--ink);
-  font-size: 0.86rem;
+  font-size: 14px;
   cursor: pointer;
 }
+.opt:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.opt.is-picked { border-color: var(--live); background: color-mix(in srgb, var(--live) 10%, transparent); }
+.opt__letter { color: var(--ink-muted); font-family: var(--heading-face); font-weight: 500; }
+.opt.is-picked .opt__letter { color: var(--live); }
 
-.opt.is-picked { border-color: var(--bhs-cyan-accent); }
-.opt__letter { color: var(--bhs-cyan-accent); font-weight: 700; }
+/* The mark says the word as well as the colour — a wrong answer read only by
+   hue is a wrong answer a colour-blind player cannot read at all. */
+.q__mark { margin: var(--space-1) 0 0; font-size: 13px; }
+.is-right { color: var(--live); }
+.is-wrong { color: var(--color-danger); }
 
-.q__mark { margin: 0.4rem 0 0; font-size: 0.8rem; }
-.is-right { color: var(--bhs-cyan-accent); }
-.is-wrong { color: var(--color-danger, #f87171); }
+.foot { display: flex; gap: var(--space-3); align-items: center; }
+.foot__count { color: var(--ink-muted); font-size: 13px; }
 
-.foot { display: flex; gap: 0.8rem; align-items: center; }
-.foot__count { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
-
-.score { margin: 0.8rem 0 0; color: var(--bhs-gold-accent); font-size: 1.05rem; }
+.score { margin: var(--space-3) 0 0; color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 20px; }
 
 .notice {
-  margin: 1rem 0;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.84rem;
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  font-size: 13px;
   line-height: 1.5;
 }
 
-.btn {
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
+@media (min-width: 768px) { .quiz { max-width: 40rem; margin: 0 auto; } }
 </style>

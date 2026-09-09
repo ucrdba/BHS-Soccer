@@ -20,22 +20,7 @@ defineProps<{ title: string; phase: string }>();
 </template>
 
 <style scoped>
-.placeholder {
-  max-width: 34rem;
-  margin: 5rem auto;
-  padding: 2rem 1.5rem;
-  text-align: center;
-}
-
-.placeholder__title {
-  color: var(--bhs-cyan-accent);
-  font-size: 1.5rem;
-  margin: 0 0 0.75rem;
-}
-
-.placeholder__body {
-  color: var(--text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
+.placeholder { max-width: 34rem; margin: var(--space-8) auto; padding: var(--space-6) var(--space-4); text-align: center; }
+.placeholder__title { margin: 0 0 var(--space-2); color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 24px; }
+.placeholder__body { margin: 0; color: var(--ink-muted); line-height: 1.6; }
 </style>
