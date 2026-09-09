@@ -380,6 +380,7 @@ async function onDrop(index: number): Promise<void> {
 /* The saved-plan picker. */
 .picker { margin: var(--space-4) 0; padding: var(--space-3); border: 1px solid var(--rule); border-radius: var(--radius-md); }
 .picker__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; justify-content: space-between; padding: var(--space-1) 0; }
+.picker__row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .picker__meta { color: var(--ink-muted); font-size: 12px; }
 .picker__none { margin: var(--space-1) var(--space-1); color: var(--ink-muted); font-size: 13px; }
 
@@ -412,6 +413,7 @@ async function onDrop(index: number): Promise<void> {
   padding: var(--space-2);
   border: 1px solid transparent;
   border-bottom-color: var(--rule);
+  cursor: grab;
 }
 .drill.is-selected { border-color: var(--rule-strong); border-radius: var(--radius-md); }
 .drill__what { display: flex; flex-direction: column; gap: 2px; }
@@ -426,6 +428,7 @@ async function onDrop(index: number): Promise<void> {
 /* The smallest control there is: a text button inside a row. */
 .mini { padding: 0 var(--space-1); border: 0; background: none; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .mini:hover { color: var(--ink); }
+.mini:disabled { opacity: 0.35; cursor: default; }
 .mini--danger:hover { color: var(--color-danger); }
 
 .notice {
