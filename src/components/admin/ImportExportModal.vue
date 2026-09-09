@@ -330,24 +330,16 @@ async function onApply(): Promise<void> {
       </button>
 
       <div class="tables">
-        <table class="table">
-          <tbody>
-            <tr v-for="d in defs" :key="d.key" data-export-row>
-              <td class="table__name">{{ d.sheetName }}</td>
-              <td><span v-if="!d.importable" class="tag" data-export-only>export only</span></td>
-              <td>
-                <button type="button" class="mini" :data-export-one="d.key" @click="onExportOne(d.key)">
-                  Export
-                </button>
-              </td>
-              <td>
-                <button type="button" class="mini" :data-template="d.key" @click="onTemplate(d.key)">
-                  Template
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-for="d in defs" :key="d.key" class="table hrow" data-export-row>
+          <span class="table__name">{{ d.sheetName }}</span>
+          <span v-if="!d.importable" class="tag" data-export-only>export only</span>
+          <button type="button" class="mini" :data-export-one="d.key" @click="onExportOne(d.key)">
+            Export
+          </button>
+          <button type="button" class="mini" :data-template="d.key" @click="onTemplate(d.key)">
+            Template
+          </button>
+        </div>
       </div>
     </section>
 
@@ -423,7 +415,9 @@ async function onApply(): Promise<void> {
 .hint--bad { color: var(--color-danger); }
 .hint--good { color: var(--live); }
 
-.row__name { flex: 1; color: var(--ink); }
+.table, .row { align-items: center; }
+
+.table__name, .row__name { flex: 1; color: var(--ink); }
 .row__n { color: var(--ink-muted); font-size: 12px; }
 
 .mini {
@@ -436,10 +430,4 @@ async function onApply(): Promise<void> {
   font-size: 12px;
   cursor: pointer;
 }
-
-.tables { overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th, .table td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
-.table th { color: var(--ink-muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
-.table__name { position: sticky; left: 0; background: var(--surface); }
 </style>
