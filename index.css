@@ -41,6 +41,7 @@
   --org-secondary: #FFD700;
   --org-mark-paper: #0047AB;
   --org-mark-dark: #FFD700;
+  --org-text-paper: #0047AB;
 
   /* Dark text for the rare light surface on a dark ground (a gold button). */
   --text-dark: #0F172A;
@@ -59,8 +60,11 @@
   --ink-muted: #605d5d;
   --ink-soft: #9b9797;
   --rule: color-mix(in srgb, #201f1d 16%, transparent);
-  --rule-strong: #7d5411;
-  --live: #7d5411;
+  /* The accent is the organization's, guarded. --rule-strong takes the 3:1
+     value because its uses are rules and kickers; --live takes the 4.5:1 one
+     because links are its body-size use. src/domain/theme.ts. */
+  --rule-strong: var(--org-mark-paper);
+  --live: var(--org-text-paper);
   --mark: var(--org-mark-paper);
   --heading-face: var(--font-heading);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);

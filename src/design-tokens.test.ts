@@ -62,10 +62,38 @@ describe('the fixed tokens', () => {
     expect(css).not.toMatch(/Inter/);
   });
 
-  it('carries the four organization properties with cold-load fallbacks', () => {
-    for (const p of ['--org-primary', '--org-secondary', '--org-mark-paper', '--org-mark-dark']) {
+  it('carries the five organization properties with cold-load fallbacks', () => {
+    for (const p of ['--org-primary', '--org-secondary', '--org-mark-paper', '--org-mark-dark', '--org-text-paper']) {
       expect(css, p).toMatch(new RegExp(`${p}\\s*:\\s*#[0-9a-fA-F]{6}`));
     }
+  });
+});
+
+/**
+ * The accent belongs to the organization, on the paper ground only.
+ *
+ * The touchline and ratings screens keep cyan and gold: there --live means
+ * "this is happening right now" under match conditions and --rule-strong marks
+ * a standard. Those are functional colours, and re-theming them would trade
+ * legibility on a touchline for consistency in a brand guideline.
+ */
+describe('the organization accent', () => {
+  it('drives both paper accent tokens', () => {
+    const paper = block('[data-ground="paper"]');
+    expect(paper).toMatch(/--rule-strong:\s*var\(--org-mark-paper\)/);
+    expect(paper).toMatch(/--live:\s*var\(--org-text-paper\)/);
+  });
+
+  it('does not reach the two dark grounds', () => {
+    for (const ground of ['pitch', 'ledger']) {
+      const body = block(`[data-ground="${ground}"]`);
+      expect(body, `${ground} --rule-strong`).not.toMatch(/--rule-strong:\s*var\(--org/);
+      expect(body, `${ground} --live`).not.toMatch(/--live:\s*var\(--org/);
+    }
+  });
+
+  it('gives --org-text-paper a cold-load fallback like its siblings', () => {
+    expect(css).toMatch(/--org-text-paper:\s*#[0-9a-fA-F]{6}/);
   });
 });
 
