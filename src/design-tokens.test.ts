@@ -92,6 +92,63 @@ describe('the temporary aliases', () => {
   }
 });
 
+/**
+ * The primitives every screen shares. Seventeen components restated an
+ * outlined button, a labelled input, a small tag and a hairline row in their
+ * own scoped blocks, against the temporary aliases. They are defined once
+ * here so a screen task is a deletion; a missing one sends the next task back
+ * to writing its own copy, which is how the drift started.
+ */
+describe('the paper primitives', () => {
+  const PRIMITIVES = [
+    '.btn--small', '.btn--plain', '.btn--danger',
+    '.field', '.field--wide', '.input', '.input--wide',
+    '.tag', '.tag--live', '.tag--warn',
+    '.note', '.note--good', '.note--bad',
+    '.hrow', '.plate', '.plate__img', '.plate__label',
+    '.kicker--accent'
+  ];
+
+  for (const cls of PRIMITIVES) {
+    it(`defines ${cls}`, () => {
+      expect(css, `${cls} is not in index.css`).toMatch(
+        new RegExp(`\\${cls}[\\s,{:]`)
+      );
+    });
+  }
+
+  it('keeps the button variants stroke rather than fill', () => {
+    expect(block('.btn--plain')).not.toMatch(/background:/);
+    expect(block('.btn--danger')).not.toMatch(/background:/);
+  });
+
+  it('gives the input well the deep surface, not the page', () => {
+    expect(block('.input')).toMatch(/background:\s*var\(--surface-deep\)/);
+  });
+});
+
+/**
+ * Files proved free of the legacy names. Phase 5 restyles the remaining
+ * screens one at a time and each task appends its files here, so the guard
+ * grows with the work and cannot silently skip a screen. Task 9 replaces this
+ * list with every .vue file under src/ and deletes the alias block.
+ */
+const RESTYLED = [
+  'src/components/roster/PlayerCard.vue',
+  'src/components/roster/PlayerDetailModal.vue'
+];
+
+const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;
+
+describe('the restyled files', () => {
+  for (const rel of RESTYLED) {
+    it(`${rel} names no legacy token`, () => {
+      const src = readFileSync(join(process.cwd(), rel), 'utf8');
+      expect(LEGACY_NAME.test(src), `${rel} still reads a --bhs-* alias`).toBe(false);
+    });
+  }
+});
+
 describe('the legacy stylesheet', () => {
   it('is gone', () => {
     expect(existsSync(join(process.cwd(), 'styles.css'))).toBe(false);

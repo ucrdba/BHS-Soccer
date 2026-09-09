@@ -99,20 +99,17 @@ const skills = computed(() => skillBars(props.player?.ratings));
 <style scoped>
 .bio__top { display: flex; gap: 14px; }
 
+/* Base look (centering, background, overflow, the photo filter) comes from
+   the global .plate/.plate__img; this modal keeps only its own larger size
+   and the thicker matted border. */
 .plate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex: none;
   width: 104px;
   height: 128px;
   border: 6px solid var(--surface);
   outline: 1px solid var(--rule);
-  background: var(--surface-deep);
-  overflow: hidden;
 }
-.plate__img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.22) saturate(0.82) contrast(1.05); }
-.plate__label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+.plate__label { font-size: 10px; }
 
 /* A plate with no photograph: the dashed edge says "no photograph yet"
    rather than "this image failed". Matches PlayerCard's empty plate. */

@@ -240,3 +240,109 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn--go { border-color: var(--live); color: var(--live); }
 .btn--go:hover { background: color-mix(in srgb, var(--live) 12%, transparent); }
 .btn--go:active { background: color-mix(in srgb, var(--live) 22%, transparent); }
+
+/* ── Paper primitives ────────────────────────────────────────────────── */
+
+/*
+ * The rules every screen was restating in its own scoped block. They are here
+ * rather than in seventeen components because they had already drifted: five
+ * button paddings, three tag colours and two names for the same input.
+ * Everything below is stroke and hairline — a component that wants a filled
+ * control wants the wrong thing (spec §2.3).
+ */
+
+/* Smaller than .btn, for the controls that sit inside a row. */
+.btn--small { min-height: 28px; padding: 0 var(--space-2); font-size: 12px; }
+
+/* The action that is not the point of the screen. */
+.btn--plain { border-color: var(--rule); color: var(--ink-muted); }
+
+/* Destructive, and quiet until pointed at: the warning is in the hover, so a
+   row of controls does not read as a row of alarms. */
+.btn--danger { border-color: var(--rule); color: var(--ink-muted); }
+.btn--danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
+
+/* A labelled control. The label is a .kicker; this is only the stack. */
+.field { display: flex; flex-direction: column; gap: var(--space-1); }
+.field--wide { grid-column: 1 / -1; }
+
+/* The well a value is typed into. --surface-deep on every ground. */
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface-deep);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.input:focus-visible { outline: 2px solid var(--live); outline-offset: -2px; }
+.input:disabled { color: var(--ink-soft); cursor: not-allowed; }
+.input--wide { grid-column: 1 / -1; }
+textarea.input { min-height: 5rem; line-height: 1.5; resize: vertical; }
+
+/* A stated fact beside a name — a count, a role, a state. Muted by default:
+   a tag that shouts is a tag nobody reads past. */
+.tag {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.tag--live { border-color: var(--live); color: var(--live); }
+.tag--warn { border-color: var(--color-warning); color: var(--color-warning); }
+
+/* A sentence the screen says back to the reader: what it did, or why it
+   would not. */
+.note { margin: var(--space-2) 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+.note--good { color: var(--live); }
+.note--bad { color: var(--color-danger); }
+
+/* The list row the paper rules ask for: content, a hairline, nothing else. */
+.hrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.hrow:last-child { border-bottom: 0; }
+
+/*
+ * A photograph matted like a tipped-in plate, or the box that says there is
+ * not one. The size belongs to whoever uses it — a roster card, a coach card
+ * and the player dialog each want a different one.
+ */
+.plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface-deep);
+}
+.plate__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: sepia(0.22) saturate(0.82) contrast(1.05);
+}
+.plate__label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* A kicker that carries the accent — the fixture rule, a standard. */
+.kicker--accent { color: var(--rule-strong); }
