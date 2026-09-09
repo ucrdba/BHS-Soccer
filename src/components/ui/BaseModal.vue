@@ -125,14 +125,11 @@ function onKeydown(e: KeyboardEvent): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--space-3);
 }
 
-.modal__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgb(0 0 0 / 0.6);
-}
+/* The scrim is per ground: --scrim was added in phase 4 for the More sheet. */
+.modal__backdrop { position: absolute; inset: 0; background: var(--scrim); }
 
 .modal__panel {
   position: relative;
@@ -140,11 +137,11 @@ function onKeydown(e: KeyboardEvent): void {
   flex-direction: column;
   width: 100%;
   max-width: 32rem;
-  max-height: calc(100vh - 2rem);
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 12px;
-  background: var(--bhs-navy-card);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 0.45);
+  max-height: calc(100vh - var(--space-6));
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
 }
 
 .modal__panel--wide { max-width: 48rem; }
@@ -157,22 +154,25 @@ function onKeydown(e: KeyboardEvent): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
 }
 
 .modal__title {
   margin: 0;
   color: var(--ink);
-  font-size: 1.05rem;
+  font-family: var(--heading-face);
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1.2;
 }
 
 .modal__close {
-  padding: 0 0.4rem;
+  padding: 0 var(--space-1);
   border: 0;
   background: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -181,25 +181,24 @@ function onKeydown(e: KeyboardEvent): void {
 .modal__close:hover,
 .modal__close:focus-visible { color: var(--ink); }
 
-.modal__body {
-  padding: 1.25rem;
-  overflow-y: auto;
-}
+.modal__body { padding: var(--space-4); overflow-y: auto; }
 
 .modal__foot {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--space-2);
   justify-content: flex-end;
-  padding: 0.9rem 1.25rem;
-  border-top: 1px solid var(--bhs-navy-border);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--rule);
 }
 
+/* Under 640px the dialog is a sheet off the bottom edge (spec §5.4). */
 @media (max-width: 640px) {
   .modal { padding: 0; align-items: flex-end; }
   .modal__panel {
     max-width: none;
     max-height: 92vh;
-    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 }
 </style>
