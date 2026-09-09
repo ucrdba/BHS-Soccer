@@ -147,3 +147,6 @@ deployed.bat
 # Subagent-driven-development workspaces: ledgers, briefs and review
 # packages. Scratch, not source; the record lives in git.
 .superpowers/
+
+# Local agent config: editor/dev-server settings, not shared state.
+.claude/
