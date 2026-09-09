@@ -8,7 +8,7 @@ VALUES (
   'Beaumont High School',
   'Cougars',
   'Beaumont, CA',
-  '{"primary": "#0047AB", "secondary": "#FFFFFF", "navy": "#0A1428"}'::jsonb,
+  '{"primary": "rgb(33, 25, 111)", "secondary": "white", "navy": "#0A1428"}'::jsonb,
   '{"wins": 9, "losses": 1, "draws": 2}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
 

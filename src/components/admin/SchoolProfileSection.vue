@@ -11,17 +11,22 @@
  * blank rather than sending one, and always writes against the resolved
  * organization code rather than the service's default.
  *
- * Colours are validated as hex here as well as in `domain/theme.ts`, because
- * they are written straight into CSS custom properties — `theme.ts` falls back
- * when it reads something else, and this stops the bad value being stored in
- * the first place.
+ * Colours are validated here with `domain/colour.ts`'s `parseColour` — a hex
+ * code, an rgb() triple, or one of its named colours — as well as in
+ * `domain/theme.ts`, because they are written straight into CSS custom
+ * properties. `theme.ts` falls back when it reads something else; this stops
+ * the bad value being stored in the first place.
  *
  * Extracted from the school profile forms in public/js/views/planner.view.js
  * during Phase 6.
  */
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { supabaseService } from '../../data/supabase';
-import { DEFAULT_PRIMARY, DEFAULT_SECONDARY } from '../../domain/theme';
+import {
+  DEFAULT_PRIMARY, DEFAULT_SECONDARY,
+  guardedColour, MIN_MARK_CONTRAST, DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK
+} from '../../domain/theme';
+import { parseColour, toHex } from '../../domain/colour';
 
 const props = defineProps<{
   /**
@@ -46,7 +51,9 @@ const saving = ref(false);
 const notice = ref<string | null>(null);
 const error = ref<string | null>(null);
 
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+/** The row as last loaded, kept so a save can merge into its `colors` rather
+ * than replacing it -- see the merge in onSave. */
+const row = ref<any>(null);
 
 async function load(): Promise<void> {
   // No organization resolved yet: wait, rather than reading a defaulted one.
@@ -55,19 +62,20 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const row: any = await supabaseService.fetchSchool(props.schoolCode);
-    if (!row) { error.value = 'That organization could not be loaded.'; return; }
+    const fetched: any = await supabaseService.fetchSchool(props.schoolCode);
+    if (!fetched) { error.value = 'That organization could not be loaded.'; return; }
+    row.value = fetched;
 
     form.value = {
-      name: row.name || '',
-      mascot: row.mascot || '',
-      city: row.city || '',
-      league: row.league || '',
-      primary: row.colors?.primary || DEFAULT_PRIMARY,
-      secondary: row.colors?.secondary || DEFAULT_SECONDARY,
-      wins: String(row.record?.wins ?? 0),
-      losses: String(row.record?.losses ?? 0),
-      draws: String(row.record?.draws ?? 0)
+      name: fetched.name || '',
+      mascot: fetched.mascot || '',
+      city: fetched.city || '',
+      league: fetched.league || '',
+      primary: fetched.colors?.primary || DEFAULT_PRIMARY,
+      secondary: fetched.colors?.secondary || DEFAULT_SECONDARY,
+      wins: String(fetched.record?.wins ?? 0),
+      losses: String(fetched.record?.losses ?? 0),
+      draws: String(fetched.record?.draws ?? 0)
     };
   } catch (e: any) {
     error.value = e?.message || 'That organization could not be loaded.';
@@ -77,6 +85,42 @@ async function load(): Promise<void> {
 }
 
 watch(() => props.schoolCode, load, { immediate: true });
+
+/** What the two fields accept, said once so the message and the hint agree. */
+const COLOUR_FORMS = 'a hex code (#21196F), an rgb() triple (rgb(33, 25, 111)), or a colour name (navy)';
+
+const colourError = computed<string | null>(() => {
+  for (const [label, value] of [['Primary', form.value.primary], ['Secondary', form.value.secondary]] as const) {
+    if (!parseColour(value)) {
+      return `${label} colour: "${value}" is not a colour this app can read. Use ${COLOUR_FORMS}.`;
+    }
+  }
+  return null;
+});
+
+/**
+ * The mark the touchline and ratings screens will actually use.
+ *
+ * An organization is entitled to know the interface overrode its brand, even
+ * though the spec's position is that the interface adapts rather than the
+ * admin.
+ */
+const substituted = computed<string | null>(() => {
+  const s = form.value.secondary;
+  if (!parseColour(s)) return null;
+  const used = guardedColour(s, DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, DARK_MARK_FALLBACK);
+  const asked = toHex(parseColour(s)!);
+  return used.toLowerCase() === asked.toLowerCase()
+    ? null
+    : `${s} cannot be told apart from the text on the match screens, so those use ${used} instead.`;
+});
+
+/** The parsed colour as hex, or transparent so a half-typed value shows
+ * nothing rather than the last good one. */
+function swatchFor(value: string): string {
+  const c = parseColour(value);
+  return c ? toHex(c) : 'transparent';
+}
 
 /** A whole number, or zero. A record field holds text. */
 const count = (v: string): number => {
@@ -96,17 +140,18 @@ async function onSave(): Promise<void> {
     error.value = 'A mascot is needed — it is rendered on headings across the app.';
     return;
   }
-  if (!HEX.test(form.value.primary.trim()) || !HEX.test(form.value.secondary.trim())) {
-    error.value = 'Each colour has to be a hex value like #0047AB.';
-    return;
-  }
+  if (colourError.value) { error.value = colourError.value; return; }
 
   const school = {
     name,
     mascot,
     city: form.value.city.trim(),
     league: form.value.league.trim(),
-    colors: { primary: form.value.primary.trim(), secondary: form.value.secondary.trim() },
+    colors: {
+      ...(row.value?.colors ?? {}),
+      primary: form.value.primary.trim(),
+      secondary: form.value.secondary.trim()
+    },
     record: {
       wins: count(form.value.wins),
       losses: count(form.value.losses),
@@ -165,11 +210,17 @@ async function onSave(): Promise<void> {
         </label>
         <label class="field">
           <span class="kicker">Primary colour</span>
-          <input v-model="form.primary" data-school-primary type="text" class="input" />
+          <span class="swatch-row">
+            <input v-model="form.primary" data-school-primary type="text" class="input" />
+            <span class="swatch" :style="{ background: swatchFor(form.primary) }" aria-hidden="true"></span>
+          </span>
         </label>
         <label class="field">
           <span class="kicker">Secondary colour</span>
-          <input v-model="form.secondary" data-school-secondary type="text" class="input" />
+          <span class="swatch-row">
+            <input v-model="form.secondary" data-school-secondary type="text" class="input" />
+            <span class="swatch" :style="{ background: swatchFor(form.secondary) }" aria-hidden="true"></span>
+          </span>
         </label>
         <label class="field">
           <span class="kicker">Wins</span>
@@ -184,6 +235,10 @@ async function onSave(): Promise<void> {
           <input v-model="form.draws" data-school-draws type="number" min="0" class="input" />
         </label>
       </div>
+
+      <p class="note" data-school-colour-forms>Colours accept {{ COLOUR_FORMS }}.</p>
+      <p v-if="colourError" class="note note--bad" role="alert" data-school-colour-error>{{ colourError }}</p>
+      <p v-if="substituted" class="note" data-school-colour-note>{{ substituted }}</p>
 
       <p class="note">
         The name and mascot are rendered on headings throughout the app.
@@ -217,4 +272,13 @@ async function onSave(): Promise<void> {
 }
 .error { color: var(--color-danger); }
 .ok { color: var(--live); }
+
+.swatch-row { display: flex; gap: var(--space-2); align-items: center; }
+.swatch {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
 </style>

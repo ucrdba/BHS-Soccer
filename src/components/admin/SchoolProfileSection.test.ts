@@ -41,6 +41,19 @@ function mountIt(props: any = {}) {
   });
 }
 
+/**
+ * Mounts with the loaded row's `colors` overridden, for the colour-field
+ * tests below. Reuses `mountIt` and `CLUB` rather than a fresh mount path --
+ * `rowOverrides` replaces top-level keys of CLUB the same way `mountIt`'s
+ * `props` replaces top-level keys of the default props.
+ */
+async function mountSection(rowOverrides: any = {}) {
+  fetchSchool.mockResolvedValueOnce({ ...CLUB, ...rowOverrides });
+  const w = mountIt();
+  await flush();
+  return w;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   fetchSchool.mockResolvedValue({ ...CLUB });
@@ -129,12 +142,14 @@ describe('SAVING NEVER FALLS BACK TO BEAUMONT', () => {
     expect(upsertSchool.mock.calls[0][1].record).toEqual({ wins: 7, losses: 1, draws: 2 });
   });
 
-  it('refuses a colour that is not a hex value', async () => {
-    // These are written straight into CSS custom properties.
+  it('refuses a colour the app cannot read', async () => {
+    // These are written straight into CSS custom properties. 'red' is a
+    // recognised colour name and would be accepted -- this uses a value that
+    // matches none of the three accepted forms.
     const w = mountIt();
     await flush();
 
-    await w.find('[data-school-primary]').setValue('red');
+    await w.find('[data-school-primary]').setValue('mauve');
     await w.find('[data-school-save]').trigger('click');
     await flush();
 
@@ -180,5 +195,50 @@ describe('who may edit it', () => {
     const w = mountIt({ isAdmin: false });
     await flush();
     expect(w.find('[data-school-save]').exists()).toBe(false);
+  });
+});
+
+describe('the colour fields', () => {
+  it('refuses to save a colour it cannot parse, and says what it accepts', async () => {
+    const wrapper = await mountSection();
+    await wrapper.find('[data-school-primary]').setValue('greenish');
+    await wrapper.find('[data-school-save]').trigger('click');
+
+    expect(upsertSchool).not.toHaveBeenCalled();
+    const msg = wrapper.find('[data-school-colour-error]').text();
+    expect(msg).toContain('greenish');
+    expect(msg).toMatch(/hex|rgb|name/i);
+  });
+
+  it('accepts each of the three forms', async () => {
+    for (const value of ['#21196F', 'rgb(33, 25, 111)', 'navy']) {
+      const wrapper = await mountSection();
+      await wrapper.find('[data-school-primary]').setValue(value);
+      await wrapper.find('[data-school-save]').trigger('click');
+      expect(upsertSchool, value).toHaveBeenCalled();
+    }
+  });
+
+  // The row carries keys this form does not edit. Writing a fresh object
+  // silently drops them -- Beaumont's row has a "navy" key that disappeared on
+  // every save.
+  it('preserves a key in colors that it does not edit', async () => {
+    const wrapper = await mountSection({
+      colors: { primary: '#21196F', secondary: 'white', navy: '#0A1428' }
+    });
+    await wrapper.find('[data-school-save]').trigger('click');
+
+    // upsertSchool(schoolCode, school) -- index 1 is the school object, per
+    // the other calls-index assertions in this file (e.g. the record test
+    // above).
+    const sent = upsertSchool.mock.calls[0][1];
+    expect(sent.colors.navy).toBe('#0A1428');
+  });
+
+  it('says which colour the interface had to substitute, and why', async () => {
+    const wrapper = await mountSection({
+      colors: { primary: '#21196F', secondary: 'white' }
+    });
+    expect(wrapper.find('[data-school-colour-note]').text()).toMatch(/white/i);
   });
 });
