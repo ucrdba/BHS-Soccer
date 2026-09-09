@@ -48,14 +48,6 @@ function jumpTo(id: string): void {
           Some sections describe coach-only screens; they are marked.
         </template>
       </p>
-
-      <label class="search">
-        <span class="search__label">Search the handbook</span>
-        <input
-          v-model="query" type="search" class="search__input"
-          placeholder="roster, lineup, ratings…" data-help-search
-        />
-      </label>
     </header>
 
     <p v-if="searching" class="count" role="status" data-help-count>
@@ -70,18 +62,28 @@ function jumpTo(id: string): void {
     </p>
 
     <div v-else class="help__body">
-      <nav class="index" aria-label="Handbook sections">
-        <div v-for="part in index" :key="part.part" class="index__part">
-          <h2 class="index__title">{{ part.part }}</h2>
-          <ul class="index__list">
-            <li v-for="s in part.sections" :key="s.id">
-              <button type="button" class="index__link" data-help-jump @click="jumpTo(s.id)">
-                {{ s.title }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </nav>
+      <div class="help__aside">
+        <label class="search">
+          <span class="search__label kicker">Search the handbook</span>
+          <input
+            v-model="query" type="search" class="search__input input"
+            placeholder="roster, lineup, ratings…" data-help-search
+          />
+        </label>
+
+        <nav class="index" aria-label="Handbook sections">
+          <div v-for="part in index" :key="part.part" class="index__part">
+            <h2 class="index__title kicker">{{ part.part }}</h2>
+            <ul class="index__list">
+              <li v-for="s in part.sections" :key="s.id">
+                <button type="button" class="index__link" data-help-jump @click="jumpTo(s.id)">
+                  {{ s.title }}
+                </button>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </div>
 
       <div class="sections">
         <article
@@ -90,7 +92,7 @@ function jumpTo(id: string): void {
         >
           <header class="section__head">
             <h2 class="section__title">{{ s.title }}</h2>
-            <span v-if="roleLabel(s)" class="section__role" data-help-role>
+            <span v-if="roleLabel(s)" class="section__role tag" data-help-role>
               {{ roleLabel(s) }}
             </span>
           </header>
@@ -103,123 +105,59 @@ function jumpTo(id: string): void {
 </template>
 
 <style scoped>
-.help { max-width: 72rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+.help { padding: var(--space-4) var(--space-4) var(--space-8); }
 
-.help__head { margin-bottom: 1.5rem; }
-.help__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.help__head { margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
+.help__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.help__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
 
-.help__sub {
-  margin: 0.3rem 0 1rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.9rem;
-}
+.search { display: block; margin-bottom: var(--space-4); }
+.search__label { display: block; margin-bottom: var(--space-1); }
 
-.search { display: block; max-width: 26rem; }
+.count { margin: 0 0 var(--space-3); color: var(--live); font-size: 13px; }
 
-.search__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
+.help__body { display: block; }
 
-.search__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.count {
-  margin: 0 0 1rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.82rem;
-}
-
-.help__body {
-  display: grid;
-  grid-template-columns: 15rem 1fr;
-  gap: 2rem;
-  align-items: start;
-}
-
-@media (max-width: 860px) {
-  .help__body { grid-template-columns: 1fr; gap: 1.25rem; }
-  .index { position: static !important; }
-}
-
-.index { position: sticky; top: 5rem; }
-.index__part { margin-bottom: 1.1rem; }
-
-.index__title {
-  margin: 0 0 0.4rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
+/* The index is a sidebar only where there is room for one; under 768px the
+   handbook is one column and the search is simply the first thing on it. */
+.index__part { margin-bottom: var(--space-4); }
+.index__title { margin: 0 0 var(--space-1); }
 .index__list { margin: 0; padding: 0; list-style: none; }
 
 .index__link {
   display: block;
   width: 100%;
-  padding: 0.22rem 0;
+  padding: 3px 0;
   border: 0;
   background: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
-
-.index__link:hover, .index__link:focus-visible { color: var(--bhs-cyan-accent); }
+.index__link:hover, .index__link:focus-visible { color: var(--live); }
 
 .section {
-  padding-bottom: 1.75rem;
-  margin-bottom: 1.75rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
-  scroll-margin-top: 5rem;
+  padding-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--rule);
+  scroll-margin-top: var(--space-8);
 }
-
 .section:last-child { border-bottom: 0; }
 
-.section__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin-bottom: 0.6rem;
-}
+.section__head { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; margin-bottom: var(--space-2); }
+.section__title { margin: 0; color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 20px; }
 
-.section__title { margin: 0; color: var(--ink); font-size: 1.1rem; }
+.section__body { color: var(--ink-muted); font-size: 14px; line-height: 1.65; }
 
-.section__role {
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 999px;
-  color: var(--bhs-gold-accent);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
+.empty { padding: var(--space-8) var(--space-3); color: var(--ink-muted); text-align: center; }
 
-.section__body { color: var(--text-muted, #94a3b8); font-size: 0.9rem; line-height: 1.65; }
-
-.empty {
-  padding: 3rem 1rem;
-  color: var(--text-muted, #94a3b8);
-  text-align: center;
+/* Above 768px: the index on the left, the prose in a 38em measure (spec §6). */
+@media (min-width: 768px) {
+  .help { max-width: 64rem; margin: 0 auto; }
+  .help__body { display: grid; grid-template-columns: 15rem minmax(0, 38em); gap: var(--space-8); align-items: start; }
+  .help__aside { position: sticky; top: var(--space-8); }
 }
 </style>
 

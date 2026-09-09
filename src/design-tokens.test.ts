@@ -139,6 +139,7 @@ const RESTYLED = [
   'src/components/ui/BaseModal.vue',
   'src/views/CoachesView.vue',
   'src/components/coaches/CoachFormModal.vue',
+  'src/views/HelpView.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;
