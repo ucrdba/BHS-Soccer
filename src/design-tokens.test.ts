@@ -69,29 +69,6 @@ describe('the fixed tokens', () => {
   });
 });
 
-describe('the temporary aliases', () => {
-  // Phase 5 deletes this block; until then every legacy name must resolve.
-  const ALIASES: Record<string, string> = {
-    '--bhs-navy-bg': '--ground',
-    '--bhs-navy-card': '--surface',
-    '--bhs-navy-border': '--rule',
-    '--bhs-blue-primary': '--org-primary',
-    '--bhs-blue-dark': '--surface-deep',
-    '--bhs-blue-electric': '--live',
-    '--bhs-cyan-accent': '--live',
-    '--bhs-gold-accent': '--rule-strong',
-    '--bhs-silver': '--ink',
-    '--text-main': '--ink',
-    '--text-muted': '--ink-muted'
-  };
-
-  for (const [legacy, token] of Object.entries(ALIASES)) {
-    it(`${legacy} resolves to ${token}`, () => {
-      expect(css).toMatch(new RegExp(`${legacy}\\s*:\\s*var\\(${token}\\)`));
-    });
-  }
-});
-
 /**
  * The primitives every screen shares. Seventeen components restated an
  * outlined button, a labelled input, a small tag and a hairline row in their
@@ -127,55 +104,6 @@ describe('the paper primitives', () => {
   });
 });
 
-/**
- * Files proved free of the legacy names. Phase 5 restyles the remaining
- * screens one at a time and each task appends its files here, so the guard
- * grows with the work and cannot silently skip a screen. Task 9 replaces this
- * list with every .vue file under src/ and deletes the alias block.
- */
-const RESTYLED = [
-  'src/components/roster/PlayerCard.vue',
-  'src/components/roster/PlayerDetailModal.vue',
-  'src/components/ui/BaseModal.vue',
-  'src/views/CoachesView.vue',
-  'src/components/coaches/CoachFormModal.vue',
-  'src/views/HelpView.vue',
-  'src/views/QuizView.vue',
-  'src/views/PlaceholderView.vue',
-  'src/views/AdminView.vue',
-  'src/components/admin/ApprovalsSection.vue',
-  'src/components/admin/CategoriesSection.vue',
-  'src/components/admin/QuizBankSection.vue',
-  'src/components/admin/TeamsSection.vue',
-  'src/components/admin/UnassignedPlayersSection.vue',
-  'src/components/admin/ImportExportSection.vue',
-  'src/components/admin/SchoolProfileSection.vue',
-  'src/components/admin/DiagnosticsSection.vue',
-  'src/components/admin/ImportExportModal.vue',
-  'src/views/PlannerView.vue',
-  'src/components/planner/TacticalBoard.vue',
-  'src/components/planner/DiagramModal.vue',
-  'src/components/planner/DrillFormModal.vue',
-  'src/components/planner/DrillsBankModal.vue',
-  'src/components/planner/RoundRobinModal.vue',
-  'src/components/planner/SavePlanModal.vue',
-  'src/components/auth/AuthModal.vue',
-  'src/components/roster/PlayerFormModal.vue',
-  'src/components/roster/RecordingNumbersModal.vue',
-  'src/components/schedule/MatchFormModal.vue',
-];
-
-const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;
-
-describe('the restyled files', () => {
-  for (const rel of RESTYLED) {
-    it(`${rel} names no legacy token`, () => {
-      const src = readFileSync(join(process.cwd(), rel), 'utf8');
-      expect(LEGACY_NAME.test(src), `${rel} still reads a --bhs-* alias`).toBe(false);
-    });
-  }
-});
-
 describe('the legacy stylesheet', () => {
   it('is gone', () => {
     expect(existsSync(join(process.cwd(), 'styles.css'))).toBe(false);
@@ -191,6 +119,29 @@ function vueFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+
+/**
+ * The exit condition of the restyle (spec §7). The temporary --bhs-* aliases
+ * are gone from index.css, so a component still naming one would resolve to
+ * nothing and render unstyled — silently, because an unset custom property
+ * inherits rather than erroring. This walks every component instead of a
+ * list, so a new file cannot be added against the old names.
+ */
+const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;
+
+describe('the legacy token names', () => {
+  it('are gone from index.css', () => {
+    expect(css).not.toMatch(LEGACY_NAME);
+  });
+
+  it('are gone from every component', () => {
+    const files = vueFiles(join(process.cwd(), 'src'));
+    const offenders = files
+      .filter(f => LEGACY_NAME.test(readFileSync(f, 'utf8')))
+      .map(f => f.replace(process.cwd(), ''));
+    expect(offenders, 'use a ground token from index.css').toEqual([]);
+  });
+});
 
 /** The style blocks of a single-file component, joined. */
 function styleOf(path: string): string {

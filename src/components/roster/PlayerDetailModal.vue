@@ -137,7 +137,6 @@ const skills = computed(() => skillBars(props.player?.ratings));
 .figure__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 .skills { margin-top: var(--space-6); }
-.kicker--accent { color: var(--rule-strong); }
 .skill { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); }
 .skill__row { display: flex; align-items: baseline; justify-content: space-between; }
 .skill__name { font-size: 13.5px; color: var(--ink); }

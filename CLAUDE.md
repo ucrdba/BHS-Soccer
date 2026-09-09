@@ -18,13 +18,13 @@ Vue 3 with `<script setup>`, Vue Router and Pinia, built by Vite. Backend is Sup
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/
 npm run typecheck  # vue-tsc --noEmit over src/, components included
-npm test           # vitest — 2,300 tests, config in vitest.config.mts
+npm test           # vitest — 2,521 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 ```
 
 Verification is three gates, and each covers a different slice:
 
-- `npm test` — Vitest (2,300 tests across 123 files), including Vue component and database tests.
+- `npm test` — Vitest (2,521 tests across 142 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit`, which checks a single-file component's script block **and its template**.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. Typecheck and tests can both pass while an import is unresolvable at bundle time.
 
@@ -264,7 +264,7 @@ The Supabase SQL editor may run as a role that is a **member** of `postgres` wit
 
 ## Conventions
 
-- **Component styles are scoped and style against the ground tokens in `index.css`** — `--ground`, `--surface`, `--surface-deep`, `--ink`, `--ink-muted`, `--ink-soft`, `--rule`, `--rule-strong`, `--live`, `--mark`, `--heading-face`, `--shadow-md` — never a literal colour. The same names are defined for three grounds (`paper`, `pitch`, `ledger`) under `data-ground` on `<html>`, which the router sets from `meta.ground` (`src/router/ground.ts`). The organization's colours arrive as `--org-primary` / `--org-secondary` (raw, for stroke) and `--org-mark-paper` / `--org-mark-dark` (after the 3:1 contrast guard in `domain/theme.ts`); `--mark` reads the right one per ground. **The `--bhs-*` names are temporary aliases** from the restyle's phase 1 and are deleted in phase 5 — do not use them in new work. `src/design-tokens.test.ts` guards all of this, including that no component style hardcodes a white.
+- **Component styles are scoped and style against the ground tokens in `index.css`** — `--ground`, `--surface`, `--surface-deep`, `--ink`, `--ink-muted`, `--ink-soft`, `--rule`, `--rule-strong`, `--live`, `--mark`, `--heading-face`, `--shadow-md` — never a literal colour. The same names are defined for three grounds (`paper`, `pitch`, `ledger`) under `data-ground` on `<html>`, which the router sets from `meta.ground` (`src/router/ground.ts`). The organization's colours arrive as `--org-primary` / `--org-secondary` (raw, for stroke) and `--org-mark-paper` / `--org-mark-dark` (after the 3:1 contrast guard in `domain/theme.ts`); `--mark` reads the right one per ground. The `--bhs-*` aliases are gone as of phase 5; `src/design-tokens.test.ts` walks every component and fails on one. `src/design-tokens.test.ts` guards all of this, including that no component style hardcodes a white.
 - **Routes carry `meta.chrome: 'tool'`** to render without the header, nav and footer; the touchline and session screens draw their own bars. Spec: `docs/superpowers/specs/2026-09-07-mobile-restyle-design.md`.
 - `tsconfig.json` is deliberately loose (`strict: false`, `noImplicitAny: false`) so the ported code type-checks without a rewrite. Don't tighten it as a side effect of another change.
 - **`typescript` is pinned to 5.x on purpose — do not upgrade to 7.** TypeScript 7 is the native Go rewrite and exports only `.` and `./unstable/*`; `vue-tsc` resolves `typescript/lib/tsc`, which that layout does not have, so it dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` and cannot run at all. Without it nothing type-checks a `.vue` file's script block or its templates. Deferred until `vue-tsc` supports TypeScript 7, not abandoned.

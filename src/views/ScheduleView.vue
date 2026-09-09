@@ -253,7 +253,6 @@ async function onRemove(m: Match): Promise<void> {
 
 .group { margin-top: var(--space-6); }
 .group:first-child { margin-top: 0; }
-.kicker--accent { color: var(--rule-strong); }
 
 /* The next fixture, carried out of the list. */
 .next {

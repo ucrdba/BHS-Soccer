@@ -163,8 +163,6 @@ const lastResult = computed(() => {
   .home__org { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 }
 
-.kicker--accent { color: var(--rule-strong); }
-
 .fixture__opp {
   margin-top: var(--space-2);
   font-family: var(--heading-face);

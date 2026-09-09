@@ -222,7 +222,6 @@ watch(
 .matrix { padding: var(--space-4) var(--space-4) var(--space-8); }
 
 .matrix__head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
-.kicker--accent { color: var(--rule-strong); }
 
 .matrix__title {
   margin-top: 6px;

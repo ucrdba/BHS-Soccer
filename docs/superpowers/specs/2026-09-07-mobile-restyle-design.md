@@ -515,7 +515,7 @@ and passes at the end of every phase.
 4. **Ratings.** The board, the segmented control, the exercise leaderboard,
    the breakdown, the remaining ledger panels, and Session entry as a route. — done 2026-09-07; the panels became a segmented control rather than routes, and subjectState/ToolNotice replaced the duplicated route-view states phase 3 left behind.
 5. **The rest.** Planner, Coaching Staff, Help, Quiz, Admin and the remaining
-   modals on paper; the `--bhs-*` aliases removed.
+   modals on paper; the `--bhs-*` aliases removed. — done 2026-09-09; the shared paper primitives moved into index.css first, which turned each screen into a deletion, and `.plate` and `.kicker--accent` stopped being copied per component.
 
 ## 10. Out of scope
 

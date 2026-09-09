@@ -110,31 +110,6 @@
   color-scheme: dark;
 }
 
-/* ── Temporary aliases ───────────────────────────────────────────────── */
-
-/*
- * The names the pre-restyle components use, resolved onto the tokens so that
- * every view renders while phases 2–5 rewrite them one at a time. Phase 5
- * deletes this block; `grep -r -- '--bhs-' src/` returning nothing is its exit
- * condition. Do not use these names in new work.
- */
-:root {
-  --bhs-navy-bg: var(--ground);
-  --bhs-navy-card: var(--surface);
-  --bhs-navy-border: var(--rule);
-  --bhs-blue-primary: var(--org-primary);
-  --bhs-blue-dark: var(--surface-deep);
-  --bhs-blue-electric: var(--live);
-  --bhs-cyan-accent: var(--live);
-  --bhs-gold-accent: var(--rule-strong);
-  --bhs-silver: var(--ink);
-  --text-main: var(--ink);
-  --text-muted: var(--ink-muted);
-  --glass-bg: var(--surface);
-  --glass-border: var(--rule);
-  --glass-shadow: var(--shadow-md);
-}
-
 /* ── Base elements ───────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; }
