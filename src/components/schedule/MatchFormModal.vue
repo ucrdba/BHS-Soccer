@@ -101,7 +101,7 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
       <label v-if="f.isHome === false" class="field field--wide">
         <span class="kicker">
           Venue address
-          <span class="note">— only an address earns a directions link</span>
+          <span class="note venue-hint">— only an address earns a directions link</span>
         </span>
         <input v-model="f.venueAddress" class="input"
                placeholder="Street, town" data-field="venueAddress" />
@@ -125,4 +125,5 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
 <style scoped>
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
 .err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
+.venue-hint { text-transform: none; letter-spacing: normal; }
 </style>

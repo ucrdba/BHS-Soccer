@@ -202,7 +202,8 @@ async function onSave(): Promise<void> {
 
 .wrap { overflow-x: auto; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th, .tbl td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+.tbl th, .tbl td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+.tbl th.is-text, .tbl td.is-text { position: sticky; left: 0; background: var(--surface); text-align: left; }
 .tbl th { color: var(--ink-muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
 .tabular { font-variant-numeric: tabular-nums; }
 </style>
