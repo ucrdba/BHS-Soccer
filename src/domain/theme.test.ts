@@ -7,9 +7,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  brandingFor, themeVars, contrastRatio, guardedMark,
+  brandingFor, themeVars, contrastRatio, colourDistance, guardedColour,
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
-  PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, DARK_MARK_FALLBACK, MIN_MARK_CONTRAST
+  PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, DARK_MARK_FALLBACK, MIN_MARK_CONTRAST,
+  MIN_TEXT_CONTRAST, MIN_INK_DISTANCE, PAPER_INK, DARK_INK
 } from './theme';
 
 describe('brandingFor', () => {
@@ -66,64 +67,120 @@ describe('brandingFor', () => {
 });
 
 describe('contrastRatio', () => {
-  it('is 21 for black on white and 1 for a colour on itself', () => {
+  it('is 21 for black against white and 1 for a colour against itself', () => {
     expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 1);
-    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 1);
-    expect(contrastRatio('#0047AB', '#0047AB')).toBeCloseTo(1, 5);
+    expect(contrastRatio('#21196f', '#21196f')).toBeCloseTo(1, 5);
   });
 
-  it('accepts three-digit hex', () => {
-    expect(contrastRatio('#000', '#fff')).toBeCloseTo(21, 1);
-  });
-
-  it('clears the floor for the default colours on their grounds', () => {
-    // The first organization must look exactly as the canvas draws it.
-    expect(contrastRatio(DEFAULT_PRIMARY, PAPER_GROUND)).toBeGreaterThanOrEqual(MIN_MARK_CONTRAST);
-    expect(contrastRatio(DEFAULT_SECONDARY, DARK_GROUND)).toBeGreaterThanOrEqual(MIN_MARK_CONTRAST);
+  // One colour, three spellings, one answer -- the guard has to measure a
+  // colour whatever form the admin typed it in.
+  it('gives the same answer for every accepted spelling', () => {
+    const hex = contrastRatio('#000080', PAPER_GROUND);
+    expect(contrastRatio('rgb(0, 0, 128)', PAPER_GROUND)).toBeCloseTo(hex, 10);
+    expect(contrastRatio('navy', PAPER_GROUND)).toBeCloseTo(hex, 10);
   });
 });
 
-describe('guardedMark', () => {
-  it('keeps a colour that reads against the ground', () => {
-    expect(guardedMark('#0047AB', PAPER_GROUND, PAPER_MARK_FALLBACK)).toBe('#0047AB');
-    expect(guardedMark('#FFD700', DARK_GROUND, DARK_MARK_FALLBACK)).toBe('#FFD700');
+describe('colourDistance', () => {
+  /*
+   * Why this is a distance and not a contrast ratio. WCAG contrast is
+   * luminance-only: Beaumont's navy and the paper ink are both very dark, so
+   * their ratio is about 1.09 and a ratio-based test would throw the
+   * organization's own colour away. By distance they are plainly different,
+   * because one is blue.
+   */
+  it('separates a brand colour from ink it merely shares a luminance with', () => {
+    expect(contrastRatio('#21196f', PAPER_INK)).toBeLessThan(1.5);
+    expect(colourDistance('#21196f', PAPER_INK)).toBeGreaterThan(MIN_INK_DISTANCE);
   });
 
-  it('falls back when the organization colour would vanish', () => {
-    // A club whose secondary is navy has chosen a colour that cannot be seen
-    // on the navy ground. The interface adapts, not the admin. Spec §18.
-    expect(guardedMark('#0A1428', DARK_GROUND, DARK_MARK_FALLBACK)).toBe(DARK_MARK_FALLBACK);
-    // And a pale primary cannot be a keyline on paper.
-    expect(guardedMark('#eeeeee', PAPER_GROUND, PAPER_MARK_FALLBACK)).toBe(PAPER_MARK_FALLBACK);
+  it('catches a colour that really is the text colour', () => {
+    expect(colourDistance('#ffffff', DARK_INK)).toBeLessThan(MIN_INK_DISTANCE);
+  });
+
+  it('is zero for a colour against itself and symmetric', () => {
+    expect(colourDistance('#21196f', '#21196f')).toBe(0);
+    expect(colourDistance('#000000', '#ffffff'))
+      .toBeCloseTo(colourDistance('#ffffff', '#000000'), 10);
+  });
+});
+
+describe('guardedColour', () => {
+  it('keeps a colour that clears both floors', () => {
+    expect(guardedColour('#21196f', PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, '#201f1d'))
+      .toBe('#21196f');
+  });
+
+  // The two floors are independent: failing either one is enough.
+  it('falls back when the contrast floor fails', () => {
+    expect(guardedColour('#f5f4f4', PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, '#201f1d'))
+      .toBe('#201f1d');
+  });
+
+  it('falls back when the colour is the ink, even at high contrast', () => {
+    expect(contrastRatio('#ffffff', DARK_GROUND)).toBeGreaterThan(MIN_MARK_CONTRAST);
+    expect(guardedColour('#ffffff', DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, '#FFD700'))
+      .toBe('#FFD700');
+  });
+
+  it('applies the text floor more strictly than the mark floor', () => {
+    const mid = '#8a7fd0';
+    const asMark = guardedColour(mid, PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, '#201f1d');
+    const asText = guardedColour(mid, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, '#201f1d');
+    expect(asMark).toBe(mid);
+    expect(asText).toBe('#201f1d');
+  });
+
+  it('falls back on a colour it cannot parse', () => {
+    expect(guardedColour('nonsense', PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, '#201f1d'))
+      .toBe('#201f1d');
   });
 });
 
 describe('themeVars', () => {
-  const branding = { name: 'X', mascot: 'Y', primary: '#111111', secondary: '#eeeeee' };
-
-  it('emits the organization colours and their guarded marks', () => {
-    const vars = themeVars(branding);
-    expect(vars['--org-primary']).toBe('#111111');
-    expect(vars['--org-secondary']).toBe('#eeeeee');
-    // #111111 reads on paper; #eeeeee reads on navy.
-    expect(vars['--org-mark-paper']).toBe('#111111');
-    expect(vars['--org-mark-dark']).toBe('#eeeeee');
+  const beaumont = brandingFor({
+    name: 'Beaumont High School', mascot: 'Cougars',
+    colors: { primary: 'rgb(33, 25, 111)', secondary: 'white' }
   });
 
-  it('substitutes the fallback mark for a colour that fails its ground', () => {
-    const vars = themeVars({ name: 'X', mascot: 'Y', primary: '#eeeeee', secondary: '#0A1428' });
-    expect(vars['--org-primary']).toBe('#eeeeee');           // still painted, for stroke
-    expect(vars['--org-mark-paper']).toBe(PAPER_MARK_FALLBACK);
-    expect(vars['--org-mark-dark']).toBe(DARK_MARK_FALLBACK);
-  });
-
-  it('no longer emits the legacy names', () => {
-    expect(themeVars(branding)['--bhs-blue-primary']).toBeUndefined();
-  });
-
-  it('returns only custom properties, so nothing else can be injected', () => {
-    for (const key of Object.keys(themeVars(branding))) {
-      expect(key).toMatch(/^--/);
+  it('emits the five properties, all as normalised hex', () => {
+    const vars = themeVars(beaumont);
+    expect(Object.keys(vars).sort()).toEqual([
+      '--org-mark-dark', '--org-mark-paper', '--org-primary',
+      '--org-secondary', '--org-text-paper'
+    ]);
+    for (const [prop, value] of Object.entries(vars)) {
+      expect(value, prop).toMatch(/^#[0-9a-f]{6}$/);
     }
+  });
+
+  /*
+   * The regression this whole task exists for. Beaumont's secondary is white,
+   * which clears 17:1 against the navy ground and so passed the old guard --
+   * making the rank figures and armed buttons the same colour as the text
+   * beside them.
+   */
+  it('refuses a white secondary as the mark on the dark grounds', () => {
+    expect(themeVars(beaumont)['--org-mark-dark']).toBe('#ffd700');
+  });
+
+  it('keeps the navy primary for both paper roles', () => {
+    const vars = themeVars(beaumont);
+    expect(vars['--org-mark-paper']).toBe('#21196f');
+    expect(vars['--org-text-paper']).toBe('#21196f');
+  });
+
+  /*
+   * A row holding nonsense renders the app's historical defaults, not the
+   * guard's fallbacks: brandingFor substitutes DEFAULT_PRIMARY and
+   * DEFAULT_SECONDARY before themeVars ever sees the value, so an organization
+   * that never set its colours looks as it did before. Both defaults clear
+   * both floors, so nothing is guarded away.
+   */
+  it('renders the historical defaults when the row holds nonsense', () => {
+    const vars = themeVars(brandingFor({ colors: { primary: '???', secondary: '???' } }));
+    expect(vars['--org-mark-paper']).toBe('#0047ab');
+    expect(vars['--org-text-paper']).toBe('#0047ab');
+    expect(vars['--org-mark-dark']).toBe('#ffd700');
   });
 });
