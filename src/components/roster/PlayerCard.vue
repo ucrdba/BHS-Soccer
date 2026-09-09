@@ -79,7 +79,7 @@ const grade = computed(() => lineupGrade(props.player));
   flex: none;
   font-family: var(--heading-face);
   font-size: 16px;
-  color: var(--ink-muted);
+  color: var(--mark);
 }
 
 /* The plate: a photograph matted like a tipped-in plate, or the box that

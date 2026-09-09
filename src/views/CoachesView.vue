@@ -176,7 +176,7 @@ async function onReject(userId: string, name: string): Promise<void> {
   border-bottom: 1px solid var(--rule);
 }
 
-.staff__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.staff__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--mark); }
 .staff__org { margin-top: var(--space-1); }
 
 /* Accounts waiting to be let in: an emphasised rule, not a filled panel. */

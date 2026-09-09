@@ -247,7 +247,7 @@ async function onRemove(m: Match): Promise<void> {
   border-bottom: 1px solid var(--rule);
 }
 
-.sched__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.sched__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--mark); }
 .sched__org { margin-top: var(--space-1); }
 .sched__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 

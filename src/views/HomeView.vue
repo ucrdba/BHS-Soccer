@@ -233,7 +233,7 @@ const lastResult = computed(() => {
   border-bottom: 1px solid var(--rule);
 }
 
-.stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--ink); }
+.stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--mark); }
 .stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 @media (min-width: 768px) {

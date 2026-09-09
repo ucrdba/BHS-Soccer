@@ -199,7 +199,7 @@ async function onRemove(p: Player): Promise<void> {
   border-bottom: 1px solid var(--rule);
 }
 
-.roster__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.roster__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--mark); }
 .roster__org { margin-top: var(--space-1); }
 .roster__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 

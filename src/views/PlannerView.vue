@@ -355,7 +355,7 @@ async function onDrop(index: number): Promise<void> {
   border-bottom: 1px solid var(--rule);
 }
 
-.planner__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.planner__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--mark); }
 .planner__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
 .planner__org { margin-top: var(--space-1); }
 .planner__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
