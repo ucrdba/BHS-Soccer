@@ -140,7 +140,7 @@ async function onSave(): Promise<void> {
     error.value = 'A mascot is needed — it is rendered on headings across the app.';
     return;
   }
-  if (colourError.value) { error.value = colourError.value; return; }
+  if (colourError.value) { return; }
 
   const school = {
     name,

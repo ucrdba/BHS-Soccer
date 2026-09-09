@@ -154,7 +154,8 @@ describe('SAVING NEVER FALLS BACK TO BEAUMONT', () => {
     await flush();
 
     expect(upsertSchool).not.toHaveBeenCalled();
-    expect(w.find('[data-school-error]').text()).toMatch(/colour|color/i);
+    // After Fix 2, the colour error renders in data-school-colour-error, not data-school-error.
+    expect(w.find('[data-school-colour-error]').text()).toMatch(/colour|color/i);
   });
 });
 
@@ -212,10 +213,14 @@ describe('the colour fields', () => {
 
   it('accepts each of the three forms', async () => {
     for (const value of ['#21196F', 'rgb(33, 25, 111)', 'navy']) {
+      upsertSchool.mockClear();
       const wrapper = await mountSection();
       await wrapper.find('[data-school-primary]').setValue(value);
       await wrapper.find('[data-school-save]').trigger('click');
-      expect(upsertSchool, value).toHaveBeenCalled();
+      expect(upsertSchool).toHaveBeenCalledOnce();
+      // Assert the payload actually reached upsertSchool: index [1] is the school object.
+      const sent = upsertSchool.mock.calls[0][1];
+      expect(sent.colors.primary).toBe(value);
     }
   });
 
