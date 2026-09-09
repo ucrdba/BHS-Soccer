@@ -56,44 +56,44 @@ const title = computed(() => (props.player ? 'Edit player' : 'Add a player'));
 
     <form id="player-form" class="grid" @submit.prevent="emit('save', f)">
       <label class="field">
-        <span class="field__label">First name</span>
-        <input v-model="f.firstName" class="field__input" required data-field="firstName" />
+        <span class="kicker">First name</span>
+        <input v-model="f.firstName" class="input" required data-field="firstName" />
       </label>
       <label class="field">
-        <span class="field__label">Last name</span>
-        <input v-model="f.lastName" class="field__input" required data-field="lastName" />
+        <span class="kicker">Last name</span>
+        <input v-model="f.lastName" class="input" required data-field="lastName" />
       </label>
 
       <label class="field">
-        <span class="field__label">Shirt number</span>
-        <input v-model="f.number" type="number" min="0" class="field__input" data-field="number" />
+        <span class="kicker">Shirt number</span>
+        <input v-model="f.number" type="number" min="0" class="input" data-field="number" />
       </label>
       <label class="field">
-        <span class="field__label" title="The paper-sheet number, not the shirt">
+        <span class="kicker" title="The paper-sheet number, not the shirt">
           Recording number
         </span>
-        <input v-model="f.recordingNumber" type="number" min="0" class="field__input"
+        <input v-model="f.recordingNumber" type="number" min="0" class="input"
                data-field="recordingNumber" />
       </label>
 
       <label class="field">
-        <span class="field__label">Position</span>
-        <input v-model="f.position" class="field__input" placeholder="e.g. Center Back"
+        <span class="kicker">Position</span>
+        <input v-model="f.position" class="input" placeholder="e.g. Center Back"
                data-field="position" />
       </label>
       <label class="field">
-        <span class="field__label">Class year</span>
-        <input v-model="f.classYear" class="field__input" placeholder="e.g. Senior"
+        <span class="kicker">Class year</span>
+        <input v-model="f.classYear" class="input" placeholder="e.g. Senior"
                data-field="classYear" />
       </label>
 
       <label class="field">
-        <span class="field__label">Height</span>
-        <input v-model="f.height" class="field__input" placeholder="e.g. 5-10" data-field="height" />
+        <span class="kicker">Height</span>
+        <input v-model="f.height" class="input" placeholder="e.g. 5-10" data-field="height" />
       </label>
       <label class="field">
-        <span class="field__label">Photo URL</span>
-        <input v-model="f.photo" class="field__input" data-field="photo" />
+        <span class="kicker">Photo URL</span>
+        <input v-model="f.photo" class="input" data-field="photo" />
       </label>
     </form>
 
@@ -108,61 +108,6 @@ const title = computed(() => (props.player ? 'Edit player' : 'Add a player'));
 </template>
 
 <style scoped>
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.25rem 1rem;
-}
-
-@media (max-width: 560px) {
-  .grid { grid-template-columns: 1fr; }
-}
-
-.err {
-  margin: 0 0 0.9rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-danger, #f87171);
-  border-radius: 6px;
-  color: var(--color-danger, #f87171);
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-
-.field { display: block; margin-bottom: 0.85rem; }
-
-.field__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.field__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.btn {
-  padding: 0.55rem 1.1rem;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-
-.btn:disabled { opacity: 0.6; cursor: progress; }
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
-.btn--plain { border-color: var(--bhs-navy-border); background: transparent; color: var(--text-muted, #94a3b8); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
+.err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
 </style>

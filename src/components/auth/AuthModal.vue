@@ -161,8 +161,8 @@ async function onVerify(): Promise<void> {
 
     <p
       v-if="feedback"
-      class="feedback"
-      :class="`feedback--${feedbackKind}`"
+      class="note"
+      :class="feedbackKind === 'error' ? 'note--bad' : ''"
       :role="feedbackKind === 'error' ? 'alert' : 'status'"
       data-feedback
     >{{ feedback }}</p>
@@ -171,13 +171,13 @@ async function onVerify(): Promise<void> {
     <form v-if="tab === 'signin'" data-tab-panel="signin" data-signin-submit
           @submit.prevent="onSignIn">
       <label class="field">
-        <span class="field__label">Email</span>
-        <input v-model="email" type="email" class="field__input" required
+        <span class="kicker">Email</span>
+        <input v-model="email" type="email" class="input" required
                autocomplete="email" data-field="email" />
       </label>
       <label class="field">
-        <span class="field__label">Password</span>
-        <input v-model="password" type="password" class="field__input" required
+        <span class="kicker">Password</span>
+        <input v-model="password" type="password" class="input" required
                autocomplete="current-password" data-field="password" />
       </label>
       <button type="submit" class="btn btn--go" :disabled="busy">
@@ -189,23 +189,23 @@ async function onVerify(): Promise<void> {
     <form v-else-if="tab === 'register'" data-tab-panel="register" data-register-submit
           @submit.prevent="onRegister">
       <label class="field">
-        <span class="field__label">Name</span>
-        <input v-model="regName" type="text" class="field__input" required
+        <span class="kicker">Name</span>
+        <input v-model="regName" type="text" class="input" required
                autocomplete="name" data-field="regName" />
       </label>
       <label class="field">
-        <span class="field__label">Email</span>
-        <input v-model="regEmail" type="email" class="field__input" required
+        <span class="kicker">Email</span>
+        <input v-model="regEmail" type="email" class="input" required
                autocomplete="email" data-field="regEmail" />
       </label>
       <label class="field">
-        <span class="field__label">Password</span>
-        <input v-model="regPassword" type="password" class="field__input" required
+        <span class="kicker">Password</span>
+        <input v-model="regPassword" type="password" class="input" required
                autocomplete="new-password" minlength="6" data-field="regPassword" />
       </label>
       <label class="field">
-        <span class="field__label">I am a</span>
-        <select v-model="regRole" class="field__input" data-field="regRole">
+        <span class="kicker">I am a</span>
+        <select v-model="regRole" class="input" data-field="regRole">
           <option v-for="r in ROLES" :key="r.value" :value="r.value" data-role-option>
             {{ r.label }}
           </option>
@@ -241,8 +241,8 @@ async function onVerify(): Promise<void> {
         Code sent to <strong data-verify-target>{{ verifyEmail }}</strong>
       </p>
       <label class="field">
-        <span class="field__label">6-digit code</span>
-        <input v-model="otp" type="text" inputmode="numeric" class="field__input"
+        <span class="kicker">6-digit code</span>
+        <input v-model="otp" type="text" inputmode="numeric" class="input"
                required autocomplete="one-time-code" maxlength="6" data-field="otp" />
       </label>
       <button type="submit" class="btn btn--go" :disabled="busy">
@@ -256,115 +256,26 @@ async function onVerify(): Promise<void> {
 </template>
 
 <style scoped>
-.tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
-
+.tabs { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); border-bottom: 1px solid var(--rule); }
 .tabs__btn {
-  flex: 1;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted, #94a3b8);
-  font: inherit;
-  font-weight: 600;
-  font-size: 0.85rem;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--heading-face);
+  font-size: 15px;
   cursor: pointer;
 }
-
-.tabs__btn.is-on {
-  border-color: var(--bhs-gold-accent);
-  color: var(--bhs-gold-accent);
-}
-
-.feedback {
-  margin: 0 0 0.9rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-
-.feedback--error {
-  border: 1px solid var(--color-danger, #f87171);
-  color: var(--color-danger, #f87171);
-}
-
-.feedback--info {
-  border: 1px solid var(--bhs-cyan-accent);
-  color: var(--bhs-cyan-accent);
-}
-
-.field { display: block; margin-bottom: 0.85rem; }
-
-.field__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.field__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.field__input:focus-visible {
-  outline: 2px solid var(--bhs-cyan-accent);
-  outline-offset: 1px;
-}
-
-.btn {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn:disabled { opacity: 0.6; cursor: progress; }
-
-.btn--go {
-  background: var(--bhs-cyan-accent);
-  color: var(--bhs-navy-bg);
-}
-
-.btn--plain {
-  margin-top: 0.5rem;
-  border-color: var(--bhs-navy-border);
-  background: transparent;
-  color: var(--text-muted, #94a3b8);
-}
+.tabs__btn.is-on { border-bottom-color: var(--live); color: var(--live); }
 
 .suggest {
-  padding: 0.75rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 6px;
+  padding: var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
 }
+.suggest__text { margin: 0 0 var(--space-2); color: var(--rule-strong); font-size: 13px; }
+.suggest__actions { display: flex; flex-direction: column; gap: var(--space-2); }
 
-.suggest__text {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.84rem;
-}
-
-.suggest__actions { display: flex; flex-direction: column; gap: 0.4rem; }
-
-.verify__target {
-  margin: 0 0 0.9rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.85rem;
-}
+.verify__target { margin: 0 0 var(--space-3); color: var(--ink-muted); font-size: 14px; }
 </style>

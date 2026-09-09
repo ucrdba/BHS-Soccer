@@ -63,29 +63,29 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
 
     <form id="match-form" class="grid" @submit.prevent="emit('save', f)">
       <label class="field field--wide">
-        <span class="field__label">Opponent</span>
-        <input v-model="f.opponent" class="field__input" required data-field="opponent" />
+        <span class="kicker">Opponent</span>
+        <input v-model="f.opponent" class="input" required data-field="opponent" />
       </label>
 
       <label class="field">
-        <span class="field__label">Date</span>
-        <input v-model="f.date" type="date" class="field__input" required data-field="date" />
+        <span class="kicker">Date</span>
+        <input v-model="f.date" type="date" class="input" required data-field="date" />
       </label>
       <label class="field">
-        <span class="field__label">Kickoff</span>
-        <input v-model="f.time" type="time" class="field__input" data-field="time" />
+        <span class="kicker">Kickoff</span>
+        <input v-model="f.time" type="time" class="input" data-field="time" />
       </label>
 
       <label class="field">
-        <span class="field__label">Home or away</span>
-        <select v-model="f.isHome" class="field__input" data-field="isHome">
+        <span class="kicker">Home or away</span>
+        <select v-model="f.isHome" class="input" data-field="isHome">
           <option :value="true">Home</option>
           <option :value="false">Away</option>
         </select>
       </label>
       <label class="field">
-        <span class="field__label">Status</span>
-        <select v-model="f.status" class="field__input" data-field="status">
+        <span class="kicker">Status</span>
+        <select v-model="f.status" class="input" data-field="status">
           <option value="SCHEDULED">Scheduled</option>
           <option value="COMPLETED">Completed</option>
           <option value="CANCELLED">Cancelled</option>
@@ -94,22 +94,22 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
 
       <label class="field field--wide">
         <!-- Required: schedule.location is NOT NULL. -->
-        <span class="field__label">Location</span>
-        <input v-model="f.location" class="field__input" required data-field="location" />
+        <span class="kicker">Location</span>
+        <input v-model="f.location" class="input" required data-field="location" />
       </label>
 
       <label v-if="f.isHome === false" class="field field--wide">
-        <span class="field__label">
+        <span class="kicker">
           Venue address
-          <span class="field__hint">— only an address earns a directions link</span>
+          <span class="note">— only an address earns a directions link</span>
         </span>
-        <input v-model="f.venueAddress" class="field__input"
+        <input v-model="f.venueAddress" class="input"
                placeholder="Street, town" data-field="venueAddress" />
       </label>
 
       <label v-if="isCompleted" class="field field--wide">
-        <span class="field__label">Score</span>
-        <input v-model="f.score" class="field__input" placeholder="3 - 1" data-field="score" />
+        <span class="kicker">Score</span>
+        <input v-model="f.score" class="input" placeholder="3 - 1" data-field="score" />
       </label>
     </form>
 
@@ -123,57 +123,6 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
 </template>
 
 <style scoped>
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1rem; }
-.field--wide { grid-column: 1 / -1; }
-
-@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-
-.err {
-  margin: 0 0 0.9rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-danger, #f87171);
-  border-radius: 6px;
-  color: var(--color-danger, #f87171);
-  font-size: 0.84rem;
-}
-
-.field { display: block; margin-bottom: 0.85rem; }
-
-.field__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.field__hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
-
-.field__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.btn {
-  padding: 0.55rem 1.1rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-
-.btn:disabled { opacity: 0.6; cursor: progress; }
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
-.btn--plain { border-color: var(--bhs-navy-border); background: transparent; color: var(--text-muted, #94a3b8); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
+.err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
 </style>

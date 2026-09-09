@@ -137,9 +137,9 @@ async function onSave(): Promise<void> {
     </p>
 
     <div class="head">
-      <label class="fld">
-        <span class="fld__label">Start the block at</span>
-        <input v-model.number="startAt" type="number" min="1" class="inp inp--narrow" data-rn-start />
+      <label class="field">
+        <span class="kicker">Start the block at</span>
+        <input v-model.number="startAt" type="number" min="1" class="input input--narrow" data-rn-start />
       </label>
       <button type="button" class="btn" data-rn-propose @click="propose">Suggest a block</button>
       <span class="head__pending" data-rn-pending>
@@ -159,13 +159,13 @@ async function onSave(): Promise<void> {
         <tbody>
           <tr v-for="p in squad" :key="p.id" data-rn-row>
             <td class="is-text" data-rn-name>{{ p.name }}</td>
-            <td class="tabular muted" data-rn-current>
+            <td class="tabular note" data-rn-current>
               {{ p.recordingNumber == null ? '—' : p.recordingNumber }}
             </td>
             <td>
               <input
                 v-model="draft[p.id]" type="number" min="1"
-                class="inp inp--narrow" :data-rn-input="p.id"
+                class="input input--narrow" :data-rn-input="p.id"
               />
             </td>
           </tr>
@@ -173,18 +173,18 @@ async function onSave(): Promise<void> {
       </table>
     </div>
 
-    <p v-if="dupes.length" class="hint hint--bad" data-rn-dupes>
+    <p v-if="dupes.length" class="note note--bad" data-rn-dupes>
       Two players share {{ dupes.length === 1 ? 'number' : 'numbers' }}
       {{ dupes.join(', ') }}. Every number must be different.
     </p>
 
-    <p v-if="notice" class="hint hint--good" role="status" data-rn-notice>{{ notice }}</p>
-    <p v-if="error" class="hint hint--bad" role="alert" data-rn-error>{{ error }}</p>
+    <p v-if="notice" class="note note--good" role="status" data-rn-notice>{{ notice }}</p>
+    <p v-if="error" class="note note--bad" role="alert" data-rn-error>{{ error }}</p>
 
     <template #footer>
       <button type="button" class="btn" @click="emit('close')">Cancel</button>
       <button
-        type="button" class="btn btn--primary" :disabled="saving"
+        type="button" class="btn btn--go" :disabled="saving"
         data-rn-save @click="onSave"
       >{{ saving ? 'Saving…' : 'Save numbers' }}</button>
     </template>
@@ -192,78 +192,17 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
-.lede {
-  margin: 0 0 0.9rem;
-  max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
+.lede { margin: 0 0 var(--space-3); max-width: 42rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
-.head { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: flex-end; margin-bottom: 0.8rem; }
-.head__pending { color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
+.head { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin-bottom: var(--space-3); }
+.head__pending { color: var(--ink-muted); font-size: 12px; }
 
-.fld { display: block; }
+/* The only narrow field in the app — not a Task 1 primitive. */
+.input--narrow { width: 4.5rem; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
 
-.fld__label {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.inp {
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.inp--narrow { max-width: 6rem; }
-
-.wrap { overflow-x: auto; max-height: 55vh; overflow-y: auto; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-
-.tbl th, .tbl td {
-  padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
-  text-align: right;
-}
-
-.tbl th.is-text, .tbl td.is-text { text-align: left; }
-
-.tbl th {
-  color: var(--bhs-cyan-accent);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
+.wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th, .tbl td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+.tbl th { color: var(--ink-muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
 .tabular { font-variant-numeric: tabular-nums; }
-.muted { color: var(--text-muted, #94a3b8); }
-
-.hint { margin: 0.6rem 0 0; font-size: 0.8rem; line-height: 1.5; }
-.hint--good { color: var(--bhs-cyan-accent); }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
 </style>

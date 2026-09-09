@@ -159,6 +159,10 @@ const RESTYLED = [
   'src/components/planner/DrillsBankModal.vue',
   'src/components/planner/RoundRobinModal.vue',
   'src/components/planner/SavePlanModal.vue',
+  'src/components/auth/AuthModal.vue',
+  'src/components/roster/PlayerFormModal.vue',
+  'src/components/roster/RecordingNumbersModal.vue',
+  'src/components/schedule/MatchFormModal.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;
