@@ -7,11 +7,15 @@
  * an item a visitor cannot reach is not in the document at all.
  *
  * Under 768px the bar holds five. `barItems` decides which sit in it and
- * which go behind More — a sheet that also carries the admin screen, which is
- * not in NAV_ITEMS because most visitors cannot open it. Above 768px every
- * item is in the bar and the More tab and the sheet are display:none; the
- * bar renders every item once, with the overflowed ones marked, so the
- * split is a matter of CSS rather than two lists.
+ * which go behind More. Above 768px every item is in the bar and the More tab
+ * and the sheet are display:none; the bar renders every item once, with the
+ * overflowed ones marked, so the split is a matter of CSS rather than two
+ * lists.
+ *
+ * Every item comes from NAV_ITEMS, admin included. Admin used to be appended
+ * to the sheet on its own, which made it unreachable by clicking above 768px,
+ * where the sheet is hidden -- so the one screen only a coach or admin can
+ * open was the one screen they could not navigate to.
  */
 import { ref, computed, nextTick } from 'vue';
 import { NAV_ITEMS, routeAllowed, type NavItem } from '../../router';
@@ -33,7 +37,6 @@ const overflowNames = computed(() => new Set(split.value.overflow.map(i => i.nam
 const hasMore = computed(() => split.value.overflow.length > 0);
 
 /** The admin screen is reached on purpose; it lives in the sheet, not the bar. */
-const showAdmin = computed(() => auth.isCoach || auth.isAdmin);
 
 function isOverflow(item: NavItem): boolean {
   return overflowNames.value.has(item.name);
@@ -84,6 +87,7 @@ async function onSheetKeydown(e: KeyboardEvent): Promise<void> {
           :title="item.label"
           data-nav-item
           :data-nav-overflow="isOverflow(item) ? '' : undefined"
+          :data-nav-admin="item.name === 'admin' ? '' : undefined"
           @click="closeSheet"
         >{{ item.short }}</RouterLink>
       </li>
@@ -115,14 +119,9 @@ async function onSheetKeydown(e: KeyboardEvent): Promise<void> {
         <li v-for="item in split.overflow" :key="item.name" class="sheet__item">
           <RouterLink
             :to="item.path" class="sheet__link" :title="item.label"
-            data-nav-sheet-item @click="closeSheet"
+            data-nav-sheet-item :data-nav-admin="item.name === 'admin' ? '' : undefined"
+            @click="closeSheet"
           >{{ item.short }}</RouterLink>
-        </li>
-        <li v-if="showAdmin" class="sheet__item">
-          <RouterLink
-            to="/admin" class="sheet__link" title="Admin"
-            data-nav-sheet-item data-nav-admin @click="closeSheet"
-          >Admin</RouterLink>
         </li>
       </ul>
     </div>

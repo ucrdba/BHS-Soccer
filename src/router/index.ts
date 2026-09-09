@@ -60,7 +60,13 @@ export const NAV_ITEMS: NavItem[] = [
   { name: 'matrix',   path: '/matrix',    label: 'Player Ratings',     short: 'Ratings',  icon: '🏆' },
   { name: 'planner',  path: '/planner',   label: 'Coach Planner',      short: 'Planner',  icon: '📋' },
   { name: 'coaches',  path: '/coaches',   label: 'Coaching Staff',     short: 'Staff',    icon: '👔' },
-  { name: 'help',     path: '/help',      label: 'Help',               short: 'Help',     icon: '📖' }
+  { name: 'help',     path: '/help',      label: 'Help',               short: 'Help',     icon: '📖' },
+  // Last, and only ever visible to a coach or an admin -- AppNav filters this
+  // list through routeAllowed(), so nobody else has it in the document. It
+  // belongs here rather than being appended to the More sheet on its own: the
+  // sheet is display:none at 768px and above, so a link that lived only there
+  // could not be reached on a desktop at all.
+  { name: 'admin',    path: '/admin',     label: 'Admin',              short: 'Admin',    icon: '⚙️' }
 ];
 
 /**

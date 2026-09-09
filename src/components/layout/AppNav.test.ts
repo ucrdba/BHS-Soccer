@@ -3,8 +3,10 @@
  *
  * The list is filtered by the same rule the router guards on, so an item a
  * visitor may not reach is not rendered at all. On a phone the bar holds
- * five: a guest's four public items fit, a coach's seven become four plus a
- * More sheet holding the rest and the admin screen.
+ * five: a guest's four public items fit, a coach's eight become four plus a
+ * More sheet holding the rest. Every item comes from NAV_ITEMS, admin
+ * included -- an item that lived only in the sheet was unreachable above
+ * 768px, where the sheet is display:none.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -12,7 +14,7 @@ import { createTestingPinia } from '@pinia/testing';
 import AppNav from './AppNav.vue';
 
 const PUBLIC = ['Home', 'Roster', 'Schedule', 'Help'];
-const ALL = ['Home', 'Roster', 'Schedule', 'Ratings', 'Planner', 'Staff', 'Help'];
+const ALL = ['Home', 'Roster', 'Schedule', 'Ratings', 'Planner', 'Staff', 'Help', 'Admin'];
 
 /** Mount with the auth store seeded to a role. */
 function mountAs(state: Record<string, boolean>) {
@@ -42,7 +44,7 @@ const sheetLabels = (w: any) => w.findAll('[data-nav-sheet-item]').map((n: any) 
 describe('AppNav', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
 
-  it('shows all seven items to a coach, in their established order', () => {
+  it('shows all eight items to a coach, in their established order', () => {
     const w = mountAs({ isCoach: true, canAccessRatings: true, isGuest: false });
     expect(barLabels(w)).toEqual(ALL);
   });
@@ -77,12 +79,31 @@ describe('AppNav', () => {
     expect(sheetLabels(w)).toEqual(['Planner', 'Staff', 'Help', 'Admin']);
     // The bar marks which of its items are behind More on a phone.
     const overflowed = w.findAll('[data-nav-item][data-nav-overflow]').map((n: any) => n.text());
-    expect(overflowed).toEqual(['Planner', 'Staff', 'Help']);
+    expect(overflowed).toEqual(['Planner', 'Staff', 'Help', 'Admin']);
   });
 
   it('offers Admin in the sheet to an admin who is not a coach', () => {
     const w = mountAs({ isAdmin: true, canAccessRatings: true, isGuest: false });
     expect(w.find('[data-nav-admin]').exists()).toBe(true);
+  });
+
+  /*
+   * The regression this arrangement exists to prevent. Admin used to be
+   * appended to the More sheet alone, and `.sheet` is display:none at 768px
+   * and above -- so on any desktop width the admin screen could not be
+   * reached by clicking at all. Rendering it from NAV_ITEMS like every other
+   * route puts it in the bar, which is the element that survives the
+   * breakpoint.
+   */
+  it('puts Admin in the bar, not only the sheet', () => {
+    const w = mountAs({ isCoach: true, canAccessRatings: true, isGuest: false });
+    expect(barLabels(w)).toContain('Admin');
+    expect(w.find('[data-nav-item][data-nav-admin]').exists()).toBe(true);
+  });
+
+  it('shows Admin to nobody who cannot open it', () => {
+    expect(barLabels(mountAs({}))).not.toContain('Admin');
+    expect(barLabels(mountAs({ canAccessRatings: true, isGuest: false }))).not.toContain('Admin');
   });
 
   it('opens the sheet and closes it again', async () => {

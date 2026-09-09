@@ -74,7 +74,7 @@ describe('routeAllowed', () => {
 });
 
 describe('NAV_ITEMS', () => {
-  it('lists the seven menu items in their established order', () => {
+  it('lists the eight menu items in their established order', () => {
     expect(NAV_ITEMS.map(i => i.label)).toEqual([
       'Home',
       'Roster & Bios',
@@ -82,7 +82,8 @@ describe('NAV_ITEMS', () => {
       'Player Ratings',
       'Coach Planner',
       'Coaching Staff',
-      'Help'
+      'Help',
+      'Admin'
     ]);
   });
 
@@ -101,7 +102,7 @@ describe('NAV_ITEMS', () => {
   });
 
   it('filters to everything for a coach', () => {
-    expect(NAV_ITEMS.filter(i => routeAllowed(i.name, coach))).toHaveLength(7);
+    expect(NAV_ITEMS.filter(i => routeAllowed(i.name, coach))).toHaveLength(8);
   });
 });
 
@@ -128,8 +129,23 @@ describe('the admin route', () => {
     expect(routeAllowed('admin', admin)).toBe(true);
   });
 
-  it('is NOT in the nav, being reached on purpose', () => {
-    // A menu item most visitors cannot open is noise.
-    expect(NAV_ITEMS.map(i => i.name)).not.toContain('admin');
+  /*
+   * It used to be kept out of NAV_ITEMS on the reasoning that a menu item most
+   * visitors cannot open is noise. But AppNav filters the list through this
+   * same routeAllowed(), so the item is not in the document at all for anyone
+   * who cannot open it -- the noise never existed. What the omission did cause
+   * was a real defect: the link lived only in the More sheet, and the sheet is
+   * display:none at 768px and above, so no coach or admin on a desktop could
+   * reach the admin screen by clicking at all.
+   */
+  it('is in the nav, so it is reachable at every width', () => {
+    expect(NAV_ITEMS.map(i => i.name)).toContain('admin');
+  });
+
+  it('is still hidden from anyone who cannot open it', () => {
+    for (const who of [guest, player]) {
+      expect(NAV_ITEMS.filter(i => routeAllowed(i.name, who)).map(i => i.name))
+        .not.toContain('admin');
+    }
   });
 });
