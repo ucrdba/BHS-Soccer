@@ -96,33 +96,14 @@ async function onSave(): Promise<void> {
       :diagram="diagram" :active="open"
       data-diagram-board />
 
-    <p v-if="error" class="hint hint--bad" role="alert" data-diagram-error>{{ error }}</p>
+    <p v-if="error" class="note note--bad" role="alert" data-diagram-error>{{ error }}</p>
 
     <template #footer>
       <button type="button" class="btn" @click="emit('close')">Cancel</button>
       <button
-        type="button" class="btn btn--primary" :disabled="saving"
+        type="button" class="btn btn--go" :disabled="saving"
         data-diagram-save @click="onSave"
       >{{ saving ? 'Saving…' : 'Save diagram' }}</button>
     </template>
   </BaseModal>
 </template>
-
-<style scoped>
-.hint { margin: 0.6rem 0 0; font-size: 0.8rem; line-height: 1.5; }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
-</style>

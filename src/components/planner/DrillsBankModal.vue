@@ -113,19 +113,19 @@ async function onDelete(drill: any): Promise<void> {
       into any session, and the Competitive Matrix scores against the same list.
     </p>
 
-    <p v-if="drills.length === 0" class="hint" data-library-empty>
+    <p v-if="drills.length === 0" class="note" data-library-empty>
       No drills in the library yet. Write one and it is available to every
       squad.
     </p>
 
-    <div v-for="d in drills" :key="d.id" class="row" data-library-row>
+    <div v-for="d in drills" :key="d.id" class="row hrow" data-library-row>
       <div class="row__what">
         <strong class="row__name" data-library-name>{{ d.name }}</strong>
-        <span class="tag">{{ d.category || 'General' }}</span>
-        <span class="tag tag--quiet" data-library-weight>
+        <span class="tag tag--live">{{ d.category || 'General' }}</span>
+        <span class="tag" data-library-weight>
           weight {{ Number(d.points ?? 3) }}
         </span>
-        <span v-if="d.diagram_image || d.diagramImage" class="tag tag--quiet">diagram</span>
+        <span v-if="d.diagram_image || d.diagramImage" class="tag">diagram</span>
         <p v-if="d.coach_notes || d.coachNotes" class="row__notes">
           {{ d.coach_notes || d.coachNotes }}
         </p>
@@ -151,23 +151,23 @@ async function onDelete(drill: any): Promise<void> {
     </p>
 
     <div v-if="composing" class="form" data-library-form>
-      <label class="fld">
-        <span class="fld__label">Drill</span>
-        <input v-model="name" type="text" class="inp inp--wide" data-library-name-input />
+      <label class="field">
+        <span class="fld__label kicker">Drill</span>
+        <input v-model="name" type="text" class="input input--wide" data-library-name-input />
       </label>
 
-      <label class="fld">
-        <span class="fld__label">Category</span>
-        <input v-model="category" type="text" class="inp" placeholder="General" data-library-category />
+      <label class="field">
+        <span class="fld__label kicker">Category</span>
+        <input v-model="category" type="text" class="input" placeholder="General" data-library-category />
       </label>
 
-      <label class="fld">
-        <span class="fld__label">Coach notes</span>
-        <textarea v-model="notes" class="inp inp--wide" rows="3" data-library-notes />
+      <label class="field">
+        <span class="fld__label kicker">Coach notes</span>
+        <textarea v-model="notes" class="input input--wide" rows="3" data-library-notes />
       </label>
     </div>
 
-    <p v-if="error" class="hint hint--bad" role="alert" data-library-error>{{ error }}</p>
+    <p v-if="error" class="note note--bad" role="alert" data-library-error>{{ error }}</p>
 
     <template #footer>
       <button type="button" class="btn" @click="emit('close')">Close</button>
@@ -175,7 +175,7 @@ async function onDelete(drill: any): Promise<void> {
         Add a drill
       </button>
       <button
-        v-else type="button" class="btn btn--primary" :disabled="busy"
+        v-else type="button" class="btn btn--go" :disabled="busy"
         data-library-save @click="onSave"
       >{{ busy ? 'Saving…' : 'Save drill' }}</button>
     </template>
@@ -183,96 +183,38 @@ async function onDelete(drill: any): Promise<void> {
 </template>
 
 <style scoped>
-.lede {
-  margin: 0 0 0.9rem;
-  max-width: 40rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
+.lede { margin: 0 0 var(--space-3); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
+/* The global .hrow is align-items: baseline; this row's own content — a
+   name, tags and actions of different heights — reads better centred. */
+.row { align-items: center; }
 
 .row__what { flex: 1; min-width: 14rem; }
-.row__name { color: var(--ink); font-size: 0.9rem; }
+.row__name { color: var(--ink); font-size: 14px; }
 
-.row__notes {
-  margin: 0.25rem 0 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
+.row__notes { margin: var(--space-1) 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
-.tag {
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-}
+/* Spacing between the name and the tags that follow it — .row__what is not
+   a flex container, so the gap has to live on the tag itself. */
+.tag { margin-left: var(--space-1); }
 
-.tag--quiet { color: var(--text-muted, #94a3b8); }
+.row__acts { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
-.row__acts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.weights { margin: var(--space-3) 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
 
-.weights {
-  margin: 0.9rem 0 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.76rem;
-  line-height: 1.5;
-}
+.form { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--rule); }
 
-.form { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--bhs-navy-border); }
+.field { margin-bottom: var(--space-2); }
 
-.fld { display: block; margin-bottom: 0.6rem; }
-
-.fld__label {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.inp {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.inp--wide { width: 100%; }
-
-.hint { margin: 0.7rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.8rem; line-height: 1.5; }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.mini, .btn {
-  padding: 0.22rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+.mini {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 12px;
   cursor: pointer;
 }
-
-.btn { color: var(--ink); padding: 0.3rem 0.65rem; font-size: 0.78rem; }
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
-.mini--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.mini--danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
 </style>

@@ -139,10 +139,10 @@ function onSave(): void {
     wide
     @close="emit('close')"
   >
-    <label v-if="!editing && library.length" class="fld">
-      <span class="fld__label">Start from a drill in the library</span>
+    <label v-if="!editing && library.length" class="field">
+      <span class="fld__label kicker">Start from a drill in the library</span>
       <select
-        class="inp" data-drill-library
+        class="input" data-drill-library
         :value="fromLibrary"
         @change="onPickFromLibrary(($event.target as HTMLSelectElement).value)"
       >
@@ -151,32 +151,32 @@ function onSave(): void {
       </select>
     </label>
 
-    <label class="fld">
-      <span class="fld__label">Drill</span>
-      <input v-model="name" type="text" class="inp inp--wide" data-drill-name-input />
+    <label class="field">
+      <span class="fld__label kicker">Drill</span>
+      <input v-model="name" type="text" class="input input--wide" data-drill-name-input />
     </label>
 
     <div class="times">
-      <label class="fld">
-        <span class="fld__label">Starts</span>
+      <label class="field">
+        <span class="fld__label kicker">Starts</span>
         <input
-          v-model="start" type="time" class="inp" data-drill-start
+          v-model="start" type="time" class="input" data-drill-start
           @change="onTimesChanged"
         />
       </label>
 
-      <label class="fld">
-        <span class="fld__label">Ends</span>
+      <label class="field">
+        <span class="fld__label kicker">Ends</span>
         <input
-          v-model="end" type="time" class="inp" data-drill-end
+          v-model="end" type="time" class="input" data-drill-end
           @change="onTimesChanged"
         />
       </label>
 
-      <label class="fld">
-        <span class="fld__label">Runs for</span>
+      <label class="field">
+        <span class="fld__label kicker">Runs for</span>
         <select
-          class="inp" data-drill-duration
+          class="input" data-drill-duration
           :value="durationChoice"
           @change="onDurationPicked(($event.target as HTMLSelectElement).value)"
         >
@@ -190,16 +190,16 @@ function onSave(): void {
       {{ slot ? `${slot.slot} · ${slot.duration}` : 'Set a start and an end time.' }}
     </p>
 
-    <label class="fld">
-      <span class="fld__label">Coach focus and notes</span>
-      <textarea v-model="notes" class="inp inp--wide" rows="4" data-drill-notes />
+    <label class="field">
+      <span class="fld__label kicker">Coach focus and notes</span>
+      <textarea v-model="notes" class="input input--wide" rows="4" data-drill-notes />
     </label>
 
-    <p v-if="error" class="hint hint--bad" role="alert" data-drill-error>{{ error }}</p>
+    <p v-if="error" class="note note--bad" role="alert" data-drill-error>{{ error }}</p>
 
     <template #footer>
       <button type="button" class="btn" @click="emit('close')">Cancel</button>
-      <button type="button" class="btn btn--primary" data-drill-save @click="onSave">
+      <button type="button" class="btn btn--go" data-drill-save @click="onSave">
         {{ editing ? 'Save drill' : 'Add to the plan' }}
       </button>
     </template>
@@ -207,52 +207,10 @@ function onSave(): void {
 </template>
 
 <style scoped>
-.fld { display: block; margin-bottom: 0.7rem; }
+.field { margin-bottom: var(--space-3); }
 
-.fld__label {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
+.times { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.times .field { margin-bottom: var(--space-2); }
 
-.inp {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.inp--wide { width: 100%; }
-
-.times { display: flex; flex-wrap: wrap; gap: 0.8rem; }
-.times .fld { margin-bottom: 0.4rem; }
-
-.slot {
-  margin: 0 0 0.8rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.82rem;
-}
-
-.hint { margin: 0.5rem 0 0; font-size: 0.8rem; line-height: 1.5; }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.slot { margin: 0 0 var(--space-3); color: var(--ink-muted); font-size: 13px; }
 </style>

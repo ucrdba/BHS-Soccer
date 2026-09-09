@@ -168,42 +168,46 @@ defineExpose({ diagramData, image });
 </template>
 
 <style scoped>
-.board { display: flex; flex-direction: column; gap: 0.4rem; }
+.board { display: flex; flex-direction: column; gap: var(--space-2); }
 
-.tools { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.tools { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
 .spacer { flex: 1; }
 
 .tool {
-  padding: 0.22rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink);
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.tool.is-on { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
+.tool.is-on { border-color: var(--live); color: var(--live); }
 .tool:disabled { opacity: 0.4; cursor: default; }
 
 .wrap { display: flex; justify-content: center; }
-.canvas { max-width: 100%; border: 1px solid var(--bhs-navy-border); border-radius: 6px; touch-action: none; }
+.canvas { max-width: 100%; border: 1px solid var(--rule); border-radius: 6px; touch-action: none; }
 
-.frames { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.frames { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
 
 .frame {
-  padding: 0.22rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.frame.is-on { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
+.frame.is-on { border-color: var(--live); color: var(--live); }
 
-.notice { margin: 0.2rem 0 0; color: var(--bhs-cyan-accent); font-size: 0.78rem; line-height: 1.5; }
+.notice { margin: var(--space-1) 0 0; color: var(--live); font-size: 13px; line-height: 1.5; }
 </style>

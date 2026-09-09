@@ -152,6 +152,13 @@ const RESTYLED = [
   'src/components/admin/SchoolProfileSection.vue',
   'src/components/admin/DiagnosticsSection.vue',
   'src/components/admin/ImportExportModal.vue',
+  'src/views/PlannerView.vue',
+  'src/components/planner/TacticalBoard.vue',
+  'src/components/planner/DiagramModal.vue',
+  'src/components/planner/DrillFormModal.vue',
+  'src/components/planner/DrillsBankModal.vue',
+  'src/components/planner/RoundRobinModal.vue',
+  'src/components/planner/SavePlanModal.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;

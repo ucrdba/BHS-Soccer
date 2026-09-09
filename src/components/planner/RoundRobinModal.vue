@@ -106,7 +106,7 @@ function downloadCsv(): void {
       </div>
 
       <section v-for="r in rounds" :key="r.round" class="round" data-rr-round>
-        <h3 class="round__h">Round {{ r.round }}</h3>
+        <h3 class="round__h kicker">Round {{ r.round }}</h3>
 
         <div
           v-for="(m, i) in r.matches" :key="i"
@@ -134,63 +134,32 @@ function downloadCsv(): void {
 </template>
 
 <style scoped>
-.lede {
-  margin: 0 0 0.9rem;
-  max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
+.lede { margin: 0 0 var(--space-3); max-width: 42rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
-.state { padding: 2rem 0; color: var(--text-muted, #94a3b8); text-align: center; font-size: 0.88rem; }
-.state--bad { color: var(--color-danger, #f87171); }
+.state { padding: var(--space-6) 0; color: var(--ink-muted); text-align: center; font-size: 14px; }
+.state--bad { color: var(--color-danger); }
 
-.bar {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  margin-bottom: 0.8rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.8rem;
-}
+.bar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); color: var(--ink-muted); font-size: 13px; }
 
 .spacer { flex: 1; }
 
-.round { margin-bottom: 0.9rem; }
-
-.round__h {
-  margin: 0 0 0.35rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
+.round { margin-bottom: var(--space-3); }
+.round__h { margin: 0 0 var(--space-1); }
 
 .match {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: baseline;
-  padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid var(--bhs-navy-border);
-  font-size: 0.82rem;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
 }
 
-.match.is-played { color: var(--text-muted, #94a3b8); }
-.match.is-bye { color: var(--text-muted, #94a3b8); font-style: italic; }
+.match.is-played { color: var(--ink-muted); }
+.match.is-bye { color: var(--ink-muted); font-style: italic; }
 
 .match__who { color: inherit; }
-.match__v { color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
-.match__bye { color: var(--text-muted, #94a3b8); font-size: 0.72rem; }
-.match__result { margin-left: auto; color: var(--bhs-gold-accent); font-size: 0.75rem; }
-
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
+.match__v { color: var(--ink-muted); font-size: 12px; }
+.match__bye { color: var(--ink-muted); font-size: 12px; }
+.match__result { margin-left: auto; color: var(--rule-strong); font-size: 12px; }
 </style>

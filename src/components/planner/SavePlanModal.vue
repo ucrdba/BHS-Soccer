@@ -96,38 +96,38 @@ async function onCopy(): Promise<void> {
 <template>
   <BaseModal :open="open" title="Saved plans" @close="emit('close')">
     <section class="block">
-      <h3 class="block__h">Save this session</h3>
-      <label class="fld">
-        <span class="fld__label">Plan name</span>
-        <input v-model="name" type="text" class="inp inp--wide" data-plan-name />
+      <h3 class="block__h kicker">Save this session</h3>
+      <label class="field">
+        <span class="fld__label kicker">Plan name</span>
+        <input v-model="name" type="text" class="input input--wide" data-plan-name />
       </label>
-      <p v-if="willReplace" class="hint" data-plan-replace>
+      <p v-if="willReplace" class="note" data-plan-replace>
         A plan called "{{ name.trim() }}" already exists on this team. Saving
         replaces it.
       </p>
       <button
-        type="button" class="btn btn--primary" :disabled="busy"
+        type="button" class="btn btn--go" :disabled="busy"
         data-plan-save @click="onSave"
       >{{ busy ? 'Saving…' : 'Save plan' }}</button>
     </section>
 
     <section v-if="copyable" class="block" data-plan-active>
-      <h3 class="block__h">"{{ copyable.name }}"</h3>
+      <h3 class="block__h kicker">"{{ copyable.name }}"</h3>
 
-      <label class="fld">
-        <span class="fld__label">Rename to</span>
-        <input v-model="renameTo" type="text" class="inp inp--wide" data-plan-rename-to />
+      <label class="field">
+        <span class="fld__label kicker">Rename to</span>
+        <input v-model="renameTo" type="text" class="input input--wide" data-plan-rename-to />
       </label>
       <button type="button" class="btn" data-plan-rename @click="onRename">Rename</button>
 
-      <label class="fld fld--top">
-        <span class="fld__label">Copy to another team</span>
-        <select v-model="target" class="inp inp--wide" data-plan-copy-target>
+      <label class="field fld--top">
+        <span class="fld__label kicker">Copy to another team</span>
+        <select v-model="target" class="input input--wide" data-plan-copy-target>
           <option value="">— pick a team —</option>
           <option v-for="t in planner.copyTargets" :key="t.id" :value="t.id">{{ t.name }}</option>
         </select>
       </label>
-      <p class="hint">
+      <p class="note">
         Only teams you coach are listed — the database refuses a write to any
         other, so offering one would be a control that always fails.
       </p>
@@ -140,13 +140,13 @@ async function onCopy(): Promise<void> {
       </div>
     </section>
 
-    <p v-else class="hint" data-plan-none-active>
+    <p v-else class="note" data-plan-none-active>
       Load a saved plan to rename, copy or delete it. Copying matches on the
       plan's name, so it needs one that has actually been saved.
     </p>
 
-    <p v-if="notice" class="hint hint--good" role="status" data-plan-notice>{{ notice }}</p>
-    <p v-if="error" class="hint hint--bad" role="alert" data-plan-error>{{ error }}</p>
+    <p v-if="notice" class="note note--good" role="status" data-plan-notice>{{ notice }}</p>
+    <p v-if="error" class="note note--bad" role="alert" data-plan-error>{{ error }}</p>
 
     <template #footer>
       <button type="button" class="btn" @click="emit('close')">Close</button>
@@ -155,60 +155,13 @@ async function onCopy(): Promise<void> {
 </template>
 
 <style scoped>
-.block { padding-bottom: 0.9rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--bhs-navy-border); }
+.block { padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
 .block:last-of-type { border-bottom: 0; }
 
-.block__h {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.74rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
+.block__h { margin: 0 0 var(--space-2); }
 
-.fld { display: block; margin-bottom: 0.6rem; }
-.fld--top { margin-top: 0.9rem; }
+.field { margin-bottom: var(--space-2); }
+.fld--top { margin-top: var(--space-3); }
 
-.fld__label {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.inp {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.inp--wide { width: 100%; }
-
-.hint { margin: 0.4rem 0; color: var(--text-muted, #94a3b8); font-size: 0.78rem; line-height: 1.5; }
-.hint--good { color: var(--bhs-cyan-accent); }
-.hint--bad { color: var(--color-danger, #f87171); }
-
-.danger { margin-top: 1rem; padding-top: 0.7rem; border-top: 1px solid var(--bhs-navy-border); }
-
-.btn {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--primary { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn--danger { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-.btn:disabled { opacity: 0.55; cursor: default; }
+.danger { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--rule); }
 </style>

@@ -189,7 +189,7 @@ async function onDrop(index: number): Promise<void> {
           Build a session as a timeline. The times reflow themselves, so a
           drill that runs long moves everything after it.
         </p>
-        <p v-if="org.branding.name" class="planner__org">
+        <p v-if="org.branding.name" class="planner__org kicker">
           {{ org.branding.name }}
           <span v-if="org.activeTeam">· {{ org.activeTeam.name }}</span>
         </p>
@@ -241,15 +241,15 @@ async function onDrop(index: number): Promise<void> {
 
     <div class="bar">
       <div>
-        <span class="bar__label">Active plan</span>
+        <span class="bar__label kicker">Active plan</span>
         <strong class="bar__value">{{ planner.activePlanName || 'Unsaved session' }}</strong>
       </div>
       <div>
-        <span class="bar__label">Total session time</span>
+        <span class="bar__label kicker">Total session time</span>
         <strong class="bar__value" data-total-time>{{ planner.totalTime }}</strong>
       </div>
       <div>
-        <span class="bar__label">Drills</span>
+        <span class="bar__label kicker">Drills</span>
         <strong class="bar__value" data-drill-count>{{ items.length }}</strong>
       </div>
     </div>
@@ -343,174 +343,106 @@ async function onDrop(index: number): Promise<void> {
 </template>
 
 <style scoped>
-.planner { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.planner { padding: var(--space-4) var(--space-4) var(--space-8); }
 
 .planner__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-3);
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
 }
 
-.planner__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.planner__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.planner__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
+.planner__org { margin-top: var(--space-1); }
+.planner__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-.planner__sub {
-  margin: 0.3rem 0 0;
-  max-width: 44rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.planner__org {
-  margin: 0.4rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.planner__acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
-
-.act--go { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
-
+/* A control in the header strip. Outlined, like every other action. */
 .act {
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--bhs-cyan-accent);
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.picker {
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
-}
-
-.picker__none { margin: 0.4rem 0.3rem; color: var(--text-muted, #94a3b8); font-size: 0.82rem; }
-
-.picker__row {
-  display: flex;
-  gap: 0.8rem;
-  align-items: baseline;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.45rem 0.55rem;
-  border: 0;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-  text-align: left;
+  font-family: var(--heading-face);
+  font-size: 14px;
   cursor: pointer;
 }
+.act:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.act--go { border-color: var(--live); color: var(--live); }
 
-.picker__row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
-.picker__meta { color: var(--text-muted, #94a3b8); font-size: 0.75rem; }
+/* The saved-plan picker. */
+.picker { margin: var(--space-4) 0; padding: var(--space-3); border: 1px solid var(--rule); border-radius: var(--radius-md); }
+.picker__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; justify-content: space-between; padding: var(--space-1) 0; }
+.picker__meta { color: var(--ink-muted); font-size: 12px; }
+.picker__none { margin: var(--space-1) var(--space-1); color: var(--ink-muted); font-size: 13px; }
 
+/* The running total for the session. */
 .bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
-  margin-bottom: 1rem;
-  padding: 0.6rem 0.85rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
+  gap: var(--space-3);
+  align-items: baseline;
+  margin: var(--space-4) 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
+.bar__label { color: var(--ink-muted); }
+.bar__value { color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 17px; font-variant-numeric: tabular-nums; }
 
-.bar__label {
-  display: block;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.bar__value { color: var(--bhs-cyan-accent); font-size: 0.95rem; }
-
-.empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; line-height: 1.6; }
+.empty { padding: var(--space-8) var(--space-3); color: var(--ink-muted); text-align: center; line-height: 1.6; }
 
 .list { margin: 0; padding: 0; list-style: none; }
 
+/* A drill in the plan: a hairline row, selected by an accent keyline rather
+   than a fill. */
 .drill {
   display: flex;
-  gap: 0.9rem;
-  align-items: flex-start;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  cursor: grab;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-bottom-color: var(--rule);
 }
+.drill.is-selected { border-color: var(--rule-strong); border-radius: var(--radius-md); }
+.drill__what { display: flex; flex-direction: column; gap: 2px; }
+.drill__name { color: var(--ink); font-size: 14px; }
+.drill__when { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.drill__dur { color: var(--live); font-size: 12px; font-variant-numeric: tabular-nums; }
+.drill__slot { color: var(--ink-muted); font-size: 12px; }
+.drill__notes { width: 100%; margin-top: var(--space-1); color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+.drill__diagram { display: inline-flex; align-items: center; gap: 4px; color: var(--live); font-size: 12px; }
+.drill__acts { display: flex; gap: var(--space-1); }
 
-.drill.is-selected { border-color: var(--bhs-gold-accent); background: rgba(0, 71, 171, 0.18); }
-
-.drill__when { min-width: 9.5rem; }
-.drill__slot { display: block; color: var(--ink); font-size: 0.8rem; white-space: nowrap; }
-.drill__dur { color: var(--bhs-cyan-accent); font-size: 0.74rem; }
-
-.drill__what { flex: 1; }
-.drill__name { margin: 0; color: var(--ink); font-size: 0.95rem; }
-
-.drill__notes {
-  margin: 0.25rem 0 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.82rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.drill__acts { display: flex; gap: 0.3rem; align-items: center; }
-
-.drill__diagram {
-  display: block;
-  margin-top: 0.5rem;
-  max-width: 18rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.mini {
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted, #94a3b8);
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.mini:disabled { opacity: 0.35; cursor: default; }
-.mini--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+/* The smallest control there is: a text button inside a row. */
+.mini { padding: 0 var(--space-1); border: 0; background: none; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.mini:hover { color: var(--ink); }
+.mini--danger:hover { color: var(--color-danger); }
 
 .notice {
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.85rem;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
 }
+.notice--bad { border-left-color: var(--color-warning); }
+.notice__x { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-
-.notice__x {
-  float: right;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: 1rem;
-  cursor: pointer;
-}
+@media (min-width: 768px) { .planner { max-width: 64rem; margin: 0 auto; } }
 </style>
