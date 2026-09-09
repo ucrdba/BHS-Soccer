@@ -50,32 +50,32 @@ const title = computed(() => (props.coach ? 'Edit coach' : 'Add a coach'));
 
     <form id="coach-form" class="grid" @submit.prevent="emit('save', f)">
       <label class="field">
-        <span class="field__label">Name</span>
-        <input v-model="f.name" class="field__input" required data-field="name" />
+        <span class="kicker">Name</span>
+        <input v-model="f.name" class="input" required data-field="name" />
       </label>
       <label class="field">
-        <span class="field__label">Role</span>
-        <input v-model="f.level" class="field__input" required
+        <span class="kicker">Role</span>
+        <input v-model="f.level" class="input" required
                placeholder="e.g. Head Coach" data-field="level" />
       </label>
 
       <label class="field">
-        <span class="field__label">Email</span>
-        <input v-model="f.email" type="email" class="field__input" data-field="email" />
+        <span class="kicker">Email</span>
+        <input v-model="f.email" type="email" class="input" data-field="email" />
       </label>
       <label class="field">
-        <span class="field__label">Phone</span>
-        <input v-model="f.phone" class="field__input" data-field="phone" />
+        <span class="kicker">Phone</span>
+        <input v-model="f.phone" class="input" data-field="phone" />
       </label>
 
       <label class="field field--wide">
-        <span class="field__label">Photo URL</span>
-        <input v-model="f.photo" class="field__input" data-field="photo" />
+        <span class="kicker">Photo URL</span>
+        <input v-model="f.photo" class="input" data-field="photo" />
       </label>
 
       <label class="field field--wide">
-        <span class="field__label">Bio</span>
-        <textarea v-model="f.bio" class="field__input field__input--area"
+        <span class="kicker">Bio</span>
+        <textarea v-model="f.bio" class="input"
                   rows="4" data-field="bio"></textarea>
       </label>
     </form>
@@ -90,57 +90,6 @@ const title = computed(() => (props.coach ? 'Edit coach' : 'Add a coach'));
 </template>
 
 <style scoped>
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1rem; }
-.field--wide { grid-column: 1 / -1; }
-
-@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-
-.err {
-  margin: 0 0 0.9rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-danger, #f87171);
-  border-radius: 6px;
-  color: var(--color-danger, #f87171);
-  font-size: 0.84rem;
-}
-
-.field { display: block; margin-bottom: 0.85rem; }
-
-.field__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.field__input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.field__input--area { resize: vertical; font-family: inherit; }
-
-.btn {
-  padding: 0.55rem 1.1rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-
-.btn:disabled { opacity: 0.6; cursor: progress; }
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
-.btn--plain { border-color: var(--bhs-navy-border); background: transparent; color: var(--text-muted, #94a3b8); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
+.err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
 </style>

@@ -136,7 +136,9 @@ describe('the paper primitives', () => {
 const RESTYLED = [
   'src/components/roster/PlayerCard.vue',
   'src/components/roster/PlayerDetailModal.vue',
-  'src/components/ui/BaseModal.vue'
+  'src/components/ui/BaseModal.vue',
+  'src/views/CoachesView.vue',
+  'src/components/coaches/CoachFormModal.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;

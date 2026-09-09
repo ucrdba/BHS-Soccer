@@ -94,7 +94,7 @@ async function onReject(userId: string, name: string): Promise<void> {
     <header class="staff__head">
       <div>
         <h1 class="staff__title">Coaching Staff</h1>
-        <p v-if="org.branding.name" class="staff__org">{{ org.branding.name }}</p>
+        <p v-if="org.branding.name" class="staff__org kicker">{{ org.branding.name }}</p>
       </div>
       <button v-if="canEdit" type="button" class="btn btn--go" data-add-coach @click="openAdd">
         + Add coach
@@ -111,9 +111,9 @@ async function onReject(userId: string, name: string): Promise<void> {
 
     <!-- Waiting to be let in. Coaches and admins only. -->
     <section v-if="canEdit && store.pending.length" class="queue" data-pending-queue>
-      <h2 class="queue__title">Waiting for approval</h2>
+      <h2 class="queue__title kicker">Waiting for approval</h2>
       <ul class="queue__list">
-        <li v-for="u in store.pending" :key="u.id" class="queue__row" data-pending-row>
+        <li v-for="u in store.pending" :key="u.id" class="queue__row hrow" data-pending-row>
           <span class="queue__who">
             <strong>{{ u.name || u.email }}</strong>
             <span class="queue__meta">{{ u.email }} · asked for {{ u.role }}</span>
@@ -135,10 +135,13 @@ async function onReject(userId: string, name: string): Promise<void> {
 
     <div v-else class="grid">
       <article v-for="c in store.staff" :key="c.id" class="card" data-coach>
-        <img class="card__photo" :src="photoOrPlaceholder(c.photo, 'coach')" :alt="''" />
+        <span class="plate card__plate">
+          <img v-if="c.photo" class="plate__img" :src="photoOrPlaceholder(c.photo, 'coach')" :alt="''" />
+          <span v-else class="plate__label">Photo</span>
+        </span>
         <div class="card__body">
           <h2 class="card__name">{{ c.name }}</h2>
-          <p class="card__level">{{ c.level }}</p>
+          <p class="card__level kicker">{{ c.level }}</p>
           <p v-if="c.bio" class="card__bio">{{ c.bio }}</p>
           <p v-if="c.email" class="card__contact">
             <a :href="`mailto:${c.email}`">{{ c.email }}</a>
@@ -161,137 +164,74 @@ async function onReject(userId: string, name: string): Promise<void> {
 </template>
 
 <style scoped>
-.staff { max-width: 66rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.staff { padding: var(--space-4) var(--space-4) var(--space-8); }
 
 .staff__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
 }
 
-.staff__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.staff__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.staff__org { margin-top: var(--space-1); }
 
-.staff__org {
-  margin: 0.25rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
+/* Accounts waiting to be let in: an emphasised rule, not a filled panel. */
 .queue {
-  margin-bottom: 1.75rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--bhs-gold-accent);
-  border-radius: 8px;
+  margin: var(--space-4) 0 var(--space-6);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--rule-strong);
 }
 
-.queue__title {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
+.queue__title { margin: 0 0 var(--space-2); }
 .queue__list { margin: 0; padding: 0; list-style: none; }
+.queue__who { display: flex; flex-direction: column; color: var(--ink); font-size: 14px; }
+.queue__meta { color: var(--ink-muted); font-size: 12px; }
+.queue__acts { display: flex; gap: var(--space-1); }
 
-.queue__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.45rem 0;
-}
+.grid { display: flex; flex-direction: column; }
 
-.queue__who { display: flex; flex-direction: column; color: var(--ink); font-size: 0.9rem; }
-.queue__meta { color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
-.queue__acts { display: flex; gap: 0.4rem; }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-  gap: 1rem;
-}
-
+/* A bordered, unfilled card (spec §5.1): the rule carries it, not a fill. */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.1rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 10px;
-  background: var(--bhs-navy-card);
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.card__photo {
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 50%;
-  border: 2px solid var(--bhs-gold-accent);
-  object-fit: cover;
-  background: var(--bhs-navy-bg);
-}
+.card__plate { width: 4.5rem; height: 4.5rem; }
+.card__name { margin: 0; color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 18px; }
+.card__level { margin-top: 2px; }
+.card__bio { margin: var(--space-2) 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.55; }
+.card__contact { margin: var(--space-1) 0 0; font-size: 13px; }
+.card__contact a { color: var(--live); }
+.card__admin { display: flex; gap: var(--space-1); }
 
-.card__name { margin: 0; color: var(--ink); font-size: 1.05rem; }
-
-.card__level {
-  margin: 0.15rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.card__bio {
-  margin: 0.6rem 0 0;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
-.card__contact { margin: 0.5rem 0 0; font-size: 0.8rem; }
-.card__contact a { color: var(--bhs-cyan-accent); }
-
-.card__admin { display: flex; gap: 0.4rem; }
-
-.empty { padding: 3rem 1rem; color: var(--text-muted, #94a3b8); text-align: center; }
+.empty { padding: var(--space-8) var(--space-3); color: var(--ink-muted); text-align: center; }
 
 .notice {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-cyan-accent);
-  border-radius: 6px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.85rem;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
 }
-
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.notice--bad { border-left-color: var(--color-warning); }
 .notice__x { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 
-.btn {
-  padding: 0.55rem 1rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
+@media (min-width: 768px) {
+  .staff { max-width: 64rem; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: var(--space-4); }
+  .card { padding: var(--space-4); border: 1px solid var(--rule); border-radius: var(--radius-md); }
 }
-
-.btn--small { padding: 0.3rem 0.6rem; font-size: 0.74rem; }
-.btn--go { background: var(--bhs-cyan-accent); color: var(--bhs-navy-bg); }
-.btn--plain { border-color: var(--bhs-navy-border); background: transparent; color: var(--text-muted, #94a3b8); }
-.btn--danger { border-color: var(--bhs-navy-border); background: transparent; color: var(--text-muted, #94a3b8); }
-.btn--danger:hover { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
 </style>
