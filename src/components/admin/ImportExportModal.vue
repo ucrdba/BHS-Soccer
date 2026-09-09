@@ -316,7 +316,7 @@ async function onApply(): Promise<void> {
 <template>
   <BaseModal :open="open" title="Import and export" wide @close="emit('close')">
     <section class="block">
-      <h3 class="block__h">Export</h3>
+      <h3 class="block__h kicker">Export</h3>
       <p class="hint">
         A backup contains exactly what is in the database. A table with nothing
         in it exports as an empty sheet — that is how you can tell.
@@ -330,21 +330,29 @@ async function onApply(): Promise<void> {
       </button>
 
       <div class="tables">
-        <div v-for="d in defs" :key="d.key" class="table" data-export-row>
-          <span class="table__name">{{ d.sheetName }}</span>
-          <span v-if="!d.importable" class="tag" data-export-only>export only</span>
-          <button type="button" class="mini" :data-export-one="d.key" @click="onExportOne(d.key)">
-            Export
-          </button>
-          <button type="button" class="mini" :data-template="d.key" @click="onTemplate(d.key)">
-            Template
-          </button>
-        </div>
+        <table class="table">
+          <tbody>
+            <tr v-for="d in defs" :key="d.key" data-export-row>
+              <td class="table__name">{{ d.sheetName }}</td>
+              <td><span v-if="!d.importable" class="tag" data-export-only>export only</span></td>
+              <td>
+                <button type="button" class="mini" :data-export-one="d.key" @click="onExportOne(d.key)">
+                  Export
+                </button>
+              </td>
+              <td>
+                <button type="button" class="mini" :data-template="d.key" @click="onTemplate(d.key)">
+                  Template
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
     <section class="block">
-      <h3 class="block__h">Import</h3>
+      <h3 class="block__h kicker">Import</h3>
       <p class="hint">
         Choosing a file shows what it would change. Nothing is written until
         you press Apply.
@@ -353,9 +361,9 @@ async function onApply(): Promise<void> {
       <input type="file" accept=".xlsx,.xls,.csv" data-import-file @change="onFile" />
 
       <template v-if="plan">
-        <h4 class="sub" data-preview>What this would do</h4>
+        <h4 class="sub kicker" data-preview>What this would do</h4>
 
-        <div v-for="s in plan.sheets" :key="s.sheetName" class="row" data-preview-sheet>
+        <div v-for="s in plan.sheets" :key="s.sheetName" class="row hrow" data-preview-sheet>
           <span class="row__name">{{ s.sheetName }}</span>
           <span class="row__n" :data-preview-rows="s.key">{{ s.rows.length }} rows</span>
           <span v-if="!s.importable" class="tag" data-preview-skipped>not imported</span>
@@ -366,16 +374,16 @@ async function onApply(): Promise<void> {
         </p>
 
         <template v-if="plan.unknownTeams.length">
-          <h4 class="sub">Teams this file names that do not exist here</h4>
+          <h4 class="sub kicker">Teams this file names that do not exist here</h4>
           <p class="hint hint--warn" data-preview-unknown>
             Nothing is imported until each of these has a squad to go to — a row
             written against the wrong team is a player on a squad they never
             played for.
           </p>
 
-          <div v-for="name in plan.unknownTeams" :key="name" class="row" data-unknown-team>
+          <div v-for="name in plan.unknownTeams" :key="name" class="row hrow" data-unknown-team>
             <span class="row__name">{{ name }}</span>
-            <select v-model="mapping[name]" class="inp" :data-map-team="name">
+            <select v-model="mapping[name]" class="input" :data-map-team="name">
               <option value="">— pick a squad —</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
@@ -403,81 +411,35 @@ async function onApply(): Promise<void> {
 </template>
 
 <style scoped>
-.block { padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--bhs-navy-border); }
+.block { padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
 .block:last-of-type { border-bottom: 0; }
 
-.block__h {
-  margin: 0 0 0.4rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
+.block__h { margin: 0 0 var(--space-1); }
 
-.sub {
-  margin: 0.9rem 0 0.3rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+.sub { margin: var(--space-3) 0 var(--space-1); }
 
-.hint {
-  margin: 0 0 0.6rem;
-  max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
+.hint { margin: 0 0 var(--space-2); max-width: 42rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+.hint--warn { color: var(--color-warning); }
+.hint--bad { color: var(--color-danger); }
+.hint--good { color: var(--live); }
 
-.hint--warn { color: var(--bhs-gold-accent); }
-.hint--bad { color: var(--color-danger, #f87171); }
-.hint--good { color: var(--bhs-cyan-accent); }
+.row__name { flex: 1; color: var(--ink); }
+.row__n { color: var(--ink-muted); font-size: 12px; }
 
-.tables { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.7rem; }
-
-.table, .row {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  padding: 0.22rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-  font-size: 0.8rem;
-}
-
-.table__name, .row__name { flex: 1; color: var(--ink); }
-.row__n { color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
-
-.tag {
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.66rem;
-}
-
-.inp {
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.8rem;
-}
-
-.btn, .mini {
-  padding: 0.28rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
+.mini {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--ink);
+  color: var(--ink-muted);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12px;
   cursor: pointer;
 }
 
-.mini { color: var(--text-muted, #94a3b8); font-size: 0.72rem; padding: 0.2rem 0.45rem; }
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.5; cursor: default; }
+.tables { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th, .table td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+.table th { color: var(--ink-muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.table__name { position: sticky; left: 0; background: var(--surface); }
 </style>

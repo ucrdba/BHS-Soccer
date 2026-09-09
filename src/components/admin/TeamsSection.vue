@@ -137,21 +137,21 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 
 <template>
   <section class="sec" data-teams-section>
-    <h2 class="sec__h">Squads and organizations</h2>
+    <h2 class="sec__h kicker">Squads and organizations</h2>
 
     <p v-if="loading" class="note">Loading…</p>
     <p v-else-if="loadError" class="note note--bad" role="alert" data-teams-error>{{ loadError }}</p>
 
     <template v-else>
-      <div v-for="t in teams" :key="t.id" class="row" data-team-row>
+      <div v-for="t in teams" :key="t.id" class="row hrow" data-team-row>
         <div class="row__what">
           <strong class="row__name" data-team-name>{{ t.name }}</strong>
-          <span class="tag" data-team-org>{{ t.school_name }}</span>
-          <span class="tag tag--quiet" data-team-kind>{{ t.school_kind }}</span>
-          <span v-if="t.season" class="tag tag--quiet">{{ t.season }}</span>
+          <span class="tag tag--live" data-team-org>{{ t.school_name }}</span>
+          <span class="tag" data-team-kind>{{ t.school_kind }}</span>
+          <span v-if="t.season" class="tag">{{ t.season }}</span>
 
           <p class="row__coaches">
-            <span v-if="coachesOf(t.id).length === 0" class="muted">No coach assigned</span>
+            <span v-if="coachesOf(t.id).length === 0" class="note">No coach assigned</span>
             <span
               v-for="c in coachesOf(t.id)" :key="c.profile_id"
               class="coach" data-team-coach
@@ -166,7 +166,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
         </div>
 
         <div class="row__acts">
-          <select v-model="picked[t.id]" class="inp" :data-team-coach-pick="t.id">
+          <select v-model="picked[t.id]" class="input" :data-team-coach-pick="t.id">
             <option value="">— pick a coach —</option>
             <option v-for="p in assignable" :key="p.id" :value="p.id">
               {{ p.name || p.email }}
@@ -180,23 +180,23 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 
       <div class="forms">
         <form class="form" data-new-org @submit.prevent="onCreateOrganization">
-          <h3 class="form__h">New organization</h3>
+          <h3 class="form__h kicker">New organization</h3>
 
-          <label class="fld">
-            <span class="fld__label">Name</span>
-            <input v-model="orgName" type="text" class="inp inp--wide" data-org-name />
+          <label class="field">
+            <span class="fld__label kicker">Name</span>
+            <input v-model="orgName" type="text" class="input input--wide" data-org-name />
           </label>
-          <label class="fld">
-            <span class="fld__label">Short code</span>
-            <input v-model="orgCode" type="text" class="inp" data-org-code />
+          <label class="field">
+            <span class="fld__label kicker">Short code</span>
+            <input v-model="orgCode" type="text" class="input" data-org-code />
           </label>
-          <label class="fld">
-            <span class="fld__label">Mascot</span>
-            <input v-model="orgMascot" type="text" class="inp" data-org-mascot />
+          <label class="field">
+            <span class="fld__label kicker">Mascot</span>
+            <input v-model="orgMascot" type="text" class="input" data-org-mascot />
           </label>
-          <label class="fld">
-            <span class="fld__label">Kind</span>
-            <select v-model="orgKind" class="inp" data-org-kind>
+          <label class="field">
+            <span class="fld__label kicker">Kind</span>
+            <select v-model="orgKind" class="input" data-org-kind>
               <option value="school">School</option>
               <option value="club">Club</option>
             </select>
@@ -206,22 +206,22 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
         </form>
 
         <form class="form" data-new-team @submit.prevent="onCreateTeam">
-          <h3 class="form__h">New team</h3>
+          <h3 class="form__h kicker">New team</h3>
 
-          <label class="fld">
-            <span class="fld__label">Organization</span>
-            <select v-model="teamOrg" class="inp inp--wide" data-team-org-pick>
+          <label class="field">
+            <span class="fld__label kicker">Organization</span>
+            <select v-model="teamOrg" class="input input--wide" data-team-org-pick>
               <option value="">— pick one —</option>
               <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
             </select>
           </label>
-          <label class="fld">
-            <span class="fld__label">Name</span>
-            <input v-model="teamName" type="text" class="inp inp--wide" data-team-name-input />
+          <label class="field">
+            <span class="fld__label kicker">Name</span>
+            <input v-model="teamName" type="text" class="input input--wide" data-team-name-input />
           </label>
-          <label class="fld">
-            <span class="fld__label">Season</span>
-            <input v-model="teamSeason" type="text" class="inp" data-team-season />
+          <label class="field">
+            <span class="fld__label kicker">Season</span>
+            <input v-model="teamSeason" type="text" class="input" data-team-season />
           </label>
 
           <button type="submit" class="btn btn--go" data-team-create>Create team</button>
@@ -235,106 +235,27 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 </template>
 
 <style scoped>
-.sec { margin-bottom: 2rem; }
-
-.sec__h {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
+.sec { margin-bottom: var(--space-6); }
 
 .row__what { flex: 1; min-width: 15rem; }
-.row__name { color: var(--ink); font-size: 0.9rem; }
+.row__name { color: var(--ink); font-size: 14px; }
 
-.row__coaches { margin: 0.3rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem; font-size: 0.78rem; }
+.row__coaches { margin: var(--space-1) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1); font-size: 13px; }
 
 .coach {
   display: inline-flex;
   gap: 0.2rem;
   align-items: center;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
+  padding: 0.05rem var(--space-2);
+  border: 1px solid var(--rule);
   border-radius: 999px;
   color: var(--ink);
 }
 
-.coach__x { border: 0; background: none; color: var(--text-muted, #94a3b8); cursor: pointer; }
+.coach__x { border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
 
-.tag {
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-}
+.row__acts { display: flex; gap: var(--space-1); align-items: flex-start; }
 
-.tag--quiet { color: var(--text-muted, #94a3b8); }
-.muted { color: var(--text-muted, #94a3b8); }
-
-.row__acts { display: flex; gap: 0.3rem; align-items: flex-start; }
-
-.forms { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.2rem; }
-.form { flex: 1; min-width: 15rem; }
-
-.form__h {
-  margin: 0 0 0.5rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.fld { display: block; margin-bottom: 0.5rem; }
-
-.fld__label {
-  display: block;
-  margin-bottom: 0.2rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.inp {
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.82rem;
-}
-
-.inp--wide { width: 100%; }
-
-.note { margin: 0.6rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.83rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn {
-  padding: 0.28rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.forms { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-4); }
+.form { flex: 1; min-width: 15rem; display: flex; flex-direction: column; gap: var(--space-2); }
 </style>

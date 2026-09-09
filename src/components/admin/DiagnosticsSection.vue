@@ -93,19 +93,19 @@ async function onRunDiagnostic(): Promise<void> {
   <section class="panel">
     <h3>Connection and diagnostics</h3>
 
-    <p v-if="!isAdmin" class="muted">
+    <p v-if="!isAdmin" class="note">
       Only an admin can change the database connection or run the diagnostic.
     </p>
 
     <template v-else>
       <div class="panel" data-credentials>
         <h4>Supabase credentials</h4>
-        <p class="muted">
+        <p class="note">
           These are stored in this browser, on this device only — saving them
           here does not configure the app for anyone else. Reload the page
           after saving for them to take effect.
         </p>
-        <p class="muted">
+        <p class="note">
           An anon key is {{ hasStoredKey() ? 'stored on this device' : 'not stored on this device' }}.
         </p>
 
@@ -128,7 +128,7 @@ async function onRunDiagnostic(): Promise<void> {
 
       <div class="panel">
         <h4>Database diagnostic</h4>
-        <p class="muted">
+        <p class="note">
           Reads and writes a test row in each table, then removes it, and
           reports what the database said.
         </p>
@@ -148,7 +148,7 @@ async function onRunDiagnostic(): Promise<void> {
               : 'Some tables did not pass — each is listed below.' }}
           </p>
 
-          <p v-if="report.credentials" class="muted" data-diag-credentials>
+          <p v-if="report.credentials" class="note" data-diag-credentials>
             Tested {{ report.credentials.url }}
             with key {{ report.credentials.anonKeyPrefix }}…
             <span v-if="report.credentials.schoolUuid">
@@ -165,7 +165,7 @@ async function onRunDiagnostic(): Promise<void> {
           <div v-for="r in (report.tableResults || [])" :key="r.table"
                class="row" data-diag-table>
             <strong>{{ r.icon }} {{ r.table }}</strong>
-            <span class="muted">{{ r.operation }}</span>
+            <span class="note">{{ r.operation }}</span>
 
             <span data-diag-select
                   :class="r.selectStatus === 'PASSED' ? 'ok' : 'error'">
@@ -177,7 +177,7 @@ async function onRunDiagnostic(): Promise<void> {
               write {{ r.insertStatus }}<template v-if="r.responseDetails"> — {{ r.responseDetails }}</template>
             </span>
 
-            <span v-if="r.cleanupStatus" class="muted" data-diag-cleanup>
+            <span v-if="r.cleanupStatus" class="note" data-diag-cleanup>
               test row cleanup {{ r.cleanupStatus }}
             </span>
           </div>
@@ -188,19 +188,25 @@ async function onRunDiagnostic(): Promise<void> {
 </template>
 
 <style scoped>
-.panel { margin-bottom: 1.5rem; }
-h4 { margin: 0 0 0.4rem; }
-label { display: flex; flex-direction: column; font-size: 0.85rem; gap: 0.2rem; margin-bottom: 0.5rem; }
-input { padding: 0.4rem; }
+.panel {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+h4 { margin: 0 0 var(--space-1); }
+label { display: flex; flex-direction: column; font-size: 13px; gap: var(--space-1); margin-bottom: var(--space-2); }
+input { padding: var(--space-1); }
 .row {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
-  font-size: 0.85rem;
+  font-size: 13px;
 }
-.muted { color: var(--text-muted); font-size: 0.85rem; }
-.error { color: #c0392b; }
-.ok { color: #1e8449; }
+.error { color: var(--color-danger); }
+.ok { color: var(--live); }
 </style>

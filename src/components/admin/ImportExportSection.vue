@@ -92,7 +92,7 @@ async function onOpen(): Promise<void> {
 <template>
   <section v-if="isAdmin" class="panel">
     <h3>Import and export</h3>
-    <p class="muted">
+    <p class="note">
       Exports this team's season as a spreadsheet, and imports one back after
       showing what it would change.
     </p>
@@ -103,7 +103,7 @@ async function onOpen(): Promise<void> {
 
     <p v-if="loadError" class="error" data-ie-load-error>{{ loadError }}</p>
 
-    <p v-if="open" class="muted" data-ie-profiles-note>
+    <p v-if="open" class="note" data-ie-profiles-note>
       The Profiles sheet exports with its headings and no rows — there is no
       read path for an organization's user accounts yet, so an empty sheet
       here does not mean the organization has no users.
@@ -118,13 +118,19 @@ async function onOpen(): Promise<void> {
       @close="open = false" />
   </section>
 
-  <p v-else class="muted">
+  <p v-else class="note">
     Only an admin can export or import the organization's data.
   </p>
 </template>
 
 <style scoped>
-.panel { margin-bottom: 1.5rem; }
-.muted { color: var(--text-muted); font-size: 0.85rem; }
-.error { color: #c0392b; }
+.panel {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.error { color: var(--color-danger); }
 </style>

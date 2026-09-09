@@ -102,7 +102,7 @@ async function onReject(u: any): Promise<void> {
 
 <template>
   <section class="sec" data-approvals>
-    <h2 class="sec__h">
+    <h2 class="sec__h kicker">
       Waiting for approval
       <span v-if="rows.length" class="sec__n" data-approvals-count>{{ rows.length }}</span>
     </h2>
@@ -115,11 +115,11 @@ async function onReject(u: any): Promise<void> {
       Nobody is waiting.
     </p>
 
-    <div v-for="u in rows" :key="u.id" class="row" data-approval-row>
+    <div v-for="u in rows" :key="u.id" class="row hrow" data-approval-row>
       <div class="row__who">
         <strong class="row__name" data-approval-name>{{ u.name || 'No name given' }}</strong>
         <span class="row__email" data-approval-email>{{ u.email }}</span>
-        <span class="tag" data-approval-role>
+        <span class="tag tag--live" data-approval-role>
           asked for {{ String(u.requestedRole || u.role || 'access').toUpperCase() }}
         </span>
       </div>
@@ -141,66 +141,21 @@ async function onReject(u: any): Promise<void> {
 </template>
 
 <style scoped>
-.sec { margin-bottom: 2rem; }
+.sec { margin-bottom: var(--space-6); }
 
-.sec__h {
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin: 0 0 0.6rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
+.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-2); }
 
 .sec__n {
-  padding: 0.05rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  padding: 0.05rem var(--space-2);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.7rem;
+  color: var(--ink-muted);
+  font-size: 11px;
 }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
+.row__who { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
+.row__name { color: var(--ink); font-size: 14px; }
+.row__email { color: var(--ink-muted); font-size: 13px; }
 
-.row__who { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
-.row__name { color: var(--ink); font-size: 0.9rem; }
-.row__email { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
-
-.tag {
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-gold-accent);
-  font-size: 0.68rem;
-}
-
-.row__acts { display: flex; gap: 0.35rem; }
-
-.note { margin: 0.5rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.83rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn {
-  padding: 0.28rem 0.6rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
-.btn:disabled { opacity: 0.55; cursor: default; }
+.row__acts { display: flex; gap: var(--space-1); }
 </style>

@@ -145,7 +145,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 
 <template>
   <section class="sec" data-quiz-bank>
-    <h2 class="sec__h">
+    <h2 class="sec__h kicker">
       Quiz questions
       <span v-if="questions.length" class="sec__n" data-bank-count>{{ questions.length }}</span>
     </h2>
@@ -162,7 +162,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
       No questions yet.
     </p>
 
-    <div v-for="q in questions" :key="q.question_id" class="row" data-bank-row>
+    <div v-for="q in questions" :key="q.question_id" class="row hrow" data-bank-row>
       <div class="row__what">
         <p class="row__q" data-bank-question>{{ q.question }}</p>
 
@@ -172,11 +172,11 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
           </span>
           <span
             v-for="id in q.teamIds" :key="id"
-            class="tag" data-bank-team
+            class="tag tag--live" data-bank-team
           >{{ teamName(id) }}</span>
 
           <!-- The likeliest reason a question a coach wrote is not appearing. -->
-          <span v-if="q.thought_id" class="tag tag--quiet" data-bank-thought>
+          <span v-if="q.thought_id" class="tag" data-bank-thought>
             only while its daily message is active
           </span>
         </p>
@@ -184,7 +184,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 
       <div class="row__acts">
         <select
-          class="inp" :data-bank-team-pick="q.question_id"
+          class="input" :data-bank-team-pick="q.question_id"
           @change="onToggleTeam(q, ($event.target as HTMLSelectElement).value,
                                 !q.teamIds.includes(($event.target as HTMLSelectElement).value))"
         >
@@ -209,9 +209,9 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
     >Write a question</button>
 
     <form v-else class="form" data-bank-form @submit.prevent="onSave">
-      <label class="fld">
-        <span class="fld__label">Question</span>
-        <textarea v-model="draft.question" class="inp inp--wide" rows="2" data-bank-question-input />
+      <label class="field">
+        <span class="fld__label kicker">Question</span>
+        <textarea v-model="draft.question" class="input input--wide" rows="2" data-bank-question-input />
       </label>
 
       <div v-for="letter in LETTERS" :key="letter" class="opt">
@@ -225,7 +225,7 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
           {{ letter }}
         </label>
         <input
-          v-model="draft.options[letter]" type="text" class="inp inp--wide"
+          v-model="draft.options[letter]" type="text" class="input input--wide"
           :data-bank-option="letter"
         />
       </div>
@@ -244,107 +244,31 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 </template>
 
 <style scoped>
-.sec { margin-bottom: 2rem; }
+.sec { margin-bottom: var(--space-6); }
 
-.sec__h {
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin: 0 0 0.3rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
+.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-1); }
 
 .sec__n {
-  padding: 0.05rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  padding: 0.05rem var(--space-2);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.7rem;
+  color: var(--ink-muted);
+  font-size: 11px;
 }
 
-.sec__note {
-  margin: 0 0 0.7rem;
-  max-width: 40rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
+.sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
 .row__what { flex: 1; min-width: 15rem; }
-.row__q { margin: 0; color: var(--ink); font-size: 0.86rem; }
-.row__meta { margin: 0.3rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.row__acts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.row__q { margin: 0; color: var(--ink); font-size: 14px; }
+.row__meta { margin: var(--space-1) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.row__acts { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
-.tag {
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-}
+.form { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 
-.tag--quiet { color: var(--text-muted, #94a3b8); }
-.tag--warn { border-color: var(--bhs-gold-accent); color: var(--bhs-gold-accent); }
+.fld__hint { margin: 0; color: var(--ink-muted); font-size: 13px; }
 
-.form { margin-top: 0.9rem; }
-.fld { display: block; margin-bottom: 0.5rem; }
+.opt { display: flex; gap: var(--space-1); align-items: center; }
+.opt__correct { display: flex; gap: 0.25rem; align-items: center; color: var(--ink); font-size: 13px; }
 
-.fld__label {
-  display: block;
-  margin-bottom: 0.2rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.fld__hint { margin: 0.3rem 0 0.6rem; color: var(--text-muted, #94a3b8); font-size: 0.76rem; }
-
-.opt { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.3rem; }
-.opt__correct { display: flex; gap: 0.25rem; align-items: center; color: var(--bhs-cyan-accent); font-size: 0.78rem; }
-
-.inp {
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.82rem;
-}
-
-.inp--wide { width: 100%; }
-
-.acts { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
-
-.note { margin: 0.6rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.83rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn {
-  padding: 0.26rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.acts { display: flex; gap: var(--space-1); margin-top: var(--space-1); }
 </style>

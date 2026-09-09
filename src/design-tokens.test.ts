@@ -142,6 +142,16 @@ const RESTYLED = [
   'src/views/HelpView.vue',
   'src/views/QuizView.vue',
   'src/views/PlaceholderView.vue',
+  'src/views/AdminView.vue',
+  'src/components/admin/ApprovalsSection.vue',
+  'src/components/admin/CategoriesSection.vue',
+  'src/components/admin/QuizBankSection.vue',
+  'src/components/admin/TeamsSection.vue',
+  'src/components/admin/UnassignedPlayersSection.vue',
+  'src/components/admin/ImportExportSection.vue',
+  'src/components/admin/SchoolProfileSection.vue',
+  'src/components/admin/DiagnosticsSection.vue',
+  'src/components/admin/ImportExportModal.vue',
 ];
 
 const LEGACY_NAME = /--bhs-[a-z-]+|--text-muted|--text-main/;

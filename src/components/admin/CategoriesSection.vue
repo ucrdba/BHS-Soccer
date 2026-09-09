@@ -154,7 +154,7 @@ async function onAdoptStray(stray: any): Promise<void> {
 
 <template>
   <section class="sec" data-categories-section>
-    <h2 class="sec__h">Drill categories</h2>
+    <h2 class="sec__h kicker">Drill categories</h2>
 
     <p v-if="loading" class="note">Loading…</p>
     <p v-else-if="loadError" class="note note--bad" role="alert" data-categories-error>
@@ -162,16 +162,16 @@ async function onAdoptStray(stray: any): Promise<void> {
     </p>
 
     <template v-else>
-      <div v-for="c in defined" :key="c.id" class="row" data-category-row>
+      <div v-for="c in defined" :key="c.id" class="row hrow" data-category-row>
         <div class="row__what">
           <template v-if="editingId === c.id">
-            <input v-model="editName" type="text" class="inp" data-category-edit-name />
+            <input v-model="editName" type="text" class="input" data-category-edit-name />
           </template>
           <template v-else>
             <strong class="row__name" data-category-name>{{ c.name }}</strong>
           </template>
 
-          <span class="tag tag--quiet" data-category-usage>
+          <span class="tag" data-category-usage>
             {{ c.drills }} drill{{ c.drills === 1 ? '' : 's' }}
           </span>
         </div>
@@ -194,24 +194,24 @@ async function onAdoptStray(stray: any): Promise<void> {
 
       <form class="add" data-category-add-form @submit.prevent="onAdd">
         <input
-          v-model="newName" type="text" class="inp"
+          v-model="newName" type="text" class="input"
           placeholder="New category" data-category-new
         />
         <button type="submit" class="btn btn--go" data-category-add>Add</button>
       </form>
 
       <template v-if="strays.length">
-        <h3 class="sub">Used by drills, not defined</h3>
+        <h3 class="sub kicker">Used by drills, not defined</h3>
         <p class="sec__note">
           <code>drills_bank.category</code> is free text rather than a link, so
           a drill can carry a name no category has. Adopt one to make it real,
           or merge it into a category that already exists.
         </p>
 
-        <div v-for="s in strays" :key="s.name" class="row" data-stray-row>
+        <div v-for="s in strays" :key="s.name" class="row hrow" data-stray-row>
           <div class="row__what">
             <strong class="row__name" data-stray-name>{{ s.name }}</strong>
-            <span class="tag tag--quiet">{{ s.drills }} drill{{ s.drills === 1 ? '' : 's' }}</span>
+            <span class="tag">{{ s.drills }} drill{{ s.drills === 1 ? '' : 's' }}</span>
           </div>
 
           <div class="row__acts">
@@ -219,7 +219,7 @@ async function onAdoptStray(stray: any): Promise<void> {
               type="button" class="btn" :data-stray-adopt="s.name" @click="onAdoptStray(s)"
             >Adopt</button>
 
-            <select v-model="mergeTo[s.name]" class="inp" :data-stray-merge-pick="s.name">
+            <select v-model="mergeTo[s.name]" class="input" :data-stray-merge-pick="s.name">
               <option value="">— merge into —</option>
               <option v-for="c in defined" :key="c.id" :value="c.name">{{ c.name }}</option>
             </select>
@@ -237,84 +237,17 @@ async function onAdoptStray(stray: any): Promise<void> {
 </template>
 
 <style scoped>
-.sec { margin-bottom: 2rem; }
+.sec { margin-bottom: var(--space-6); }
 
-.sec__h {
-  margin: 0 0 0.5rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
+.sub { margin: var(--space-4) 0 var(--space-1); }
 
-.sub {
-  margin: 1rem 0 0.3rem;
-  color: var(--bhs-gold-accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+.sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
-.sec__note {
-  margin: 0 0 0.5rem;
-  max-width: 40rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
+.row__what { display: flex; gap: var(--space-1); align-items: baseline; }
+.row__name { color: var(--ink); font-size: 14px; }
+.row__acts { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
-
-.row__what { display: flex; gap: 0.4rem; align-items: baseline; }
-.row__name { color: var(--ink); font-size: 0.88rem; }
-.row__acts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-
-.tag {
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.68rem;
-}
-
-.tag--quiet { color: var(--text-muted, #94a3b8); }
-
-.add { display: flex; gap: 0.35rem; margin-top: 0.7rem; }
-
-.inp {
-  padding: 0.28rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: var(--bhs-navy-bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.82rem;
-}
-
-.note { margin: 0.6rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.83rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn {
-  padding: 0.26rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.add { display: flex; gap: var(--space-1); margin-top: var(--space-3); }
 
 code { font-size: 0.9em; }
 </style>

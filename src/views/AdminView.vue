@@ -60,7 +60,7 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
         Approvals, squads and the shared lists behind the app. What you can
         reach here depends on your role.
       </p>
-      <p v-if="org.branding.name" class="admin__org">{{ org.branding.name }}</p>
+      <p v-if="org.branding.name" class="admin__org kicker">{{ org.branding.name }}</p>
     </header>
 
     <ApprovalsSection
@@ -121,51 +121,30 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
 </template>
 
 <style scoped>
-.admin { max-width: 62rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.admin { padding: var(--space-4) var(--space-4) var(--space-8); }
 
-.admin__head { margin-bottom: 1.5rem; }
-.admin__title { margin: 0; color: var(--ink); font-size: 1.4rem; }
+.admin__head { margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule); }
+.admin__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--ink); }
+.admin__sub { margin-top: var(--space-1); max-width: 42rem; color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
+.admin__org { margin-top: var(--space-1); }
 
-.admin__sub {
-  margin: 0.3rem 0 0;
-  max-width: 42rem;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.admin__org {
-  margin: 0.4rem 0 0;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.sec { margin-bottom: 2rem; }
-
-.sec__h {
-  margin: 0 0 0.6rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.sec__note { margin: 0; color: var(--text-muted, #94a3b8); font-size: 0.82rem; }
+.sec { margin-bottom: var(--space-6); }
+.sec__h { margin: 0 0 var(--space-2); }
+.sec__note { margin: 0; color: var(--ink-muted); font-size: 13px; }
 
 .notice {
-  margin: 1rem 0;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 6px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.84rem;
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--live);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  font-size: 13px;
   line-height: 1.5;
 }
-
-.notice--bad { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
+.notice--bad { border-left-color: var(--color-warning); color: var(--ink); }
 
 code { font-size: 0.9em; }
+
+@media (min-width: 768px) { .admin { max-width: 64rem; margin: 0 auto; } }
 </style>

@@ -112,7 +112,7 @@ async function onRetire(p: any): Promise<void> {
 
 <template>
   <section class="sec" data-unassigned-section>
-    <h2 class="sec__h">
+    <h2 class="sec__h kicker">
       Players on no team
       <span v-if="people.length" class="sec__n" data-unassigned-count>{{ people.length }}</span>
     </h2>
@@ -130,11 +130,11 @@ async function onRetire(p: any): Promise<void> {
       Everybody is on a squad.
     </p>
 
-    <div v-for="p in people" :key="p.id" class="row" data-unassigned-row>
+    <div v-for="p in people" :key="p.id" class="row hrow" data-unassigned-row>
       <div class="row__who">
         <strong class="row__name" data-unassigned-name>{{ p.name }}</strong>
-        <span v-if="p.class_year" class="tag tag--quiet">{{ p.class_year }}</span>
-        <span v-if="p.resultCount > 0" class="tag" data-unassigned-results>
+        <span v-if="p.class_year" class="tag">{{ p.class_year }}</span>
+        <span v-if="p.resultCount > 0" class="tag tag--live" data-unassigned-results>
           {{ p.resultCount }} result{{ p.resultCount === 1 ? '' : 's' }}
         </span>
         <span v-if="p.historyUnknown" class="tag tag--warn" data-unassigned-unknown>
@@ -163,68 +163,21 @@ async function onRetire(p: any): Promise<void> {
 </template>
 
 <style scoped>
-.sec { margin-bottom: 2rem; }
+.sec { margin-bottom: var(--space-6); }
 
-.sec__h {
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin: 0 0 0.3rem;
-  color: var(--bhs-cyan-accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
+.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-1); }
 
 .sec__n {
-  padding: 0.05rem 0.45rem;
-  border: 1px solid var(--bhs-navy-border);
+  padding: 0.05rem var(--space-2);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  color: var(--text-muted, #94a3b8);
-  font-size: 0.7rem;
+  color: var(--ink-muted);
+  font-size: 11px;
 }
 
-.sec__note { margin: 0 0 0.6rem; color: var(--text-muted, #94a3b8); font-size: 0.8rem; line-height: 1.5; }
+.sec__note { margin: 0 0 var(--space-2); }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.45rem 0;
-  border-bottom: 1px solid var(--bhs-navy-border);
-}
-
-.row__who { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; }
-.row__name { color: var(--ink); font-size: 0.88rem; }
-.row__acts { display: flex; gap: 0.3rem; }
-
-.tag {
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 999px;
-  color: var(--bhs-gold-accent);
-  font-size: 0.68rem;
-}
-
-.tag--quiet { color: var(--text-muted, #94a3b8); }
-.tag--warn { border-color: var(--color-danger, #f87171); color: var(--color-danger, #f87171); }
-
-.note { margin: 0.6rem 0 0; color: var(--text-muted, #94a3b8); font-size: 0.83rem; line-height: 1.5; }
-.note--bad { color: var(--color-danger, #f87171); }
-.note--good { color: var(--bhs-cyan-accent); }
-
-.btn {
-  padding: 0.26rem 0.55rem;
-  border: 1px solid var(--bhs-navy-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.btn--go { border-color: var(--bhs-cyan-accent); color: var(--bhs-cyan-accent); }
+.row__who { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: baseline; }
+.row__name { color: var(--ink); font-size: 14px; }
+.row__acts { display: flex; gap: var(--space-1); }
 </style>

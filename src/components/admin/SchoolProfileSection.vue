@@ -139,12 +139,12 @@ async function onSave(): Promise<void> {
   <section class="panel">
     <h3>Organization profile</h3>
 
-    <p v-if="!isAdmin" class="muted">
+    <p v-if="!isAdmin" class="note">
       Only an admin can edit the organization's name, colours and record.
     </p>
 
     <template v-else>
-      <p v-if="loading" class="muted">Loading…</p>
+      <p v-if="loading" class="note">Loading…</p>
 
       <div class="grid">
         <label>Name
@@ -176,7 +176,7 @@ async function onSave(): Promise<void> {
         </label>
       </div>
 
-      <p class="muted">
+      <p class="note">
         The name and mascot are rendered on headings throughout the app.
       </p>
 
@@ -192,16 +192,22 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
-.panel { margin-bottom: 1.5rem; }
+.panel {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.6rem;
-  margin-bottom: 0.6rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
-label { display: flex; flex-direction: column; font-size: 0.85rem; gap: 0.2rem; }
-input { padding: 0.4rem; }
-.muted { color: var(--text-muted); font-size: 0.85rem; }
-.error { color: #c0392b; }
-.ok { color: #1e8449; }
+label { display: flex; flex-direction: column; font-size: 13px; gap: var(--space-1); }
+input { padding: var(--space-1); }
+.error { color: var(--color-danger); }
+.ok { color: var(--live); }
 </style>
