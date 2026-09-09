@@ -153,6 +153,8 @@ async function onReject(u: any): Promise<void> {
   font-size: 11px;
 }
 
+.row { align-items: center; }
+
 .row__who { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
 .row__name { color: var(--ink); font-size: 14px; }
 .row__email { color: var(--ink-muted); font-size: 13px; }

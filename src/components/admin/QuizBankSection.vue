@@ -258,6 +258,8 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 
 .sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
+.row { align-items: flex-start; }
+
 .row__what { flex: 1; min-width: 15rem; }
 .row__q { margin: 0; color: var(--ink); font-size: 14px; }
 .row__meta { margin: var(--space-1) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }

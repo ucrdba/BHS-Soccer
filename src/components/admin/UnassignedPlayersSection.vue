@@ -177,6 +177,8 @@ async function onRetire(p: any): Promise<void> {
 
 .sec__note { margin: 0 0 var(--space-2); }
 
+.row { align-items: center; }
+
 .row__who { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: baseline; }
 .row__name { color: var(--ink); font-size: 14px; }
 .row__acts { display: flex; gap: var(--space-1); }

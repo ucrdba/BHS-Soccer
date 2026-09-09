@@ -243,6 +243,8 @@ async function onAdoptStray(stray: any): Promise<void> {
 
 .sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
+.row { align-items: center; }
+
 .row__what { display: flex; gap: var(--space-1); align-items: baseline; }
 .row__name { color: var(--ink); font-size: 14px; }
 .row__acts { display: flex; gap: var(--space-1); flex-wrap: wrap; }
