@@ -91,7 +91,7 @@ async function onOpen(): Promise<void> {
 
 <template>
   <section v-if="isAdmin" class="panel">
-    <h3>Import and export</h3>
+    <h2 class="sec__h kicker">Import and export</h2>
     <p class="note">
       Exports this team's season as a spreadsheet, and imports one back after
       showing what it would change.

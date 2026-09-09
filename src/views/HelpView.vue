@@ -142,7 +142,7 @@ function jumpTo(id: string): void {
   padding-bottom: var(--space-6);
   margin-bottom: var(--space-6);
   border-bottom: 1px solid var(--rule);
-  scroll-margin-top: var(--space-8);
+  scroll-margin-top: 3.5rem;
 }
 .section:last-child { border-bottom: 0; }
 
@@ -157,7 +157,7 @@ function jumpTo(id: string): void {
 @media (min-width: 768px) {
   .help { max-width: 64rem; margin: 0 auto; }
   .help__body { display: grid; grid-template-columns: 15rem minmax(0, 38em); gap: var(--space-8); align-items: start; }
-  .help__aside { position: sticky; top: var(--space-8); }
+  .help__aside { position: sticky; top: 3.5rem; }
 }
 </style>
 

@@ -415,6 +415,8 @@ async function onApply(): Promise<void> {
 .hint--bad { color: var(--color-danger); }
 .hint--good { color: var(--live); }
 
+.tables { margin-top: var(--space-3); }
+
 .table, .row { align-items: center; }
 
 .table__name, .row__name { flex: 1; color: var(--ink); }

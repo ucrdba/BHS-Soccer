@@ -135,7 +135,7 @@ async function onReject(userId: string, name: string): Promise<void> {
 
     <div v-else class="grid">
       <article v-for="c in store.staff" :key="c.id" class="card" data-coach>
-        <span class="plate card__plate">
+        <span class="plate card__plate" :class="{ 'plate--empty': !c.photo }">
           <img v-if="c.photo" class="plate__img" :src="photoOrPlaceholder(c.photo, 'coach')" :alt="''" />
           <span v-else class="plate__label">Photo</span>
         </span>
@@ -204,6 +204,7 @@ async function onReject(userId: string, name: string): Promise<void> {
 }
 
 .card__plate { width: 4.5rem; height: 4.5rem; }
+.card__plate.plate--empty { border-style: dashed; background: transparent; }
 .card__name { margin: 0; color: var(--ink); font-family: var(--heading-face); font-weight: 500; font-size: 18px; }
 .card__level { margin-top: 2px; }
 .card__bio { margin: var(--space-2) 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.55; }

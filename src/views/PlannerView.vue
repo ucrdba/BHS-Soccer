@@ -379,7 +379,7 @@ async function onDrop(index: number): Promise<void> {
 
 /* The saved-plan picker. */
 .picker { margin: var(--space-4) 0; padding: var(--space-3); border: 1px solid var(--rule); border-radius: var(--radius-md); }
-.picker__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; justify-content: space-between; padding: var(--space-1) 0; }
+.picker__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; justify-content: space-between; padding: var(--space-1) 0; border: 0; background: none; width: 100%; text-align: left; cursor: pointer; }
 .picker__row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .picker__meta { color: var(--ink-muted); font-size: 12px; }
 .picker__none { margin: var(--space-1) var(--space-1); color: var(--ink-muted); font-size: 13px; }
@@ -422,7 +422,7 @@ async function onDrop(index: number): Promise<void> {
 .drill__dur { color: var(--live); font-size: 12px; font-variant-numeric: tabular-nums; }
 .drill__slot { color: var(--ink-muted); font-size: 12px; }
 .drill__notes { width: 100%; margin-top: var(--space-1); color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
-.drill__diagram { display: inline-flex; align-items: center; gap: 4px; color: var(--live); font-size: 12px; }
+.drill__diagram { display: block; margin-top: var(--space-1); max-width: 18rem; border: 1px solid var(--rule); border-radius: var(--radius-md); cursor: pointer; }
 .drill__acts { display: flex; gap: var(--space-1); }
 
 /* The smallest control there is: a text button inside a row. */

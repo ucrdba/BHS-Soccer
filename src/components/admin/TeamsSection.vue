@@ -243,6 +243,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 .row__name { color: var(--ink); font-size: 14px; }
 
 .row__coaches { margin: var(--space-1) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1); font-size: 13px; }
+.row__coaches .note { margin: 0; }
 
 .coach {
   display: inline-flex;

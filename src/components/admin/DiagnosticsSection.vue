@@ -91,14 +91,14 @@ async function onRunDiagnostic(): Promise<void> {
 
 <template>
   <section class="panel">
-    <h3>Connection and diagnostics</h3>
+    <h2 class="sec__h kicker">Connection and diagnostics</h2>
 
     <p v-if="!isAdmin" class="note">
       Only an admin can change the database connection or run the diagnostic.
     </p>
 
     <template v-else>
-      <div class="panel" data-credentials>
+      <div class="panel__sub" data-credentials>
         <h4>Supabase credentials</h4>
         <p class="note">
           These are stored in this browser, on this device only — saving them
@@ -128,7 +128,7 @@ async function onRunDiagnostic(): Promise<void> {
         <p v-if="credNotice" class="ok" data-cred-notice>{{ credNotice }}</p>
       </div>
 
-      <div class="panel">
+      <div class="panel__sub">
         <h4>Database diagnostic</h4>
         <p class="note">
           Reads and writes a test row in each table, then removes it, and
@@ -198,6 +198,8 @@ async function onRunDiagnostic(): Promise<void> {
   background: transparent;
 }
 
+.panel__sub { margin-bottom: var(--space-4); }
+
 h4 { margin: 0 0 var(--space-1); }
 .field { margin-bottom: var(--space-2); }
 .row {
@@ -208,6 +210,7 @@ h4 { margin: 0 0 var(--space-1); }
   border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   font-size: 13px;
 }
+.row .note { margin: 0; }
 .error { color: var(--color-danger); }
 .ok { color: var(--live); }
 </style>

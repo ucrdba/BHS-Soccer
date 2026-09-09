@@ -128,10 +128,6 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
 .admin__sub { margin-top: var(--space-1); max-width: 42rem; color: var(--ink-muted); font-size: 14px; line-height: 1.5; }
 .admin__org { margin-top: var(--space-1); }
 
-.sec { margin-bottom: var(--space-6); }
-.sec__h { margin: 0 0 var(--space-2); }
-.sec__note { margin: 0; color: var(--ink-muted); font-size: 13px; }
-
 .notice {
   margin: var(--space-3) 0;
   padding: var(--space-2) var(--space-3);

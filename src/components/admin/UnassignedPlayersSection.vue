@@ -175,7 +175,7 @@ async function onRetire(p: any): Promise<void> {
   font-size: 11px;
 }
 
-.sec__note { margin: 0 0 var(--space-2); }
+.sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 
 .row { align-items: center; }
 

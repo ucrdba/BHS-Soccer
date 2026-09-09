@@ -256,6 +256,8 @@ async function onVerify(): Promise<void> {
 </template>
 
 <style scoped>
+form { display: flex; flex-direction: column; gap: var(--space-3); }
+
 .tabs { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); border-bottom: 1px solid var(--rule); }
 .tabs__btn {
   padding: var(--space-2) 0;

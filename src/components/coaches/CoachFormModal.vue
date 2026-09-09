@@ -91,5 +91,5 @@ const title = computed(() => (props.coach ? 'Edit coach' : 'Add a coach'));
 
 <style scoped>
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
-.err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
+.err { margin: 0 0 var(--space-3); color: var(--color-danger); font-size: 13px; }
 </style>

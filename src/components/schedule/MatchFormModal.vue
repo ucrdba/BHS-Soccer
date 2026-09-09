@@ -124,6 +124,6 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
 
 <style scoped>
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
-.err { margin: var(--space-3) 0 0; color: var(--color-danger); font-size: 13px; }
-.venue-hint { text-transform: none; letter-spacing: normal; }
+.err { margin: 0 0 var(--space-3); color: var(--color-danger); font-size: 13px; }
+.venue-hint { text-transform: none; letter-spacing: normal; font-size: inherit; }
 </style>

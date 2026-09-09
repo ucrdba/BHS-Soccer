@@ -137,7 +137,7 @@ async function onSave(): Promise<void> {
 
 <template>
   <section class="panel">
-    <h3>Organization profile</h3>
+    <h2 class="sec__h kicker">Organization profile</h2>
 
     <p v-if="!isAdmin" class="note">
       Only an admin can edit the organization's name, colours and record.
