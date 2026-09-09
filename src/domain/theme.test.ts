@@ -9,8 +9,8 @@ import { describe, it, expect } from 'vitest';
 import {
   brandingFor, themeVars, contrastRatio, colourDistance, guardedColour,
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
-  PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, DARK_MARK_FALLBACK, MIN_MARK_CONTRAST,
-  MIN_TEXT_CONTRAST, MIN_INK_DISTANCE, PAPER_INK, DARK_INK
+  PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, PAPER_ACCENT_FALLBACK, DARK_MARK_FALLBACK,
+  MIN_MARK_CONTRAST, MIN_TEXT_CONTRAST, MIN_INK_DISTANCE, PAPER_INK, DARK_INK
 } from './theme';
 
 describe('brandingFor', () => {
@@ -119,8 +119,10 @@ describe('guardedColour', () => {
 
   it('falls back when the colour is the ink, even at high contrast', () => {
     expect(contrastRatio('#ffffff', DARK_GROUND)).toBeGreaterThan(MIN_MARK_CONTRAST);
+    // Fix 4: guardedColour normalises the fallback the same way it normalises
+    // a success, so an upper-case fallback constant comes back lower-case.
     expect(guardedColour('#ffffff', DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, '#FFD700'))
-      .toBe('#FFD700');
+      .toBe('#ffd700');
   });
 
   it('applies the text floor more strictly than the mark floor', () => {
@@ -134,6 +136,22 @@ describe('guardedColour', () => {
   it('falls back on a colour it cannot parse', () => {
     expect(guardedColour('nonsense', PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, '#201f1d'))
       .toBe('#201f1d');
+  });
+
+  /*
+   * The regression Fix 1 exists for. PAPER_MARK_FALLBACK is the same value as
+   * PAPER_INK, so themeVars using it as the fallback for --org-mark-paper and
+   * --org-text-paper handed a rejected colour's callers a result at zero
+   * distance from the ink -- the exact thing guardedColour's contract forbids.
+   * PAPER_ACCENT_FALLBACK is the real fallback for those two properties now,
+   * and every fallback constant this module hands to guardedColour must clear
+   * the same floors a real colour would have to.
+   */
+  it('never falls back to a colour the guard would itself reject', () => {
+    expect(colourDistance(PAPER_ACCENT_FALLBACK, PAPER_INK)).toBeGreaterThanOrEqual(MIN_INK_DISTANCE);
+    expect(contrastRatio(PAPER_ACCENT_FALLBACK, PAPER_GROUND)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    expect(colourDistance(DARK_MARK_FALLBACK, DARK_INK)).toBeGreaterThanOrEqual(MIN_INK_DISTANCE);
+    expect(contrastRatio(DARK_MARK_FALLBACK, DARK_GROUND)).toBeGreaterThanOrEqual(MIN_MARK_CONTRAST);
   });
 });
 
@@ -178,6 +196,15 @@ describe('themeVars', () => {
    * both floors, so nothing is guarded away.
    */
   it('renders the historical defaults when the row holds nonsense', () => {
+    // This case is only correct because DEFAULT_PRIMARY and DEFAULT_SECONDARY
+    // clear both floors on their own grounds -- pinned directly below, so a
+    // default that stops clearing a floor fails here rather than surfacing
+    // only as an unrelated-looking mismatch in this "nonsense" case.
+    expect(guardedColour(DEFAULT_PRIMARY, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, PAPER_ACCENT_FALLBACK))
+      .toBe(DEFAULT_PRIMARY.toLowerCase());
+    expect(guardedColour(DEFAULT_SECONDARY, DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, DARK_MARK_FALLBACK))
+      .toBe(DEFAULT_SECONDARY.toLowerCase());
+
     const vars = themeVars(brandingFor({ colors: { primary: '???', secondary: '???' } }));
     expect(vars['--org-mark-paper']).toBe('#0047ab');
     expect(vars['--org-text-paper']).toBe('#0047ab');

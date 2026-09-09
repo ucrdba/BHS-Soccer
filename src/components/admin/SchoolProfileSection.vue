@@ -24,7 +24,10 @@ import { ref, computed, watch } from 'vue';
 import { supabaseService } from '../../data/supabase';
 import {
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
-  guardedColour, MIN_MARK_CONTRAST, DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK
+  guardedColour, contrastRatio,
+  MIN_MARK_CONTRAST, MIN_TEXT_CONTRAST,
+  PAPER_GROUND, PAPER_INK, PAPER_ACCENT_FALLBACK,
+  DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK
 } from '../../domain/theme';
 import { parseColour, toHex } from '../../domain/colour';
 
@@ -99,20 +102,48 @@ const colourError = computed<string | null>(() => {
 });
 
 /**
- * The mark the touchline and ratings screens will actually use.
+ * The colours the touchline and ratings screens will actually use, wherever
+ * they differ from what the admin typed.
  *
  * An organization is entitled to know the interface overrode its brand, even
  * though the spec's position is that the interface adapts rather than the
- * admin.
+ * admin. Both colours are checked, not just the secondary: the primary now
+ * drives --live on the paper ground (body-size text, so the 4.5:1 floor),
+ * and an admin who set only a bad primary previously heard nothing about it.
+ *
+ * `guardedColour` substitutes for either of two reasons -- the colour cannot
+ * be seen against its ground, or it sits too close to the ink beside it --
+ * and of the colours that fail on the dark ground in practice, most fail the
+ * contrast floor rather than the ink-distance one. Reporting one reason for
+ * both would be wrong most of the time it fires, so each substitution names
+ * whichever check actually failed. Since guardedColour checks contrast first,
+ * a substitution that isn't a contrast failure is necessarily a distance one.
  */
-const substituted = computed<string | null>(() => {
-  const s = form.value.secondary;
-  if (!parseColour(s)) return null;
-  const used = guardedColour(s, DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, DARK_MARK_FALLBACK);
-  const asked = toHex(parseColour(s)!);
-  return used.toLowerCase() === asked.toLowerCase()
-    ? null
-    : `${s} cannot be told apart from the text on the match screens, so those use ${used} instead.`;
+const substitutions = computed<Array<{ used: string; reason: string }>>(() => {
+  const out: Array<{ used: string; reason: string }> = [];
+
+  const check = (
+    value: string, ground: string, ink: string, min: number, fallback: string, place: string
+  ): void => {
+    const parsed = parseColour(value);
+    if (!parsed) return;
+    const used = guardedColour(value, ground, ink, min, fallback);
+    const asked = toHex(parsed);
+    if (used.toLowerCase() === asked.toLowerCase()) return;
+
+    const reason = contrastRatio(value, ground) < min
+      ? `${value} cannot be seen against the ${place} screens, so those use ${used} instead.`
+      : `${value} cannot be told apart from the text on the ${place} screens, so those use ${used} instead.`;
+    out.push({ used, reason });
+  };
+
+  // Primary drives --live on the paper ground (MIN_TEXT_CONTRAST, since a
+  // link is body-size text). Secondary drives the dark-ground mark
+  // (MIN_MARK_CONTRAST) -- matching what themeVars actually does.
+  check(form.value.primary, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, PAPER_ACCENT_FALLBACK, 'paper');
+  check(form.value.secondary, DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, DARK_MARK_FALLBACK, 'dark match');
+
+  return out;
 });
 
 /** The parsed colour as hex, or transparent so a half-typed value shows
@@ -238,7 +269,7 @@ async function onSave(): Promise<void> {
 
       <p class="note" data-school-colour-forms>Colours accept {{ COLOUR_FORMS }}.</p>
       <p v-if="colourError" class="note note--bad" role="alert" data-school-colour-error>{{ colourError }}</p>
-      <p v-if="substituted" class="note" data-school-colour-note>{{ substituted }}</p>
+      <p v-for="(item, i) in substitutions" :key="i" class="note" data-school-colour-note>{{ item.reason }}</p>
 
       <p class="note">
         The name and mascot are rendered on headings throughout the app.

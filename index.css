@@ -35,7 +35,17 @@
    * runtime from the schools row (src/domain/theme.ts); the values here are
    * only the cold-load fallbacks, and they are the app's historical defaults
    * so an organization that never set colours looks as it always did.
-   * The two -mark- values are the same colours after the contrast guard.
+   *
+   * --org-mark-paper, --org-mark-dark and --org-text-paper are the guarded
+   * values: each is the organization's primary or secondary if it clears two
+   * floors (it can be seen against its ground, and it is not mistaken for the
+   * ink beside it) or a safe fallback otherwise. See src/domain/theme.ts.
+   *
+   * --org-primary and --org-secondary are raw and unguarded -- the colour
+   * exactly as entered, before either floor is applied. Nothing reads them
+   * today, and a component must not start: reach for --mark / --live /
+   * --rule-strong instead, which is what stays legible if an organization
+   * picks a colour that fails a floor.
    */
   --org-primary: #0047AB;
   --org-secondary: #FFD700;

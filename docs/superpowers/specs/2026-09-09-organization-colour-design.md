@@ -150,10 +150,20 @@ because one is blue. Meanwhile white against the dark ground's `#F8FAFC` is ~9
 apart, and is correctly rejected. A threshold of 32, against a maximum possible
 distance of ~441, separates the two cases with room either side.
 
-Euclidean sRGB distance is a crude perceptual model and is named as such in the
-module. It is adequate here because the question is coarse — *is this the same
-colour as the text?* — and a more faithful model (CIE ΔE) would add a colour-space
-conversion for no change in outcome on any case this guards against.
+Euclidean sRGB distance is a crude perceptual model, and is named as such in
+the module, as a deliberate simplification rather than an oversight — the
+question here is coarse, and colour-space conversion is not free. But it is
+known to over-accept light achromatic colours near the dark ground's ink,
+because un-gamma-corrected sRGB distance is dominated by the achromatic axis
+and over-weights the light end, which is exactly where the dark ink `#F8FAFC`
+sits — the only place this distance test does any work. **Silver is the named
+case it gets wrong:** against `#F8FAFC`, `#c0c0c0` scores 100 by this
+measure — a confident accept at three times the threshold — but only ~20.5 by
+CIE ΔE76, closer to the ink than cream (23.8) and barely further than ivory
+(8.8), both of which this guard rejects. "Navy and silver" and "black and
+silver" are common school colour pairs, so this is not a hypothetical. If it
+proves necessary, the upgrade is ΔE76 over CIE Lab at a threshold near 25 —
+not a different sRGB threshold.
 
 ```ts
 export function contrastRatio(a: string, b: string): number;   // existing, now via parseColour

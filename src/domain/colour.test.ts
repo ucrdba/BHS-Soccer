@@ -51,6 +51,16 @@ describe('parseColour', () => {
     }
   });
 
+  // COLOUR_NAMES is built with a null prototype for exactly this: both keys
+  // are already lowercase and would otherwise resolve to an inherited member
+  // of Object.prototype instead of `undefined`, and toHex would throw on the
+  // result rather than the value being refused.
+  it('refuses constructor and __proto__ rather than resolving an inherited member', () => {
+    for (const v of ['constructor', '__proto__']) {
+      expect(parseColour(v), v).toBeNull();
+    }
+  });
+
   // The value ends up in a stylesheet. Nothing that could close a declaration
   // or open a rule may survive parsing.
   it('refuses a value carrying stylesheet punctuation', () => {

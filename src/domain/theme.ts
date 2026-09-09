@@ -61,6 +61,21 @@ export const PAPER_MARK_FALLBACK = '#201f1d';
 export const DARK_MARK_FALLBACK = '#FFD700';
 
 /**
+ * The fallback for the paper ground's two guarded accent properties
+ * (`--org-mark-paper`, `--org-text-paper`).
+ *
+ * It is deliberately not PAPER_MARK_FALLBACK, even though that constant's
+ * name suggests it belongs here. PAPER_MARK_FALLBACK is the same value as
+ * PAPER_INK -- both are the paper ground's body-text colour -- so using it as
+ * an accent fallback would hand a rejected colour's callers the ink itself,
+ * which is precisely the distance `guardedColour` exists to enforce. #7d5411
+ * is the accent the paper ground used before organization colours existed,
+ * and it clears both floors against the paper ground and its ink (see
+ * theme.test.ts's invariant test below).
+ */
+export const PAPER_ACCENT_FALLBACK = '#7d5411';
+
+/**
  * 3:1 is WCAG's floor for graphical objects and large text. The mark is a
  * keyline, a rank figure or a kicker — never body copy — so that is the right
  * floor for it.
@@ -74,6 +89,14 @@ export const DARK_INK = '#F8FAFC';
 /**
  * 4.5:1 is WCAG's floor for body-size text. A link is body-size text; a
  * keyline or a rank figure is not, which is why MIN_MARK_CONTRAST is 3.
+ *
+ * TODO: there is no equivalent text floor on the dark ground. MatrixBoard.vue's
+ * `.rank` is 15px text on the ledger ground, guarded only at MIN_MARK_CONTRAST
+ * (3:1), so a club with a green or royal-blue secondary gets rank figures at
+ * roughly 3.6:1 -- readable, but below the 4.5:1 a body-size figure would get
+ * on paper. Not fixed here: the asymmetry predates this change, and closing
+ * it (a dark-ground text floor, and deciding which surfaces are text-weight)
+ * is a design decision, not a bug this pass owns.
  */
 export const MIN_TEXT_CONTRAST = 4.5;
 
@@ -88,10 +111,20 @@ export const MIN_TEXT_CONTRAST = 4.5;
  * apart, because one is blue. White against the dark ground's #F8FAFC is ~9
  * apart and is correctly rejected. 32 separates the two with room either side.
  *
- * Euclidean sRGB distance is a crude perceptual model. It is adequate because
- * the question is coarse -- is this the same colour as the text? -- and a
- * faithful model would add a colour-space conversion without changing the
- * answer in any case this guards against.
+ * Euclidean sRGB distance is a crude perceptual model, and a deliberate
+ * simplification rather than an oversight: the question here is coarse -- is
+ * this the same colour as the text? -- and colour-space conversion is not
+ * free. But it is known to over-accept light achromatic colours near the dark
+ * ground's ink, because un-gamma-corrected sRGB distance is dominated by the
+ * achromatic axis and over-weights the light end -- exactly where the dark
+ * ink #F8FAFC sits, which is the only place this distance test does any work.
+ * Silver is the named case it gets wrong: against #F8FAFC, #c0c0c0 scores 100
+ * by this measure -- a confident accept at three times the threshold -- but
+ * only ~20.5 by CIE ΔE76, closer to the ink than cream (23.8) and barely
+ * further than ivory (8.8), which this guard rejects. "Navy and silver" and
+ * "black and silver" are common school colour pairs, so this is not a
+ * hypothetical. If it proves necessary, the upgrade is ΔE76 over CIE Lab at a
+ * threshold near 25, not a different sRGB threshold.
  */
 export const MIN_INK_DISTANCE = 32;
 
@@ -135,14 +168,20 @@ export function colourDistance(a: string, b: string): number {
  * against the ground, or it cannot be told apart from the text beside it.
  * `min` is MIN_MARK_CONTRAST for a keyline or figure, MIN_TEXT_CONTRAST for
  * body-size text.
+ *
+ * The fallback is normalised the same way a success is -- a caller passing
+ * `#FFD700` and one passing `gold` must not get a different-cased answer
+ * depending on whether the organization's own colour happened to pass.
  */
 export function guardedColour(
   colour: string, ground: string, ink: string, min: number, fallback: string
 ): string {
+  const fc = parseColour(fallback);
+  const normalisedFallback = fc ? toHex(fc) : fallback;
   const c = parseColour(colour);
-  if (!c) return fallback;
-  if (contrastRatio(colour, ground) < min) return fallback;
-  if (colourDistance(colour, ink) < MIN_INK_DISTANCE) return fallback;
+  if (!c) return normalisedFallback;
+  if (contrastRatio(colour, ground) < min) return normalisedFallback;
+  if (colourDistance(colour, ink) < MIN_INK_DISTANCE) return normalisedFallback;
   return toHex(c);
 }
 
@@ -151,7 +190,16 @@ export function guardedColour(
  *
  * Always normalised hex, whatever the row holds: six hex digits are the only
  * thing that reaches a stylesheet, which is what makes accepting rgb() and
- * names safe.
+ * names safe. `guardedColour` normalises both of its own outcomes, so nothing
+ * here needs a further `.toLowerCase()`.
+ *
+ * `--org-primary` and `--org-secondary` are raw and unguarded -- the
+ * organization's colour exactly as entered, before either floor is applied.
+ * Nothing in the app reads them today, and nothing should start: a component
+ * that reaches for `--org-primary` instead of `--mark` / `--live` /
+ * `--rule-strong` reintroduces the bug this guard exists to prevent. They are
+ * kept anyway, rather than removed, because deleting two established custom
+ * properties would only churn index.css and this file's tests for no gain.
  */
 export function themeVars(b: Branding): Record<string, string> {
   const raw = (v: string, fallback: string): string => {
@@ -162,13 +210,13 @@ export function themeVars(b: Branding): Record<string, string> {
     '--org-primary': raw(b.primary, DEFAULT_PRIMARY.toLowerCase()),
     '--org-secondary': raw(b.secondary, DEFAULT_SECONDARY.toLowerCase()),
     '--org-mark-paper': guardedColour(
-      b.primary, PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, PAPER_MARK_FALLBACK
-    ).toLowerCase(),
+      b.primary, PAPER_GROUND, PAPER_INK, MIN_MARK_CONTRAST, PAPER_ACCENT_FALLBACK
+    ),
     '--org-mark-dark': guardedColour(
       b.secondary, DARK_GROUND, DARK_INK, MIN_MARK_CONTRAST, DARK_MARK_FALLBACK
-    ).toLowerCase(),
+    ),
     '--org-text-paper': guardedColour(
-      b.primary, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, PAPER_MARK_FALLBACK
-    ).toLowerCase()
+      b.primary, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, PAPER_ACCENT_FALLBACK
+    )
   };
 }

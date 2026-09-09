@@ -2,6 +2,9 @@
 -- Run this script in your Supabase SQL Editor after running supabase_schema.sql
 
 -- 1. SEED SCHOOL METADATA
+-- primary is rgb() and secondary is a colour name on purpose, not merely
+-- Beaumont's brand guide -- src/domain/colour.ts's parseColour must accept
+-- both forms, and seeding one of each exercises that rather than only hex.
 INSERT INTO public.schools (id, name, mascot, city, colors, record)
 VALUES (
   'bhs',

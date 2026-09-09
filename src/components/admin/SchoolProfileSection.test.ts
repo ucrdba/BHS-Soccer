@@ -246,4 +246,41 @@ describe('the colour fields', () => {
     });
     expect(wrapper.find('[data-school-colour-note]').text()).toMatch(/white/i);
   });
+
+  // Fix 2: guardedColour substitutes for either of two independent reasons,
+  // and the message must name whichever one actually fired -- the two
+  // wordings are not interchangeable. maroon fails the dark ground's 3:1
+  // contrast floor (its contrast against DARK_GROUND is ~1.7); white passes
+  // that floor at 17:1 but sits at zero distance from the dark ink, so it
+  // fails only the ink-distance floor.
+  it('says a colour cannot be SEEN when it fails the contrast floor', async () => {
+    const wrapper = await mountSection({
+      colors: { primary: '#21196F', secondary: 'maroon' }
+    });
+    const note = wrapper.find('[data-school-colour-note]').text();
+    expect(note).toMatch(/maroon/i);
+    expect(note).toMatch(/cannot be seen/i);
+    expect(note).not.toMatch(/cannot be told apart/i);
+  });
+
+  it('says a colour cannot be TOLD APART when it fails only the ink-distance floor', async () => {
+    const wrapper = await mountSection({
+      colors: { primary: '#21196F', secondary: 'white' }
+    });
+    const note = wrapper.find('[data-school-colour-note]').text();
+    expect(note).toMatch(/cannot be told apart/i);
+    expect(note).not.toMatch(/cannot be seen/i);
+  });
+
+  // The primary was previously unchecked entirely, even though it now drives
+  // --live on the paper ground. #f5f4f4 clears the ink-distance floor easily
+  // (it is nowhere near the dark ink) but fails the paper ground's 4.5:1 text
+  // contrast floor -- a pure contrast failure, on the paper side this time.
+  it('reports a primary substitution too, since it now drives --live on paper', async () => {
+    const wrapper = await mountSection({
+      colors: { primary: '#f5f4f4', secondary: '#abcdef' }
+    });
+    const notes = wrapper.findAll('[data-school-colour-note]').map(n => n.text());
+    expect(notes.some(n => /f5f4f4/i.test(n) && /paper/i.test(n) && /cannot be seen/i.test(n))).toBe(true);
+  });
 });

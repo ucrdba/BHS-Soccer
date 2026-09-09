@@ -54,9 +54,20 @@ function fromHex(hex: string): Rgb {
   };
 }
 
-/** The names accepted, as channels. */
-export const COLOUR_NAMES: Record<string, Rgb> = Object.fromEntries(
-  Object.entries(NAMED_HEX).map(([name, hex]) => [name, fromHex(hex)])
+/**
+ * The names accepted, as channels.
+ *
+ * Built on a null prototype rather than `{}` / `Object.fromEntries`'s default
+ * object. A plain object inherits `Object.prototype`, and `parseColour`
+ * lowercases before the lookup -- which keeps out `toString` and `valueOf`
+ * but not `constructor` or `__proto__`, which are already lowercase and
+ * resolve to inherited members. Without a null prototype, `parseColour`
+ * would hand `toHex` a function or another object instead of `null`, and
+ * `toHex` would throw rather than the value being refused.
+ */
+export const COLOUR_NAMES: Record<string, Rgb> = Object.assign(
+  Object.create(null),
+  Object.fromEntries(Object.entries(NAMED_HEX).map(([name, hex]) => [name, fromHex(hex)]))
 );
 
 /** The colour a coach typed, as channels, or null if it is not one. */
