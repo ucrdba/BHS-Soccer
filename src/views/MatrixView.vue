@@ -48,16 +48,58 @@ const notice = ref<string | null>(null);
 const weightsOpen = ref(false);
 const squadOpen = ref(false);
 const progressOpen = ref(false);
-/** The exercise the grid is recording. Chosen before it opens. */
-const sessionDrillId = ref('');
+/**
+ * Every live exercise, which is one list rather than two.
+ *
+ * There used to be a picker here that only chose what "Record a session"
+ * opened, and a second one on the exercise panel that chose what the
+ * leaderboard showed. Choosing in the obvious one appeared to do nothing,
+ * because its only effect was a link's href.
+ *
+ * Merging them takes the wider list, because the two were narrow in opposite
+ * directions: the recording list carried brand-new exercises with no results
+ * yet, and the viewing list carried 1v1s. Narrowing to either would have lost
+ * a real case — recording an exercise for the first time, or reading a 1v1's
+ * standings. So the picker offers everything and the two jobs gate themselves.
+ */
+const sessionDrills = computed(() => session.drills);
 
 /**
- * Sessions are recorded per exercise, and head_to_head is deliberately not
- * offered: those are entered as pairings, and giving one drill both routes
- * would let the same day's competition be counted twice.
+ * Whether the chosen exercise can be recorded as a session.
+ *
+ * head_to_head is entered as pairings; giving one drill both routes would let
+ * the same day's competition be counted twice. That rule used to be enforced
+ * by keeping 1v1s out of the picker, which also kept their ratings out of
+ * reach. It is now said on screen instead.
  */
-const sessionDrills = computed(() =>
-  session.drills.filter((d: any) => d.measure !== 'head_to_head'));
+const chosenDrill = computed(() =>
+  session.drills.find((d: any) => d.id === matrix.exerciseFilter) || null);
+
+const recordable = computed(() =>
+  !!sessionDrills.value.length
+  && (!chosenDrill.value || chosenDrill.value.measure !== 'head_to_head'));
+
+/**
+ * Whether the chosen exercise has anything to show. `matrix.exercises` is the
+ * drills that carry results, so an exercise absent from it has never been
+ * recorded — which is a sentence, not an empty table.
+ */
+const hasResults = computed(() =>
+  matrix.exercises.some((d: any) => d.id === matrix.exerciseFilter));
+
+/** What "Record a session" opens: the chosen exercise, or the first offered. */
+const sessionDrillId = computed(() =>
+  matrix.exerciseFilter || (sessionDrills.value[0]?.id ?? ''));
+
+/**
+ * Choosing an exercise is choosing what the screen is about, so it moves to
+ * the panel that shows it. Leaving the coach on the board to discover a tab
+ * is what made the control read as broken.
+ */
+function onExerciseChosen(id: string): void {
+  matrix.setExerciseFilter(id);
+  if (id) chosenPanel.value = 'exercise';
+}
 
 async function openSessions(): Promise<void> {
   await session.loadDrills(schoolId.value);
@@ -147,15 +189,21 @@ watch(
 
     <div v-if="isCoach" class="acts">
       <select
-        v-if="sessionDrills.length" v-model="sessionDrillId"
-        class="acts__select" aria-label="Exercise to record" data-session-drill
+        v-if="sessionDrills.length"
+        class="acts__select" aria-label="Exercise" data-session-drill
+        :value="matrix.exerciseFilter"
+        @change="onExerciseChosen(($event.target as HTMLSelectElement).value)"
       >
+        <option value="">All exercises</option>
         <option v-for="d in sessionDrills" :key="d.id" :value="d.id">{{ d.name }}</option>
       </select>
       <RouterLink
-        v-if="sessionDrills.length" class="act" data-record-session
-        :to="{ name: 'session-entry', params: { drillId: sessionDrillId || sessionDrills[0].id } }"
+        v-if="recordable" class="act" data-record-session
+        :to="{ name: 'session-entry', params: { drillId: sessionDrillId } }"
       >Record a session</RouterLink>
+      <p v-else-if="sessionDrills.length" class="act act--dead" data-record-pairings>
+        Recorded as pairings, not a session
+      </p>
       <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
       <button type="button" class="act" data-open-weights @click="weightsOpen = true">Weights &amp; standards</button>
       <button type="button" class="act" data-open-squad @click="squadOpen = true">Squad report</button>
@@ -172,20 +220,17 @@ watch(
         <MatrixBoard @open-player="openPlayerId = $event" />
       </template>
 
+      <!--
+        No picker of its own: the one in the actions row above chooses the
+        exercise for the whole screen, and having two was what made choosing
+        in the obvious one look like it did nothing.
+      -->
       <template v-else-if="panel === 'exercise'">
-        <label class="picker">
-          <span class="picker__label kicker">Exercise</span>
-          <select
-            class="picker__select" data-exercise-filter
-            :value="matrix.exerciseFilter"
-            @change="matrix.setExerciseFilter(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Choose an exercise</option>
-            <option v-for="d in matrix.exercises" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
-        </label>
-        <ExerciseLeaderboard v-if="matrix.exerciseFilter" />
-        <p v-else class="empty">Pick an exercise to see it on its own.</p>
+        <ExerciseLeaderboard v-if="matrix.exerciseFilter && hasResults" />
+        <p v-else-if="matrix.exerciseFilter" class="empty" data-no-results>
+          No results recorded for {{ chosenDrill?.name || 'this exercise' }} yet.
+        </p>
+        <p v-else class="empty">Choose an exercise above to see it on its own.</p>
       </template>
 
       <template v-else-if="panel === 'results'">

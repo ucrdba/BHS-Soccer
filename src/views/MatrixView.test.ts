@@ -417,15 +417,70 @@ describe('recording a session', () => {
     expect(w.find('[data-history]').exists()).toBe(false);
   });
 
-  it('does not offer a 1v1 exercise as a session', async () => {
+  /*
+   * One picker, not two.
+   *
+   * There used to be an exercise dropdown here that only chose what "Record a
+   * session" would open, and a second one on the Exercise panel that chose
+   * what the leaderboard showed. Picking in the obvious one appeared to do
+   * nothing, because its only effect was a link's href.
+   *
+   * They list different drills for real reasons, which is why merging them
+   * needs care rather than a changed binding: the recording list carries
+   * brand-new exercises that have no results yet, and the viewing list
+   * carries 1v1s, which cannot be recorded as a session at all.
+   */
+  const ONE_V_ONE = { id: 'd-1v1', name: 'One v One', measure: 'head_to_head' };
+
+  it('offers every exercise, including a 1v1 that cannot be recorded', async () => {
+    const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
+    const names = w.find('[data-session-drill]').findAll('option').map(o => o.text());
+    expect(names).toContain('One v One');
+    expect(names).toContain('3 Laps');
+  });
+
+  it('shows that exercise\'s ratings as soon as one is chosen', async () => {
+    // LAPS is the drill the fixture records points against.
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-session-drill]').setValue(LAPS);
+
+    // The choice moves the screen to the exercise panel rather than leaving
+    // the coach to find a tab -- "nothing happens" was the whole complaint.
+    expect(w.find('[data-panel]').attributes('data-panel')).toBe('exercise');
+    expect(w.find('[data-exercise-leaderboard]').exists()).toBe(true);
+  });
+
+  it('says so rather than showing an empty table for an exercise never recorded', async () => {
+    // SMALL is offered -- it is a live exercise, and recording it is exactly
+    // what a coach would come here to do -- but nothing has been recorded
+    // against it, so there is no leaderboard to draw.
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-session-drill]').setValue(SMALL);
+
+    expect(w.find('[data-exercise-leaderboard]').exists()).toBe(false);
+    expect(w.find('[data-no-results]').text()).toContain('Small Sided');
+  });
+
+  it('does not offer to record a 1v1, and says why', async () => {
     // Those are entered as pairings. Offering both routes for one drill would
     // let the same day's competition be counted twice.
-    const w = await mountMatrix({
-      coach: true,
-      drills: DRILLS.concat([{ id: 'd-1v1', name: 'One v One', measure: 'head_to_head' }])
-    });
-    const names = w.find('[data-session-drill]').findAll('option').map(o => o.text());
-    expect(names).not.toContain('One v One');
+    const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
+    await w.find('[data-session-drill]').setValue('d-1v1');
+
+    expect(w.find('[data-record-session]').exists()).toBe(false);
+    expect(w.find('[data-record-pairings]').text()).toMatch(/pairing/i);
+  });
+
+  it('offers to record an exercise that can be, targeting the chosen one', async () => {
+    const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
+    await w.find('[data-session-drill]').setValue(SMALL);
+    expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${SMALL}`);
+  });
+
+  it('carries no second picker on the exercise panel', async () => {
+    const w = await mountMatrix({ coach: true });
+    await switchTo(w, 'Exercise');
+    expect(w.find('[data-exercise-filter]').exists()).toBe(false);
   });
 
   it('reads the session history for the team', async () => {
