@@ -15,7 +15,7 @@ import { checkEmail } from './auth/email-typo';
 // silently had no auth at all until it published that global, and which
 // bypassed the client's real type signatures in favour of the looser ambient
 // declaration in globals.d.ts.
-import { supabaseService, LEGACY_DEFAULT_ORG } from './data/supabase';
+import { supabaseService } from './data/supabase';
 
 const ROLES = {
   GUEST: 'guest' as UserRole,
@@ -197,20 +197,19 @@ export class AuthManager {
   /**
    * Accounts awaiting approval, for one organization.
    *
-   * The argument is not optional by accident. `fetchPendingApprovals` declares
-   * `schoolId: string = 'bhs'`, so calling it bare — as this did — shows a club
-   * admin Beaumont's pending signups, and the default makes that invisible at
-   * the call site. Callers pass the organization they are looking at.
+   * The argument is not optional by accident. Calling `fetchPendingApprovals`
+   * without one used to show a club admin Beaumont's pending signups — people
+   * requesting access to an organization that is not theirs — and the
+   * substitution made that invisible at the call site.
    *
-   * It stays optional only so the legacy admin panel, which has no resolved id
-   * to hand, keeps its existing behaviour rather than breaking. New callers
-   * should always pass one.
+   * This passed `schoolId || LEGACY_DEFAULT_ORG` for the benefit of
+   * public/js/admin.js, which Phase 7 deleted. Nothing substitutes now: with
+   * no organization the service queries nothing and returns null, and an
+   * unresolved organization produces an empty queue rather than somebody
+   * else's.
    */
   async getPendingApprovals(schoolId?: string): Promise<AppUser[]> {
-    // The fallback is named rather than implied, so it is greppable and so
-    // nobody mistakes it for a considered default. public/js/admin.js:1662 is
-    // the only caller that reaches here without an organization.
-    const rows = await supabaseService.fetchPendingApprovals(schoolId || LEGACY_DEFAULT_ORG);
+    const rows = await supabaseService.fetchPendingApprovals(schoolId as string);
     return (rows || []).map(mapProfileRowToAppUser);
   }
 

@@ -93,7 +93,7 @@ declare global {
     fetchLatestDailyThoughts(teamId: string): Promise<Partial<DailyThought> | null>;
     upsertDailyThought(teamId: string, thought: any): Promise<any>;
     setActiveDailyThought(teamId: string, activeId?: string): Promise<any>;
-    fetchSoccerCategories(schoolCode?: string): Promise<Partial<SoccerCategory>[] | null>;
+    fetchSoccerCategories(schoolCode: string): Promise<Partial<SoccerCategory>[] | null>;
     // Every one of these takes the organization: migration 0027 gave
     // soccer_categories a school_id and made the name unique per
     // organization, and the rename and merge work by NAME, so unscoped they
@@ -167,7 +167,7 @@ declare global {
     fetchOwnProfile(): Promise<Record<string, any> | null>;
     approveProfile(userId: string): Promise<Record<string, any> | null>;
     rejectProfile(userId: string): Promise<Record<string, any> | null>;
-    fetchPendingApprovals(schoolCode?: string): Promise<Record<string, any>[] | null>;
+    fetchPendingApprovals(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
     fetchMatrixStandings(teamId: string): Promise<Record<string, any>[] | null>;
     fetchMatrixLogs(teamId: string): Promise<Record<string, any>[] | null>;

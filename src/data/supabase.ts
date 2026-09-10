@@ -118,20 +118,25 @@ initSupabaseClient();
  * seeing Beaumont's pending signups, and the roster before it moved to
  * fetchTeamRoster.
  *
- * The parameter is now REQUIRED, so TypeScript refuses a new bare call. The
- * fallback survives only for the two remaining callers in public/js, which is
- * not typechecked — and it says so loudly rather than pretending all is well.
+ * The parameter is REQUIRED, so TypeScript refuses a bare call, and the
+ * untypechecked callers the fallback once survived for — the two in
+ * `public/js` — were deleted in Phase 7. But `tsconfig` runs with
+ * `strict: false`, so `fetchPlayers(org.school?.id)` still compiles and still
+ * arrives here as `undefined` when the organization has not resolved. That is
+ * the path that stayed open, and it is why this returns nothing rather than
+ * substituting: the method then asks the database nothing at all.
+ *
+ * An empty screen is visibly wrong and safe. Another organization's data is
+ * invisibly wrong.
  */
-export const LEGACY_DEFAULT_ORG = 'bhs';
-
-function requireOrg(method: string, schoolId: string | undefined | null): string {
+function orgOrNull(method: string, schoolId: string | undefined | null): string | null {
   if (schoolId) return schoolId;
-  console.warn(
-    `${method}() was called with no organization, so it is falling back to ` +
-    `'${LEGACY_DEFAULT_ORG}'. That serves one organization's data to whoever ` +
-    `asked. Pass the resolved organization id.`
+  console.error(
+    `${method}() was called with no organization, so it returned nothing ` +
+    `rather than querying. Pass the resolved organization id — see ` +
+    `resolveActiveTeam() in data/team-scope.ts.`
   );
-  return LEGACY_DEFAULT_ORG;
+  return null;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -331,7 +336,8 @@ class SupabaseService {
   }
 
   async getSchoolUuid(schoolCodeOrId: string): Promise<string | null> {
-    schoolCodeOrId = requireOrg('getSchoolUuid', schoolCodeOrId);
+    schoolCodeOrId = orgOrNull('getSchoolUuid', schoolCodeOrId);
+    if (!schoolCodeOrId) return null;
     if (!schoolCodeOrId) return null;
     if (this.isUuid(schoolCodeOrId)) return schoolCodeOrId;
     if (!this.isConfigured()) return null;
@@ -425,7 +431,8 @@ class SupabaseService {
   }
 
   async fetchPendingApprovals(schoolId: string): Promise<any> {
-    schoolId = requireOrg('fetchPendingApprovals', schoolId);
+    schoolId = orgOrNull('fetchPendingApprovals', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
       .from('profiles')
@@ -652,7 +659,8 @@ class SupabaseService {
 
   // Database Query Wrappers
   async fetchPlayers(schoolId: string): Promise<Record<string, any>[] | null> {
-    schoolId = requireOrg('fetchPlayers', schoolId);
+    schoolId = orgOrNull('fetchPlayers', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     let query = this.client!.from('players').select('*').or('is_deleted.is.null,is_deleted.eq.false') as any;
     const schoolUuid = await this.getSchoolUuid(schoolId);
@@ -1341,7 +1349,8 @@ class SupabaseService {
    * this reads as empty rather than as everybody's.
    */
   async fetchSoccerCategories(schoolId: string): Promise<Partial<SoccerCategoryRow>[] | null> {
-    schoolId = requireOrg('fetchSoccerCategories', schoolId);
+    schoolId = orgOrNull('fetchSoccerCategories', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     try {
       const schoolUuid = await this.getSchoolUuid(schoolId);
@@ -2275,7 +2284,8 @@ class SupabaseService {
   async upsertSoccerCategory(
     schoolId: string, categoryObj: any = {}
   ): Promise<{ ok: boolean; error?: string; data?: any }> {
-    schoolId = requireOrg('upsertSoccerCategory', schoolId);
+    schoolId = orgOrNull('upsertSoccerCategory', schoolId);
+    if (!schoolId) return { ok: false, error: 'Cloud database is not configured.' };
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
 
     const name = (categoryObj.name || '').trim();
@@ -2316,7 +2326,8 @@ class SupabaseService {
    * five of ten drills are in that state.
    */
   async fetchCategoryUsage(schoolId: string): Promise<Record<string, number> | null> {
-    schoolId = requireOrg('fetchCategoryUsage', schoolId);
+    schoolId = orgOrNull('fetchCategoryUsage', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     // Scoped, because these counts are what the editor shows beside each
     // category and what its "used by drills, not defined" group is built
@@ -2350,7 +2361,8 @@ class SupabaseService {
   async retagDrills(
     schoolId: string, fromName: string, toName: string
   ): Promise<{ ok: boolean; error?: string; count?: number }> {
-    schoolId = requireOrg('retagDrills', schoolId);
+    schoolId = orgOrNull('retagDrills', schoolId);
+    if (!schoolId) return { ok: false, error: 'Cloud database is not configured.' };
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!fromName || !toName) return { ok: false, error: 'Both the old and the new name are needed.' };
 
@@ -2385,7 +2397,8 @@ class SupabaseService {
   async renameSoccerCategory(
     schoolId: string, id: string, oldName: string, newName: string
   ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
-    schoolId = requireOrg('renameSoccerCategory', schoolId);
+    schoolId = orgOrNull('renameSoccerCategory', schoolId);
+    if (!schoolId) return { ok: false, error: 'Cloud database is not configured.' };
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
 
     const to = (newName || '').trim();
@@ -2435,7 +2448,8 @@ class SupabaseService {
   async mergeSoccerCategory(
     schoolId: string, fromName: string, toName: string
   ): Promise<{ ok: boolean; error?: string; drillsUpdated?: number }> {
-    schoolId = requireOrg('mergeSoccerCategory', schoolId);
+    schoolId = orgOrNull('mergeSoccerCategory', schoolId);
+    if (!schoolId) return { ok: false, error: 'Cloud database is not configured.' };
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!fromName || !toName) return { ok: false, error: 'Pick a category and a destination.' };
     if (fromName === toName) return { ok: false, error: 'That is the same category.' };
@@ -2493,7 +2507,8 @@ class SupabaseService {
    * organization's at once.
    */
   async fetchDrillsBank(schoolId: string): Promise<Record<string, any>[] | null> {
-    schoolId = requireOrg('fetchDrillsBank', schoolId);
+    schoolId = orgOrNull('fetchDrillsBank', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     try {
       const schoolUuid = await this.getSchoolUuid(schoolId);
@@ -2512,7 +2527,8 @@ class SupabaseService {
   }
 
   async upsertDrillBankItem(schoolId: string, drill: any = {}): Promise<any> {
-    schoolId = requireOrg('upsertDrillBankItem', schoolId);
+    schoolId = orgOrNull('upsertDrillBankItem', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
 
@@ -3211,7 +3227,8 @@ class SupabaseService {
   }
 
   async fetchSchool(schoolCode: string): Promise<Partial<SchoolRow> | null> {
-    schoolCode = requireOrg('fetchSchool', schoolCode);
+    schoolCode = orgOrNull('fetchSchool', schoolCode);
+    if (!schoolCode) return null;
     if (!this.isConfigured()) return null;
     try {
       const { data, error } = await this.client!
@@ -3241,7 +3258,8 @@ class SupabaseService {
   }
 
   async upsertSchool(schoolCode: string, school: any = {}): Promise<any> {
-    schoolCode = requireOrg('upsertSchool', schoolCode);
+    schoolCode = orgOrNull('upsertSchool', schoolCode);
+    if (!schoolCode) return { data: null, error: 'Supabase Cloud DB is not configured (Anon Key missing).' };
     if (!this.isConfigured()) return { data: null, error: 'Supabase Cloud DB is not configured (Anon Key missing).' };
     const payload: Record<string, any> = {
       code: schoolCode || school.code || 'bhs',
@@ -3325,7 +3343,8 @@ class SupabaseService {
   }
 
   async fetchCoaches(schoolId: string): Promise<Partial<CoachRow>[] | null> {
-    schoolId = requireOrg('fetchCoaches', schoolId);
+    schoolId = orgOrNull('fetchCoaches', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     let query = this.client!.from('coaches').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true }) as any;
@@ -3336,7 +3355,8 @@ class SupabaseService {
   }
 
   async upsertCoach(schoolId: string, coach: any = {}): Promise<any> {
-    schoolId = requireOrg('upsertCoach', schoolId);
+    schoolId = orgOrNull('upsertCoach', schoolId);
+    if (!schoolId) return null;
     if (!this.isConfigured()) return null;
     const schoolUuid = await this.getSchoolUuid(schoolId);
     const payload: Record<string, any> = {
