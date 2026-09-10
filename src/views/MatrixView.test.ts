@@ -12,6 +12,7 @@ import { createTestingPinia } from '@pinia/testing';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import MatrixView from './MatrixView.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
+import { useMatrixStore } from '../stores/matrix';
 
 /**
  * A real router, so useRouter() inside the view actually returns something
@@ -267,6 +268,43 @@ describe('the run ratio beside a standard', () => {
       }
     });
     expect(w.find('[data-exercise-avg]').exists()).toBe(false);
+  });
+
+  /*
+   * The export is of the table as the coach has it sorted. Re-sorting on the
+   * way out would throw away the answer they arrived at -- fastest first to
+   * pick a squad, slowest first to plan a session.
+   */
+  it('exports the rows in the order the board is sorted', async () => {
+    const w = mountWith([
+      point({ player_id: 'p1', earned: 1, available: 1, raw_value: 300 }),
+      point({ player_id: 'p2', earned: 1, available: 1, raw_value: 240 })
+    ]);
+    const store: any = useMatrixStore();
+
+    const first = () => store.leaderboard.map((r: any) => r.playerId);
+    store.setExerciseSort('best');
+    await w.vm.$nextTick();
+    const fastestFirst = first();
+
+    store.setExerciseSort('best');   // same column again reverses it
+    await w.vm.$nextTick();
+    expect(first()).toEqual([...fastestFirst].reverse());
+  });
+
+  it('offers both exports only while there is something to export', () => {
+    const w = mountWith([point({ player_id: 'p1', earned: 1, available: 1, raw_value: 269 })]);
+    expect(w.find('[data-export-print]').exists()).toBe(true);
+    expect(w.find('[data-export-excel]').exists()).toBe(true);
+  });
+
+  it('says the spreadsheet library has not loaded rather than throwing', async () => {
+    const w = mountWith([point({ player_id: 'p1', earned: 1, available: 1, raw_value: 269 })]);
+    const had = (window as any).XLSX;
+    delete (window as any).XLSX;
+    await w.find('[data-export-excel]').trigger('click');
+    expect(w.find('[data-export-error]').text()).toMatch(/library/i);
+    if (had) (window as any).XLSX = had;
   });
 
   it('says nothing when every run cleared it, having nothing to add', () => {

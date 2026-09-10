@@ -18,9 +18,11 @@
  * stays on screen, ordered however the reader chooses. That was the condition
  * on introducing the emphasis at all.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useMatrixStore } from '../../stores/matrix';
 import { bandStanding } from '../../domain/matrix-threshold';
+import { exerciseSheet, buildExercisePrintDocument } from '../../domain/exercise-export';
+import { useOrganizationStore } from '../../stores/organization';
 import { formatSecondsAsTime } from '../../domain/time';
 
 const matrix = useMatrixStore();
@@ -68,6 +70,66 @@ function figure(row: any, v: any): string {
 
 const emit = defineEmits<{ openPlayer: [string] }>();
 
+const org = useOrganizationStore();
+const exportError = ref<string | null>(null);
+
+/** What both exports describe: this exercise, as the coach has it sorted. */
+function exportOptions() {
+  return {
+    exercise: matrix.selectedDrill?.name || 'Exercise',
+    measure: matrix.measure,
+    organization: org.branding.name || '',
+    team: org.activeTeam?.name || '',
+    // Straight off the store, so the order is whatever column the coach
+    // sorted by. Re-sorting here would throw away their answer.
+    rows: matrix.leaderboard
+  };
+}
+
+/**
+ * Printed through the browser's own dialog, where Save as PDF is one of the
+ * destinations. No PDF library -- the practice planner already prints this
+ * way, and a library would be a dependency for a worse result.
+ */
+function onPrint(): void {
+  exportError.value = null;
+  const html = buildExercisePrintDocument(exportOptions());
+  if (!html) { exportError.value = 'There is nothing to print yet.'; return; }
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    // A blocked pop-up is silent otherwise, and the coach just sees nothing
+    // happen when they press print.
+    exportError.value = 'Your browser blocked the print window. Allow pop-ups for this site and try again.';
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function onExcel(): void {
+  exportError.value = null;
+  const XLSX = (window as any).XLSX;
+  if (typeof XLSX === 'undefined') {
+    // The CDN may not have answered yet. Said, not thrown.
+    exportError.value = 'The spreadsheet library has not loaded yet. Wait a moment and try again.';
+    return;
+  }
+
+  const opts = exportOptions();
+  const rows = exerciseSheet(opts);
+  if (rows.length === 0) { exportError.value = 'There is nothing to export yet.'; return; }
+
+  const wb = XLSX.utils.book_new();
+  // A sheet name may not carry : \ / ? * [ ] and is capped at 31 characters,
+  // so an exercise called "3-430 / laps" would throw rather than save.
+  const sheetName = opts.exercise.replace(/[:\/?*\[\]]/g, '-').slice(0, 31) || 'Exercise';
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+  XLSX.writeFile(wb, `${sheetName.replace(/\s+/g, '_')}.xlsx`);
+}
+
 /**
  * How consistently, beside whether at all.
  *
@@ -93,9 +155,25 @@ function standing(row: any): string {
 <template>
   <div>
     <header v-if="matrix.selectedDrill" class="lb__head">
-      <p class="kicker">Exercise · {{ matrix.measure.replace('_', ' ') }}</p>
-      <h2 class="lb__name">{{ matrix.selectedDrill.name }}</h2>
+      <div>
+        <p class="kicker">Exercise · {{ matrix.measure.replace('_', ' ') }}</p>
+        <h2 class="lb__name">{{ matrix.selectedDrill.name }}</h2>
+      </div>
+      <!-- Beside the exercise's own name, because they export THIS table --
+           as it is sorted, not the board behind it. -->
+      <div v-if="matrix.leaderboard.length" class="lb__acts">
+        <button type="button" class="btn btn--small" data-export-print @click="onPrint">
+          Print / PDF
+        </button>
+        <button type="button" class="btn btn--small" data-export-excel @click="onExcel">
+          Excel
+        </button>
+      </div>
     </header>
+
+    <p v-if="exportError" class="note note--bad" role="alert" data-export-error>
+      {{ exportError }}
+    </p>
 
     <!--
       Only for a standard. A competitive exercise gets no summary, because
@@ -202,7 +280,14 @@ function standing(row: any): string {
 </template>
 
 <style scoped>
-.lb__head { margin-bottom: var(--space-3); }
+.lb__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
 
 .lb__name {
   margin-top: 6px;
@@ -290,4 +375,6 @@ function standing(row: any): string {
 
 /* The ratio is context for the verdict beside it, not a second verdict. */
 .mark__runs { color: var(--ink-muted); }
+
+.lb__acts { display: flex; gap: var(--space-2); flex: none; }
 </style>
