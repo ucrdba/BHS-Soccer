@@ -31,11 +31,17 @@ const isTimed = computed(() =>
   matrix.measure === 'time_low' || matrix.measure === 'time_bands');
 
 const bestLabel = computed(() => (isTimed.value ? 'Best time' : 'Best'));
+const avgLabel = computed(() => (isTimed.value ? 'Average' : 'Avg'));
 
 const columns = computed(() => [
   { key: 'number', label: '#' },
   { key: 'name', label: 'Player', text: true },
-  isWinLoss.value ? { key: 'wins', label: 'W-D-L' } : { key: 'best', label: bestLabel.value },
+  // The best figure is a ceiling, the average the norm; a player whose only
+  // clear run was his fastest reads very differently from one who clears it
+  // routinely. A win-loss exercise has no figure to average.
+  ...(isWinLoss.value
+    ? [{ key: 'wins', label: 'W-D-L' }]
+    : [{ key: 'best', label: bestLabel.value }, { key: 'avg', label: avgLabel.value }]),
   { key: 'earned', label: 'Points' }
 ]);
 
@@ -46,8 +52,18 @@ function arrow(key: string): string {
 
 /** A player's best figure, phrased for the exercise they did it in. */
 function best(row: any): string {
-  if (row.best === null || row.best === undefined) return '—';
-  return row.timed ? formatSecondsAsTime(row.best) : String(row.best);
+  return figure(row, row.best);
+}
+
+/** The same phrasing for the average, rounded: a mean second is spurious precision. */
+function avg(row: any): string {
+  if (row.avg === null || row.avg === undefined) return '—';
+  return figure(row, row.timed ? Math.round(row.avg) : Number(row.avg.toFixed(1)));
+}
+
+function figure(row: any, v: any): string {
+  if (v === null || v === undefined) return '—';
+  return row.timed ? formatSecondsAsTime(v) : String(v);
 }
 
 const emit = defineEmits<{ openPlayer: [string] }>();
@@ -146,10 +162,13 @@ function standing(row: any): string {
                 @click="emit('openPlayer', r.playerId)"
               >{{ r.name }}</button>
             </td>
-            <td class="tnum">
-              <template v-if="isWinLoss">{{ r.wins }} - {{ r.draws }} - {{ r.losses }}</template>
-              <template v-else>{{ best(r) }}</template>
-            </td>
+            <template v-if="isWinLoss">
+              <td class="tnum">{{ r.wins }} - {{ r.draws }} - {{ r.losses }}</td>
+            </template>
+            <template v-else>
+              <td class="tnum">{{ best(r) }}</td>
+              <td class="tnum muted" data-exercise-avg>{{ avg(r) }}</td>
+            </template>
             <td class="tnum points">{{ r.earned.toFixed(2) }}</td>
             <td class="tnum muted">{{ r.available.toFixed(2) }}</td>
             <td v-if="matrix.isThreshold" class="tnum">

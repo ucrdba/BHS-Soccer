@@ -32,7 +32,7 @@ export function exerciseLeaderboard(
       wins: 0, draws: 0, losses: 0,
       earned: 0, available: 0, attempts: 0,
       metRuns: 0, shortRuns: 0,
-      best: null, timed
+      best: null, sum: 0, timed
     };
 
     a.wins += Number(r.w) || 0;
@@ -56,6 +56,7 @@ export function exerciseLeaderboard(
     if (rowAvailable > 0 && rowEarned >= rowAvailable) a.metRuns += 1;
     else a.shortRuns += 1;
     const v = Number(r.raw_value);
+    a.sum += v;
     if (a.best === null) a.best = v;
     else a.best = timed ? Math.min(a.best, v) : Math.max(a.best, v);
   });
@@ -66,6 +67,10 @@ export function exerciseLeaderboard(
       ...a,
       name: (p && p.name) || 'Former squad member',
       recordingNumber: p ? p.recordingNumber : null,
+      // The best figure is a ceiling; the average is the norm. Over attempts
+      // only -- an absence has no value, and counting it would drag a mean
+      // toward zero for a session the player was never at.
+      avg: a.attempts ? a.sum / a.attempts : null,
       share: a.available ? (100 * a.earned) / a.available : 0
     };
   });
@@ -96,6 +101,14 @@ export function compareExerciseRows(
     }
     // Fastest first for a timed exercise; highest first for a counted one.
     return flip * (timed ? x.best - y.best : y.best - x.best);
+  }
+
+  if (by === 'avg') {
+    if (x.avg === null || y.avg === null) {
+      if (x.avg === y.avg) return 0;
+      return x.avg === null ? 1 : -1;
+    }
+    return flip * (timed ? x.avg - y.avg : y.avg - x.avg);
   }
 
   if (by === 'wins') {
@@ -216,7 +229,9 @@ export function boardSortDescends(by: string): boolean {
  */
 export function exerciseSortDescends(by: string, timed: boolean): boolean {
   if (by === 'name' || by === 'number') return false;
-  if (by === 'best') return !timed;
+  // Both figures read the same way round: a faster time is better, a higher
+  // count is better.
+  if (by === 'best' || by === 'avg') return !timed;
   return true;                        // earned, wins
 }
 

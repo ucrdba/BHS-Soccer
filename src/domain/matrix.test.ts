@@ -104,6 +104,47 @@ describe('exerciseLeaderboard', () => {
     expect(belowStandard(rows)).toEqual([]);
   });
 
+  /*
+   * The best time is a ceiling; the average is the norm. A player whose only
+   * clear run was his fastest reads very differently from one who clears it
+   * routinely, and the two figures side by side say which.
+   */
+  it('averages the attempted values, ignoring absences', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, raw_value: 269, earned: 1, available: 1 }),
+      row({ drill_id: LAPS, raw_value: 281, earned: 0.5, available: 1 }),
+      // No value: it is not an attempt, so it must not drag the mean toward 0.
+      row({ drill_id: LAPS, raw_value: null, earned: 0, available: 1 })
+    ]), LAPS);
+
+    expect(rows[0].best).toBe(269);
+    expect(rows[0].avg).toBe(275);
+  });
+
+  it('has no average for a player who never attempted', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, raw_value: null, earned: 0, available: 1 })
+    ]), LAPS);
+    expect(rows[0].avg).toBeNull();
+  });
+
+  it('sorts a timed exercise fastest-average-first', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, player_id: 'p1', raw_value: 300 }),
+      row({ drill_id: LAPS, player_id: 'p2', raw_value: 240 })
+    ]), LAPS, 'avg');
+    expect(rows.map(r => r.playerId)).toEqual(['p2', 'p1']);
+  });
+
+  it('sinks a player with no average whichever way that column is sorted', () => {
+    const points = [
+      row({ drill_id: LAPS, player_id: 'p1', raw_value: null, earned: 5, available: 5 }),
+      row({ drill_id: LAPS, player_id: 'p2', raw_value: 240, earned: 1, available: 5 })
+    ];
+    expect(exerciseLeaderboard(ctx(points), LAPS, 'avg')[1].playerId).toBe('p1');
+    expect(exerciseLeaderboard(ctx(points), LAPS, 'avg', true)[1].playerId).toBe('p1');
+  });
+
   it('takes the LOWEST value as a personal best for a timed exercise', () => {
     const rows = exerciseLeaderboard(ctx([
       row({ drill_id: LAPS, raw_value: 190 }),

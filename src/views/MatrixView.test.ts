@@ -238,6 +238,37 @@ describe('the run ratio beside a standard', () => {
     expect(w.find('[data-standard-runs]').text()).toContain('1 of 2');
   });
 
+  it('shows the average beside the best, so a ceiling is not read as a norm', () => {
+    const w = mountWith([
+      point({ player_id: 'p1', earned: 1, available: 1, raw_value: 269 }),
+      point({ player_id: 'p1', earned: 0.5, available: 1, raw_value: 281 })
+    ]);
+    // Best 4:29, average of 269 and 281 is 275 -> 4:35.
+    expect(w.text()).toContain('4:29');
+    expect(w.find('[data-exercise-avg]').text()).toBe('4:35');
+  });
+
+  it('offers no average column for a win-loss exercise, having nothing to average', () => {
+    const w = mount(ExerciseLeaderboard, {
+      global: {
+        plugins: [createTestRouter(), createTestingPinia({
+          createSpy: vi.fn,
+          stubActions: false,
+          initialState: {
+            matrix: {
+              exerciseFilter: SMALL,
+              drillsBank: DRILLS,
+              players: [{ id: 'p1', name: 'Lanza', recordingNumber: 1 }],
+              exercisePoints: [point({ player_id: 'p1', drill_id: SMALL, w: 1, raw_value: null })]
+            }
+          }
+        })],
+        stubs: { RouterLink: routerLinkStub }
+      }
+    });
+    expect(w.find('[data-exercise-avg]').exists()).toBe(false);
+  });
+
   it('says nothing when every run cleared it, having nothing to add', () => {
     const w = mountWith([
       point({ player_id: 'p1', earned: 1, available: 1, raw_value: 250 }),
