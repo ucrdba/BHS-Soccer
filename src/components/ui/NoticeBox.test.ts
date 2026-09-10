@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import NoticeBox from './NoticeBox.vue';
-import { reportFailure, resetNotices, currentNotices } from '../../domain/notices';
+import { reportFailure, resetNotices, currentNotices, reportConnection } from '../../domain/notices';
 
 beforeEach(() => { resetNotices(); });
 afterEach(() => { resetNotices(); });
@@ -173,5 +173,81 @@ describe('leaving the page', () => {
 
     // Would throw on a component rendering after unmount.
     expect(() => reportFailure('fetchSchedule', 'timeout')).not.toThrow();
+  });
+});
+
+describe('the connection banner', () => {
+  /*
+   * The 107 service methods that return null when the client is unconfigured
+   * say nothing at all, so an app with no credentials loads empty and reports
+   * nothing. This is the one thing that explains an entirely blank site.
+   */
+  it('is absent while the app is connected', async () => {
+    const w = await mountBox();
+    expect(w.find('[data-connection]').exists()).toBe(false);
+  });
+
+  it('appears on its own, with no failure to accompany it', async () => {
+    reportConnection(false, 'Needs a .supabase.co URL. Got: (no URL).');
+    const w = await mountBox();
+
+    expect(w.find('[data-connection-message]').text()).toContain('Not connected');
+    expect(w.findAll('[data-notice]')).toHaveLength(0);
+  });
+
+  it('says what a person can do about it', async () => {
+    reportConnection(false, 'no key');
+    const w = await mountBox();
+
+    expect(w.find('[data-connection]').text()).toMatch(/admin/i);
+  });
+
+  it('keeps the technical reason behind a toggle', async () => {
+    reportConnection(false, 'Needs a .supabase.co URL. Got: (no URL).');
+    const w = await mountBox();
+
+    expect(w.find('[data-connection-detail]').exists()).toBe(false);
+    await w.find('[data-connection-toggle]').trigger('click');
+    expect(w.find('[data-connection-detail]').text()).toContain('supabase.co');
+  });
+
+  it('cannot be dismissed, because it is a state and not an event', async () => {
+    // Dismissing it would hide the only explanation for an empty site, and
+    // the state it describes would still be true.
+    reportConnection(false, 'no key');
+    const w = await mountBox();
+
+    expect(w.find('[data-connection]').find('[data-notice-dismiss]').exists()).toBe(false);
+  });
+
+  it('goes away by itself when the connection arrives', async () => {
+    // setCredentials rebuilds the client from the admin panel.
+    reportConnection(false, 'no key');
+    const w = await mountBox();
+    expect(w.find('[data-connection]').exists()).toBe(true);
+
+    reportConnection(true);
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-connection]').exists()).toBe(false);
+  });
+
+  it('sits above the failures, being the one that explains them', async () => {
+    reportConnection(false, 'no key');
+    reportFailure('fetchTeamRoster', 'timeout');
+    const w = await mountBox();
+
+    const html = w.html();
+    expect(html.indexOf('data-connection')).toBeLessThan(html.indexOf('data-notice='));
+  });
+
+  it('is not capped or counted with the failures', async () => {
+    // Three failures already fill the visible column; the banner is extra.
+    ['fetchSchedule', 'fetchPlayers', 'fetchCoaches'].forEach(m => reportFailure(m, 'timeout'));
+    reportConnection(false, 'no key');
+    const w = await mountBox();
+
+    expect(w.find('[data-connection]').exists()).toBe(true);
+    expect(w.findAll('[data-notice]')).toHaveLength(3);
   });
 });

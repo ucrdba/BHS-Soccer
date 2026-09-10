@@ -11,21 +11,33 @@
  * Nothing here auto-dismisses. A message that vanishes on its own is a
  * message a coach looking at the pitch never saw, and the failures reported
  * here are things that did not happen.
+ *
+ * The connection banner is the exception to every rule below: it is a state
+ * rather than an event, so it cannot be dismissed, is not counted or capped,
+ * and clears itself the moment a client is built.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { subscribeToNotices, dismissNotice, clearNotices, type Notice } from '../../domain/notices';
+import {
+  subscribeToNotices, subscribeToConnection, dismissNotice, clearNotices,
+  type Notice, type Connection
+} from '../../domain/notices';
 
 const notices = ref<Notice[]>([]);
+const connection = ref<Connection>({ configured: true, reason: null });
+const connectionOpen = ref(false);
 /** Which ones have had their technical detail opened, by id. */
 const opened = ref<number[]>([]);
 
-let off: (() => void) | null = null;
+let off: Array<() => void> = [];
 
 onMounted(() => {
-  off = subscribeToNotices(list => { notices.value = list; });
+  off = [
+    subscribeToNotices(list => { notices.value = list; }),
+    subscribeToConnection(c => { connection.value = c; })
+  ];
 });
 
-onBeforeUnmount(() => { off?.(); off = null; });
+onBeforeUnmount(() => { off.forEach(fn => fn()); off = []; });
 
 /**
  * Newest first, and only a few.
@@ -63,9 +75,34 @@ function dismissAll(): void {
     not cut across what they are reading mid-sentence.
   -->
   <div
-    v-if="shown.length" class="notices" role="region"
+    v-if="shown.length || !connection.configured" class="notices" role="region"
     aria-label="Problems" aria-live="polite" data-notices
   >
+    <!--
+      Not dismissible, because it is not an event that happened: it is the
+      state the app is in, and it goes away when the state does. Everything
+      else on the page is empty while this is up, which is the thing it
+      exists to explain.
+    -->
+    <article v-if="!connection.configured" class="notice notice--down" data-connection>
+      <p class="notice__message" data-connection-message>
+        Not connected to the database. Nothing will load or save until the
+        connection is set.
+      </p>
+      <p class="notice__meta">
+        An administrator can set it in Admin → Diagnostics.
+        <button
+          v-if="connection.reason" type="button" class="notice__more"
+          :aria-expanded="connectionOpen" data-connection-toggle
+          @click="connectionOpen = !connectionOpen"
+        >{{ connectionOpen ? 'Hide details' : 'Details' }}</button>
+      </p>
+      <p
+        v-if="connection.reason && connectionOpen"
+        class="notice__detail" data-connection-detail
+      >{{ connection.reason }}</p>
+    </article>
+
     <article v-for="n in shown" :key="n.id" class="notice" data-notice>
       <div class="notice__head">
         <p class="notice__message" data-notice-message>{{ n.message }}</p>
@@ -131,6 +168,12 @@ function dismissAll(): void {
 }
 
 .notice__head { display: flex; align-items: flex-start; gap: var(--space-2); }
+
+/*
+ * The connection is a harder failure than any single query: while it is
+ * down, nothing on the site works at all.
+ */
+.notice--down { border-left-color: var(--color-danger); }
 
 .notice__message {
   flex: 1;

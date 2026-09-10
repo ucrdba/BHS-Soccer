@@ -214,6 +214,58 @@ export function describeDetail(detail: unknown): string | null {
   return text.length > DETAIL_LIMIT ? `${text.slice(0, DETAIL_LIMIT)}…` : text;
 }
 
+// ── the connection ────────────────────────────────────────────────────────
+
+/**
+ * Whether the app can reach its database at all.
+ *
+ * A state, not an event, and that is why it does not go through
+ * `reportFailure`. A hundred and seven service methods return `null` without
+ * a word when the client is unconfigured, so an app with no credentials loads
+ * empty and reports nothing — which CLAUDE.md names as the usual cause of
+ * "nothing loaded from the DB". One failure per method would be a hundred
+ * boxes saying the same thing; one standing banner says it once, and goes
+ * away by itself when the connection arrives.
+ */
+export interface Connection {
+  configured: boolean;
+  /** What was wrong, for whoever can fix it. */
+  reason: string | null;
+}
+
+/*
+ * Assumed working until the client says otherwise, so the banner never
+ * flashes during startup. `initSupabaseClient()` reports the truth at
+ * module-evaluation time, before anything has mounted.
+ */
+let connection: Connection = { configured: true, reason: null };
+let connectionListeners: Array<(c: Connection) => void> = [];
+
+function tellConnection(fn: (c: Connection) => void): void {
+  try { fn({ ...connection }); } catch { /* a bad reader is not the reporter's problem */ }
+}
+
+/** Called by the data layer whenever it builds or fails to build a client. */
+export function reportConnection(configured: boolean, reason?: string | null): void {
+  const next: Connection = { configured, reason: configured ? null : (reason || null) };
+  if (next.configured === connection.configured && next.reason === connection.reason) return;
+
+  connection = next;
+  connectionListeners.forEach(tellConnection);
+}
+
+export function currentConnection(): Connection {
+  return { ...connection };
+}
+
+/** Returns the unsubscribe, which a component calls on unmount. */
+export function subscribeToConnection(fn: (c: Connection) => void): () => void {
+  connectionListeners = connectionListeners.concat(fn);
+  // Replayed, because the client is built before the app mounts.
+  tellConnection(fn);
+  return () => { connectionListeners = connectionListeners.filter(l => l !== fn); };
+}
+
 // ── the channel ───────────────────────────────────────────────────────────
 
 /** A reader that throws is its own problem, not the reporter's. */
@@ -287,4 +339,6 @@ export function resetNotices(): void {
   notices = [];
   listeners = [];
   seq = 0;
+  connection = { configured: true, reason: null };
+  connectionListeners = [];
 }

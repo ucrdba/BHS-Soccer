@@ -15,7 +15,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { reportFailure } from '../domain/notices';
+import { reportFailure, reportConnection } from '../domain/notices';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -96,13 +96,21 @@ function initSupabaseClient(): void {
         }
       });
       console.log('⚡ Connected to Supabase:', url);
+      reportConnection(true);
     } catch (err: any) {
       report('init', err.message);
       supabaseClient = null;
+      reportConnection(false, err.message);
     }
   } else {
     supabaseClient = null;
-    console.log('📦 No Supabase client: needs a .supabase.co or loopback URL and an anon key starting eyJ. Got:', url || '(none)');
+    const reason = `Needs a .supabase.co or loopback URL and an anon key starting eyJ. `
+      + `Got: ${url || '(no URL)'}${key ? '' : ' and no key'}.`;
+    console.log('📦 No Supabase client:', reason);
+    // A state rather than a failure: every method below returns null without a
+    // word while this is true, so one standing banner replaces the hundred
+    // silent nulls it would otherwise take to notice.
+    reportConnection(false, reason);
   }
 }
 

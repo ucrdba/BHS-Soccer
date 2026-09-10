@@ -9,7 +9,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   describeFailure, describeDetail, reportFailure, currentNotices,
-  dismissNotice, clearNotices, subscribeToNotices, resetNotices
+  dismissNotice, clearNotices, subscribeToNotices, resetNotices,
+  reportConnection, currentConnection, subscribeToConnection
 } from './notices';
 
 beforeEach(() => { resetNotices(); });
@@ -203,5 +204,94 @@ describe('dismissing', () => {
     reportFailure('fetchPlayers', 'b');
     clearNotices();
     expect(currentNotices()).toHaveLength(0);
+  });
+});
+
+describe('the connection', () => {
+  /*
+   * A state, not an event. A hundred and seven service methods return null
+   * without a word when the client is unconfigured, so an app with no
+   * credentials loads empty and reports nothing -- which is the usual cause
+   * of "nothing loaded from the DB". One failure per method would be a
+   * hundred boxes saying the same thing.
+   */
+  it('assumes it is working, so no banner flashes during startup', () => {
+    expect(currentConnection().configured).toBe(true);
+  });
+
+  it('carries why, for whoever can fix it', () => {
+    reportConnection(false, 'Needs a .supabase.co URL. Got: (no URL).');
+    expect(currentConnection()).toEqual({
+      configured: false,
+      reason: 'Needs a .supabase.co URL. Got: (no URL).'
+    });
+  });
+
+  it('clears the reason once it connects', () => {
+    reportConnection(false, 'no key');
+    reportConnection(true);
+    expect(currentConnection()).toEqual({ configured: true, reason: null });
+  });
+
+  it('tells a reader the state it is already in', () => {
+    // The client is built at module-evaluation time, long before the app
+    // mounts, so a reader that only heard changes would never hear this one.
+    reportConnection(false, 'no key');
+
+    const seen = vi.fn();
+    subscribeToConnection(seen);
+    expect(seen).toHaveBeenCalledWith({ configured: false, reason: 'no key' });
+  });
+
+  it('tells its readers when it goes down and when it comes back', () => {
+    const seen = vi.fn();
+    subscribeToConnection(seen);
+    seen.mockClear();
+
+    reportConnection(false, 'no key');
+    reportConnection(true);
+
+    expect(seen).toHaveBeenCalledTimes(2);
+    expect(seen).toHaveBeenLastCalledWith({ configured: true, reason: null });
+  });
+
+  it('says nothing when nothing changed', () => {
+    // setCredentials re-runs the client builder, which reports either way.
+    // Re-rendering the same banner on every attempt would be noise.
+    reportConnection(false, 'no key');
+    const seen = vi.fn();
+    subscribeToConnection(seen);
+    seen.mockClear();
+
+    reportConnection(false, 'no key');
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('stops telling a reader that has gone', () => {
+    const seen = vi.fn();
+    const off = subscribeToConnection(seen);
+    off();
+    seen.mockClear();
+
+    reportConnection(false, 'no key');
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('hands out a copy, so a reader cannot edit the state', () => {
+    reportConnection(false, 'no key');
+    const c = currentConnection();
+    c.configured = true;
+    expect(currentConnection().configured).toBe(false);
+  });
+
+  it('keeps reporting when one reader throws', () => {
+    const bad = vi.fn(() => { throw new Error('nope'); });
+    const good = vi.fn();
+    subscribeToConnection(bad);
+    subscribeToConnection(good);
+    good.mockClear();
+
+    expect(() => reportConnection(false, 'no key')).not.toThrow();
+    expect(good).toHaveBeenCalled();
   });
 });
