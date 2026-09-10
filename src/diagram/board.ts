@@ -76,6 +76,24 @@ export class TacticalBoard {
   selectedDrawing: Drawing | null = null;
   isPlaying = false;
 
+  /**
+   * Whether the diagram has been edited since it was loaded or last saved.
+   *
+   * Read by the screen above to warn before a close that would discard the
+   * work — a drawn diagram is only in the canvas until someone saves it.
+   *
+   * It is a flag rather than a comparison against the loaded blob on purpose.
+   * `toDiagramData()` calls `commit()`, which writes the CURRENT elements into
+   * the current keyframe, and during playback those elements are a
+   * mid-interpolation state — so a dirty check that serialized on every change
+   * would quietly write interpolated positions into the coach's keyframes.
+   *
+   * It also draws the line in the right place for free: `setTool`,
+   * `goToKeyframe` and every animation tick fire `onChange`, and none of them
+   * is an edit.
+   */
+  dirty = false;
+
   private history: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
   private animId: number | null = null;
@@ -91,6 +109,28 @@ export class TacticalBoard {
   constructor(private options: BoardOptions = {}) {}
 
   private changed(): void { this.options.onChange?.(); }
+
+  /** An edit happened. Every content mutation passes through here. */
+  private touch(): void { this.dirty = true; }
+
+  /** The diagram has been written somewhere it survives being closed. */
+  markSaved(): void {
+    this.dirty = false;
+    this.changed();
+  }
+
+  /**
+   * The board is holding work that is not stored, after all.
+   *
+   * Needed because a load clears the flag, and not every load is a save: the
+   * planner store writes a drill into its local list BEFORE it persists, and
+   * that write feeds straight back down into `fromDiagramData`. A refused
+   * write would otherwise leave the board looking saved.
+   */
+  markDirty(): void {
+    this.touch();
+    this.changed();
+  }
 
   // ── the canvas ──────────────────────────────────────────────────────────
 
@@ -200,6 +240,10 @@ export class TacticalBoard {
   }
 
   saveState(): void {
+    // Every content mutation calls this before mutating -- pieces, labels,
+    // drags, freehand, clear, deletes and the pitch change -- so it is the
+    // one door the dirty flag needs to sit in.
+    this.touch();
     this.history.push(this.snapshot());
     // Capped: a long session would otherwise hold every state of a board full
     // of elements.
@@ -211,6 +255,10 @@ export class TacticalBoard {
   undo(): boolean {
     if (this.history.length === 0) return false;
 
+    // Undoing back to exactly what was loaded still counts as edited. A
+    // warning that is occasionally over-cautious costs a keystroke; one that
+    // misses costs the diagram.
+    this.touch();
     this.redoStack.push(this.snapshot());
     const state = this.history.pop()!;
     this.elements = state.elements;
@@ -287,6 +335,7 @@ export class TacticalBoard {
   }
 
   addKeyframe(): void {
+    this.touch();
     this.commit();
     this.stopAnimation();
 
@@ -321,6 +370,7 @@ export class TacticalBoard {
       return { ok: false, error: 'The start position cannot be deleted — every diagram needs one.' };
     }
 
+    this.touch();
     this.keyframes = next;
     this.currentFrameIndex = Math.min(this.currentFrameIndex, this.keyframes.length - 1);
     this.showFrame(this.currentFrameIndex);
@@ -438,6 +488,8 @@ export class TacticalBoard {
     this.selectedDrawing = null;
     this.history = [];
     this.redoStack = [];
+    // Opening a stored diagram is not an edit of it.
+    this.dirty = false;
     this.render();
     this.changed();
   }

@@ -186,3 +186,99 @@ describe('with nothing to save to', () => {
     expect(w.find('[data-diagram-error]').exists()).toBe(true);
   });
 });
+
+describe('closing with work that has not been saved', () => {
+  /*
+   * Closing unmounts the board, and a diagram lives in the canvas until
+   * someone saves it. The board looks identical saved or not, so without
+   * this the work goes with no prompt and nothing on screen to say so.
+   *
+   * "+ Time frame" is used to dirty the board because it is a real click a
+   * coach makes; placing a piece needs a pointer on a canvas jsdom will not
+   * paint.
+   */
+  const dirty = async (w: any) => {
+    await w.find('[data-frame-add]').trigger('click');
+    await w.vm.$nextTick();
+  };
+
+  it('closes without a word when nothing has been drawn', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountModal({ index: 0 });
+
+    await w.find('.btn').trigger('click');
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(w.emitted('close')).toBeTruthy();
+  });
+
+  it('asks before throwing away an edited diagram', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountModal({ index: 0 });
+    await dirty(w);
+
+    await w.find('.btn').trigger('click');
+
+    expect(confirm).toHaveBeenCalled();
+    expect(confirm.mock.calls[0][0]).toMatch(/not been saved/i);
+    expect(w.emitted('close')).toBeTruthy();
+  });
+
+  it('stays open when the coach says no', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountModal({ index: 0 });
+    await dirty(w);
+
+    await w.find('.btn').trigger('click');
+
+    expect(confirm).toHaveBeenCalled();
+    expect(w.emitted('close')).toBeFalsy();
+  });
+
+  it('asks on Escape too, which is the same discard', async () => {
+    // BaseModal emits one close for Cancel, Escape and the backdrop, so all
+    // three arrive at the same guard.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountModal({ index: 0 });
+    await dirty(w);
+
+    await w.find('[role="dialog"]').trigger('keydown', { key: 'Escape' });
+
+    expect(confirm).toHaveBeenCalled();
+    expect(w.emitted('close')).toBeFalsy();
+  });
+
+  it('says so on the board while the work is unsaved', async () => {
+    const w = await mountModal({ index: 0 });
+    expect(w.find('[data-board-unsaved]').exists()).toBe(false);
+
+    await dirty(w);
+    expect(w.find('[data-board-unsaved]').text()).toMatch(/unsaved/i);
+  });
+
+  it('does not ask after a save, and drops the mark', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountModal({ index: 0 });
+    await dirty(w);
+
+    await w.find('[data-diagram-save]').trigger('click');
+    await flush();
+    await w.vm.$nextTick();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(w.find('[data-board-unsaved]').exists()).toBe(false);
+  });
+
+  it('still asks when the save was refused, because nothing was written', async () => {
+    saveFullPracticePlan.mockResolvedValue({ success: false, error: 'No team selected.' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountModal({ index: 0 });
+    await dirty(w);
+
+    await w.find('[data-diagram-save]').trigger('click');
+    await flush();
+    await w.find('.btn').trigger('click');
+
+    expect(confirm).toHaveBeenCalled();
+  });
+});

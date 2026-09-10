@@ -476,3 +476,123 @@ describe('detaching', () => {
     expect(board.isPlaying).toBe(false);
   });
 });
+
+describe('unsaved work', () => {
+  /*
+   * A drawn diagram is only in the canvas until someone saves it, and the
+   * board looks identical either way. The flag is what lets the screen above
+   * warn before a close throws the work away.
+   */
+  it('starts clean, because nothing has been drawn yet', () => {
+    const { board } = makeBoard();
+    expect(board.dirty).toBe(false);
+  });
+
+  it('is dirty once a piece is placed', () => {
+    const { board } = makeBoard();
+    board.placePiece('attacker', at(20, 20));
+    expect(board.dirty).toBe(true);
+  });
+
+  it('is dirty after a clear, which is a change like any other', () => {
+    const { board } = makeBoard();
+    board.placePiece('attacker', at(20, 20));
+    board.markSaved();
+
+    board.clear();
+    expect(board.dirty).toBe(true);
+  });
+
+  it('is dirty after the pitch changes under the same pieces', () => {
+    const { board } = makeBoard();
+    board.setPitchType('half');
+    expect(board.dirty).toBe(true);
+  });
+
+  it('is dirty after a time frame is added or deleted', () => {
+    const { board } = makeBoard();
+    board.addKeyframe();
+    expect(board.dirty).toBe(true);
+
+    board.markSaved();
+    board.deleteCurrentKeyframe();
+    expect(board.dirty).toBe(true);
+  });
+
+  it('stays clean when the delete is refused', () => {
+    // Refusing to delete the start position changed nothing, so there is
+    // nothing to warn about.
+    const { board } = makeBoard();
+    const res = board.deleteCurrentKeyframe();
+
+    expect(res.ok).toBe(false);
+    expect(board.dirty).toBe(false);
+  });
+
+  it('counts an undo as an edit', () => {
+    // Undoing back to what was loaded may leave the diagram where it began,
+    // but a warning that is occasionally over-cautious costs a keystroke and
+    // one that misses costs the diagram.
+    const { board } = makeBoard();
+    board.placePiece('attacker', at(20, 20));
+    board.markSaved();
+
+    board.undo();
+    expect(board.dirty).toBe(true);
+  });
+
+  it('does not count picking a tool, which draws nothing', () => {
+    const { board } = makeBoard();
+    board.setTool('line_arrow');
+    expect(board.dirty).toBe(false);
+  });
+
+  it('does not count stepping between time frames', () => {
+    const { board } = makeBoard();
+    board.addKeyframe();
+    board.markSaved();
+
+    board.goToKeyframe(0);
+    board.goToKeyframe(1);
+    expect(board.dirty).toBe(false);
+  });
+
+  it('does not count playing the movement back', () => {
+    const { board } = makeBoard();
+    board.addKeyframe();
+    board.markSaved();
+    board.goToKeyframe(0);
+
+    board.togglePlay();
+    board.stopAnimation();
+    expect(board.dirty).toBe(false);
+  });
+
+  it('is clean again after a save, and after opening a stored diagram', () => {
+    const { board } = makeBoard();
+    board.placePiece('attacker', at(20, 20));
+    const stored = board.toDiagramData();
+
+    board.markSaved();
+    expect(board.dirty).toBe(false);
+
+    board.placePiece('defender', at(40, 40));
+    expect(board.dirty).toBe(true);
+
+    // Opening a diagram is not an edit of it.
+    board.fromDiagramData(stored);
+    expect(board.dirty).toBe(false);
+  });
+
+  it('tells the screen above when it becomes clean', () => {
+    // The "Unsaved changes" mark is rendered off onChange, so a save that
+    // did not fire one would leave the warning up over a saved diagram.
+    const onChange = vi.fn();
+    const { board } = makeBoard({ onChange });
+    board.placePiece('attacker', at(20, 20));
+    onChange.mockClear();
+
+    board.markSaved();
+    expect(onChange).toHaveBeenCalled();
+  });
+});

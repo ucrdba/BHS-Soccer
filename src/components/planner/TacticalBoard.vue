@@ -30,6 +30,7 @@ const pitch = ref<PitchType>('full');
 const frames = ref<{ label: string }[]>([]);
 const frameIndex = ref(0);
 const playing = ref(false);
+const dirty = ref(false);
 const notice = ref<string | null>(null);
 
 const PIECES: [Tool, string][] = [
@@ -55,6 +56,7 @@ function sync(): void {
   frames.value = board.keyframes.map(f => ({ label: f.label }));
   frameIndex.value = board.currentFrameIndex;
   playing.value = board.isPlaying;
+  dirty.value = board.dirty;
   emit('change');
 }
 
@@ -99,7 +101,17 @@ function onDeleteFrame(): void {
 function diagramData(): any { return engine.value?.toDiagramData() ?? null; }
 function image(): string | null { return engine.value?.exportImage() ?? null; }
 
-defineExpose({ diagramData, image });
+/**
+ * Whether closing now would throw work away.
+ *
+ * Asked rather than watched, because the answer is only needed at the moment
+ * of a close and the engine already holds it.
+ */
+function isDirty(): boolean { return engine.value?.dirty === true; }
+function markSaved(): void { engine.value?.markSaved(); }
+function markDirty(): void { engine.value?.markDirty(); }
+
+defineExpose({ diagramData, image, isDirty, markSaved, markDirty });
 </script>
 
 <template>
@@ -161,6 +173,16 @@ defineExpose({ diagramData, image });
         :title="frames.length < 2 ? 'Add a second time frame to animate the movement.' : ''"
         data-board-play @click="onPlay"
       >{{ playing ? 'Pause' : 'Play' }}</button>
+
+      <span class="spacer" />
+      <!--
+        A drawn diagram lives in the canvas until someone saves it, and the
+        board looks exactly the same either way. This is the only thing on
+        screen that says so.
+      -->
+      <span v-if="dirty" class="unsaved" role="status" data-board-unsaved>
+        Unsaved changes
+      </span>
     </div>
 
     <p v-if="notice" class="notice" role="status" data-board-notice>{{ notice }}</p>
@@ -210,4 +232,12 @@ defineExpose({ diagramData, image });
 .frame.is-on { border-color: var(--live); color: var(--live); }
 
 .notice { margin: var(--space-1) 0 0; color: var(--live); font-size: 13px; line-height: 1.5; }
+
+.unsaved {
+  color: var(--live);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 </style>

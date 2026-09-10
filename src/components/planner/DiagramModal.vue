@@ -9,6 +9,9 @@
  * Both a `diagramData` blob and a `diagramImage` thumbnail are written. The
  * blob is the diagram; the image is what the timeline and the printed plan
  * show without instantiating a board.
+ *
+ * Closing this discards whatever is on the board, and the board looks the
+ * same saved or not — so a close that would throw work away asks first.
  */
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
@@ -48,6 +51,23 @@ const diagram = computed(() =>
 
 watch(() => props.open, (open) => { if (open) error.value = null; });
 
+/**
+ * Close, unless that would lose a diagram nobody has saved.
+ *
+ * Every way out of this modal arrives here — Cancel, Escape and a click on
+ * the backdrop — because BaseModal emits one `close` for all three.
+ */
+function onClose(): void {
+  if (board.value?.isDirty?.()) {
+    const ok = window.confirm(
+      'This diagram has changes that have not been saved.\n\n'
+      + 'Close it and lose them?'
+    );
+    if (!ok) return;
+  }
+  emit('close');
+}
+
 async function onSave(): Promise<void> {
   error.value = null;
 
@@ -55,16 +75,31 @@ async function onSave(): Promise<void> {
   if (!data) { error.value = 'The board is not ready yet.'; return; }
   const image = board.value?.image?.() || null;
 
+  /*
+   * Whether the board was holding unsaved work when Save was pressed.
+   *
+   * Restored on a refusal, because saving to a drill on the timeline goes
+   * through the planner store, which writes the drill into its local list
+   * BEFORE it persists -- and that write feeds back down into the board as a
+   * load, which clears the flag. Without this, a refused write leaves a
+   * diagram that only exists in the canvas looking saved.
+   */
+  const wasDirty = board.value?.isDirty?.() === true;
+  const refuse = (message: string): void => {
+    error.value = message;
+    if (wasDirty) board.value?.markDirty?.();
+  };
+
   saving.value = true;
   try {
     if (planDrill.value && props.index !== null && props.index !== undefined) {
       const res = await planner.editDrill(props.teamId, props.index, {
         ...planDrill.value, diagramData: data, diagramImage: image
       });
-      if (!res?.ok) { error.value = res?.error || 'Could not save that diagram.'; return; }
+      if (!res?.ok) { refuse(res?.error || 'Could not save that diagram.'); return; }
     } else if (props.libraryDrill) {
       if (!props.schoolId) {
-        error.value = 'No organization for this team, so there is no library to save to.';
+        refuse('No organization for this team, so there is no library to save to.');
         return;
       }
       const saved = await supabaseService.upsertDrillBankItem(props.schoolId, {
@@ -74,13 +109,15 @@ async function onSave(): Promise<void> {
         diagramData: data,
         diagramImage: image
       });
-      if (!saved) { error.value = 'Could not save that diagram.'; return; }
+      if (!saved) { refuse('Could not save that diagram.'); return; }
       await planner.loadDrillsBank(props.schoolId);
     } else {
-      error.value = 'Nothing to save this diagram to.';
+      refuse('Nothing to save this diagram to.');
       return;
     }
 
+    // Saved, so the board is no longer holding anything that would be lost.
+    board.value?.markSaved?.();
     emit('saved');
     emit('close');
   } finally {
@@ -90,7 +127,7 @@ async function onSave(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="title" wide @close="emit('close')">
+  <BaseModal :open="open" :title="title" wide @close="onClose">
     <TacticalBoard
       v-if="open" ref="board"
       :diagram="diagram" :active="open"
@@ -99,7 +136,7 @@ async function onSave(): Promise<void> {
     <p v-if="error" class="note note--bad" role="alert" data-diagram-error>{{ error }}</p>
 
     <template #footer>
-      <button type="button" class="btn" @click="emit('close')">Cancel</button>
+      <button type="button" class="btn" @click="onClose">Cancel</button>
       <button
         type="button" class="btn btn--go" :disabled="saving"
         data-diagram-save @click="onSave"
