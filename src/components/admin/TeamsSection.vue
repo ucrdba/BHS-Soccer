@@ -18,6 +18,7 @@
  * placeholder nobody remembers to correct.
  */
 import { ref, computed, onMounted } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 
 const teams = ref<any[]>([]);
@@ -136,8 +137,11 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 </script>
 
 <template>
-  <section class="sec" data-teams-section>
-    <h2 class="sec__h kicker">Squads and organizations</h2>
+  <SectionShell
+    title="Squads and organizations"
+    :badge="`${teams.length} teams`"
+    data-teams-section
+  >
 
     <p v-if="loading" class="note">Loading…</p>
     <p v-else-if="loadError" class="note note--bad" role="alert" data-teams-error>{{ loadError }}</p>
@@ -231,11 +235,10 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 
     <p v-if="notice" class="note note--good" role="status" data-teams-notice>{{ notice }}</p>
     <p v-if="error" class="note note--bad" role="alert" data-teams-form-error>{{ error }}</p>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.sec { margin-bottom: var(--space-6); }
 
 .row { align-items: flex-start; }
 

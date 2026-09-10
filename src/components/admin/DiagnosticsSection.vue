@@ -21,6 +21,7 @@
  * Extracted from the diagnostics panel in public/js/admin.js during Phase 6.
  */
 import { ref } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 
 const props = defineProps<{
@@ -90,8 +91,7 @@ async function onRunDiagnostic(): Promise<void> {
 </script>
 
 <template>
-  <section class="panel">
-    <h2 class="sec__h kicker">Connection and diagnostics</h2>
+  <SectionShell title="Connection and diagnostics">
 
     <p v-if="!isAdmin" class="note">
       Only an admin can change the database connection or run the diagnostic.
@@ -186,17 +186,10 @@ async function onRunDiagnostic(): Promise<void> {
         </div>
       </div>
     </template>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.panel {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: transparent;
-}
 
 .panel__sub { margin-bottom: var(--space-4); }
 

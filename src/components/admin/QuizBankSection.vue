@@ -21,6 +21,7 @@
  * `quiz_answers` row.
  */
 import { ref, computed, watch } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 import { answerText } from '../../domain/quiz';
 
@@ -144,11 +145,11 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 </script>
 
 <template>
-  <section class="sec" data-quiz-bank>
-    <h2 class="sec__h kicker">
-      Quiz questions
-      <span v-if="questions.length" class="sec__n" data-bank-count>{{ questions.length }}</span>
-    </h2>
+  <SectionShell
+    title="Quiz questions"
+    :badge="`${questions.length} questions`"
+    data-quiz-bank
+  >
 
     <p class="sec__note">
       The bank belongs to this organization; each squad picks from it. A
@@ -240,21 +241,10 @@ async function onToggleTeam(q: any, teamId: string, on: boolean): Promise<void> 
 
     <p v-if="notice" class="note note--good" role="status" data-bank-notice>{{ notice }}</p>
     <p v-if="error" class="note note--bad" role="alert" data-bank-action-error>{{ error }}</p>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.sec { margin-bottom: var(--space-6); }
-
-.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-1); }
-
-.sec__n {
-  padding: 0.05rem var(--space-2);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink-muted);
-  font-size: 11px;
-}
 
 .sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 

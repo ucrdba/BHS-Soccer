@@ -16,6 +16,7 @@
  * reintroduce.
  */
 import { ref, computed, watch } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { auth } from '../../auth';
 
 const props = defineProps<{ schoolId: string | null }>();
@@ -101,11 +102,11 @@ async function onReject(u: any): Promise<void> {
 </script>
 
 <template>
-  <section class="sec" data-approvals>
-    <h2 class="sec__h kicker">
-      Waiting for approval
-      <span v-if="rows.length" class="sec__n" data-approvals-count>{{ rows.length }}</span>
-    </h2>
+  <SectionShell
+    title="Waiting for approval"
+    :badge="`${rows.length} waiting`"
+    data-approvals
+  >
 
     <p v-if="loading" class="note">Loading…</p>
     <p v-else-if="loadError" class="note note--bad" role="alert" data-approvals-error>
@@ -137,21 +138,10 @@ async function onReject(u: any): Promise<void> {
     </div>
 
     <p v-if="notice" class="note note--good" role="status" data-approvals-notice>{{ notice }}</p>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.sec { margin-bottom: var(--space-6); }
-
-.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-2); }
-
-.sec__n {
-  padding: 0.05rem var(--space-2);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink-muted);
-  font-size: 11px;
-}
 
 .row { align-items: center; }
 

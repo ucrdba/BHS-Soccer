@@ -20,6 +20,7 @@
  * button: the panel may have been open while a result was recorded elsewhere.
  */
 import { ref, computed, onMounted } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 
 const props = defineProps<{ teamId: string | null; teams: any[] }>();
@@ -111,11 +112,11 @@ async function onRetire(p: any): Promise<void> {
 </script>
 
 <template>
-  <section class="sec" data-unassigned-section>
-    <h2 class="sec__h kicker">
-      Players on no team
-      <span v-if="people.length" class="sec__n" data-unassigned-count>{{ people.length }}</span>
-    </h2>
+  <SectionShell
+    title="Players on no team"
+    :badge="`${people.length} players`"
+    data-unassigned-section
+  >
 
     <p class="sec__note">
       Usually somebody an import could not match to a squad. Adding them to a
@@ -159,21 +160,10 @@ async function onRetire(p: any): Promise<void> {
 
     <p v-if="notice" class="note note--good" role="status" data-unassigned-notice>{{ notice }}</p>
     <p v-if="error" class="note note--bad" role="alert" data-unassigned-action-error>{{ error }}</p>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.sec { margin-bottom: var(--space-6); }
-
-.sec__h { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-1); }
-
-.sec__n {
-  padding: 0.05rem var(--space-2);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink-muted);
-  font-size: 11px;
-}
 
 .sec__note { margin: 0 0 var(--space-2); max-width: 40rem; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
 

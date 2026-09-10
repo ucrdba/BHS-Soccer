@@ -21,6 +21,7 @@
  * during Phase 6.
  */
 import { ref, computed, watch } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 import {
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
@@ -212,8 +213,7 @@ async function onSave(): Promise<void> {
 </script>
 
 <template>
-  <section class="panel">
-    <h2 class="sec__h kicker">Organization profile</h2>
+  <SectionShell title="Organization profile" :badge="form.name || null">
 
     <p v-if="!isAdmin" class="note">
       Only an admin can edit the organization's name, colours and record.
@@ -283,17 +283,10 @@ async function onSave(): Promise<void> {
       <p v-if="error" class="error" data-school-error>{{ error }}</p>
       <p v-if="notice" class="ok" data-school-notice>{{ notice }}</p>
     </template>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.panel {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: transparent;
-}
 
 .grid {
   display: grid;

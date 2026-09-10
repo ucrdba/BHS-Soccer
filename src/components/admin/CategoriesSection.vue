@@ -30,6 +30,7 @@
  * falling back, because `requireOrg`'s fallback is Beaumont.
  */
 import { ref, computed, onMounted } from 'vue';
+import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 
 const props = defineProps<{ schoolId: string | null }>();
@@ -153,8 +154,11 @@ async function onAdoptStray(stray: any): Promise<void> {
 </script>
 
 <template>
-  <section class="sec" data-categories-section>
-    <h2 class="sec__h kicker">Drill categories</h2>
+  <SectionShell
+    title="Drill categories"
+    :badge="`${categories.length} categories`"
+    data-categories-section
+  >
 
     <p v-if="loading" class="note">Loading…</p>
     <p v-else-if="loadError" class="note note--bad" role="alert" data-categories-error>
@@ -233,11 +237,10 @@ async function onAdoptStray(stray: any): Promise<void> {
 
     <p v-if="notice" class="note note--good" role="status" data-categories-notice>{{ notice }}</p>
     <p v-if="error" class="note note--bad" role="alert" data-categories-action-error>{{ error }}</p>
-  </section>
+  </SectionShell>
 </template>
 
 <style scoped>
-.sec { margin-bottom: var(--space-6); }
 
 .sub { margin: var(--space-4) 0 var(--space-1); }
 

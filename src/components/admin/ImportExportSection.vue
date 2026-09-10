@@ -23,6 +23,7 @@
  * no users" — the same treatment the Matrix sheet gets on the import side.
  */
 import { ref } from 'vue';
+import SectionShell from './SectionShell.vue';
 import ImportExportModal from './ImportExportModal.vue';
 import { supabaseService } from '../../data/supabase';
 import type { ExportData } from '../../domain/workbook';
@@ -90,8 +91,7 @@ async function onOpen(): Promise<void> {
 </script>
 
 <template>
-  <section v-if="isAdmin" class="panel">
-    <h2 class="sec__h kicker">Import and export</h2>
+  <SectionShell v-if="isAdmin" title="Import and export">
     <p class="note">
       Exports this team's season as a spreadsheet, and imports one back after
       showing what it would change.
@@ -116,7 +116,7 @@ async function onOpen(): Promise<void> {
       :teams="teams"
       :data="data"
       @close="open = false" />
-  </section>
+  </SectionShell>
 
   <p v-else class="note">
     Only an admin can export or import the organization's data.
@@ -124,13 +124,6 @@ async function onOpen(): Promise<void> {
 </template>
 
 <style scoped>
-.panel {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: transparent;
-}
 
 .error { color: var(--color-danger); }
 </style>
