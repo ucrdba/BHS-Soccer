@@ -52,6 +52,23 @@ function best(row: any): string {
 
 const emit = defineEmits<{ openPlayer: [string] }>();
 
+/**
+ * How consistently, beside whether at all.
+ *
+ * The standard is judged on the fastest run — one clear run proves the player
+ * can do it — so a player who ran 4:29 and 4:40 against a 4:30 bar reads as
+ * met. That alone would hide the 4:40, which is the thing a coach picking a
+ * squad wants to see. Shown only where there is something to say: a player who
+ * cleared every run he made needs no ratio.
+ */
+function runs(row: any): string {
+  const met = Number(row?.metRuns) || 0;
+  const short = Number(row?.shortRuns) || 0;
+  const total = met + short;
+  if (total === 0 || short === 0) return '';
+  return `${met} of ${total}`;
+}
+
 function standing(row: any): string {
   return matrix.isThreshold ? bandStanding(row) : 'met';
 }
@@ -140,7 +157,12 @@ function standing(row: any): string {
                 v-if="standing(r) === 'below' || standing(r) === 'missed'"
                 class="mark mark--short" data-below-standard
               >{{ standing(r) === 'missed' ? 'no band' : '△ below' }}</span>
-              <span v-else-if="standing(r) === 'met'" class="mark">met</span>
+              <span v-else-if="standing(r) === 'met'" class="mark">
+                met<span
+                  v-if="runs(r)" class="mark__runs" data-standard-runs
+                  :title="`Cleared the standard on ${runs(r)} runs`"
+                > · {{ runs(r) }}</span>
+              </span>
               <span v-else class="mark mark--none">—</span>
             </td>
           </tr>
@@ -242,4 +264,7 @@ function standing(row: any): string {
 }
 
 .who:hover, .who:focus-visible { color: var(--live); }
+
+/* The ratio is context for the verdict beside it, not a second verdict. */
+.mark__runs { color: var(--ink-muted); }
 </style>

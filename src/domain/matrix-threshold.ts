@@ -23,12 +23,12 @@ export interface StandingRow {
   /** Results with a value. An absence is not an attempt. */
   attempts: number;
   /**
-   * The same totals over attempted sessions alone, which is what a standard
-   * is judged on. Optional: a row built before the distinction existed falls
-   * back to the totals above.
+   * Runs that cleared the bar outright, and runs that did not. Attempts only —
+   * an absence is neither. Optional: a row built before the distinction
+   * existed falls back to reading the totals.
    */
-  attemptedEarned?: number;
-  attemptedAvailable?: number;
+  metRuns?: number;
+  shortRuns?: number;
   [k: string]: any;
 }
 
@@ -45,30 +45,32 @@ export function isThresholdMeasure(measure: string): boolean {
 export function bandStanding(row: StandingRow): BandStanding {
   const attempts = Number(row?.attempts) || 0;
 
-  /*
-   * Judged on the sessions the player actually ran, not on every session held.
-   *
-   * A leaderboard row totals `earned` and `available` over every session,
-   * absences included — that is the scoring rule, and it is right for the
-   * POINTS, which rank the squad. It is wrong for the STANDARD, which asks a
-   * different question: when this player ran, did they clear the bar? A player
-   * who met it on both his runs and missed a third arrived here as 2 of 3 and
-   * was reported below a standard he had never actually failed.
-   *
-   * `attemptedEarned` / `attemptedAvailable` carry the same totals over
-   * attempted sessions alone. They are optional so a row built before this
-   * distinction existed still reads sensibly, falling back to the totals.
-   */
-  const hasAttempted = row?.attemptedAvailable !== undefined
-    && row?.attemptedAvailable !== null;
-  const earned = Number(hasAttempted ? row.attemptedEarned : row?.earned) || 0;
-  const available = Number(hasAttempted ? row.attemptedAvailable : row?.available) || 0;
-
   // No attempt is not a failure. A player who was not there has not run
   // slowly, and counting them as falling short would put a coach's attention
   // on the wrong person.
-  if (attempts === 0 || available === 0) return 'none';
+  if (attempts === 0) return 'none';
 
+  /*
+   * Judged on the fastest run, not on an average of them.
+   *
+   * A player who ran 4:29 and 4:40 against a 4:30 bar has PROVED he can clear
+   * it. The 4:40 says he does not always, which is worth showing — and
+   * `metRuns` / `shortRuns` are what show it — but it is not the same as
+   * failing. Averaging the two put him below a standard he had already met.
+   *
+   * This also settles the absence case on its own: an absence is not an
+   * attempt, so it is in neither count and cannot demote anybody.
+   */
+  const metRuns = Number(row?.metRuns);
+  if (Number.isFinite(metRuns)) {
+    if (metRuns > 0) return 'met';
+    return (Number(row?.earned) || 0) > 0 ? 'below' : 'missed';
+  }
+
+  // A row built before the counts existed: read the totals, as it used to.
+  const earned = Number(row?.earned) || 0;
+  const available = Number(row?.available) || 0;
+  if (available === 0) return 'none';
   if (earned >= available) return 'met';
   if (earned > 0) return 'below';
   return 'missed';

@@ -15,8 +15,14 @@ import { isThresholdMeasure, bandStanding, belowStandard } from './matrix-thresh
 
 // The id includes attempts: without it, a missed attempt and a non-attempt
 // both read as "p0-1" and the assertions below cannot tell them apart.
-const row = (earned: number, available: number, attempts = 1) =>
-  ({ earned, available, attempts, playerId: `p${earned}-${available}-${attempts}` });
+const row = (earned: number, available: number, attempts = 1, metRuns?: number) =>
+  ({
+    earned, available, attempts,
+    // Runs that cleared the bar outright. Defaults to the whole-marks reading
+    // so the older cases below still describe what they meant.
+    metRuns: metRuns === undefined ? (earned >= available && attempts > 0 ? 1 : 0) : metRuns,
+    playerId: `p${earned}-${available}-${attempts}-${metRuns}`
+  });
 
 describe('isThresholdMeasure', () => {
   it('is true for a time measured against bands', () => {
@@ -87,21 +93,23 @@ describe('bandStanding', () => {
    * everything. The same reasoning holds for one who missed some.
    */
   it('reads a player who cleared the bar on every run as having met it', () => {
-    // Two sessions met in full, one missed: earned 2, available 3, attempts 2.
-    expect(bandStanding({ ...row(2, 3, 2), attemptedEarned: 2, attemptedAvailable: 2 }))
-      .toBe('met');
+    // Two runs inside the standard, one session missed: earned 2 of an
+    // available 3, but both RUNS cleared it.
+    expect(bandStanding(row(2, 3, 2, 2))).toBe('met');
   });
 
   it('still reads a genuine shortfall as below, absences or not', () => {
-    // Ran three, met one in full and one at a looser band, missed a fourth.
-    expect(bandStanding({ ...row(1.5, 4, 3), attemptedEarned: 1.5, attemptedAvailable: 3 }))
-      .toBe('below');
+    // Ran three on looser bands and missed a fourth. Never cleared the bar.
+    expect(bandStanding(row(1.5, 4, 3, 0))).toBe('below');
   });
 
-  it('falls back to the totals when the attempted figures are absent', () => {
-    // Older callers, and any row built before this distinction existed.
-    expect(bandStanding(row(1, 1))).toBe('met');
-    expect(bandStanding(row(0.5, 1))).toBe('below');
+  it('falls back to the totals when the run counts are absent', () => {
+    // Any row built before the counts existed, read the way it used to be.
+    const bare = (earned: number, available: number, attempts = 1) =>
+      ({ earned, available, attempts, playerId: 'bare' });
+    expect(bandStanding(bare(1, 1))).toBe('met');
+    expect(bandStanding(bare(0.5, 1))).toBe('below');
+    expect(bandStanding(bare(0, 1, 0))).toBe('none');
   });
 });
 
@@ -131,5 +139,40 @@ describe('belowStandard', () => {
   it('copes with no rows at all', () => {
     expect(belowStandard([])).toEqual([]);
     expect(belowStandard(null as any)).toEqual([]);
+  });
+});
+
+
+/**
+ * The standard is judged on the fastest run, not the average of them.
+ *
+ * A player who ran 4:29 and 4:40 against a 4:30 bar has proved he can clear
+ * it; the 4:40 says he does not always, which is worth showing but is not the
+ * same as failing. Averaging the two put him below a standard he had met, and
+ * a coach reading the board to pick a squad wants both facts, not a blend.
+ */
+describe('bandStanding on the fastest run', () => {
+  it('reads one clear run as having met the standard', () => {
+    // 4:29 met it, 4:40 took a looser band: earned 1.5 of 2 across two runs.
+    expect(bandStanding(row(1.5, 2, 2, 1))).toBe('met');
+  });
+
+  it('reads no clear run but some credit as below', () => {
+    // Two runs, both on looser bands. Never actually cleared the bar.
+    expect(bandStanding(row(1, 2, 2, 0))).toBe('below');
+  });
+
+  it('reads attempts that earned nothing as missed', () => {
+    expect(bandStanding(row(0, 2, 2, 0))).toBe('missed');
+  });
+
+  it('still reads no attempt at all as none', () => {
+    expect(bandStanding(row(0, 2, 0, 0))).toBe('none');
+  });
+
+  it('counts a player below only while no run has cleared the bar', () => {
+    const cleared = row(1.5, 2, 2, 1);
+    const never = row(1, 2, 2, 0);
+    expect(belowStandard([cleared, never])).toEqual([never]);
   });
 });

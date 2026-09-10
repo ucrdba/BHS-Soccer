@@ -68,8 +68,27 @@ describe('exerciseLeaderboard', () => {
     expect(rows[0].earned).toBe(2);
     expect(rows[0].available).toBe(3);
     expect(rows[0].attempts).toBe(2);
-    expect(rows[0].attemptedEarned).toBe(2);
-    expect(rows[0].attemptedAvailable).toBe(2);
+    // Both runs cleared the bar; the absence is in neither count.
+    expect(rows[0].metRuns).toBe(2);
+    expect(rows[0].shortRuns).toBe(0);
+  });
+
+  /*
+   * Ashton: 4:29 cleared a 4:30 bar, 4:40 took a looser band, one session
+   * missed. He has proved he can do it, so the standard reads met -- and the
+   * two counts are what say he does not do it every time.
+   */
+  it('counts a clear run and a looser one separately', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, raw_value: 269, earned: 1, available: 1 }),
+      row({ drill_id: LAPS, raw_value: 280, earned: 0.5, available: 1 }),
+      row({ drill_id: LAPS, raw_value: null, earned: 0, available: 1 })
+    ]), LAPS);
+
+    expect(rows[0].metRuns).toBe(1);
+    expect(rows[0].shortRuns).toBe(1);
+    expect(rows[0].attempts).toBe(2);
+    expect(bandStanding(rows[0])).toBe('met');
   });
 
   it('reads that player as having met the standard, end to end', () => {

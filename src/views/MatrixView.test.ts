@@ -202,6 +202,51 @@ function mountMatrixWithBandedExercise() {
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
+/**
+ * How consistently, beside whether at all.
+ *
+ * Ashton ran 4:29 and 4:40 against a 4:30 bar. The fastest cleared it, so he
+ * has proved he can — but a coach picking a squad wants the 4:40 too, and a
+ * bare "met" hides it.
+ */
+describe('the run ratio beside a standard', () => {
+  function mountWith(points: any[]) {
+    return mount(ExerciseLeaderboard, {
+      global: {
+        plugins: [createTestRouter(), createTestingPinia({
+          createSpy: vi.fn,
+          stubActions: false,
+          initialState: {
+            matrix: {
+              exerciseFilter: LAPS,
+              drillsBank: DRILLS,
+              players: [{ id: 'p1', name: 'Lanza', recordingNumber: 1 }],
+              exercisePoints: points
+            }
+          }
+        })],
+        stubs: { RouterLink: routerLinkStub }
+      }
+    });
+  }
+
+  it('says how many runs cleared the bar when not all of them did', () => {
+    const w = mountWith([
+      point({ player_id: 'p1', earned: 1, available: 1, raw_value: 269 }),
+      point({ player_id: 'p1', earned: 0.5, available: 1, raw_value: 280 })
+    ]);
+    expect(w.find('[data-standard-runs]').text()).toContain('1 of 2');
+  });
+
+  it('says nothing when every run cleared it, having nothing to add', () => {
+    const w = mountWith([
+      point({ player_id: 'p1', earned: 1, available: 1, raw_value: 250 }),
+      point({ player_id: 'p1', earned: 1, available: 1, raw_value: 245 })
+    ]);
+    expect(w.find('[data-standard-runs]').exists()).toBe(false);
+  });
+});
+
 describe('the board', () => {
   it('renders every player, including one who has taken part in nothing', async () => {
     const w = await mountMatrix();

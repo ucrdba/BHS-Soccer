@@ -31,7 +31,7 @@ export function exerciseLeaderboard(
       playerId: r.player_id,
       wins: 0, draws: 0, losses: 0,
       earned: 0, available: 0, attempts: 0,
-      attemptedEarned: 0, attemptedAvailable: 0,
+      metRuns: 0, shortRuns: 0,
       best: null, timed
     };
 
@@ -46,11 +46,15 @@ export function exerciseLeaderboard(
     // personal best.
     if (r.raw_value === null || r.raw_value === undefined) return;
     a.attempts += 1;
-    // The same totals over attempted sessions alone. Points rank on the
-    // totals above, absences included; a match-readiness standard asks only
-    // whether the player cleared the bar when they ran, so it reads these.
-    a.attemptedEarned += Number(r.earned) || 0;
-    a.attemptedAvailable += Number(r.available) || 0;
+
+    // Runs that cleared the bar outright, and runs that took a looser band.
+    // A standard is judged on the fastest run -- one clear run proves the
+    // player can do it -- while the two counts say how consistently. Points
+    // rank on the totals above; these answer a different question.
+    const rowEarned = Number(r.earned) || 0;
+    const rowAvailable = Number(r.available) || 0;
+    if (rowAvailable > 0 && rowEarned >= rowAvailable) a.metRuns += 1;
+    else a.shortRuns += 1;
     const v = Number(r.raw_value);
     if (a.best === null) a.best = v;
     else a.best = timed ? Math.min(a.best, v) : Math.max(a.best, v);
