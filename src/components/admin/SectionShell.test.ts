@@ -92,6 +92,24 @@ describe('SectionShell', () => {
     expect(mountShell().find('[data-inner]').exists()).toBe(true);
   });
 
+  /*
+   * A badge that reports a problem has to look unlike one that reports a
+   * count, or the one signal worth scanning for reads as furniture.
+   */
+  it('carries the tone it is given', () => {
+    expect(mountShell({ badge: 'Connected', tone: 'live' })
+      .find('[data-section-badge]').classes()).toContain('tag--live');
+    expect(mountShell({ badge: 'Not configured', tone: 'warn' })
+      .find('[data-section-badge]').classes()).toContain('tag--warn');
+  });
+
+  it('is a plain tag when given no tone', () => {
+    const cls = mountShell({ badge: '25 categories' }).find('[data-section-badge]').classes();
+    expect(cls).toContain('tag');
+    expect(cls).not.toContain('tag--live');
+    expect(cls).not.toContain('tag--warn');
+  });
+
   it('can be asked to start open', () => {
     expect(bodyHidden(mountShell({ startOpen: true }))).toBe(false);
   });

@@ -54,7 +54,10 @@ vi.mock('../data/supabase', () => ({
     fetchUnassignedPlayers: vi.fn().mockResolvedValue([]),
     fetchSoccerCategories: vi.fn().mockResolvedValue([]),
     fetchCategoryUsage: vi.fn().mockResolvedValue({}),
-    fetchQuizBank: vi.fn().mockResolvedValue([])
+    fetchQuizBank: vi.fn().mockResolvedValue([]),
+    // DiagnosticsSection reads this synchronously to label its header, so the
+    // double needs it even though this suite is about which sections render.
+    isConfigured: vi.fn().mockReturnValue(true)
   }
 }));
 

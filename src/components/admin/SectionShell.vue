@@ -38,6 +38,12 @@ const props = defineProps<{
   title: string;
   /** A short summary of this section's own state. Omitted when it has none. */
   badge?: string | null;
+  /**
+   * How the badge reads. A badge reporting a problem has to look unlike one
+   * reporting a count, or the one signal worth scanning for is furniture.
+   * `plain` for a figure, `live` for a good state, `warn` for a problem.
+   */
+  tone?: 'plain' | 'live' | 'warn';
   startOpen?: boolean;
 }>();
 
@@ -56,7 +62,12 @@ const bodyId = nextBodyId();
       @click="open = !open"
     >
       <span class="shell__title kicker">{{ title }}</span>
-      <span v-if="badge" class="shell__badge tag" data-section-badge>{{ badge }}</span>
+      <span
+        v-if="badge"
+        class="shell__badge tag"
+        :class="tone && tone !== 'plain' ? `tag--${tone}` : null"
+        data-section-badge
+      >{{ badge }}</span>
       <span class="shell__chev" :class="{ 'is-open': open }" aria-hidden="true">▾</span>
     </button>
 

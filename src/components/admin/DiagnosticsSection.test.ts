@@ -211,3 +211,74 @@ describe('THE REPORT SAYS WHAT IT FOUND, not only pass or fail', () => {
     expect(w.find('[data-diag-running]').exists()).toBe(false);
   });
 });
+
+/**
+ * The badge on the collapsed header.
+ *
+ * It says only what is known without asking the database anything. That is
+ * the same discipline the report itself follows: this screen exists so a
+ * misconfigured deployment can be diagnosed, and a chip that went green
+ * because a client object had been constructed would say all-clear while the
+ * database was unreachable — the exact failure the section is for.
+ *
+ * So "Configured" means the credentials look usable, and "Connected" is
+ * claimed only once something has actually talked to the database.
+ */
+describe('the connection badge', () => {
+  const badge = (w: any) => w.find('[data-section-badge]').text();
+
+  it('says the credentials are missing, which explains every empty screen', () => {
+    isConfigured.mockReturnValue(false);
+    expect(badge(mountIt())).toBe('Not configured');
+  });
+
+  it('claims only "Configured" before anything has talked to the database', () => {
+    expect(badge(mountIt())).toBe('Configured');
+  });
+
+  it('says Connected once a diagnostic has come back clean', async () => {
+    runFullDatabaseDiagnostic.mockResolvedValue({ ...REPORT, success: true });
+    const w = mountIt();
+    await w.find('[data-run-diagnostic]').trigger('click');
+    await flush();
+    expect(badge(w)).toBe('Connected');
+  });
+
+  it('does not say Connected when the diagnostic found problems', async () => {
+    const w = mountIt();
+    await w.find('[data-run-diagnostic]').trigger('click');
+    await flush();
+    expect(badge(w)).toBe('Problems found');
+  });
+
+  it('is shown to a coach as well, who cannot run the diagnostic', () => {
+    // A coach reaches /admin for the categories and the quiz bank. If the
+    // database is unconfigured, that is why those are empty, and they should
+    // be able to see it said even though the tools below are not theirs.
+    isConfigured.mockReturnValue(false);
+    expect(badge(mountIt({ isAdmin: false }))).toBe('Not configured');
+  });
+});
+
+describe('the badge tone', () => {
+  const tone = (w: any) => w.find('[data-section-badge]').classes();
+
+  it('marks an unconfigured database as a problem, not a fact', () => {
+    isConfigured.mockReturnValue(false);
+    expect(tone(mountIt())).toContain('tag--warn');
+  });
+
+  it('marks a clean diagnostic as live', async () => {
+    runFullDatabaseDiagnostic.mockResolvedValue({ ...REPORT, success: true });
+    const w = mountIt();
+    await w.find('[data-run-diagnostic]').trigger('click');
+    await flush();
+    expect(tone(w)).toContain('tag--live');
+  });
+
+  it('leaves "Configured" plain, because it is a fact and not an all-clear', () => {
+    const cls = tone(mountIt());
+    expect(cls).not.toContain('tag--live');
+    expect(cls).not.toContain('tag--warn');
+  });
+});

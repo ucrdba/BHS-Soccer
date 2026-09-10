@@ -20,7 +20,7 @@
  *
  * Extracted from the diagnostics panel in public/js/admin.js during Phase 6.
  */
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 
@@ -41,6 +41,36 @@ const credNotice = ref<string | null>(null);
 const running = ref(false);
 const report = ref<any>(null);
 const diagError = ref<string | null>(null);
+
+/**
+ * What the collapsed header says about the connection.
+ *
+ * It reports only what is known without asking the database anything, which
+ * is the same discipline the report below follows. A chip that went green
+ * because a client object had been constructed would say all-clear while the
+ * database was unreachable — the exact failure this section exists to
+ * diagnose. So `Configured` means the credentials look usable, and
+ * `Connected` is claimed only once something has actually talked to it.
+ *
+ * `Not configured` is the valuable one: it is the single fact that explains
+ * every empty screen elsewhere in the app, and it costs nothing to know.
+ */
+const connection = computed<string>(() => {
+  if (!supabaseService.isConfigured()) return 'Not configured';
+  if (!report.value) return 'Configured';
+  return report.value.success ? 'Connected' : 'Problems found';
+});
+
+/**
+ * `Configured` stays plain deliberately: it is a statement about the
+ * credentials, not an all-clear about the database, and colouring it green
+ * would make it read as one.
+ */
+const connectionTone = computed<'plain' | 'live' | 'warn'>(() => {
+  if (connection.value === 'Connected') return 'live';
+  if (connection.value === 'Configured') return 'plain';
+  return 'warn';
+});
 
 /** Whether a key is stored on this device — never the key itself. */
 function hasStoredKey(): boolean {
@@ -91,7 +121,7 @@ async function onRunDiagnostic(): Promise<void> {
 </script>
 
 <template>
-  <SectionShell title="Connection and diagnostics">
+  <SectionShell title="Connection and diagnostics" :badge="connection" :tone="connectionTone">
 
     <p v-if="!isAdmin" class="note">
       Only an admin can change the database connection or run the diagnostic.
