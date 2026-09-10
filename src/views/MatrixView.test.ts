@@ -477,6 +477,30 @@ describe('recording a session', () => {
     expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${SMALL}`);
   });
 
+  /*
+   * Clicking a name on an exercise's leaderboard asks about THAT exercise.
+   * The same modal opened from the overall board is not scoped, because the
+   * question there has no exercise in it. The wiring is the part that can
+   * silently regress, so it is asserted through the view rather than the
+   * modal alone.
+   */
+  it('opens a player scoped to the exercise being read', async () => {
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-session-drill]').setValue(LAPS);
+    await w.find('[data-leaderboard-player]').trigger('click');
+
+    const modal = w.findComponent({ name: 'PlayerBreakdownModal' });
+    expect(modal.props('drillId')).toBe(LAPS);
+  });
+
+  it('opens a player from the board unscoped', async () => {
+    const w = await mountMatrix({ coach: true });
+    await w.find('[data-board-player]').trigger('click');
+
+    const modal = w.findComponent({ name: 'PlayerBreakdownModal' });
+    expect(modal.props('drillId')).toBeNull();
+  });
+
   it('carries no second picker on the exercise panel', async () => {
     const w = await mountMatrix({ coach: true });
     await switchTo(w, 'Exercise');

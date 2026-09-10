@@ -43,6 +43,23 @@ const panel = computed(() =>
   panelFor(chosenPanel.value, isCoach.value, !!matrix.exerciseFilter));
 
 const openPlayerId = ref<string | null>(null);
+/**
+ * The exercise the breakdown is scoped to, or null for all of them.
+ *
+ * Opened from an exercise's leaderboard the coach's question already has an
+ * exercise in it; opened from the overall board it does not.
+ */
+const openPlayerDrillId = ref<string | null>(null);
+
+function openFromBoard(id: string): void {
+  openPlayerDrillId.value = null;
+  openPlayerId.value = id;
+}
+
+function openFromExercise(id: string): void {
+  openPlayerDrillId.value = matrix.exerciseFilter || null;
+  openPlayerId.value = id;
+}
 const notice = ref<string | null>(null);
 
 const weightsOpen = ref(false);
@@ -217,7 +234,7 @@ watch(
 
     <div v-else class="panel" :data-panel="panel">
       <template v-if="panel === 'board'">
-        <MatrixBoard @open-player="openPlayerId = $event" />
+        <MatrixBoard @open-player="openFromBoard" />
       </template>
 
       <!--
@@ -226,7 +243,9 @@ watch(
         in the obvious one look like it did nothing.
       -->
       <template v-else-if="panel === 'exercise'">
-        <ExerciseLeaderboard v-if="matrix.exerciseFilter && hasResults" />
+        <ExerciseLeaderboard
+          v-if="matrix.exerciseFilter && hasResults"
+          @open-player="openFromExercise" />
         <p v-else-if="matrix.exerciseFilter" class="empty" data-no-results>
           No results recorded for {{ chosenDrill?.name || 'this exercise' }} yet.
         </p>
@@ -246,6 +265,7 @@ watch(
 
     <PlayerBreakdownModal
       :player-id="openPlayerId" :team-id="org.activeTeamId"
+      :drill-id="openPlayerDrillId"
       @close="openPlayerId = null" />
 
     <WeightsModal

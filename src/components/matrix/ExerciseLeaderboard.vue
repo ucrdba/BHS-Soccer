@@ -50,6 +50,8 @@ function best(row: any): string {
   return row.timed ? formatSecondsAsTime(row.best) : String(row.best);
 }
 
+const emit = defineEmits<{ openPlayer: [string] }>();
+
 function standing(row: any): string {
   return matrix.isThreshold ? bandStanding(row) : 'met';
 }
@@ -120,7 +122,13 @@ function standing(row: any): string {
             data-leaderboard-row
           >
             <td class="tnum muted">{{ r.recordingNumber != null ? r.recordingNumber : '—' }}</td>
-            <td class="is-text">{{ r.name }}</td>
+            <td class="is-text">
+              <button
+                type="button" class="who" data-leaderboard-player
+                title="See this player's sessions for this exercise"
+                @click="emit('openPlayer', r.playerId)"
+              >{{ r.name }}</button>
+            </td>
             <td class="tnum">
               <template v-if="isWinLoss">{{ r.wins }} - {{ r.draws }} - {{ r.losses }}</template>
               <template v-else>{{ best(r) }}</template>
@@ -220,4 +228,18 @@ function standing(row: any): string {
 @media (max-width: 767.98px) {
   .lb td.is-text, .lb th.is-text { position: sticky; left: 0; background: var(--ground); }
 }
+
+/* The same affordance the board gives a name: a button that does not look
+   like one until you reach it. */
+.who {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.who:hover, .who:focus-visible { color: var(--live); }
 </style>

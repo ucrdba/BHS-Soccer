@@ -1965,7 +1965,10 @@ class SupabaseService {
     if (!this.isConfigured() || !teamId || !playerId) return null;
     const { data, error } = await this.client!
       .from('matrix_exercise_points')
-      .select('exercise, occurred_on, kind, detail, raw_value, attendance, weight, earned, available, opponent_id')
+      // drill_id so a breakdown opened from one exercise's leaderboard can be
+      // scoped to it. Names are not a safe key: two exercises may share one,
+      // and a rename would silently empty the panel.
+      .select('drill_id, exercise, occurred_on, kind, detail, raw_value, attendance, weight, earned, available, opponent_id')
       .eq('team_id', teamId)
       .eq('player_id', playerId)
       .order('occurred_on', { ascending: false });

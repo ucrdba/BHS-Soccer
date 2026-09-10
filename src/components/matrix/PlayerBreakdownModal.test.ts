@@ -31,12 +31,14 @@ const DRILLS = [
 /** The watch that fetches is async; let it settle. */
 const flush = () => new Promise(r => setTimeout(r, 0));
 
-async function mountModal(rows: any[] | null, playerId: string | null = 'p1') {
+async function mountModal(
+  rows: any[] | null, playerId: string | null = 'p1', drillId: string | null = null
+) {
   vi.clearAllMocks();
   fetchPlayerBreakdown.mockResolvedValue(rows);
 
   const w = mount(PlayerBreakdownModal, {
-    props: { playerId, teamId: 't1' },
+    props: { playerId, teamId: 't1', drillId },
     global: {
       plugins: [createTestingPinia({
         createSpy: vi.fn,
@@ -148,5 +150,56 @@ describe('closing', () => {
     const w = await mountModal([]);
     await w.find('[data-modal-close]').trigger('click');
     expect(w.emitted('close')).toBeTruthy();
+  });
+});
+
+
+/**
+ * Opened from one exercise's leaderboard, it answers about that exercise.
+ *
+ * A coach reading the 3-430 board and clicking a name has a question with an
+ * exercise already in it -- what did he run? Handing back every exercise makes
+ * them find the rows themselves. Opened from the overall board there is no
+ * exercise in the question, so nothing is scoped away.
+ */
+describe('scoped to one exercise', () => {
+  const MIXED = [
+    { drill_id: 'd-laps', exercise: '3 Laps', occurred_on: '2026-09-08',
+      kind: 'time', raw_value: 224, earned: 1, available: 1 },
+    { drill_id: 'd-coopers', exercise: 'Coopers', occurred_on: '2026-09-07',
+      kind: 'count', raw_value: 40, earned: 1, available: 1 },
+    { drill_id: 'd-laps', exercise: '3 Laps', occurred_on: '2026-09-01',
+      kind: 'time', raw_value: null, attendance: 'absent', earned: 0, available: 1 }
+  ];
+
+  it('shows only that exercise when one is given', async () => {
+    const w = await mountModal(MIXED, 'p1', 'd-laps');
+    const dates = w.findAll('[data-breakdown-row]')
+      .map((r: any) => r.text());
+    expect(dates.length).toBe(2);
+    expect(dates.join(' ')).not.toContain('Coopers');
+  });
+
+  it('names the exercise in the title, so the scope is not a surprise', async () => {
+    const w = await mountModal(MIXED, 'p1', 'd-laps');
+    expect(w.text()).toContain('3 Laps');
+  });
+
+  it('drops the exercise column, which would repeat one value down the table', async () => {
+    const w = await mountModal(MIXED, 'p1', 'd-laps');
+    const heads = w.findAll('th').map((h: any) => h.text());
+    expect(heads).not.toContain('Exercise');
+  });
+
+  it('shows every exercise when none is given, as the board does', async () => {
+    const w = await mountModal(MIXED, 'p1', null);
+    expect(w.findAll('[data-breakdown-row]').length).toBe(3);
+    expect(w.findAll('th').map((h: any) => h.text())).toContain('Exercise');
+  });
+
+  it('says nothing is recorded when that player has none of THIS exercise', async () => {
+    const w = await mountModal(
+      [MIXED[1]], 'p1', 'd-laps');
+    expect(w.find('[data-breakdown-empty]').exists()).toBe(true);
   });
 });

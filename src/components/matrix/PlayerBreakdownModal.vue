@@ -12,7 +12,17 @@ import { supabaseService } from '../../data/supabase';
 import { breakdownDetail } from '../../domain/matrix-breakdown';
 import { useMatrixStore } from '../../stores/matrix';
 
-const props = defineProps<{ playerId: string | null; teamId: string | null }>();
+const props = defineProps<{
+  playerId: string | null;
+  teamId: string | null;
+  /**
+   * Scope to one exercise. Opened from an exercise's leaderboard the coach's
+   * question already has an exercise in it -- what did he run? -- so handing
+   * back every exercise would make them find the rows themselves. Opened from
+   * the overall board there is no exercise in the question, and this is null.
+   */
+  drillId?: string | null;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const matrix = useMatrixStore();
@@ -25,6 +35,24 @@ const player = computed(() =>
 
 const names = computed(() =>
   new Map(matrix.players.map((p: any) => [p.id, p.name])));
+
+/** The exercise being scoped to, for the title. */
+const drill = computed(() =>
+  props.drillId
+    ? (matrix.drillsBank.find((d: any) => d.id === props.drillId) || null)
+    : null);
+
+/** What the table lists: every line, or only the scoped exercise's. */
+const shown = computed<any[] | null>(() => {
+  if (!rows.value) return rows.value;
+  if (!props.drillId) return rows.value;
+  return rows.value.filter((r: any) => r.drill_id === props.drillId);
+});
+
+const title = computed(() => {
+  const who = player.value ? player.value.name : 'Player';
+  return drill.value ? `${who} · ${drill.value.name}` : who;
+});
 
 watch(() => props.playerId, async (id) => {
   rows.value = null;
@@ -52,7 +80,7 @@ function detail(row: any): string {
 <template>
   <BaseModal
     :open="playerId !== null"
-    :title="player ? player.name : 'Player'"
+    :title="title"
     wide
     @close="emit('close')"
   >
@@ -62,7 +90,7 @@ function detail(row: any): string {
       Could not load this player's results.
     </p>
 
-    <p v-else-if="!rows || rows.length === 0" class="state" data-breakdown-empty>
+    <p v-else-if="!shown || shown.length === 0" class="state" data-breakdown-empty>
       Nothing recorded for this player yet.
     </p>
 
@@ -70,14 +98,16 @@ function detail(row: any): string {
       <table class="tbl">
         <thead>
           <tr>
-            <th>Date</th><th class="is-text">Exercise</th>
+            <th>Date</th>
+            <!-- Scoped, the column would repeat one value down every row. -->
+            <th v-if="!drillId" class="is-text">Exercise</th>
             <th class="is-text">What happened</th><th>Earned</th><th>Of</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(r, i) in rows" :key="i" data-breakdown-row>
+          <tr v-for="(r, i) in shown" :key="i" data-breakdown-row>
             <td class="nowrap">{{ r.occurred_on || '—' }}</td>
-            <td class="is-text">{{ r.exercise || '—' }}</td>
+            <td v-if="!drillId" class="is-text">{{ r.exercise || '—' }}</td>
             <td class="is-text" data-breakdown-detail>{{ detail(r) }}</td>
             <td class="tabular"><strong>{{ Number(r.earned ?? 0).toFixed(2) }}</strong></td>
             <td class="tabular muted">{{ Number(r.available ?? 0).toFixed(2) }}</td>
