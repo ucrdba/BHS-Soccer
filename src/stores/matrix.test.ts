@@ -183,14 +183,23 @@ describe('a standard, versus a competition', () => {
     expect(s.shortOfStandard).toEqual([]);
   });
 
-  it('names who fell short, excluding those who never attempted', async () => {
+  /*
+   * Reversed deliberately. A player who has never run the exercise has not
+   * shown he can last a full match, so he is counted among those who have not
+   * met the standard — marked apart on his row, because he needs to turn up
+   * rather than to train, but counted the same.
+   *
+   * The denominator widened with it: counting him in the numerator while
+   * leaving him out of the denominator would let the fraction exceed itself.
+   */
+  it('names everyone not shown to be match-ready, never-run included', async () => {
     const s = useMatrixStore();
     await s.load('t1', 's1');
     s.setExerciseFilter(LAPS);
 
-    expect(s.shortOfStandard.map((r: any) => r.playerId)).toEqual(['p2']);
-    // Two ran; one did not, and is not counted against the standard.
-    expect(s.measuredCount).toBe(2);
+    // p2 ran and fell short; p3 never ran. Both are short of the standard.
+    expect(s.shortOfStandard.map((r: any) => r.playerId)).toEqual(['p2', 'p3']);
+    expect(s.measuredCount).toBe(3);
   });
 
   it('KEEPS every row on the leaderboard regardless', async () => {

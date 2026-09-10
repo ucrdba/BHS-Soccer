@@ -337,14 +337,15 @@ describe('a competitive exercise', () => {
 describe('a fitness standard', () => {
   const opts = { filter: LAPS, points: BAND_POINTS };
 
-  it('says how many fell below it, of those measured', async () => {
+  it('says how many have not met it, never-run players included', async () => {
     const w = await mountMatrix(opts);
     await switchTo(w, 'Exercise');
     const summary = w.find('[data-standard-summary]');
     expect(summary.exists()).toBe(true);
-    // One below; the player who never ran is not counted against the standard.
-    expect(summary.text()).toMatch(/1\b/);
-    expect(summary.text()).toMatch(/2 measured/);
+    // p2 ran short, p3 never ran: two of the three have not met it.
+    expect(summary.text()).toMatch(/2 of 3/);
+    // "measured" no longer fits a denominator that includes the unmeasured.
+    expect(summary.text()).not.toMatch(/measured/i);
   });
 
   it('marks the rows that fell short', async () => {
@@ -370,7 +371,7 @@ describe('a fitness standard', () => {
                point({ player_id: 'p2', earned: 1, available: 1 })]
     });
     await switchTo(w, 'Exercise');
-    expect(w.find('[data-standard-summary]').text()).toMatch(/all 2 measured/i);
+    expect(w.find('[data-standard-summary]').text()).toMatch(/all 2 players have cleared/i);
   });
 
   it('KEEPS every player on the table', async () => {

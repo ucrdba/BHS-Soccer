@@ -107,16 +107,18 @@ function standing(row: any): string {
     >
       <p class="kicker standard__kicker">Match-readiness standard, not a ranking</p>
       <p class="standard__line">
+        <!-- "measured" no longer fits the denominator: a player who never ran
+             it is counted here, and he is precisely the unmeasured one. -->
         <template v-if="matrix.shortOfStandard.length">
           <span class="standard__count tnum">{{ matrix.shortOfStandard.length }}</span>
-          of {{ matrix.measuredCount }} measured
-          {{ matrix.shortOfStandard.length === 1 ? 'player is' : 'players are' }}
-          below the standard. The rest have cleared it.
+          of {{ matrix.measuredCount }}
+          {{ matrix.shortOfStandard.length === 1 ? 'player has' : 'players have' }}
+          not met the standard — slower, or not yet run. The rest have cleared it.
         </template>
         <template v-else>
-          All {{ matrix.measuredCount }} measured
-          {{ matrix.measuredCount === 1 ? 'player meets' : 'players meet' }}
-          the standard.
+          All {{ matrix.measuredCount }}
+          {{ matrix.measuredCount === 1 ? 'player has' : 'players have' }}
+          cleared the standard.
         </template>
       </p>
     </div>
@@ -182,7 +184,9 @@ function standing(row: any): string {
                   :title="`Cleared the standard on ${runs(r)} runs`"
                 > · {{ runs(r) }}</span>
               </span>
-              <span v-else class="mark mark--none">—</span>
+              <!-- Never run. Marked apart from a slow run because it asks
+                   something different of a coach, but counted with it. -->
+              <span v-else class="mark mark--short" data-no-runs>△ no runs</span>
             </td>
           </tr>
         </tbody>

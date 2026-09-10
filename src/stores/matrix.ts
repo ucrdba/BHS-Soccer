@@ -70,9 +70,16 @@ export const useMatrixStore = defineStore('matrix', () => {
   const isThreshold = computed(() => isThresholdMeasure(measure.value));
   const shortOfStandard = computed(() =>
     isThreshold.value ? belowStandard(leaderboard.value) : []);
-  /** Those who actually attempted, which is what "3 of 19" counts against. */
+  /**
+   * Everyone the standard applies to, which is what "7 of 24" counts against.
+   *
+   * Every player on the board, not just those who ran: a player who has never
+   * run it is now counted as short of the standard, and leaving him out of the
+   * denominator while counting him in the numerator would let the fraction
+   * exceed itself.
+   */
   const measuredCount = computed(() =>
-    isThreshold.value ? leaderboard.value.filter(r => (r.attempts || 0) > 0).length : 0);
+    isThreshold.value ? leaderboard.value.length : 0);
 
   /**
    * The team scopes the results; the organization scopes the drill library.

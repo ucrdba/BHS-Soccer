@@ -63,9 +63,19 @@ describe('bandStanding', () => {
     expect(bandStanding(row(0, 1, 1))).toBe('missed');
   });
 
-  it('reads no attempt as none, not as failure', () => {
-    // An absence is not a slow time, and must not be counted against a player
-    // as though they had run and failed.
+  /*
+   * A player who has never run it is not match-ready either.
+   *
+   * This used to read 'none', on the reasoning that an absence is not a slow
+   * time and counting it as a shortfall points a coach at the wrong person.
+   * That is true about BLAME and wrong about READINESS, which is what this
+   * standard measures: not demonstrated is not met, whatever the reason.
+   *
+   * It gets its own value rather than folding into 'below', because the two
+   * ask different things of a coach — one player needs training, the other
+   * needs to turn up — and both belong in the same tally.
+   */
+  it('reads no attempt as unmeasured, which is still short of the standard', () => {
     expect(bandStanding(row(0, 1, 0))).toBe('none');
   });
 
@@ -121,14 +131,20 @@ describe('belowStandard', () => {
     row(0, 1, 0)                          // never attempted
   ];
 
-  it('counts those who fell short, and those alone', () => {
-    // Below AND missed: both fell short of the standard.
-    expect(belowStandard(squad)).toHaveLength(3);
+  it('counts everyone who has not met it', () => {
+    // Below, missed, and never run: three ways of not being match-ready.
+    expect(belowStandard(squad)).toHaveLength(4);
   });
 
-  it('does not count a player who never attempted', () => {
+  /*
+   * Reversed deliberately. A player who has never run the exercise has not
+   * shown he can last a full match, and a headline that leaves him out
+   * understates who is not ready. He is marked differently on the row — see
+   * bandStanding — but counted the same.
+   */
+  it('counts a player who never attempted, who is also not match-ready', () => {
     const ids = belowStandard(squad).map(r => r.playerId);
-    expect(ids).not.toContain(row(0, 1, 0).playerId);
+    expect(ids).toContain(row(0, 1, 0).playerId);
   });
 
   it('is empty when the whole squad met the standard', () => {

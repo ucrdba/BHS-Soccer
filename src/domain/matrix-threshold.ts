@@ -45,9 +45,19 @@ export function isThresholdMeasure(measure: string): boolean {
 export function bandStanding(row: StandingRow): BandStanding {
   const attempts = Number(row?.attempts) || 0;
 
-  // No attempt is not a failure. A player who was not there has not run
-  // slowly, and counting them as falling short would put a coach's attention
-  // on the wrong person.
+  /*
+   * Never run: not measured, and therefore not shown to be match-ready.
+   *
+   * This used to be excluded from the shortfall entirely, on the reasoning
+   * that an absence is not a slow time. That is true about blame and wrong
+   * about READINESS, which is what this standard measures — a player who has
+   * not run three laps in 4:30 has not shown he can last a full match,
+   * whatever the reason.
+   *
+   * It keeps its own value rather than folding into 'below' because the two
+   * ask different things of a coach: one player needs training, the other
+   * needs to turn up. `belowStandard` counts both.
+   */
   if (attempts === 0) return 'none';
 
   /*
@@ -77,14 +87,13 @@ export function bandStanding(row: StandingRow): BandStanding {
 }
 
 /**
- * The rows worth a coach's attention: those who attempted and fell short.
+ * The rows worth a coach's attention: everyone not shown to be match-ready.
  *
- * Both `below` and `missed` — meeting a looser band and meeting none are
- * different degrees of the same signal.
+ * `below`, `missed` and `none` — meeting a looser band, meeting none, and
+ * never having run it are three degrees of the same signal. They are marked
+ * differently on the row, because they call for different things, but a
+ * headline that left any of them out would understate who is not ready.
  */
 export function belowStandard<T extends StandingRow>(rows: T[]): T[] {
-  return (rows || []).filter(r => {
-    const s = bandStanding(r);
-    return s === 'below' || s === 'missed';
-  });
+  return (rows || []).filter(r => bandStanding(r) !== 'met');
 }
