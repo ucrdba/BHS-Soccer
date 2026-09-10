@@ -15,6 +15,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { reportFailure } from '../domain/notices';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function initSupabaseClient(): void {
       });
       console.log('⚡ Connected to Supabase:', url);
     } catch (err: any) {
-      console.warn('Supabase init notice:', err.message);
+      report('init', err.message);
       supabaseClient = null;
     }
   } else {
@@ -106,6 +107,29 @@ function initSupabaseClient(): void {
 }
 
 initSupabaseClient();
+
+
+/**
+ * A failure, said in both places it needs saying.
+ *
+ * Every method here returns `null` when a query fails and used to write the
+ * reason to the console alone. The audience is coaches: a roster that will not
+ * load is a blank screen and no explanation, while the sentence explaining it
+ * sits in a devtools panel nobody opens. So the same failure now also reaches
+ * `domain/notices`, which the app renders.
+ *
+ * The console call stays. It carries every argument it ever did — an error
+ * object as well as its message — and is still the better read when the tools
+ * are already open.
+ *
+ * The method name is the notice's whole vocabulary: `domain/notices` turns
+ * `fetchTeamRoster` into "The roster could not be loaded." Pass the method's
+ * own name and nothing else, so a rename carries the wording with it.
+ */
+function report(method: string, ...detail: unknown[]): void {
+  console.error(`Supabase ${method}:`, ...detail);
+  reportFailure(method, detail[0]);
+}
 
 
 /**
@@ -131,10 +155,11 @@ initSupabaseClient();
  */
 function orgOrNull(method: string, schoolId: string | undefined | null): string | null {
   if (schoolId) return schoolId;
-  console.error(
-    `${method}() was called with no organization, so it returned nothing ` +
-    `rather than querying. Pass the resolved organization id — see ` +
-    `resolveActiveTeam() in data/team-scope.ts.`
+  report(
+    method,
+    `${method}() was called with no organization, so it returned nothing `
+    + `rather than querying. Pass the resolved organization id — see `
+    + `resolveActiveTeam() in data/team-scope.ts.`
   );
   return null;
 }
@@ -241,10 +266,10 @@ class SupabaseService {
         email, password,
         options: { data: metadata, emailRedirectTo: this.authRedirectUrl() }
       });
-      if (error) console.warn('Supabase Auth signUp notice:', error.message);
+      if (error) report('Auth', error.message);
       return { data, error };
     } catch (e) {
-      console.warn('Supabase Auth signUp exception:', e);
+      report('Auth', e);
       return null;
     }
   }
@@ -253,10 +278,10 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     try {
       const { data, error } = await this.client!.auth.signInWithPassword({ email, password });
-      if (error) console.warn('Supabase Auth signIn notice:', error.message);
+      if (error) report('Auth', error.message);
       return { data, error };
     } catch (e) {
-      console.warn('Supabase Auth signIn exception:', e);
+      report('Auth', e);
       return null;
     }
   }
@@ -265,10 +290,10 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     try {
       const { error } = await this.client!.auth.signOut();
-      if (error) console.warn('Supabase Auth signOut notice:', error.message);
+      if (error) report('Auth', error.message);
       return { error };
     } catch (e) {
-      console.warn('Supabase Auth signOut exception:', e);
+      report('Auth', e);
       return null;
     }
   }
@@ -287,10 +312,10 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     try {
       const { data, error } = await this.client!.auth.verifyOtp({ email, token, type: 'signup' });
-      if (error) console.warn('Supabase Auth verifyOtp notice:', error.message);
+      if (error) report('Auth', error.message);
       return { data, error };
     } catch (e) {
-      console.warn('Supabase Auth verifyOtp exception:', e);
+      report('Auth', e);
       return null;
     }
   }
@@ -303,9 +328,9 @@ class SupabaseService {
         // This branch used to return null silently, which made a failed profile
         // load indistinguishable from an RLS denial — the caller only reports
         // "Account profile could not be loaded". Log which one it actually was.
-        console.error(
-          'Supabase fetchOwnProfile: getUser() failed —',
-          userError ? userError.message : 'no user on the session',
+        report(
+          'fetchOwnProfile',
+          `getUser() failed — ${userError ? userError.message : 'no user on the session'}`
         );
         return null;
       }
@@ -314,19 +339,19 @@ class SupabaseService {
         .select('*')
         .eq('id', userData.user.id)
         .maybeSingle();
-      if (error) { console.error('Supabase fetchOwnProfile error:', error.message); return null; }
+      if (error) { report('fetchOwnProfile', error.message); return null; }
       if (!data) {
         // maybeSingle() returns { data: null, error: null } when RLS filters the
         // row out — a silent zero-row result. Distinguish it from a query error.
-        console.error(
-          'Supabase fetchOwnProfile: no profiles row visible for auth user',
-          userData.user.id,
-          '— either no such row exists, or RLS denied it.',
+        report(
+          'fetchOwnProfile',
+          `no profiles row visible for auth user ${userData.user.id} `
+          + '— either no such row exists, or RLS denied it.'
         );
       }
       return data;
     } catch (e) {
-      console.error('Supabase fetchOwnProfile exception:', e);
+      report('fetchOwnProfile', e);
       return null;
     }
   }
@@ -366,7 +391,7 @@ class SupabaseService {
 
   async upsertProfile(userId: string, fields: { name?: string; avatar?: string; teamLevel?: string } = {}): Promise<any> {
     if (!this.isConfigured()) return null;
-    if (!userId) { console.warn('Supabase upsertProfile: missing userId — profile rows are created by the handle_new_user DB trigger, not the client.'); return null; }
+    if (!userId) { report('upsertProfile', 'missing userId — profile rows are created by the handle_new_user DB trigger, not the client.'); return null; }
 
     const payload: Record<string, any> = {};
     if (fields.name !== undefined) payload.name = fields.name;
@@ -381,12 +406,12 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase profiles update error:', error.message, error);
+        report('profiles', error.message, error);
         return null;
       }
       return data ? data[0] : null;
     } catch (err: any) {
-      console.error('❌ Supabase profiles exception:', err.message);
+      report('profiles', err.message);
       return null;
     }
   }
@@ -399,17 +424,17 @@ class SupabaseService {
         .select('requested_role')
         .eq('id', userId)
         .maybeSingle();
-      if (fetchError || !existing) { console.error('❌ Supabase approveProfile fetch error:', fetchError?.message); return null; }
+      if (fetchError || !existing) { report('approveProfile', fetchError?.message); return null; }
 
       const { data, error } = await this.client!
         .from('profiles')
         .update({ status: 'active', role: existing.requested_role || 'player' })
         .eq('id', userId)
         .select();
-      if (error) { console.error('❌ Supabase approveProfile error:', error.message); return null; }
+      if (error) { report('approveProfile', error.message); return null; }
       return data ? data[0] : null;
     } catch (e: any) {
-      console.error('❌ Supabase approveProfile exception:', e.message);
+      report('approveProfile', e.message);
       return null;
     }
   }
@@ -422,10 +447,10 @@ class SupabaseService {
         .update({ status: 'rejected' })
         .eq('id', userId)
         .select();
-      if (error) { console.error('❌ Supabase rejectProfile error:', error.message); return null; }
+      if (error) { report('rejectProfile', error.message); return null; }
       return data ? data[0] : null;
     } catch (e: any) {
-      console.error('❌ Supabase rejectProfile exception:', e.message);
+      report('rejectProfile', e.message);
       return null;
     }
   }
@@ -439,7 +464,7 @@ class SupabaseService {
       .select('*')
       .eq('status', 'pending_approval')
       .order('created_at', { ascending: true });
-    if (error) { console.error('Supabase fetchPendingApprovals error:', error.message); return null; }
+    if (error) { report('fetchPendingApprovals', error.message); return null; }
     return data;
   }
 
@@ -466,14 +491,14 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase test profile insert error:', error.message);
+        report('test', error.message);
         return { success: false, error: error.message };
       }
 
       console.log('✅ Supabase test profile inserted successfully:', data);
       return { success: true, data: data[0] };
     } catch (err: any) {
-      console.error('❌ Supabase test profile exception:', err.message);
+      report('test', err.message);
       return { success: false, error: err.message };
     }
   }
@@ -666,7 +691,7 @@ class SupabaseService {
     const schoolUuid = await this.getSchoolUuid(schoolId);
     if (schoolUuid) query = query.eq('school_id', schoolUuid);
     const { data, error } = await query;
-    if (error) { console.error('Supabase fetchPlayers error:', error); return null; }
+    if (error) { report('fetchPlayers', error); return null; }
     return data;
   }
 
@@ -707,14 +732,14 @@ class SupabaseService {
       if (ids) q = q.in('id', ids); else q = q.eq('is_public_default', true);
 
       const { data, error } = await q;
-      if (error) { console.warn('Supabase fetchTeamsForViewer notice:', error.message); return null; }
+      if (error) { report('fetchTeamsForViewer', error.message); return null; }
       return (data || []).map((t: any) => ({
         id: t.id, school_id: t.school_id, name: t.name, season: t.season,
         is_public_default: t.is_public_default,
         school_name: t.schools?.name || '', school_kind: t.schools?.kind || 'school'
       })).sort((a, b) => (a.school_name + a.name).localeCompare(b.school_name + b.name));
     } catch (e) {
-      console.warn('Supabase fetchTeamsForViewer exception:', e);
+      report('fetchTeamsForViewer', e);
       return null;
     }
   }
@@ -729,10 +754,10 @@ class SupabaseService {
       let q = this.client!.from('teams').select('id').eq('is_public_default', true).eq('is_deleted', false);
       if (schoolId) q = q.eq('school_id', schoolId);
       const { data, error } = await q.limit(1);
-      if (error) { console.warn('Supabase fetchPublicDefaultTeamId notice:', error.message); return null; }
+      if (error) { report('fetchPublicDefaultTeamId', error.message); return null; }
       return data && data[0] ? data[0].id : null;
     } catch (e) {
-      console.warn('Supabase fetchPublicDefaultTeamId exception:', e);
+      report('fetchPublicDefaultTeamId', e);
       return null;
     }
   }
@@ -744,7 +769,7 @@ class SupabaseService {
       .select('id, team_id, school_id, number, recording_number, position, season_stats, ratings, is_deleted, players(id, name, first_name, last_name, class_year, height, photo_url)')
       .eq('team_id', teamId)
       .eq('is_deleted', false);
-    if (error) { console.warn('Supabase fetchTeamRoster notice:', error.message); return null; }
+    if (error) { report('fetchTeamRoster', error.message); return null; }
     return data;
   }
 
@@ -761,7 +786,7 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
       .from('players').select('id, name').eq('is_deleted', false);
-    if (error) { console.warn('Supabase fetchAllPlayerIdentities notice:', error.message); return null; }
+    if (error) { report('fetchAllPlayerIdentities', error.message); return null; }
     return data;
   }
 
@@ -783,7 +808,7 @@ class SupabaseService {
       .from('teams')
       .select('id, school_id, name, season, is_public_default, schools(name, kind)')
       .eq('is_deleted', false);
-    if (error) { console.warn('Supabase fetchAllTeams notice:', error.message); return null; }
+    if (error) { report('fetchAllTeams', error.message); return null; }
     return (data || []).map((t: any) => ({
       id: t.id, school_id: t.school_id, name: t.name, season: t.season,
       is_public_default: t.is_public_default,
@@ -796,7 +821,7 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
       .from('team_coaches').select('team_id, profile_id, profiles(name, email, role, status)');
-    if (error) { console.warn('Supabase fetchTeamCoaches notice:', error.message); return null; }
+    if (error) { report('fetchTeamCoaches', error.message); return null; }
     return (data || []).map((r: any) => ({
       team_id: r.team_id, profile_id: r.profile_id,
       name: r.profiles?.name || '(unknown)', email: r.profiles?.email || '',
@@ -815,7 +840,7 @@ class SupabaseService {
       .from('profiles').select('id, name, email, role')
       .in('role', ['coach', 'admin']).eq('status', 'active')
       .order('name', { ascending: true });
-    if (error) { console.warn('Supabase fetchAssignableCoaches notice:', error.message); return null; }
+    if (error) { report('fetchAssignableCoaches', error.message); return null; }
     return data;
   }
 
@@ -827,7 +852,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('team_coaches').upsert([{ team_id: teamId, profile_id: profileId }], { onConflict: 'team_id,profile_id' }).select();
       if (error) {
-        console.warn('Supabase assignCoachToTeam notice:', error.message);
+        report('assignCoachToTeam', error.message);
         return { ok: false, error: error.message };
       }
       // An RLS denial returns no error and no rows; team_coaches_write is
@@ -837,7 +862,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase assignCoachToTeam exception:', e);
+      report('assignCoachToTeam', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -854,7 +879,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('team_coaches').delete().eq('team_id', teamId).eq('profile_id', profileId).select();
       if (error) {
-        console.warn('Supabase removeCoachFromTeam notice:', error.message);
+        report('removeCoachFromTeam', error.message);
         return { ok: false, error: error.message };
       }
       if (!data || data.length === 0) {
@@ -862,7 +887,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase removeCoachFromTeam exception:', e);
+      report('removeCoachFromTeam', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -893,7 +918,7 @@ class SupabaseService {
       .from('teams').insert([payload]).select();
 
     if (error) {
-      console.warn('Supabase createTeam notice:', error.message);
+      report('createTeam', error.message);
       if (error.code === '23505') {
         return { ok: false, error: `There is already a team called "${name}" in that organization.` };
       }
@@ -914,7 +939,7 @@ class SupabaseService {
       .from('players').select('id, name, class_year, photo_url')
       .eq('is_deleted', false)
       .ilike('name', `%${q}%`).limit(10);
-    if (error) { console.warn('Supabase searchPlayersByName notice:', error.message); return null; }
+    if (error) { report('searchPlayersByName', error.message); return null; }
     return data;
   }
 
@@ -935,7 +960,7 @@ class SupabaseService {
       .order('match_on', { ascending: true, nullsFirst: false })
       .order('kickoff_time', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
-    if (error) { console.error('Supabase fetchSchedule error:', error); return null; }
+    if (error) { report('fetchSchedule', error); return null; }
     return data;
   }
 
@@ -953,7 +978,7 @@ class SupabaseService {
     // treat a falsy return as failure and tell the coach the fixture was not
     // saved.
     if (!teamId || !this.isUuid(teamId)) {
-      console.warn('upsertMatch: no valid team; refusing to write an unscoped fixture. Got:', teamId);
+      report('upsertMatch', `no valid team; refusing to write an unscoped fixture. Got: ${teamId}`);
       return null;
     }
     const payload: Record<string, any> = {
@@ -978,7 +1003,7 @@ class SupabaseService {
       .from('schedule')
       .upsert([payload])
       .select();
-    if (error) console.error('Supabase upsertMatch error:', error);
+    if (error) report('upsertMatch', error);
     return data ? data[0] : null;
   }
 
@@ -989,7 +1014,7 @@ class SupabaseService {
       .update({ is_deleted: true })
       .eq('id', matchId)
       .select();
-    if (error) console.error('Supabase soft deleteMatch error:', error);
+    if (error) report('soft', error);
     return data;
   }
 
@@ -1005,7 +1030,7 @@ class SupabaseService {
       .or('is_deleted.is.null,is_deleted.eq.false')
       .eq('team_id', teamId)
       .order('created_at', { ascending: true });
-    if (error) { console.error('Supabase fetchPracticePlans error:', error); return null; }
+    if (error) { report('fetchPracticePlans', error); return null; }
     return data;
   }
 
@@ -1027,7 +1052,7 @@ class SupabaseService {
       .from('team_coaches')
       .select('team_id, teams(id, name, school_id, schools(name))')
       .eq('profile_id', uid);
-    if (error) { console.warn('Supabase teamsCoachedBy notice:', error.message); return null; }
+    if (error) { report('teamsCoachedBy', error.message); return null; }
 
     return (rows || []).map((r: any) => ({
       id: r.teams?.id || r.team_id,
@@ -1130,7 +1155,7 @@ class SupabaseService {
     }));
 
     const { data, error } = await this.client!.from('practice_plans').insert(copies).select();
-    if (error) { console.warn('Supabase copyPracticePlan notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('copyPracticePlan', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) {
       return { ok: false, error: 'The database refused that. Only a coach of the destination team can copy to it.' };
     }
@@ -1161,7 +1186,7 @@ class SupabaseService {
       is_active: false,
       is_deleted: false
     }]).select();
-    if (error) { console.warn('Supabase copyDailyThought notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('copyDailyThought', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) {
       return { ok: false, error: 'The database refused that. Only a coach of the destination team can copy to it.' };
     }
@@ -1223,7 +1248,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('name', oldName)
       .select();
-    if (error) { console.warn('Supabase renamePracticePlan notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('renamePracticePlan', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) {
       return { ok: false, error: `No plan called "${oldName}" on this team, or the database refused the change.` };
     }
@@ -1275,14 +1300,14 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase saveFullPracticePlan error:', error.message, error);
+        report('saveFullPracticePlan', error.message, error);
         return { success: false, error: error.message };
       } else {
         console.log('✅ Supabase practice plan items saved successfully:', data);
         return { success: true, data };
       }
     } catch (err: any) {
-      console.error('❌ Supabase saveFullPracticePlan exception:', err.message);
+      report('saveFullPracticePlan', err.message);
       return { success: false, error: err.message };
     }
   }
@@ -1292,7 +1317,7 @@ class SupabaseService {
     // Same team_id guard as saveFullPracticePlan -- refuse a leftover school
     // code here rather than letting it reach Postgres and fail the uuid cast.
     if (!teamId || !this.isUuid(teamId)) {
-      console.warn('Supabase savePracticePlanItem notice: no team selected; refusing to save an unscoped practice plan item.');
+      report('savePracticePlanItem', 'no team selected; refusing to save an unscoped practice plan item.');
       return null;
     }
     const payload: Record<string, any> = {
@@ -1315,12 +1340,12 @@ class SupabaseService {
         .upsert([payload])
         .select();
       if (error) {
-        console.error('❌ Supabase savePracticePlanItem error:', error.message, error);
+        report('savePracticePlanItem', error.message, error);
         return null;
       }
       return data ? data[0] : null;
     } catch (e: any) {
-      console.error('❌ Supabase savePracticePlanItem exception:', e.message);
+      report('savePracticePlanItem', e.message);
       return null;
     }
   }
@@ -1335,7 +1360,7 @@ class SupabaseService {
       .from('practice_plans')
       .update({ is_deleted: true })
       .eq('id', planId);
-    if (error) console.error('Supabase soft deletePracticePlanItem error:', error);
+    if (error) report('soft', error);
   }
 
   /**
@@ -1361,7 +1386,7 @@ class SupabaseService {
         .eq('school_id', schoolUuid)
         .or('is_deleted.is.null,is_deleted.eq.false')
         .order('name', { ascending: true });
-      if (error) { console.error('Supabase fetchSoccerCategories error:', error.message); return null; }
+      if (error) { report('fetchSoccerCategories', error.message); return null; }
       return data;
     } catch (e) {
       return null;
@@ -1472,7 +1497,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('quiz_questions').upsert([payload]).select();
       if (error) {
-        console.warn('Supabase upsertQuizQuestion notice:', error.message);
+        report('upsertQuizQuestion', error.message);
         return { ok: false, error: error.message };
       }
       if (!data || data.length === 0) {
@@ -1720,7 +1745,7 @@ class SupabaseService {
       .select('id, drill_id, team_id, max_seconds, factor')
       .eq('drill_id', drillId)
       .eq('team_id', teamId);
-    if (error) { console.warn('Supabase fetchTimeBands notice:', error.message); return null; }
+    if (error) { report('fetchTimeBands', error.message); return null; }
 
     return (data || [])
       .slice()
@@ -1774,14 +1799,14 @@ class SupabaseService {
       .delete()
       .eq('drill_id', drillId)
       .eq('team_id', teamId);
-    if (clearErr) { console.warn('Supabase saveTimeBands clear notice:', clearErr.message); return { ok: false, error: clearErr.message }; }
+    if (clearErr) { report('saveTimeBands', clearErr.message); return { ok: false, error: clearErr.message }; }
 
     if (!parsed.length) return { ok: true, saved: 0 };
 
     const { error } = await this.client!
       .from('drill_time_bands')
       .insert(parsed.map(p => ({ drill_id: drillId, team_id: teamId, ...p })));
-    if (error) { console.warn('Supabase saveTimeBands notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('saveTimeBands', error.message); return { ok: false, error: error.message }; }
 
     return { ok: true, saved: parsed.length };
   }
@@ -1802,7 +1827,7 @@ class SupabaseService {
       .eq('school_id', schoolUuid)
       .eq('is_deleted', false)
       .order('name', { ascending: true });
-    if (error) { console.warn('Supabase fetchDrillsForWeighting notice:', error.message); return null; }
+    if (error) { report('fetchDrillsForWeighting', error.message); return null; }
     return data;
   }
 
@@ -1835,7 +1860,7 @@ class SupabaseService {
         .update({ points: Number(r.points), measure: r.measure })
         .eq('id', r.id)
         .select();
-      if (error) { console.warn('Supabase updateDrillWeights notice:', error.message); return { ok: false, error: error.message, updated }; }
+      if (error) { report('updateDrillWeights', error.message); return { ok: false, error: error.message, updated }; }
       if (!data || data.length === 0) {
         return { ok: false, error: 'The database refused that write. Coach or admin access is required.', updated };
       }
@@ -1852,7 +1877,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('is_deleted', false)
       .order('occurred_on', { ascending: false });
-    if (error) { console.warn('Supabase fetchMatrixSessions notice:', error.message); return null; }
+    if (error) { report('fetchMatrixSessions', error.message); return null; }
     return data;
   }
 
@@ -1904,7 +1929,7 @@ class SupabaseService {
 
     const { data: sData, error: sErr } = await this.client!
       .from('matrix_sessions').upsert([sessionRow]).select();
-    if (sErr) { console.warn('Supabase saveMatrixSession notice:', sErr.message); return { ok: false, error: sErr.message }; }
+    if (sErr) { report('saveMatrixSession', sErr.message); return { ok: false, error: sErr.message }; }
     if (!sData || sData.length === 0) {
       return { ok: false, error: 'The database refused that write. Only a coach of this team can record sessions.' };
     }
@@ -1936,7 +1961,7 @@ class SupabaseService {
           // Nothing further to be done if the rollback itself fails; the
           // original write failure below is still reported honestly.
         }
-        if (rErr) console.warn('Supabase saveMatrixSession results notice:', rErr.message);
+        if (rErr) report('saveMatrixSession', rErr.message);
         return {
           ok: false,
           error: rErr ? rErr.message : 'The session saved but its results were refused. Check coach access for this team.'
@@ -1972,7 +1997,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('player_id', playerId)
       .order('occurred_on', { ascending: false });
-    if (error) { console.warn('Supabase fetchPlayerBreakdown notice:', error.message); return null; }
+    if (error) { report('fetchPlayerBreakdown', error.message); return null; }
     return data;
   }
 
@@ -1990,7 +2015,7 @@ class SupabaseService {
       .from('matrix_exercise_points')
       .select('player_id, drill_id, exercise, kind, raw_value, weight, earned, available, w, dr, ls, occurred_on')
       .eq('team_id', teamId);
-    if (error) { console.warn('Supabase fetchTeamExercisePoints notice:', error.message); return null; }
+    if (error) { report('fetchTeamExercisePoints', error.message); return null; }
     return data;
   }
 
@@ -2013,7 +2038,7 @@ class SupabaseService {
     q = matchId && this.isUuid(matchId) ? q.eq('match_id', matchId) : q.is('match_id', null);
 
     const { data: found, error: findErr } = await q.maybeSingle();
-    if (findErr) { console.warn('Supabase openStatMatch notice:', findErr.message); return { ok: false, error: findErr.message }; }
+    if (findErr) { report('openStatMatch', findErr.message); return { ok: false, error: findErr.message }; }
     if (found?.id) return { ok: true, id: found.id };
 
     const { data, error } = await this.client!
@@ -2024,7 +2049,7 @@ class SupabaseService {
         label: label || null, is_deleted: false
       }])
       .select();
-    if (error) { console.warn('Supabase openStatMatch insert notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('openStatMatch', error.message); return { ok: false, error: error.message }; }
     if (!data || !data[0]) {
       return { ok: false, error: 'The database refused that. You must coach this team.' };
     }
@@ -2058,7 +2083,7 @@ class SupabaseService {
       .eq('team_id', teamId).eq('is_deleted', false);
     del = matchId && this.isUuid(matchId) ? del.eq('match_id', matchId) : del.is('match_id', null);
     const { error: delErr } = await del;
-    if (delErr) { console.warn('Supabase importStatMatch clear notice:', delErr.message); return { ok: false, error: delErr.message }; }
+    if (delErr) { report('importStatMatch', delErr.message); return { ok: false, error: delErr.message }; }
 
     const { data: made, error: insErr } = await this.client!
       .from('stat_matches')
@@ -2068,7 +2093,7 @@ class SupabaseService {
         label: label || 'IMPORTED', is_deleted: false
       }])
       .select();
-    if (insErr) { console.warn('Supabase importStatMatch notice:', insErr.message); return { ok: false, error: insErr.message }; }
+    if (insErr) { report('importStatMatch', insErr.message); return { ok: false, error: insErr.message }; }
     if (!made || !made[0]) {
       return { ok: false, error: 'The database refused that. You must coach this team.' };
     }
@@ -2083,7 +2108,7 @@ class SupabaseService {
         at_seconds: e.atSeconds, period: e.period, is_deleted: false
       })))
       .select('id');
-    if (evErr) { console.warn('Supabase importStatMatch events notice:', evErr.message); return { ok: false, error: evErr.message }; }
+    if (evErr) { report('importStatMatch', evErr.message); return { ok: false, error: evErr.message }; }
 
     return { ok: true, id, events: (rows || []).length };
   }
@@ -2113,7 +2138,7 @@ class SupabaseService {
       .select('id, match_id, label, created_at')
       .eq('team_id', teamId)
       .eq('is_deleted', false);
-    if (sErr) { console.warn('Supabase fetchSeasonStats notice:', sErr.message); return null; }
+    if (sErr) { report('fetchSeasonStats', sErr.message); return null; }
     if (!sessions || sessions.length === 0) return { sessions: [], eventsBySession: {} };
 
     const ids = sessions.map(s => s.id);
@@ -2123,7 +2148,7 @@ class SupabaseService {
       .in('match_id', ids)
       .eq('is_deleted', false)
       .order('created_at');
-    if (eErr) { console.warn('Supabase fetchSeasonStats events notice:', eErr.message); return null; }
+    if (eErr) { report('fetchSeasonStats', eErr.message); return null; }
 
     const eventsBySession: Record<string, Record<string, any>[]> = {};
     ids.forEach(id => { eventsBySession[id] = []; });
@@ -2146,7 +2171,7 @@ class SupabaseService {
       .eq('match_id', statMatchId)
       .eq('is_deleted', false)
       .order('created_at');
-    if (error) { console.warn('Supabase fetchStatEvents notice:', error.message); return null; }
+    if (error) { report('fetchStatEvents', error.message); return null; }
     return (data || []).map(r => ({
       id: r.id, kind: r.kind, playerId: r.player_id,
       atSeconds: r.at_seconds, period: r.period, createdAt: r.created_at
@@ -2179,7 +2204,7 @@ class SupabaseService {
       }])
       .select();
 
-    if (error) { console.warn('Supabase appendStatEvent notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('appendStatEvent', error.message); return { ok: false, error: error.message }; }
     if (!data || !data[0]) {
       return { ok: false, error: 'The database refused that event. You must coach this team.' };
     }
@@ -2197,7 +2222,7 @@ class SupabaseService {
     if (!eventId || !this.isUuid(eventId)) return { ok: false, error: 'Nothing to undo.' };
     const { data, error } = await this.client!
       .from('stat_events').update({ is_deleted: true }).eq('id', eventId).select();
-    if (error) { console.warn('Supabase undoStatEvent notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('undoStatEvent', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) return { ok: false, error: 'The database refused that undo.' };
     return { ok: true };
   }
@@ -2224,7 +2249,7 @@ class SupabaseService {
       .eq('is_deleted', false)
       .order('occurred_on');
 
-    if (error) { console.warn('Supabase fetchTeamSessionHistory notice:', error.message); return null; }
+    if (error) { report('fetchTeamSessionHistory', error.message); return null; }
 
     // Flattened here rather than in the view: the nested shape is an artefact
     // of how PostgREST returns an embedded table, not something the rest of
@@ -2252,7 +2277,7 @@ class SupabaseService {
       .from('matrix_session_results')
       .select('player_id, attendance, raw_value, outcome')
       .eq('session_id', sessionId);
-    if (error) { console.warn('Supabase fetchMatrixSessionResults notice:', error.message); return null; }
+    if (error) { report('fetchMatrixSessionResults', error.message); return null; }
     return data;
   }
 
@@ -2260,7 +2285,7 @@ class SupabaseService {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     const { data, error } = await this.client!
       .from('matrix_sessions').update({ is_deleted: true }).eq('id', sessionId).select();
-    if (error) { console.warn('Supabase deleteMatrixSession notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('deleteMatrixSession', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) {
       return { ok: false, error: 'The database refused that. Only a coach of this team can delete a session.' };
     }
@@ -2310,7 +2335,7 @@ class SupabaseService {
         .from('soccer_categories')
         .upsert([payload], { onConflict: 'school_id,name' })
         .select();
-      if (error) { console.warn('Supabase upsertSoccerCategory notice:', error.message); return { ok: false, error: error.message }; }
+      if (error) { report('upsertSoccerCategory', error.message); return { ok: false, error: error.message }; }
       if (!data || data.length === 0) {
         return { ok: false, error: 'The database refused that. Only a coach or admin can edit categories.' };
       }
@@ -2343,7 +2368,7 @@ class SupabaseService {
       .select('category')
       .eq('school_id', schoolUuid)
       .or('is_deleted.is.null,is_deleted.eq.false');
-    if (error) { console.warn('Supabase fetchCategoryUsage notice:', error.message); return null; }
+    if (error) { report('fetchCategoryUsage', error.message); return null; }
 
     const counts: Record<string, number> = {};
     (data || []).forEach((d: any) => {
@@ -2381,7 +2406,7 @@ class SupabaseService {
       .eq('school_id', schoolUuid)
       .eq('category', fromName)
       .select();
-    if (error) { console.warn('Supabase retagDrills notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('retagDrills', error.message); return { ok: false, error: error.message }; }
     return { ok: true, count: (data || []).length };
   }
 
@@ -2432,7 +2457,7 @@ class SupabaseService {
       .eq('id', id)
       .select();
     if (error) {
-      console.warn('Supabase renameSoccerCategory notice:', error.message);
+      report('renameSoccerCategory', error.message);
       return {
         ok: false,
         error: `${retag.count} drill(s) were re-tagged, but the category itself could not be renamed: ${error.message}`
@@ -2472,7 +2497,7 @@ class SupabaseService {
       .eq('name', fromName)
       .select();
     if (error) {
-      console.warn('Supabase mergeSoccerCategory notice:', error.message);
+      report('mergeSoccerCategory', error.message);
       return {
         ok: false,
         error: `${retag.count} drill(s) moved, but "${fromName}" could not be retired: ${error.message}`
@@ -2497,7 +2522,7 @@ class SupabaseService {
       .update({ is_deleted: true })
       .eq('id', id)
       .select();
-    if (error) { console.warn('Supabase retireSoccerCategory notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('retireSoccerCategory', error.message); return { ok: false, error: error.message }; }
     return { ok: true };
   }
 
@@ -2522,7 +2547,7 @@ class SupabaseService {
         .eq('school_id', schoolUuid)
         .or('is_deleted.is.null,is_deleted.eq.false')
         .order('created_at', { ascending: true });
-      if (error) { console.error('Supabase fetchDrillsBank error:', error.message); return null; }
+      if (error) { report('fetchDrillsBank', error.message); return null; }
       return data;
     } catch (e) {
       return null;
@@ -2567,14 +2592,14 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase upsertDrillBankItem error:', error.message, error);
+        report('upsertDrillBankItem', error.message, error);
         return null;
       } else {
         console.log('✅ Supabase master drill saved successfully:', data);
         return data ? data[0] : null;
       }
     } catch (e: any) {
-      console.error('❌ Supabase upsertDrillBankItem exception:', e.message);
+      report('upsertDrillBankItem', e.message);
       return null;
     }
   }
@@ -2586,7 +2611,7 @@ class SupabaseService {
         .from('drills_bank')
         .update({ is_deleted: true })
         .eq('id', drillId);
-      if (error) console.error('Supabase soft deleteDrillBankItem error:', error.message);
+      if (error) report('soft', error.message);
     } catch (e) {}
   }
 
@@ -2615,7 +2640,7 @@ class SupabaseService {
       .from('players')
       .upsert([dbPayload])
       .select();
-    if (error) console.error('Supabase upsertPlayer error:', error);
+    if (error) report('upsertPlayer', error);
     return data ? data[0] : null;
   }
 
@@ -2682,7 +2707,7 @@ class SupabaseService {
     // A blank row would show as an unnamed player on the roster that nobody can
     // identify or search for, so refuse rather than write one.
     if (!parts.firstName) {
-      console.warn('Supabase upsertPlayerIdentity notice: a player needs a name.');
+      report('upsertPlayerIdentity', 'a player needs a name.');
       return null;
     }
 
@@ -2700,7 +2725,7 @@ class SupabaseService {
       .from('players')
       .upsert([payload])
       .select();
-    if (error) { console.warn('Supabase upsertPlayerIdentity notice:', error.message); return null; }
+    if (error) { report('upsertPlayerIdentity', error.message); return null; }
     return data ? data[0] : null;
   }
 
@@ -2735,7 +2760,7 @@ class SupabaseService {
       .from('team_players')
       .select('player_id, recording_number, number, is_deleted, players(id, name, first_name, last_name)')
       .eq('team_id', teamId);
-    if (error) { console.warn('Supabase fetchTeamLookup notice:', error.message); return null; }
+    if (error) { report('fetchTeamLookup', error.message); return null; }
 
     return (data || [])
       .filter((m: any) => !m.is_deleted && m.players)
@@ -2845,7 +2870,7 @@ class SupabaseService {
       .select();
 
     if (error) {
-      console.warn('Supabase setRecordingNumber notice:', error.message);
+      report('setRecordingNumber', error.message);
       if (error.code === '23505') {
         return { ok: false, error: `Recording number ${recordingNumber} is already used by someone on this team.` };
       }
@@ -2878,7 +2903,7 @@ class SupabaseService {
     q = matchId && this.isUuid(matchId) ? q.eq('match_id', matchId) : q.is('match_id', null);
 
     const { data, error } = await q.maybeSingle();
-    if (error) { console.warn('Supabase fetchLineup notice:', error.message); return null; }
+    if (error) { report('fetchLineup', error.message); return null; }
     if (!data) return null;
 
     const { data: rows, error: rowErr } = await this.client!
@@ -2887,7 +2912,7 @@ class SupabaseService {
       .eq('lineup_id', data.id)
       .eq('is_deleted', false)
       .order('sort_order');
-    if (rowErr) { console.warn('Supabase fetchLineup rows notice:', rowErr.message); return null; }
+    if (rowErr) { report('fetchLineup', rowErr.message); return null; }
 
     return { ...data, players: rows || [] };
   }
@@ -2907,7 +2932,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('is_deleted', false)
       .order('updated_at', { ascending: false });
-    if (error) { console.warn('Supabase fetchTeamLineups notice:', error.message); return null; }
+    if (error) { report('fetchTeamLineups', error.message); return null; }
     return data || [];
   }
 
@@ -2943,7 +2968,7 @@ class SupabaseService {
         .update({ formation, notes: notes ?? null, updated_at: new Date().toISOString() })
         .eq('id', lineupId)
         .select();
-      if (error) { console.warn('Supabase saveLineup notice:', error.message); return { ok: false, error: error.message }; }
+      if (error) { report('saveLineup', error.message); return { ok: false, error: error.message }; }
       if (!data || data.length === 0) {
         return { ok: false, error: 'The database refused that change. You must coach this team.' };
       }
@@ -2956,7 +2981,7 @@ class SupabaseService {
           formation, notes: notes ?? null, is_deleted: false
         }])
         .select();
-      if (error) { console.warn('Supabase saveLineup insert notice:', error.message); return { ok: false, error: error.message }; }
+      if (error) { report('saveLineup', error.message); return { ok: false, error: error.message }; }
       if (!data || !data[0]) {
         return { ok: false, error: 'The database refused that change. You must coach this team.' };
       }
@@ -2966,7 +2991,7 @@ class SupabaseService {
     const { error: delErr } = await this.client!
       .from('lineup_players').delete().eq('lineup_id', lineupId);
     if (delErr) {
-      console.warn('Supabase saveLineup clear notice:', delErr.message);
+      report('saveLineup', delErr.message);
       return { ok: false, error: delErr.message };
     }
 
@@ -2988,7 +3013,7 @@ class SupabaseService {
     const { data: ins, error: insErr } = await this.client!
       .from('lineup_players').insert(rows).select();
     if (insErr) {
-      console.warn('Supabase saveLineup players notice:', insErr.message);
+      report('saveLineup', insErr.message);
       // Say where it stopped: the old players are already gone.
       return { ok: false, error: `${insErr.message} — the lineup is now empty; set it again.` };
     }
@@ -3024,7 +3049,7 @@ class SupabaseService {
       .select();
 
     if (error) {
-      console.warn('Supabase setUniformNumber notice:', error.message);
+      report('setUniformNumber', error.message);
       if (error.code === '23505') {
         return { ok: false, error: `Uniform number ${number} is already used by someone on this team.` };
       }
@@ -3074,7 +3099,7 @@ class SupabaseService {
           .or('is_deleted.is.null,is_deleted.eq.false')
           .maybeSingle();
         if (findErr) {
-          console.warn('Supabase upsertTeamMembership lookup notice:', findErr.message);
+          report('upsertTeamMembership', findErr.message);
           return { ok: false, error: findErr.message };
         }
         if (existing && existing.id) payload.id = existing.id;
@@ -3084,7 +3109,7 @@ class SupabaseService {
         ? await this.client!.from('team_players').update(payload).eq('id', payload.id).select()
         : await this.client!.from('team_players').insert([payload]).select();
       if (error) {
-        console.warn('Supabase upsertTeamMembership notice:', error.message);
+        report('upsertTeamMembership', error.message);
         // 23505 is the unique violation. Say which rule was hit rather than
         // handing a coach a Postgres error code.
         if (error.code === '23505') {
@@ -3098,7 +3123,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase upsertTeamMembership exception:', e);
+      report('upsertTeamMembership', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -3123,7 +3148,7 @@ class SupabaseService {
         .eq('player_id', playerId)
         .select();
       if (error) {
-        console.warn('Supabase deleteTeamMembership notice:', error.message);
+        report('deleteTeamMembership', error.message);
         return { ok: false, error: error.message };
       }
       if (!data || data.length === 0) {
@@ -3131,7 +3156,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase deleteTeamMembership exception:', e);
+      report('deleteTeamMembership', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -3173,14 +3198,15 @@ class SupabaseService {
         .select('player_id')
     ]);
 
-    if (people.error) { console.warn('Supabase fetchUnassignedPlayers notice:', people.error.message); return null; }
+    if (people.error) { report('fetchUnassignedPlayers', people.error.message); return null; }
 
     // If a history query failed we cannot say what anyone owns. Say so rather
     // than reporting zero, which reads identically to "safe to retire".
     const historyUnknown = !!(logs.error || sessionResults.error || memberships.error);
     if (historyUnknown) {
-      console.warn('Supabase fetchUnassignedPlayers: could not read result history —',
-        (logs.error || sessionResults.error || memberships.error)?.message);
+      report('fetchUnassignedPlayers',
+        'could not read result history — '
+        + (logs.error || sessionResults.error || memberships.error)?.message);
     }
 
     const onATeam = new Set(
@@ -3220,9 +3246,9 @@ class SupabaseService {
       .eq('id', playerId)
       .select();
     if (error) {
-      console.error('Supabase soft deletePlayer error:', error);
+      report('soft', error);
     } else if (!data || data.length === 0) {
-      console.warn('Supabase deletePlayer: no rows updated for id:', playerId, '— likely blocked by RLS policy. Run the fix SQL in Supabase Dashboard.');
+      report('deletePlayer', playerId, '— likely blocked by RLS policy. Run the fix SQL in Supabase Dashboard.');
     } else {
       console.log('Supabase deletePlayer: soft-deleted player', playerId, data);
     }
@@ -3239,7 +3265,7 @@ class SupabaseService {
         .select('*')
         .eq('code', schoolCode)
         .maybeSingle();
-      if (error) { console.error('Supabase fetchSchool error:', error.message); return null; }
+      if (error) { report('fetchSchool', error.message); return null; }
       return data;
     } catch (e) {
       return null;
@@ -3253,7 +3279,7 @@ class SupabaseService {
         .from('schools')
         .select('*')
         .order('name', { ascending: true });
-      if (error) { console.error('Supabase fetchSchools error:', error.message); return null; }
+      if (error) { report('fetchSchools', error.message); return null; }
       return data;
     } catch (e) {
       return null;
@@ -3293,14 +3319,14 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase upsertSchool error:', error.message, error);
+        report('upsertSchool', error.message, error);
         return { data: null, error: error.message };
       } else {
         console.log('✅ Supabase school saved successfully:', data);
         return { data: data ? data[0] : null, error: null };
       }
     } catch (err: any) {
-      console.error('❌ Supabase upsertSchool exception:', err.message);
+      report('upsertSchool', err.message);
       return { data: null, error: err.message };
     }
   }
@@ -3331,7 +3357,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('schools').insert([{ code: c, name: n, kind, mascot: m }]).select();
       if (error) {
-        console.warn('Supabase createSchool notice:', error.message);
+        report('createSchool', error.message);
         if (error.code === '23505') return { ok: false, error: `The code "${c}" is already in use.` };
         return { ok: false, error: error.message };
       }
@@ -3340,7 +3366,7 @@ class SupabaseService {
       }
       return { ok: true, id: data[0].id };
     } catch (e: any) {
-      console.warn('Supabase createSchool exception:', e);
+      report('createSchool', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -3353,7 +3379,7 @@ class SupabaseService {
     let query = this.client!.from('coaches').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: true }) as any;
     if (schoolUuid) query = query.eq('school_id', schoolUuid);
     const { data, error } = await query;
-    if (error) { console.error('Supabase fetchCoaches error:', error); return null; }
+    if (error) { report('fetchCoaches', error); return null; }
     return data;
   }
 
@@ -3387,14 +3413,14 @@ class SupabaseService {
         .select();
 
       if (error) {
-        console.error('❌ Supabase upsertCoach error:', error.message, error);
+        report('upsertCoach', error.message, error);
         return null;
       } else {
         console.log('✅ Supabase coach saved successfully:', data);
         return data ? data[0] : null;
       }
     } catch (err: any) {
-      console.error('❌ Supabase upsertCoach exception:', err.message);
+      report('upsertCoach', err.message);
       return null;
     }
   }
@@ -3405,7 +3431,7 @@ class SupabaseService {
       .from('coaches')
       .update({ is_deleted: true })
       .eq('id', coachId);
-    if (error) console.error('Supabase soft deleteCoach error:', error);
+    if (error) report('soft', error);
   }
 
   async fetchDailyThoughts(teamId: string): Promise<Partial<DailyThoughtRow>[] | null> {
@@ -3419,7 +3445,7 @@ class SupabaseService {
       .or('is_deleted.is.null,is_deleted.eq.false')
       .eq('team_id', teamId)
       .order('created_at', { ascending: false });
-    if (error) { console.error('Supabase fetchDailyThoughts error:', error); return null; }
+    if (error) { report('fetchDailyThoughts', error); return null; }
     return data;
   }
 
@@ -3433,7 +3459,7 @@ class SupabaseService {
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1);
-    if (error) { console.error('Supabase fetchLatestDailyThoughts error:', error); return null; }
+    if (error) { report('fetchLatestDailyThoughts', error); return null; }
     return data && data.length > 0 ? data[0] : null;
   }
 
@@ -3453,7 +3479,7 @@ class SupabaseService {
       .select('id')
       .eq('id', id)
       .maybeSingle();
-    if (error) { console.warn('Supabase resolveCoachRowId notice:', error.message); return null; }
+    if (error) { report('resolveCoachRowId', error.message); return null; }
     return data ? data.id : null;
   }
 
@@ -3503,7 +3529,7 @@ class SupabaseService {
         console.log('⚡ Updated existing daily_thought in Supabase:', updData[0].id);
         return { data: updData[0] };
       } else if (updErr) {
-        console.warn('Supabase updateDailyThought notice:', updErr.message);
+        report('updateDailyThought', updErr.message);
       }
     }
 
@@ -3513,7 +3539,7 @@ class SupabaseService {
       .select();
 
     if (insErr) {
-      console.error('Supabase insertDailyThought error:', insErr.message || insErr);
+      report('insertDailyThought', insErr.message || insErr);
       return { error: insErr.message };
     }
 
@@ -3530,7 +3556,7 @@ class SupabaseService {
       .from('daily_thoughts')
       .update({ is_deleted: true })
       .eq('id', thoughtId);
-    if (error) console.error('Supabase soft deleteDailyThought error:', error);
+    if (error) report('soft', error);
   }
 
   async setActiveDailyThought(teamId: string, activeId?: string): Promise<any> {
@@ -3541,13 +3567,13 @@ class SupabaseService {
       .from('daily_thoughts')
       .update({ is_active: false })
       .eq('team_id', teamId);
-    if (err1) console.error('Supabase setActiveDailyThought reset error:', err1);
+    if (err1) report('setActiveDailyThought', err1);
 
     const { error: err2 } = await this.client!
       .from('daily_thoughts')
       .update({ is_active: true })
       .eq('id', activeId);
-    if (err2) console.error('Supabase setActiveDailyThought set error:', err2);
+    if (err2) report('setActiveDailyThought', err2);
   }
 
   /**
@@ -3571,7 +3597,7 @@ class SupabaseService {
       .from('team_quiz_questions')
       .select('question_id, quiz_questions(question_id, question, correct_option, explanation, category, thought_id, is_deleted)')
       .eq('team_id', teamId);
-    if (error) { console.warn('Supabase fetchTeamQuiz notice:', error.message); return null; }
+    if (error) { report('fetchTeamQuiz', error.message); return null; }
 
     // A question may name the daily message it tests (0018). Those are asked
     // only while that message is the active one, so last week's questions stop
@@ -3603,7 +3629,7 @@ class SupabaseService {
       .from('quiz_answers')
       .select('question_id, letter, answer_text, is_correct, ordinal, is_deleted')
       .in('question_id', ids);
-    if (error) console.warn('Supabase attachAnswers notice:', error.message);
+    if (error) report('attachAnswers', error.message);
 
     const byQuestion: Record<string, any[]> = {};
     (data || []).forEach((a: any) => {
@@ -3637,7 +3663,7 @@ class SupabaseService {
       .select('id, import_key, is_deleted')
       .eq('team_id', teamId)
       .eq('import_key', wanted);
-    if (error) { console.warn('Supabase findThoughtIdByKey notice:', error.message); return null; }
+    if (error) { report('findThoughtIdByKey', error.message); return null; }
     const hit = (data || []).find((t: any) => !t.is_deleted);
     return hit ? hit.id : null;
   }
@@ -3675,12 +3701,12 @@ class SupabaseService {
 
     const { error: clearErr } = await this.client!
       .from('quiz_answers').delete().eq('question_id', questionId);
-    if (clearErr) { console.warn('Supabase saveQuizAnswers clear notice:', clearErr.message); return; }
+    if (clearErr) { report('saveQuizAnswers', clearErr.message); return; }
 
     const { error } = await this.client!
       .from('quiz_answers')
       .insert(rows.map(r => ({ ...r, question_id: questionId })));
-    if (error) console.warn('Supabase saveQuizAnswers notice:', error.message);
+    if (error) report('saveQuizAnswers', error.message);
   }
 
   /**
@@ -3702,7 +3728,7 @@ class SupabaseService {
       this.client!.from('team_quiz_questions').select('team_id, question_id')
     ]);
 
-    if (questions.error) { console.warn('Supabase fetchQuizBank notice:', questions.error.message); return null; }
+    if (questions.error) { report('fetchQuizBank', questions.error.message); return null; }
 
     const teamsByQuestion: Record<string, string[]> = {};
     (selections.data || []).forEach((r: any) => {
@@ -3731,7 +3757,7 @@ class SupabaseService {
       .update({ is_deleted: true })
       .eq('question_id', questionId)
       .select();
-    if (error) { console.warn('Supabase retireQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('retireQuizQuestion', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) {
       return { ok: false, error: 'The database refused that. Coach or admin access is required.' };
     }
@@ -3757,7 +3783,7 @@ class SupabaseService {
       const { error } = await this.client!
         .from('team_quiz_questions')
         .upsert([{ team_id: teamId, question_id: questionId }], { onConflict: 'team_id,question_id' });
-      if (error) { console.warn('Supabase setTeamQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+      if (error) { report('setTeamQuizQuestion', error.message); return { ok: false, error: error.message }; }
       return { ok: true };
     }
 
@@ -3766,7 +3792,7 @@ class SupabaseService {
       .delete()
       .eq('team_id', teamId)
       .eq('question_id', questionId);
-    if (error) { console.warn('Supabase setTeamQuizQuestion notice:', error.message); return { ok: false, error: error.message }; }
+    if (error) { report('setTeamQuizQuestion', error.message); return { ok: false, error: error.message }; }
     return { ok: true };
   }
 
@@ -3779,7 +3805,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('is_active', true)
       .or('is_deleted.is.null,is_deleted.eq.false');
-    if (error) { console.warn('Supabase fetchActiveThoughtId notice:', error.message); return null; }
+    if (error) { report('fetchActiveThoughtId', error.message); return null; }
     const live = (data || []).find((t: any) => !t.is_deleted);
     return live ? live.id : null;
   }
@@ -3802,7 +3828,7 @@ class SupabaseService {
       .select('id, title, is_deleted')
       .eq('team_id', teamId)
       .or('is_deleted.is.null,is_deleted.eq.false');
-    if (error) { console.warn('Supabase findThoughtIdByTitle notice:', error.message); return null; }
+    if (error) { report('findThoughtIdByTitle', error.message); return null; }
 
     const hit = (data || []).find(
       (t: any) => !t.is_deleted && String(t.title || '').trim().toLowerCase() === wanted
@@ -3818,7 +3844,7 @@ class SupabaseService {
     // somebody who does not exist. The UI guards this too; this is the layer
     // that actually touches the table, so it guards independently.
     if (!playerData?.id || !playerData?.name) {
-      console.warn('saveQuizAttempt refused: no signed-in player to attribute the attempt to.');
+      report('saveQuizAttempt', 'no signed-in player to attribute the attempt to.');
       return null;
     }
 
@@ -3844,7 +3870,7 @@ class SupabaseService {
       .select();
 
     if (attemptErr) {
-      console.warn('Supabase saveQuizAttempt notice:', attemptErr.message);
+      report('saveQuizAttempt', attemptErr.message);
       return null;
     }
 
@@ -3870,7 +3896,7 @@ class SupabaseService {
         .from('player_answers')
         .insert(answerRows);
 
-      if (ansErr) console.warn('Supabase player_answers save notice:', ansErr.message);
+      if (ansErr) report('player_answers', ansErr.message);
     }
 
     return attemptData ? attemptData[0] : null;
@@ -3881,12 +3907,12 @@ class SupabaseService {
     try {
       const { data, error } = await this.client!.from('roles').select('name,permissions');
       if (error) {
-        console.warn('Supabase fetchRoles notice:', error.message);
+        report('fetchRoles', error.message);
         return null;
       }
       return data;
     } catch (e) {
-      console.warn('Supabase fetchRoles exception:', e);
+      report('fetchRoles', e);
       return null;
     }
   }
@@ -3898,10 +3924,10 @@ class SupabaseService {
         .from('matrix_standings')
         .select('*')
         .eq('team_id', teamId);
-      if (error) { console.warn('Supabase fetchMatrixStandings notice:', error.message); return null; }
+      if (error) { report('fetchMatrixStandings', error.message); return null; }
       return data;
     } catch (e) {
-      console.warn('Supabase fetchMatrixStandings exception:', e);
+      report('fetchMatrixStandings', e);
       return null;
     }
   }
@@ -3915,10 +3941,10 @@ class SupabaseService {
         .eq('team_id', teamId)
         .eq('is_deleted', false)
         .order('occurred_on', { ascending: false });
-      if (error) { console.warn('Supabase fetchMatrixLogs notice:', error.message); return null; }
+      if (error) { report('fetchMatrixLogs', error.message); return null; }
       return data;
     } catch (e) {
-      console.warn('Supabase fetchMatrixLogs exception:', e);
+      report('fetchMatrixLogs', e);
       return null;
     }
   }
@@ -3939,7 +3965,7 @@ class SupabaseService {
 
       const { data, error } = await this.client!.from('matrix_logs').insert([payload]).select();
       if (error) {
-        console.warn('Supabase logMatrixResult notice:', error.message);
+        report('logMatrixResult', error.message);
         return { ok: false, error: error.message };
       }
       // An RLS denial returns no error and no rows. Report it rather than
@@ -3949,7 +3975,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase logMatrixResult exception:', e);
+      report('logMatrixResult', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -3980,7 +4006,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('matrix_logs').update(payload).eq('id', id).select();
       if (error) {
-        console.warn('Supabase updateMatrixResult notice:', error.message);
+        report('updateMatrixResult', error.message);
         return { ok: false, error: error.message };
       }
       // Same reasoning as logMatrixResult: an RLS denial on UPDATE returns no
@@ -3990,7 +4016,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase updateMatrixResult exception:', e);
+      report('updateMatrixResult', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }
@@ -4007,7 +4033,7 @@ class SupabaseService {
       const { data, error } = await this.client!
         .from('matrix_logs').update({ is_deleted: true }).eq('id', id).select();
       if (error) {
-        console.warn('Supabase deleteMatrixResult notice:', error.message);
+        report('deleteMatrixResult', error.message);
         return { ok: false, error: error.message };
       }
       if (!data || data.length === 0) {
@@ -4015,7 +4041,7 @@ class SupabaseService {
       }
       return { ok: true };
     } catch (e: any) {
-      console.warn('Supabase deleteMatrixResult exception:', e);
+      report('deleteMatrixResult', e);
       return { ok: false, error: e?.message || String(e) };
     }
   }

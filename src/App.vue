@@ -8,12 +8,18 @@
  * A route marked `chrome: 'tool'` renders bare. The touchline and session
  * screens draw their own top and bottom bars, and a header over a match
  * clock is in the way of a coach holding a phone one-handed.
+ *
+ * NoticeBox is the one thing outside that rule: it renders on every route,
+ * bare ones included. A save that failed during a match is exactly the
+ * failure a coach must be told about, and those screens have no header to
+ * put it in.
  */
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import AppHeader from './components/layout/AppHeader.vue';
 import AppNav from './components/layout/AppNav.vue';
 import AppFooter from './components/layout/AppFooter.vue';
+import NoticeBox from './components/ui/NoticeBox.vue';
 import { useOrganizationStore } from './stores/organization';
 
 const org = useOrganizationStore();
@@ -35,6 +41,8 @@ onMounted(() => org.load());
   </main>
 
   <AppFooter v-if="!toolChrome" />
+
+  <NoticeBox />
 </template>
 
 <style scoped>
