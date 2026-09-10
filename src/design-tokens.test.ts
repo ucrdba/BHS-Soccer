@@ -215,3 +215,48 @@ describe('component styles', () => {
     expect(offenders.map(f => f.replace(process.cwd(), '')), 'use var(--ink) or a color-mix of it').toEqual([]);
   });
 });
+
+/**
+ * A <select> must not be left with a transparent background.
+ *
+ * The element itself renders against the page, so on a dark ground white text
+ * on a transparent select reads perfectly — and the closed control looks
+ * right, which is what makes this hard to spot. But the OPEN dropdown is
+ * painted by the browser, not by the page: with no background of its own it
+ * falls back to the platform default, which is white, while the options
+ * inherit the select's near-white colour. The list is then invisible except
+ * under the hover highlight.
+ *
+ * This cost the ratings screen both of its exercise pickers.
+ */
+describe('select controls', () => {
+  const files = vueFiles(join(process.cwd(), 'src'));
+
+  /** Rule bodies whose selector mentions a select, per file. */
+  function selectRules(css: string): string[] {
+    const out: string[] = [];
+    for (const m of css.matchAll(/([^{}]*select[^{}]*)\{([^}]*)\}/gi)) {
+      // Skip a rule that only targets the option list itself.
+      if (/^\s*option/i.test(m[1])) continue;
+      out.push(m[2]);
+    }
+    return out;
+  }
+
+  it('never leave the native dropdown on the browser default', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const css = styleOf(f);
+      const transparent = selectRules(css).some(b => /background:\s*transparent/.test(b));
+      if (!transparent) continue;
+      // A transparent control is fine -- chromeless is a legitimate look --
+      // so long as the options carry a background of their own.
+      const optionsStyled = /option[^{}]*\{[^}]*background:\s*var\(/.test(css);
+      if (!optionsStyled) offenders.push(f.replace(process.cwd(), ''));
+    }
+    expect(
+      offenders,
+      'give the select a background token, or style its option elements'
+    ).toEqual([]);
+  });
+});

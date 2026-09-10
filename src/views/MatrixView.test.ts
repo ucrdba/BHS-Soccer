@@ -442,6 +442,20 @@ describe('recording a session', () => {
     expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${LAPS}`);
   });
 
+  /*
+   * Reported as "nothing happens when you click on them". If the v-model is
+   * wired, choosing the second exercise must retarget the link. Whether a
+   * coach can SEE that it did is a separate question, and the answer is no:
+   * the link's href is the only thing the choice changes.
+   */
+  it('retargets "Record a session" when a different exercise is chosen', async () => {
+    const w = await mountMatrix({ coach: true });
+    expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${LAPS}`);
+
+    await w.find('[data-session-drill]').setValue(SMALL);
+    expect(w.find('[data-record-session]').attributes('href')).toBe(`/matrix/session/${SMALL}`);
+  });
+
   it('pushes the recorded session\'s id in the query when a coach edits it', async () => {
     // This is the exact wiring the plan's pre-flight scan flagged: without
     // the session id in the query, opening a recorded session for editing

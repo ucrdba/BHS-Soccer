@@ -287,15 +287,30 @@ watch(
 .act:hover { border-color: var(--live); color: var(--live); }
 .act--dead:hover { border-color: var(--rule); color: var(--ink-muted); }
 
+/*
+ * The background is explicit, not transparent. The closed control renders
+ * against the page either way — which is what made this hard to see — but the
+ * open dropdown is painted by the browser, and with no background of its own
+ * it falls back to the platform default -- a pale list -- while options inherit
+ * --ink. The list was then invisible except under the hover highlight.
+ *
+ * The `option` rule is belt and braces: not every browser passes the select's
+ * background down to the list.
+ */
 .acts__select, .picker__select {
   min-height: 36px;
   padding: 0 var(--space-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--surface-deep);
   color: var(--ink);
   font: inherit;
   font-size: 12px;
+}
+
+.acts__select option, .picker__select option {
+  background: var(--surface-deep);
+  color: var(--ink);
 }
 
 .picker { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-3); }

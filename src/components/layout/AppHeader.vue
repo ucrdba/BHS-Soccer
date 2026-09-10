@@ -204,6 +204,17 @@ async function onAccountClick(): Promise<void> {
   font-size: 12.5px;
 }
 
+/*
+ * The control stays transparent so it reads as text with a caret rather than
+ * as a form control -- but the OPTIONS must not.
+ *
+ * Both dark grounds declare `color-scheme: dark`, which is what normally
+ * makes a browser paint a native dropdown dark. Setting `background:
+ * transparent` on the select overrides that for the list, which then falls
+ * back to a pale surface while the options inherit the header's near-#F8FAFC
+ * text -- unreadable except under the hover highlight. Styling the options
+ * directly fixes the list without giving the control a visible box.
+ */
 .switcher__select {
   appearance: none;
   -webkit-appearance: none;
@@ -213,6 +224,11 @@ async function onAccountClick(): Promise<void> {
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+.switcher__select option {
+  background: var(--surface-deep);
+  color: var(--ink);
 }
 
 .switcher__caret {
