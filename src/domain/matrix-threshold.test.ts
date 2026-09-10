@@ -67,6 +67,42 @@ describe('bandStanding', () => {
     expect(() => bandStanding(row(0, 0, 0))).not.toThrow();
     expect(bandStanding(row(0, 0, 0))).toBe('none');
   });
+
+  /*
+   * An absence must not turn a player who cleared the bar into one who did
+   * not — the reported bug.
+   *
+   * A real case: three 3-430 sessions, two run at 3:44 and 4:07 and both
+   * inside the standard, one missed. The leaderboard row aggregates earned
+   * and available over EVERY session (exerciseLeaderboard in domain/matrix.ts
+   * says so: an absence "counts against the points, but it is not an
+   * attempt"), so it arrives here as earned 2 of available 3 with 2 attempts
+   * — and 2 >= 3 is false, so a player who met the standard every time he ran
+   * was reported below it.
+   *
+   * Counting an absence against the POINTS is right: that is the scoring rule
+   * and it drives the ranking. Counting it against the STANDARD is not. The
+   * standard asks a different question — when this player ran, did they clear
+   * the bar? — and this function already says so for a player who missed
+   * everything. The same reasoning holds for one who missed some.
+   */
+  it('reads a player who cleared the bar on every run as having met it', () => {
+    // Two sessions met in full, one missed: earned 2, available 3, attempts 2.
+    expect(bandStanding({ ...row(2, 3, 2), attemptedEarned: 2, attemptedAvailable: 2 }))
+      .toBe('met');
+  });
+
+  it('still reads a genuine shortfall as below, absences or not', () => {
+    // Ran three, met one in full and one at a looser band, missed a fourth.
+    expect(bandStanding({ ...row(1.5, 4, 3), attemptedEarned: 1.5, attemptedAvailable: 3 }))
+      .toBe('below');
+  });
+
+  it('falls back to the totals when the attempted figures are absent', () => {
+    // Older callers, and any row built before this distinction existed.
+    expect(bandStanding(row(1, 1))).toBe('met');
+    expect(bandStanding(row(0.5, 1))).toBe('below');
+  });
 });
 
 describe('belowStandard', () => {

@@ -13,6 +13,9 @@ import {
   exerciseLeaderboard, exercisesWithResults, matrixBoardRows,
   boardSortDescends, exerciseSortDescends, nextSortState
 } from './matrix';
+// Read across the seam on purpose: the bug lived between what the leaderboard
+// totals and what the standard reads, so one of these tests spans both.
+import { bandStanding, belowStandard } from './matrix-threshold';
 
 const COOPERS = 'd-coopers';   // count_high
 const LAPS = 'd-laps';         // time_bands
@@ -43,6 +46,43 @@ describe('exerciseLeaderboard', () => {
       row({ raw_value: 40 }), row({ raw_value: 55 })
     ]), COOPERS);
     expect(rows[0].best).toBe(55);
+  });
+
+  /*
+   * The two totals a standard and a ranking need, which are not the same.
+   *
+   * A player ran two 3-430 sessions inside the standard and missed a third.
+   * Points must count the absence — that is the scoring rule, and it is what
+   * ranks the squad. The standard must not: it asks whether he cleared the bar
+   * when he ran, and he did, every time. Reported as below the standard, he
+   * was the reason this distinction exists.
+   */
+  it('separates the totals over every session from those over attempts', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, raw_value: 224, earned: 1, available: 1 }),
+      row({ drill_id: LAPS, raw_value: 247, earned: 1, available: 1 }),
+      // The no-show: no value, so not an attempt, but still available.
+      row({ drill_id: LAPS, raw_value: null, earned: 0, available: 1 })
+    ]), LAPS);
+
+    expect(rows[0].earned).toBe(2);
+    expect(rows[0].available).toBe(3);
+    expect(rows[0].attempts).toBe(2);
+    expect(rows[0].attemptedEarned).toBe(2);
+    expect(rows[0].attemptedAvailable).toBe(2);
+  });
+
+  it('reads that player as having met the standard, end to end', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: LAPS, raw_value: 224, earned: 1, available: 1 }),
+      row({ drill_id: LAPS, raw_value: 247, earned: 1, available: 1 }),
+      row({ drill_id: LAPS, raw_value: null, earned: 0, available: 1 })
+    ]), LAPS);
+
+    // Through the real row rather than a hand-built one: the bug lived in the
+    // seam between what the leaderboard totals and what the standard reads.
+    expect(bandStanding(rows[0])).toBe('met');
+    expect(belowStandard(rows)).toEqual([]);
   });
 
   it('takes the LOWEST value as a personal best for a timed exercise', () => {

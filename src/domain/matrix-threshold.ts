@@ -17,10 +17,18 @@
 export type BandStanding = 'met' | 'below' | 'missed' | 'none';
 
 export interface StandingRow {
+  /** Over every session held, absences included. This is what points rank on. */
   earned: number;
   available: number;
   /** Results with a value. An absence is not an attempt. */
   attempts: number;
+  /**
+   * The same totals over attempted sessions alone, which is what a standard
+   * is judged on. Optional: a row built before the distinction existed falls
+   * back to the totals above.
+   */
+  attemptedEarned?: number;
+  attemptedAvailable?: number;
   [k: string]: any;
 }
 
@@ -36,8 +44,25 @@ export function isThresholdMeasure(measure: string): boolean {
 
 export function bandStanding(row: StandingRow): BandStanding {
   const attempts = Number(row?.attempts) || 0;
-  const earned = Number(row?.earned) || 0;
-  const available = Number(row?.available) || 0;
+
+  /*
+   * Judged on the sessions the player actually ran, not on every session held.
+   *
+   * A leaderboard row totals `earned` and `available` over every session,
+   * absences included — that is the scoring rule, and it is right for the
+   * POINTS, which rank the squad. It is wrong for the STANDARD, which asks a
+   * different question: when this player ran, did they clear the bar? A player
+   * who met it on both his runs and missed a third arrived here as 2 of 3 and
+   * was reported below a standard he had never actually failed.
+   *
+   * `attemptedEarned` / `attemptedAvailable` carry the same totals over
+   * attempted sessions alone. They are optional so a row built before this
+   * distinction existed still reads sensibly, falling back to the totals.
+   */
+  const hasAttempted = row?.attemptedAvailable !== undefined
+    && row?.attemptedAvailable !== null;
+  const earned = Number(hasAttempted ? row.attemptedEarned : row?.earned) || 0;
+  const available = Number(hasAttempted ? row.attemptedAvailable : row?.available) || 0;
 
   // No attempt is not a failure. A player who was not there has not run
   // slowly, and counting them as falling short would put a coach's attention

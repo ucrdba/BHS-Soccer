@@ -31,6 +31,7 @@ export function exerciseLeaderboard(
       playerId: r.player_id,
       wins: 0, draws: 0, losses: 0,
       earned: 0, available: 0, attempts: 0,
+      attemptedEarned: 0, attemptedAvailable: 0,
       best: null, timed
     };
 
@@ -45,6 +46,11 @@ export function exerciseLeaderboard(
     // personal best.
     if (r.raw_value === null || r.raw_value === undefined) return;
     a.attempts += 1;
+    // The same totals over attempted sessions alone. Points rank on the
+    // totals above, absences included; a match-readiness standard asks only
+    // whether the player cleared the bar when they ran, so it reads these.
+    a.attemptedEarned += Number(r.earned) || 0;
+    a.attemptedAvailable += Number(r.available) || 0;
     const v = Number(r.raw_value);
     if (a.best === null) a.best = v;
     else a.best = timed ? Math.min(a.best, v) : Math.max(a.best, v);
