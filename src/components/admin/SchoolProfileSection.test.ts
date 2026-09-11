@@ -347,3 +347,60 @@ describe('the logo', () => {
     expect(upsertSchool.mock.calls[0][1].logoUrl).toBe('');
   });
 });
+
+describe('a logo address that does not load', () => {
+  it('says so, and hides the broken preview', async () => {
+    const w = await mountSection({ logo_url: '/img/missing.png' });
+    await w.find('[data-school-logo-preview]').trigger('error');
+
+    expect(w.find('[data-school-logo-broken]').text()).toMatch(/did not load an image/i);
+    expect((w.find('[data-school-logo-preview]').element as HTMLElement).style.display).toBe('none');
+  });
+
+  it('warns rather than refusing: the address still saves', async () => {
+    // It may be a file not uploaded yet, or a host that is briefly down. The
+    // public page withdraws a logo that fails to load, so saving is safe.
+    const w = await mountSection({ logo_url: '/img/missing.png' });
+    await w.find('[data-school-logo-preview]').trigger('error');
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool).toHaveBeenCalled();
+    expect(upsertSchool.mock.calls[0][1].logoUrl).toBe('/img/missing.png');
+  });
+
+  /*
+   * The preview follows the typing after a pause. Fetching on every keystroke
+   * would request /i, /im, /img/... -- each failing, each flashing the warning
+   * at an admin who has not finished typing.
+   */
+  it('waits for the typing to pause before fetching the new address', async () => {
+    const w = await mountSection({ logo_url: '/img/old.png' });
+    vi.useFakeTimers();
+    try {
+      await w.find('[data-school-logo]').setValue('/img/new.png');
+      expect(w.find('[data-school-logo-preview]').attributes('src')).toBe('/img/old.png');
+
+      vi.advanceTimersByTime(500);
+      await w.vm.$nextTick();
+      expect(w.find('[data-school-logo-preview]').attributes('src')).toBe('/img/new.png');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the warning once a corrected address is shown', async () => {
+    const w = await mountSection({ logo_url: '/img/missing.png' });
+    await w.find('[data-school-logo-preview]').trigger('error');
+    vi.useFakeTimers();
+    try {
+      await w.find('[data-school-logo]').setValue('/img/legends.png');
+      vi.advanceTimersByTime(500);
+      await w.vm.$nextTick();
+
+      expect(w.find('[data-school-logo-broken]').exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

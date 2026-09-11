@@ -253,3 +253,34 @@ describe("the organization's logo", () => {
     expect(w.find('[data-org-logo]').exists()).toBe(false);
   });
 });
+
+describe('a logo that does not load', () => {
+  /*
+   * An admin types the address, and a typo or a missing file would otherwise
+   * put a broken-image icon on the public page with nothing to say so. The
+   * figure is withdrawn instead; the profile form is where the admin is told.
+   */
+  const BROKEN = {
+    schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/missing.png' }]
+  };
+
+  it('is withdrawn rather than shown to visitors broken', async () => {
+    const w = mountHome({}, BROKEN);
+    await w.find('[data-org-logo] img').trigger('error');
+
+    expect(w.find('[data-org-logo]').exists()).toBe(false);
+  });
+
+  it('comes back once the address is corrected, without a reload', async () => {
+    // Keyed on the address that failed, not a flag that stays down forever:
+    // fixing the row must be enough.
+    const w = mountHome({}, BROKEN);
+    await w.find('[data-org-logo] img').trigger('error');
+
+    (w.vm as any).$pinia.state.value.organization.schools =
+      [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/legends.png' }];
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-org-logo] img').attributes('src')).toBe('/img/legends.png');
+  });
+});

@@ -20,7 +20,7 @@
  * Extracted from the school profile forms in public/js/views/planner.view.js
  * during Phase 6.
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import SectionShell from './SectionShell.vue';
 import { supabaseService } from '../../data/supabase';
 import {
@@ -60,6 +60,16 @@ const error = ref<string | null>(null);
  * than replacing it -- see the merge in onSave. */
 const row = ref<any>(null);
 
+/**
+ * The address the logo preview is showing, and the one that failed to load.
+ *
+ * The preview follows the field after a pause rather than on every keystroke,
+ * so a half-typed address is not fetched, does not fail, and does not flash a
+ * warning at an admin who has not finished typing. Set at once on load.
+ */
+const previewUrl = ref('');
+const brokenPreview = ref<string | null>(null);
+
 async function load(): Promise<void> {
   // No organization resolved yet: wait, rather than reading a defaulted one.
   if (!props.schoolCode) return;
@@ -83,6 +93,7 @@ async function load(): Promise<void> {
       losses: String(fetched.record?.losses ?? 0),
       draws: String(fetched.record?.draws ?? 0)
     };
+    previewUrl.value = safeLogoUrl(fetched.logo_url);
   } catch (e: any) {
     error.value = e?.message || 'That organization could not be loaded.';
   } finally {
@@ -110,6 +121,16 @@ const logoError = computed<string | null>(() => {
 });
 
 const logoPreview = computed(() => safeLogoUrl(form.value.logoUrl));
+
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+watch(logoPreview, (url) => {
+  clearTimeout(previewTimer);
+  // Already showing it: the load path sets the preview directly, and waiting
+  // to set the same value again would only race a test's fake clock.
+  if (url === previewUrl.value) return;
+  previewTimer = setTimeout(() => { previewUrl.value = url; }, 400);
+});
+onBeforeUnmount(() => clearTimeout(previewTimer));
 
 /** What the two fields accept, said once so the message and the hint agree. */
 const COLOUR_FORMS = 'a hex code (#21196F), an rgb() triple (rgb(33, 25, 111)), or a colour name (navy)';
@@ -304,7 +325,17 @@ async function onSave(): Promise<void> {
         This database has no logo column yet. Apply migration 0028 to give the organization a logo.
       </p>
       <p v-else-if="logoError" class="note note--bad" role="alert" data-school-logo-error>{{ logoError }}</p>
-      <img v-else-if="logoPreview" :src="logoPreview" alt="" class="logo-preview" data-school-logo-preview />
+      <template v-else-if="previewUrl">
+        <img v-show="brokenPreview !== previewUrl" :src="previewUrl" alt="" class="logo-preview"
+             data-school-logo-preview
+             @error="brokenPreview = previewUrl" @load="brokenPreview = null" />
+        <!-- Warned, not refused: the file may not be uploaded yet, and the
+             public page withdraws a logo that fails to load. -->
+        <p v-if="brokenPreview === previewUrl" class="note note--bad" role="alert" data-school-logo-broken>
+          That address did not load an image, so visitors will not see a logo. Check it is spelled
+          exactly as the file is named, including the extension (.png, .jpg).
+        </p>
+      </template>
 
       <p class="note">
         The name and mascot are rendered on headings throughout the app.

@@ -22,6 +22,19 @@ const auth = useAuthStore();
 const canWriteThought = computed(() => auth.isCoach || auth.isAdmin);
 
 /**
+ * The logo address that failed to load, if one did.
+ *
+ * An admin types the address, so a typo or a file that was never uploaded
+ * would otherwise put a broken-image icon on the public page with nothing to
+ * say so. The figure is withdrawn instead -- the profile form is where the
+ * admin is told. Keyed on the address rather than a flag, so correcting the
+ * row brings the logo back without a reload.
+ */
+const failedLogo = ref<string | null>(null);
+const showLogo = computed(() =>
+  !!org.branding.logoUrl && failedLogo.value !== org.branding.logoUrl);
+
+/**
  * The countdown, re-derived on a tick rather than stored.
  *
  * `now` is the only mutable thing: bumping it invalidates the computed, which
@@ -136,13 +149,15 @@ const lastResult = computed(() => {
 
       A visitor sees the organization's logo in its place, read from the
       organization's row like the name and colours. An organization with no
-      logo leaves the space empty rather than borrowing anybody else's.
+      logo leaves the space empty rather than borrowing anybody else's, and a
+      logo that fails to load is withdrawn rather than shown broken.
     -->
     <DailyThought v-if="auth.isLoggedIn" :team-id="org.activeTeamId" :can-edit="canWriteThought" />
-    <figure v-else-if="org.branding.logoUrl" class="crest" data-org-logo>
+    <figure v-else-if="showLogo" class="crest" data-org-logo>
       <img
         :src="org.branding.logoUrl" :alt="org.branding.name || 'Organization logo'"
-        class="crest__img" width="512" height="512" decoding="async" />
+        class="crest__img" width="512" height="512" decoding="async"
+        @error="failedLogo = org.branding.logoUrl" />
     </figure>
 
     <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats tnum">
