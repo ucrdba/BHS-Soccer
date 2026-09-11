@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatIsoToDisplayDate, formatDisplayDateToIso,
   format24hTo12h, format12hTo24h, matchDirectionsUrl, displayDate,
-  matchOutcome
+  matchOutcome, recentForm
 } from './schedule-view';
 
 describe('formatIsoToDisplayDate', () => {
@@ -176,5 +176,55 @@ describe('matchOutcome', () => {
     expect(matchOutcome({ status: 'SCHEDULED', score: null })).toBeNull();
     expect(matchOutcome({ status: 'COMPLETED', score: 'W' })).toBeNull();
     expect(matchOutcome(null)).toBeNull();
+  });
+});
+
+describe('recentForm', () => {
+  const done = (id: string, matchOn: string, score: string) =>
+    ({ id, status: 'COMPLETED', score, date: 'x', matchOn });
+
+  it('reads the results oldest first, as letters', () => {
+    expect(recentForm([
+      done('b', '2026-08-08', '0 - 2'),
+      done('a', '2026-08-01', '3 - 1'),
+      done('c', '2026-08-15', '1 - 1')
+    ])).toEqual(['W', 'L', 'D']);
+  });
+
+  it('keeps only the last five', () => {
+    const seven = ['01', '02', '03', '04', '05', '06', '07'].map((d, i) =>
+      done(`m${i}`, `2026-08-${d}`, i < 2 ? '0 - 1' : '2 - 0'));
+    expect(recentForm(seven)).toEqual(['W', 'W', 'W', 'W', 'W']);
+  });
+
+  it('counts only completed fixtures', () => {
+    expect(recentForm([
+      done('a', '2026-08-01', '3 - 1'),
+      { id: 'n', status: 'SCHEDULED', score: null, date: 'x', matchOn: '2026-09-04' }
+    ])).toEqual(['W']);
+  });
+
+  /*
+   * A score that does not parse is left out rather than guessed. Counting it
+   * as a draw would put a result in the form that nobody recorded.
+   */
+  it('leaves out a score it cannot read, rather than calling it a draw', () => {
+    expect(recentForm([
+      done('a', '2026-08-01', '3 - 1'),
+      done('b', '2026-08-08', 'W')
+    ])).toEqual(['W']);
+  });
+
+  it('takes a different count', () => {
+    expect(recentForm([
+      done('a', '2026-08-01', '3 - 1'),
+      done('b', '2026-08-08', '0 - 2'),
+      done('c', '2026-08-15', '1 - 1')
+    ], 2)).toEqual(['L', 'D']);
+  });
+
+  it('is empty with no results', () => {
+    expect(recentForm([])).toEqual([]);
+    expect(recentForm(null as any)).toEqual([]);
   });
 });

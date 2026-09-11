@@ -153,3 +153,23 @@ export function matchOutcome(m: any): Outcome | null {
   if (parsed.goalsFor === parsed.goalsAgainst) return 'drawn';
   return 'lost';
 }
+
+export type FormLetter = 'W' | 'D' | 'L';
+
+/**
+ * The last `n` results as letters, oldest first, for the home page's form.
+ *
+ * The letter carries the result and colour only reinforces it, so it reads
+ * in sunlight and to a screen reader, as the result word does. Only completed
+ * fixtures with a readable score count: a score that does not parse is left
+ * out rather than guessed as a draw -- the same refusal matchOutcome makes.
+ */
+export function recentForm(schedule: any[], n = 5): FormLetter[] {
+  const letter: Record<Outcome, FormLetter> = { won: 'W', drawn: 'D', lost: 'L' };
+  return (schedule || [])
+    .map(m => ({ outcome: matchOutcome(m), t: matchDateTime(m) }))
+    .filter((x): x is { outcome: Outcome; t: Date } => !!x.outcome && !!x.t)
+    .sort((a, b) => a.t.getTime() - b.t.getTime())
+    .slice(-n)
+    .map(x => letter[x.outcome]);
+}
