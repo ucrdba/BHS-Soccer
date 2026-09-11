@@ -64,10 +64,12 @@ describe('an upcoming fixture', () => {
     expect(w.text()).toContain('Home Field');
   });
 
-  it('counts down as one figure rather than reading all zeroes', () => {
+  it('counts down in days and hours, and reads it as a sentence', () => {
     // NOW is Sep 1 12:00; kick-off is Sep 4 18:00 — three days and six hours.
-    const w = mountHome({ matches: [row()] });
-    expect(w.find('[data-countdown]').text()).toBe('3d 06h');
+    const count = mountHome({ matches: [row()] }).find('[data-countdown]');
+    expect(count.text()).toContain('3');
+    expect(count.text()).toContain('days');
+    expect(count.find('.sr-only').text()).toBe('3 days and 6 hours until kick-off');
   });
 
   it('shows the last result in words beside the score', () => {
@@ -215,72 +217,81 @@ describe("the coach's message", () => {
   });
 });
 
-describe("the organization's logo", () => {
+describe('the band', () => {
   /*
-   * A visitor sees the organization's logo where the squad sees the coach's
-   * message. Read from the organization's row like the name and colours, so a
-   * club shows its own -- and one with no logo shows none.
+   * The organization's photo and logo, read from its row like the name and
+   * colours, for every viewer -- the band replaced the visitor-only logo.
    */
-  const WITH_LOGO = {
-    schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/legends.png' }]
+  const OWN = {
+    schools: [{
+      id: 's1', name: 'Legends FC', mascot: 'Lions',
+      logo_url: '/img/legends.png', hero_url: '/img/legends-band.jpg',
+      league: 'SoCal Premier', city: 'Riverside, CA'
+    }]
   };
+  const MEMBER = { auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false } };
 
-  it("shows a visitor the organization's own logo", () => {
-    const w = mountHome({}, WITH_LOGO);
-    const img = w.find('[data-org-logo] img');
-
-    expect(img.attributes('src')).toBe('/img/legends.png');
-    expect(img.attributes('alt')).toBe('Legends FC');
+  it("shows the organization's photo", () => {
+    const w = mountHome({ matches: [row()] }, OWN);
+    expect(w.find('[data-band-photo]').attributes('src')).toBe('/img/legends-band.jpg');
   });
 
-  it('gives the squad the message rather than the logo', () => {
-    const w = mountHome({}, WITH_LOGO, {
-      auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false }
+  it('shows the colour band when the organization has no photo, rather than borrowing one', () => {
+    const w = mountHome({ matches: [row()] });
+    expect(w.find('[data-home-band]').exists()).toBe(true);
+    expect(w.find('[data-band-photo]').exists()).toBe(false);
+  });
+
+  it('refuses a photo address that is not a web address or a path', () => {
+    const w = mountHome({ matches: [row()] }, {
+      schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', hero_url: 'javascript:alert(1)' }]
     });
-    expect(w.find('[data-org-logo]').exists()).toBe(false);
+    expect(w.find('[data-band-photo]').exists()).toBe(false);
   });
 
-  it('leaves the space empty for an organization with no logo, rather than borrowing one', () => {
-    const w = mountHome({});
-    expect(w.find('[data-org-logo]').exists()).toBe(false);
+  it('shows the logo and the league and city to a visitor and to the squad alike', () => {
+    for (const extra of [{}, MEMBER]) {
+      const w = mountHome({ matches: [row()] }, OWN, extra);
+      expect(w.find('[data-band-logo]').attributes('src')).toBe('/img/legends.png');
+      expect(w.find('[data-band-who]').text()).toContain('SoCal Premier · Riverside, CA');
+    }
   });
 
-  it('refuses an address that is not a web address or a path', () => {
-    // An admin types this, and it is rendered on the public page.
-    const w = mountHome({}, {
-      schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: 'javascript:alert(1)' }]
-    });
-    expect(w.find('[data-org-logo]').exists()).toBe(false);
+  it('no longer carries the separate visitor logo', () => {
+    expect(mountHome({ matches: [row()] }, OWN).find('[data-org-logo]').exists()).toBe(false);
   });
 });
 
-describe('a logo that does not load', () => {
-  /*
-   * An admin types the address, and a typo or a missing file would otherwise
-   * put a broken-image icon on the public page with nothing to say so. The
-   * figure is withdrawn instead; the profile form is where the admin is told.
-   */
-  const BROKEN = {
-    schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/missing.png' }]
-  };
+describe('coming up', () => {
+  it('lists the fixtures after the next one, and not the next one again', () => {
+    const w = mountHome({
+      matches: [
+        row(),
+        row({ id: 'm2', match_date: 'SEP 11 2026', match_on: '2026-09-11', opponent: 'Redlands' }),
+        row({ id: 'm3', match_date: 'SEP 18 2026', match_on: '2026-09-18', opponent: 'Hemet' })
+      ]
+    });
+    const rows = w.findAll('[data-coming-row]');
+    expect(rows.map(r => r.text()).join(' ')).toContain('Redlands');
+    expect(rows.map(r => r.text()).join(' ')).not.toContain('Yucaipa');
+    expect(w.find('[data-all-fixtures]').text()).toContain('All 3 fixtures');
+  });
+});
 
-  it('is withdrawn rather than shown to visitors broken', async () => {
-    const w = mountHome({}, BROKEN);
-    await w.find('[data-org-logo] img').trigger('error');
-
-    expect(w.find('[data-org-logo]').exists()).toBe(false);
+describe('how the season is going', () => {
+  it('says when the season opens before the first result', () => {
+    const w = mountHome({ matches: [row()] });
+    expect(w.find('[data-season-opens]').text()).toContain('SEP 4 2026');
   });
 
-  it('comes back once the address is corrected, without a reload', async () => {
-    // Keyed on the address that failed, not a flag that stays down forever:
-    // fixing the row must be enough.
-    const w = mountHome({}, BROKEN);
-    await w.find('[data-org-logo] img').trigger('error');
-
-    (w.vm as any).$pinia.state.value.organization.schools =
-      [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/legends.png' }];
-    await w.vm.$nextTick();
-
-    expect(w.find('[data-org-logo] img').attributes('src')).toBe('/img/legends.png');
+  it('shows the form once there are results', () => {
+    const w = mountHome({
+      matches: [
+        row({ id: 'a', match_on: '2026-08-01', status: 'COMPLETED', score: '3 - 1' }),
+        row({ id: 'b', match_on: '2026-08-08', status: 'COMPLETED', score: '0 - 2' }),
+        row()
+      ]
+    });
+    expect(w.find('[data-form]').text().replace(/\s+/g, ' ')).toContain('W L');
   });
 });

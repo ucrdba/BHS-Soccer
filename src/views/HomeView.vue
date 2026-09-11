@@ -2,19 +2,24 @@
 /**
  * The home page.
  *
- * Every figure on this screen comes from a tested module in src/domain/, so
- * this file computes nothing: it is the proof that Phase 0's extraction paid
- * off. The fixture logic in particular -- which match is next, why there
- * isn't one, and the countdown -- is `domain/schedule.ts`, and the record is
- * `domain/season-record.ts`.
+ * Composition only: every figure and every string comes from a tested module
+ * in src/domain/, and every piece of the page is its own component (spec
+ * 2026-09-10-home-hero-design.md). The band holds who the organization is and
+ * the next match; the coach's message follows for the squad; then what's
+ * coming up and how the season is going.
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useAuthStore } from '../stores/auth';
-import { nextMatchCountdown, shortCountdown, lastCompletedMatch } from '../domain/schedule';
-import { displayDate, matchOutcome } from '../domain/schedule-view';
+import {
+  nextMatchCountdown, longCountdown, lastCompletedMatch, upcomingMatches
+} from '../domain/schedule';
+import { displayDate, matchOutcome, recentForm } from '../domain/schedule-view';
 import DailyThought from '../components/home/DailyThought.vue';
+import HomeHero from '../components/home/HomeHero.vue';
+import ComingUp from '../components/home/ComingUp.vue';
+import SeasonSummary from '../components/home/SeasonSummary.vue';
 
 const org = useOrganizationStore();
 const schedule = useScheduleStore();
@@ -22,24 +27,11 @@ const auth = useAuthStore();
 const canWriteThought = computed(() => auth.isCoach || auth.isAdmin);
 
 /**
- * The logo address that failed to load, if one did.
+ * The clock, re-read on a tick rather than stored.
  *
- * An admin types the address, so a typo or a file that was never uploaded
- * would otherwise put a broken-image icon on the public page with nothing to
- * say so. The figure is withdrawn instead -- the profile form is where the
- * admin is told. Keyed on the address rather than a flag, so correcting the
- * row brings the logo back without a reload.
- */
-const failedLogo = ref<string | null>(null);
-const showLogo = computed(() =>
-  !!org.branding.logoUrl && failedLogo.value !== org.branding.logoUrl);
-
-/**
- * The countdown, re-derived on a tick rather than stored.
- *
- * `now` is the only mutable thing: bumping it invalidates the computed, which
- * asks the domain module again. Storing the digits instead would mean two
- * places that can disagree about which match is being counted down to.
+ * `now` is the only mutable thing: bumping it invalidates the computeds that
+ * ask the domain module which match is next and how long until it. Storing
+ * the digits instead would mean two places that can disagree.
  */
 const now = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -54,20 +46,49 @@ onUnmounted(() => { if (timer) clearInterval(timer); });
 // The schedule is team-scoped, so it reloads when the active team changes.
 watch(() => org.activeTeamId, (id) => { schedule.load(id); }, { immediate: true });
 
-const countdown = computed(() => {
-  // Referenced so the tick invalidates this.
-  void now.value;
-  return shortCountdown(nextMatchCountdown(schedule.matches));
-});
-
 /** Nothing is claimed about the season until a load has actually happened. */
 const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
 
-/** What the fixture block says when there is no next match. */
-const noFixtureLine = computed(() => {
+const next = computed(() => (settled.value ? schedule.nextMatch : null));
+
+/** "League · City" from the organization's row, or '' when it has neither. */
+const place = computed(() =>
+  [org.school?.league, org.school?.city].filter(Boolean).join(' · '));
+
+const kicker = computed(() => {
+  const m = next.value;
+  if (!m) return 'Next match';
+  const side = m.isHome ? 'Home' : 'Away';
+  return m.location ? `Next match · ${side} · ${m.location}` : `Next match · ${side}`;
+});
+
+/** What the band says when there is no next match. */
+const headline = computed(() => {
+  if (schedule.loadError) return 'Schedule unavailable';
+  if (!settled.value) return 'Loading the schedule…';
+  if (next.value) return next.value.opponent;
   if (schedule.state === 'empty') return 'Schedule coming soon';
   if (schedule.state === 'stale') return 'No upcoming fixtures';
   return 'Season complete';
+});
+
+const countdown = computed(() => {
+  // Referenced so the tick invalidates this.
+  void now.value;
+  return next.value ? longCountdown(nextMatchCountdown(schedule.matches)) : null;
+});
+
+const when = computed(() => {
+  const m = next.value;
+  if (!m) return '';
+  const date = displayDate(m);
+  return m.time ? `${date} · Kick-off ${m.time}` : date;
+});
+
+/** Up to three fixtures after the one the band already shows. */
+const comingUp = computed(() => {
+  void now.value;
+  return settled.value ? upcomingMatches(schedule.matches).slice(1, 4) : [];
 });
 
 /**
@@ -82,159 +103,66 @@ const lastResult = computed(() => {
   const word = outcome === 'won' ? 'Won' : outcome === 'drawn' ? 'Drew' : 'Lost';
   return { opponent: m.opponent, side: m.isHome ? 'home' : 'away', word, score: m.score };
 });
+
+const form = computed(() => recentForm(schedule.matches));
+const opensOn = computed(() => (next.value ? displayDate(next.value) : ''));
 </script>
 
 <template>
-  <section class="home">
-    <div class="fixture">
-      <p v-if="org.branding.name" class="home__org kicker tnum">
-        {{ org.branding.name }}<template v-if="org.branding.mascot"> · {{ org.branding.mascot }}</template><template v-if="org.activeTeam"> · {{ org.activeTeam.name }}</template>
-      </p>
+  <div class="home">
+    <!-- The header names the organization for the eye; this is for a screen
+         reader arriving on the page, and says which team it is about. -->
+    <p v-if="org.branding.name" class="sr-only" data-home-org>
+      {{ org.branding.name }}<template v-if="org.branding.mascot"> · {{ org.branding.mascot }}</template><template v-if="org.activeTeam"> · {{ org.activeTeam.name }}</template>
+    </p>
 
+    <HomeHero
+      :photo="org.branding.heroUrl" :logo="org.branding.logoUrl" :org-name="org.branding.name"
+      :place="place" :kicker="kicker" :headline="headline" :quiet="!next"
+      :countdown="countdown" :when="when" />
+
+    <div class="page">
       <p v-if="schedule.loadError" class="refused" role="alert">{{ schedule.loadError }}</p>
 
-      <template v-else-if="!settled">
-        <p class="kicker">Next match</p>
-        <p class="fixture__opp fixture__opp--quiet">Loading the schedule…</p>
-      </template>
-
-      <template v-else-if="schedule.nextMatch">
-        <p class="kicker kicker--accent">Next match</p>
-        <h1 class="fixture__opp" data-next-fixture>{{ schedule.nextMatch.opponent }}</h1>
-        <p class="fixture__where">
-          {{ schedule.nextMatch.isHome ? 'Home' : 'Away' }}
-          <template v-if="schedule.nextMatch.location"> · {{ schedule.nextMatch.location }}</template>
-        </p>
-        <div class="when">
-          <div>
-            <p class="when__date tnum">{{ displayDate(schedule.nextMatch) }}</p>
-            <p v-if="schedule.nextMatch.time" class="when__time tnum">Kick-off {{ schedule.nextMatch.time }}</p>
-          </div>
-          <div class="when__count" aria-label="Time until the next match">
-            <p class="when__figure tnum" data-countdown>{{ countdown }}</p>
-            <p class="when__label">to kick-off</p>
-          </div>
-        </div>
-      </template>
-
-      <template v-else>
-        <p class="kicker">Next match</p>
-        <h1 class="fixture__opp fixture__opp--quiet">{{ noFixtureLine }}</h1>
-        <p v-if="schedule.state === 'empty'" class="fixture__where">
+      <!-- Why there is no next match, in the words the page has always used. -->
+      <p v-else-if="settled && !next" class="state">
+        <template v-if="schedule.state === 'empty'">
           No fixtures have been added yet.<template v-if="auth.isCoach"> Add them from the Schedule tab.</template>
-        </p>
-        <p v-else-if="schedule.state === 'stale'" class="fixture__where">
+        </template>
+        <template v-else-if="schedule.state === 'stale'">
           <template v-if="schedule.lastPlayed">
             Last match: {{ schedule.lastPlayed.opponent }} on {{ schedule.lastPlayed.date }}.
           </template>
           <template v-if="auth.isCoach"> Add the next fixture, or record the result of the last one.</template>
           <template v-else> Check back soon for the next match.</template>
-        </p>
-        <p v-else class="fixture__where">
+        </template>
+        <template v-else>
           All scheduled matches have been played. Final record: {{ schedule.record.recordText }}
-        </p>
-      </template>
+        </template>
+      </p>
 
-      <div v-if="settled && lastResult" class="last" data-last-result>
-        <p class="last__who">Last out · <em>{{ lastResult.opponent }}, {{ lastResult.side }}</em></p>
-        <p class="last__score tnum">{{ lastResult.word }} {{ lastResult.score }}</p>
+      <!-- The coach speaking to the squad: straight after the band, for the
+           squad only, and v-if so a visitor's browser never fetches it. -->
+      <DailyThought v-if="auth.isLoggedIn" :team-id="org.activeTeamId" :can-edit="canWriteThought" />
+
+      <div class="split">
+        <ComingUp :matches="comingUp" :total="schedule.matches.length" />
+        <SeasonSummary
+          v-if="settled"
+          :record="schedule.record" :last-result="lastResult" :form="form"
+          :opens-on="opensOn" :fixtures="schedule.matches.length" />
       </div>
     </div>
-
-    <!--
-      Directly after the fixture: it is the coach speaking to the squad, and
-      the squad reads this page first. For the squad only -- players, coaches
-      and admins -- and v-if rather than v-show, so a visitor's browser never
-      fetches the message at all.
-
-      A visitor sees the organization's logo in its place, read from the
-      organization's row like the name and colours. An organization with no
-      logo leaves the space empty rather than borrowing anybody else's, and a
-      logo that fails to load is withdrawn rather than shown broken.
-    -->
-    <DailyThought v-if="auth.isLoggedIn" :team-id="org.activeTeamId" :can-edit="canWriteThought" />
-    <figure v-else-if="showLogo" class="crest" data-org-logo>
-      <img
-        :src="org.branding.logoUrl" :alt="org.branding.name || 'Organization logo'"
-        class="crest__img" width="512" height="512" decoding="async"
-        @error="failedLogo = org.branding.logoUrl" />
-    </figure>
-
-    <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats tnum">
-      <div class="stat">
-        <span class="stat__value">{{ schedule.record.recordText }}</span>
-        <span class="stat__label">Record (W&ndash;L&ndash;D)</span>
-      </div>
-      <div class="stat">
-        <span class="stat__value">{{ schedule.record.gamesPlayed }}</span>
-        <span class="stat__label">Played</span>
-      </div>
-      <div class="stat">
-        <span class="stat__value">{{ schedule.record.goalsPerGame }}</span>
-        <span class="stat__label">Goals / game</span>
-      </div>
-      <div class="stat">
-        <span class="stat__value">{{ schedule.record.cleanSheets }}</span>
-        <span class="stat__label">Clean sheets</span>
-      </div>
-    </section>
-  </section>
+  </div>
 </template>
 
 <style scoped>
 .home { padding: 0 0 var(--space-8); }
 
-.fixture { padding: var(--space-4); }
+.refused,
+.state { margin: var(--space-4) var(--space-4) 0; }
 
-.home__org { margin-bottom: var(--space-3); }
-@media (max-width: 767.98px) {
-  .home__org { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-}
-
-.fixture__opp {
-  margin-top: var(--space-2);
-  font-family: var(--heading-face);
-  font-weight: 400;
-  font-size: 32px;
-  line-height: 1.05;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.fixture__opp--quiet { font-size: 24px; color: var(--ink-muted); }
-
-.fixture__where { margin-top: 4px; font-size: 13px; color: var(--ink-muted); }
-
-.when {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--rule-strong);
-}
-
-.when__date { font-family: var(--heading-face); font-size: 23px; line-height: 1; color: var(--ink); }
-.when__time { margin-top: 3px; font-size: 13px; color: var(--ink-muted); }
-.when__count { text-align: right; }
-.when__figure { font-family: var(--heading-face); font-size: 23px; line-height: 1; color: var(--rule-strong); }
-.when__label { margin-top: 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
-
-.last {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-}
-
-.last__who { font-size: 12px; color: var(--ink-muted); }
-.last__who em { font-style: italic; }
-.last__score { font-family: var(--heading-face); font-size: 17px; color: var(--ink); }
+.state { font-size: 13px; line-height: 1.5; color: var(--ink-muted); }
 
 .refused {
   padding: var(--space-3) var(--space-4);
@@ -245,40 +173,15 @@ const lastResult = computed(() => {
   font-size: 0.9rem;
 }
 
-.stats {
+/* One column on a phone; side by side once there is room for two. */
+.split {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0 var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--space-6) var(--space-8);
   margin: var(--space-6) var(--space-4) 0;
-  border-top: 1px solid var(--rule);
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--rule);
-}
-
-.stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--mark); }
-.stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
-
-/* The organization's logo, for a visitor. Sized to sit under the fixture
-   rather than compete with it. */
-.crest { display: flex; justify-content: center; margin: var(--space-6) var(--space-4) 0; }
-
-.crest__img {
-  width: min(14rem, 64vw);
-  height: auto;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
 }
 
 @media (min-width: 768px) {
-  .fixture, .stats { max-width: 40rem; margin-inline: auto; }
-  .crest { max-width: 40rem; margin-inline: auto; }
-  .fixture { padding: var(--space-8) var(--space-4) 0; }
-  .stats { grid-template-columns: repeat(4, 1fr); }
+  .page { max-width: 40rem; margin-inline: auto; }
 }
 </style>
