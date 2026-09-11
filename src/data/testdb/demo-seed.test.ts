@@ -62,10 +62,17 @@ describe.skipIf(!available)('demo_seed.sql', () => {
     it('is not callable through the API', async () => {
       await withDb(async (c) => {
         await build(c);
-        const r = await one(c, `select
-          has_function_privilege('anon', 'public.demo_clone_org(uuid, text)', 'execute') as clone,
-          has_function_privilege('anon', 'public.demo_clone_manifest()', 'execute') as manifest`);
-        expect(r).toEqual({ clone: false, manifest: false });
+        // Both API roles: the published key is anon, and every signed-in
+        // visitor is authenticated.
+        const { rows } = await c.query(`
+          select r.role,
+                 has_function_privilege(r.role, 'public.demo_clone_org(uuid, text)', 'execute') as clone,
+                 has_function_privilege(r.role, 'public.demo_clone_manifest()', 'execute')      as manifest
+            from unnest(array['anon', 'authenticated']) as r(role) order by r.role`);
+        expect(rows).toEqual([
+          { role: 'anon', clone: false, manifest: false },
+          { role: 'authenticated', clone: false, manifest: false }
+        ]);
       });
     }, 60_000);
   });

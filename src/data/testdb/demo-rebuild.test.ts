@@ -46,13 +46,40 @@ describe.skipIf(!available)('the whole rebuild', () => {
     await withDb(async (c) => {
       await signInAccounts(c);
       await runSteps(c, rebuildSteps(REPO, '2026-09-11'));
+      // Production's data, which the demo refuses a visitor: past the lock.
+      await c.query(`select set_config('demo.rebuilding', 'on', true)`);
       await c.query(`insert into schools (code, name, mascot) values ('bhs', 'Beaumont High School', 'Cougars')`);
+      await c.query(`select set_config('demo.rebuilding', 'off', true)`);
 
       await c.query('savepoint before_rebuild');
       await expect(runSteps(c, rebuildSteps(REPO, '2026-09-11'))).rejects.toThrow(/^guard: REFUSING TO REBUILD/);
       await c.query('rollback to savepoint before_rebuild');
 
       expect((await c.query(`select count(*)::int as n from schools`)).rows[0].n).toBe(11);
+    });
+  }, 180_000);
+
+  // An account deleted and re-created with scripts/demo-create-accounts.mjs
+  // between rebuilds: GoTrue confirms it in a second statement, which must get
+  // past the profile lock, and the next rebuild gives it a copy and locks it.
+  it('builds and locks an account re-created between rebuilds', async () => {
+    await withDb(async (c) => {
+      await signInAccounts(c);
+      await runSteps(c, rebuildSteps(REPO, '2026-09-11'));
+
+      await c.query(`select set_config('demo.rebuilding', 'on', true)`);
+      await c.query(`delete from auth.users where email = 'demo6@demo.invalid'`);
+      await c.query(`select set_config('demo.rebuilding', 'off', true)`);
+      await c.query(`insert into auth.users (email, encrypted_password) values ('demo6@demo.invalid', 'hash')`);
+      await c.query(`update auth.users set email_confirmed_at = now() where email = 'demo6@demo.invalid'`);
+
+      await runSteps(c, rebuildSteps(REPO, '2026-09-12'));
+      const p = (await c.query(`
+        select p.role, s.code from profiles p join schools s on s.id = p.school_id
+         where p.email = 'demo6@demo.invalid'`)).rows[0];
+      expect(p).toEqual({ role: 'coach', code: 'demo6' });
+      await expect(c.query(`update profiles set status = 'pending_approval' where email = 'demo6@demo.invalid'`))
+        .rejects.toThrow(/cannot change their role, status/);
     });
   }, 180_000);
 
