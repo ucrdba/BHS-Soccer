@@ -115,7 +115,8 @@ buttons, each saying what that role sees:
 - **Admin** — the organization profile, colours, logo, photo, import and export.
 
 One click signs in as `demoN@demo.invalid` with `VITE_DEMO_PASSWORD`. Registration is
-hidden. The password is in the demo's JavaScript and must be treated as public; that is
+hidden, and sign-ups are turned off on the demo project too (§8), because the published
+key could otherwise call sign-up directly. The password is in the demo's JavaScript and must be treated as public; that is
 acceptable only because the demo database holds nothing real and the accounts are
 locked (§6.2).
 
@@ -375,14 +376,16 @@ The work is done on a feature branch; `main` is touched only by the merge.
 Going live, in this order, all by the owner:
 
 1. **Merge.** Production is unaffected — no flag, no migration.
-2. **Create the accounts once**: run `scripts/demo-create-accounts.mjs` locally with the
+2. **Turn off sign-ups on the demo project** (Authentication → "Allow new users to sign
+   up"). The account script uses the admin API, which still works; visitors only sign in.
+3. **Create the accounts once**: run `scripts/demo-create-accounts.mjs` locally with the
    demo project's service-role key and the shared password.
-3. **GitHub**: add `DEMO_DATABASE_URL` (Session pooler) and `DEMO_PROJECT_REF`.
-4. **Vercel, the `bhs-soccer-demo` project**: add `VITE_DEMO_PASSWORD`, remove
+4. **GitHub**: add `DEMO_DATABASE_URL` (Session pooler) and `DEMO_PROJECT_REF`.
+5. **Vercel, the `bhs-soccer-demo` project**: add `VITE_DEMO_PASSWORD`, remove
    `VITE_DEMO_EXPIRY_HOURS`, and switch its production branch to `main`.
-5. **Run the workflow once by hand.** Sign in as Coach 1, Player and Admin; the band, the
+6. **Run the workflow once by hand.** Sign in as Coach 1, Player and Admin; the band, the
    Matrix and the quiz should all have data.
-6. **Delete the `demo` branch**, locally and on GitHub.
+7. **Delete the `demo` branch**, locally and on GitHub.
 
 ## 9. Out of scope
 
