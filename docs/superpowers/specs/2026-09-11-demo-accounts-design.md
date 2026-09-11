@@ -184,11 +184,28 @@ demo stays up, never half-built.
 3. **Schema from today's migrations.** Apply `supabase_schema.sql`, `schema_roles.sql` and
    `supabase_migration_auth.sql`, then every file in `supabase/migrations/` in number
    order, read fresh on each run. Each file's own `begin;` / `commit;` lines are stripped,
-   as the migration tests already do. Three files are skipped, with the generator's
-   reasons carried over:
-   - `0006_move_club_teams_to_legends_fc.sql` — data; moves teams named by production UUIDs.
-   - `0007_assign_coaches_to_club_teams.sql` — data, and it raises when its coach is absent.
-   - `0012_set_drill_weights.sql` — data; weights on Beaumont's drills.
+   as the migration tests already do. The demo generator's three rules come across
+   with it — a rehearsal on a fresh Postgres on 2026-09-11 applied every file only with
+   all three in place:
+   - **Skip** three files, with the generator's reasons:
+     - `0006_move_club_teams_to_legends_fc.sql` — data; moves teams named by production UUIDs.
+     - `0007_assign_coaches_to_club_teams.sql` — data, and it raises when its coach is absent.
+     - `0012_set_drill_weights.sql` — data; weights on Beaumont's drills.
+   - **Cut** one statement from `0005_multi_team_schema.sql`: the insert of Beaumont's
+     Varsity team by its literal school UUID, which is a foreign-key violation (`23503`)
+     on an empty database and aborts the migration. The cut must match exactly once, so
+     an edit to 0005 fails the rebuild loudly rather than silently doing nothing.
+   - **Reconcile** straight after `supabase_schema.sql`: drop `drills_bank.duration` and
+     `soccer_categories.school_id`, which the provisioning script declares and production
+     never had (0027 later adds `soccer_categories.school_id` back, deliberately). Without
+     the first, 0009's self-check insert fails on `duration`'s `NOT NULL`.
+   Production also has columns **no migration creates**, added by hand. A read of one
+   production row per publicly readable table on 2026-09-11 found `practice_plans.drill`
+   (the planner writes it on every save) and `soccer_categories.display_order` and
+   `active`. A new migration records them with `add column if not exists` — a no-op on
+   production, and what makes a database built from migrations match it. Nine tables had
+   no readable row (`daily_thoughts`, `stat_events`, `profiles` among them), so the first
+   demo run ends with a smoke check that saves one of everything (§8).
 4. **The sample program** — `Resouces/SQL/demo/demo_seed.sql` (§5.4).
 5. **Nine copies** — `demo_clone_org` once per account (§5.5).
 6. **Link the accounts** — `Resouces/SQL/demo/demo_accounts.sql` (§5.6).
@@ -205,9 +222,14 @@ It is **Riverside High School Hawks**, exactly as `2026-09-05-demo-seed-data-des
 §"The template's content" describes: a Varsity and a JV team, 38 players with recording
 numbers assigned as a contiguous block per squad, a part-played season with results,
 plus/minus for four matches with real rotation and low-minute players, Matrix sessions
-and head-to-head history, `time_low` bands as match-readiness thresholds, 12 drills of
-which 3 carry `diagram_data` **captured from the real board's serialize output**, two
-practice plans, three daily thoughts (one active), and a quiz with answers and attempts.
+and head-to-head history, 12 drills of which 3 carry `diagram_data` **captured from the
+real board's serialize output**, two practice plans, three daily thoughts (one active),
+and a quiz with answers and attempts.
+
+One correction to that spec's Matrix drills: the database allows **five** measures
+(`head_to_head`, `win_loss`, `count_high`, `time_low`, `time_bands`), so the template has
+one Matrix drill per measure. The match-readiness bands (`drill_time_bands`) belong to the
+**`time_bands`** drill — the standard — not to `time_low`, which ranks a sprint relatively.
 
 Two changes to that spec:
 
@@ -340,7 +362,8 @@ All three gates, judged by exit code, as everywhere in this repository.
 The work is done on a feature branch; `main` is touched only by the merge.
 
 1. The demo code onto `main` (§4).
-2. The sample program — the largest piece (§5.4).
+2. The migration recording production's hand-added columns (§5.3), tested against Postgres.
+3. The sample program — the largest piece (§5.4).
 3. The accounts, the links and the locks (§5.2, §5.6, §6.2).
 4. The rebuild script and the workflow (§5.1, §5.3).
 5. Documentation: a new demo runbook replacing the "applied twice, by hand" rule; a
