@@ -1,20 +1,18 @@
--- demo_seed.sql — the template organization, and cloning it
+-- demo_seed.sql — the sample program, and cloning it
 --
 -- ██ DEMO PROJECT ONLY. NEVER APPLY THIS TO PRODUCTION. ██
 --
--- Step 3 of the apply order at the top of demo_auth_open.sql:
+-- Applied by the nightly rebuild (scripts/demo-rebuild.mjs), after every
+-- migration and before demo_accounts.sql. It defines:
 --
---   1. demo_schema.sql        the structure
---   2. demo_auth_open.sql     self-serve coach accounts
---   3. demo_seed.sql          this file
---   4. demo_expire.sql        the 48-hour sweep
+--   demo_orgs                 which organization is the template, and which
+--                             copy belongs to which demo account
+--   demo_clone_manifest()     the tables a copy takes, in order
+--   demo_clone_org()          the deep copy
+--   demo_seed_template(date)  Riverside High School Hawks, a season in progress,
+--                             dated relative to the day of the rebuild
 --
--- It inserts ONE template organization and replaces public.demo_new_org() with
--- a version that deep-clones it, so every visitor gets a private copy of a
--- season already in progress rather than an empty program.
---
--- Re-runnable: applying it twice replaces the template rather than adding a
--- second one, which demo_orgs_one_template would reject anyway.
+-- Spec: docs/superpowers/specs/2026-09-11-demo-accounts-design.md §5.4.
 
 begin;
 
@@ -30,7 +28,28 @@ begin
   end if;
 end $$;
 
--- ─── 1. What gets cloned, in what order ────────────────────────────────────
+-- ─── 1. Which organization is which ────────────────────────────────────────
+--
+-- One template, and one copy per demo account. Revoked from the API and given
+-- RLS with no policies: nothing a visitor does should be able to read or change
+-- which organization is whose.
+
+create table if not exists public.demo_orgs (
+  school_id  uuid primary key references public.schools(id) on delete cascade,
+  kind       text not null check (kind in ('template', 'account')),
+  account_no int check (account_no between 1 and 9),
+  check ((kind = 'template') = (account_no is null))
+);
+
+create unique index if not exists demo_orgs_one_template
+  on public.demo_orgs ((kind)) where kind = 'template';
+create unique index if not exists demo_orgs_one_per_account
+  on public.demo_orgs (account_no) where kind = 'account';
+
+alter table public.demo_orgs enable row level security;
+revoke all on table public.demo_orgs from anon, authenticated;
+
+-- ─── 2. What gets cloned, in what order ────────────────────────────────────
 --
 -- A function rather than a comment so that demo_clone_org and the test read the
 -- same list and cannot drift apart.
@@ -44,6 +63,9 @@ end $$;
 -- players is the odd one: it carries no organization column at all, so its rows
 -- are reached through team_players. That is spelled out in demo_clone_org
 -- rather than expressible here.
+--
+-- soccer_categories is here since migration 0027 gave categories a school_id:
+-- each copy has its own list.
 
 create or replace function public.demo_clone_manifest()
 returns table (ord int, table_name text, scope_column text, parent_table text)
@@ -51,6 +73,7 @@ language sql
 immutable
 as $$
   values
+    ( 0, 'soccer_categories',      'school_id',   null),
     ( 1, 'teams',                  'school_id',   null),
     ( 2, 'drills_bank',            'school_id',   null),
     ( 3, 'coaches',                'school_id',   null),
@@ -76,10 +99,10 @@ $$;
 
 comment on function public.demo_clone_manifest() is
   'Ordered table list for demo_clone_org. Every table appears after everything '
-  'it references. profiles, roles, soccer_categories and team_coaches are '
-  'deliberately absent -- see demo_seed.sql section 1.';
+  'it references. profiles, roles and team_coaches are deliberately absent: '
+  'demo_accounts.sql writes each copy''s profiles and coaches itself.';
 
--- ─── 2. The deep clone ─────────────────────────────────────────────────────
+-- ─── 3. The deep clone ─────────────────────────────────────────────────────
 --
 -- The table list and its order are explicit (section 1). Everything else is
 -- discovered from the catalog at runtime: each table's columns, its primary
@@ -354,87 +377,12 @@ comment on function public.demo_clone_org(uuid, text) is
   'demo_clone_manifest(); columns, primary keys and foreign keys are read from '
   'the catalog, so a new column clones without editing this function.';
 
--- ─── 3. What a new signup gets ─────────────────────────────────────────────
---
--- Replaces the version in demo_auth_open.sql, which created an empty
--- organization. Same signature: handle_new_user() calls it and is unchanged.
---
--- The fallback is the important part. A visitor with an empty program is a poor
--- demo; a visitor who cannot create an account at all is a broken site. So a
--- missing template, or a clone that raises, degrades to the old behaviour
--- instead of aborting the signup.
-
-create or replace function public.demo_new_org(display_name text)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  template   uuid;
-  new_school uuid;
-begin
-  select school_id into template from public.demo_orgs where kind = 'template';
-
-  if template is not null then
-    begin
-      new_school := public.demo_clone_org(template, display_name);
-    exception when others then
-      -- Logged, not raised: see the note above.
-      raise warning 'demo_new_org: clone failed (%), falling back to an empty organization', sqlerrm;
-      new_school := null;
-    end;
-  end if;
-
-  if new_school is null then
-    insert into public.schools (code, name, mascot, kind, city)
-    values (
-      'demo-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12),
-      display_name, 'Demo', 'school', 'Anytown'
-    )
-    returning id into new_school;
-
-    insert into public.teams (school_id, name, season, is_public_default)
-    values (new_school, 'Varsity', to_char(now(), 'YYYY'), true);
-  end if;
-
-  insert into public.demo_orgs (school_id, kind) values (new_school, 'visitor');
-
-  return new_school;
-end;
-$$;
-
-comment on function public.demo_new_org(text) is
-  'Creates one visitor organization by cloning the template, and returns its '
-  'id. Falls back to an empty organization if there is no template or the '
-  'clone raises -- a failed signup is worse than an empty demo.';
-
--- None of these three is an API.
---
--- A function keeps EXECUTE for PUBLIC unless it is taken away, and PostgREST
--- publishes as an RPC anything the anon role can execute. demo_clone_org is
--- `security definer`, so without this a POST to /rest/v1/rpc/demo_clone_org
--- carrying the published anon key clones the template -- a schools row plus
--- twenty tables of copy -- as often as it is asked to. It writes no demo_orgs
--- row (Task 4's demo_new_org owns that), which means demo_capacity() does not
--- count the result and the expiry sweep does not reap it: unbounded permanent
--- junk from an anonymous caller. demo_new_org is the same hole and is
--- reachable today.
---
--- demo_auth_open.sql is deliberately allow-list about this -- it revokes the
--- demo tables from anon and authenticated and then grants execute on exactly
--- one function, demo_capacity() -- and this matches that intent. It lives here
--- rather than there because demo_seed.sql is applied after it and
--- demo_auth_open.sql must stay byte-identical to what was applied by hand.
---
--- demo_new_org is called by handle_new_user(), demo_clone_org by demo_new_org,
--- and demo_clone_manifest only by demo_clone_org. All three run as the
--- trigger's definer, which is not subject to these grants. NOTE for whoever
--- replaces demo_new_org next: `create or replace function` preserves the ACL,
--- but a `drop`/`create` pair resets it and hands PUBLIC the grant back.
-
+-- None of these is an API. A function keeps EXECUTE for PUBLIC unless it is
+-- taken away, and PostgREST publishes as an RPC anything anon can execute.
+-- demo_clone_org is security definer: without this, the published anon key
+-- could clone the template -- a schools row and twenty tables of copy -- as
+-- often as it liked.
 revoke all on function public.demo_clone_org(uuid, text) from public, anon, authenticated;
-revoke all on function public.demo_new_org(text)         from public, anon, authenticated;
 revoke all on function public.demo_clone_manifest()      from public, anon, authenticated;
 
 commit;

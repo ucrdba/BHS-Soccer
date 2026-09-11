@@ -188,3 +188,12 @@ export async function runSteps(client, steps) {
     }
   }
 }
+
+const DEMO_SQL = ['Resouces', 'SQL', 'demo'];
+
+/** demo_seed.sql, with the three captured diagrams put in. */
+export function seedSql(repo) {
+  const diagrams = JSON.parse(readFileSync(join(repo, ...DEMO_SQL, 'demo_diagrams.json'), 'utf8'));
+  const sql = readSql(join(repo, ...DEMO_SQL, 'demo_seed.sql'));
+  return stripTransactionControl(substituteDiagrams(sql, diagrams));
+}
