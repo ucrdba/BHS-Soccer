@@ -18,6 +18,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import AdminView from './AdminView.vue';
+import ImportExportSection from '../components/admin/ImportExportSection.vue';
+import { useOrganizationStore } from '../stores/organization';
 import { setRoles } from '../auth/permissions';
 
 // The whole module is replaced, so it needs everything the auth STORE
@@ -205,3 +207,14 @@ describe('the coach-visible sections', () => {
     expect(w.find('[data-admin-categories]').exists()).toBe(true);
   });
 });
+
+describe('after an import', () => {
+  it('reloads the organization, since a Schools row may have rewritten it', async () => {
+    const w = await mountAdmin({ admin: true });
+    const org = useOrganizationStore();
+    (org.load as any).mockClear();
+    await w.findComponent(ImportExportSection).vm.$emit('imported');
+    expect(org.load).toHaveBeenCalledTimes(1);
+  });
+});
+

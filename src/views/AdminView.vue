@@ -99,7 +99,7 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
       :is-admin="isAdmin" :team-id="org.activeTeamId"
       :school-id="schoolId" :school-code="schoolCode"
       :team-name="org.activeTeam?.name ?? null" :teams="org.teams"
-      data-admin-importexport />
+      data-admin-importexport @imported="org.load()" />
 
     <DiagnosticsSection
       v-if="isAdmin"

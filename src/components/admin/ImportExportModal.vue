@@ -26,7 +26,9 @@ import { supabaseService } from '../../data/supabase';
 import {
   tableDefs, sheetFor, templateFor, type ExportData
 } from '../../domain/workbook';
-import { planImport, readyToApply, resolveTeam, type ImportPlan } from '../../domain/import-plan';
+import {
+  planImport, readyToApply, resolveTeam, type ImportPlan, type SchoolRowPlan
+} from '../../domain/import-plan';
 import { parsePositionCell } from '../../domain/position';
 
 const props = defineProps<{
@@ -172,7 +174,11 @@ async function onFile(e: Event): Promise<void> {
       sheets[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' });
     });
 
-    plan.value = planImport(sheets, { teams: props.teams || [] });
+    // The loaded organization row, so the Schools sheet can be compared with
+    // it -- and so its columns say which image addresses may be named.
+    plan.value = planImport(sheets, {
+      teams: props.teams || [], school: props.data?.school || null
+    });
   } catch {
     error.value = 'That file could not be read as a workbook.';
   } finally {
@@ -287,9 +293,24 @@ async function writeRow(key: string, row: any): Promise<boolean> {
     return !!res?.ok;
   }
 
-  // schools, profiles and plan are written whole rather than row by row, and
-  // matrix is export-only. Left for the caller to handle deliberately.
+  // profiles and plan are written whole rather than row by row, and matrix is
+  // export-only. Left for the caller to handle deliberately. schools goes
+  // through writeSchool.
   return false;
+}
+
+/**
+ * The organization's own row, exactly as the preview showed it.
+ *
+ * `planSchoolRow` has already refused another organization's code, a blank
+ * `upsertSchool` would fill with Beaumont's, and an image address the public
+ * page would not show -- and left out any image column this database lacks.
+ * This only writes what it planned.
+ */
+async function writeSchool(planned: SchoolRowPlan | undefined): Promise<boolean> {
+  if (!planned?.school || !planned.code) return false;
+  const res: any = await supabaseService.upsertSchool(planned.code, planned.school);
+  return !!res && !res.error;
 }
 
 async function onApply(): Promise<void> {
@@ -303,8 +324,11 @@ async function onApply(): Promise<void> {
   try {
     for (const sheet of plan.value.sheets) {
       if (!sheet.importable) continue;
-      for (const row of sheet.rows) {
-        if (await writeRow(sheet.key, row)) written += 1;
+      for (let i = 0; i < sheet.rows.length; i++) {
+        const ok = sheet.key === 'schools'
+          ? await writeSchool(sheet.schoolRows?.[i])
+          : await writeRow(sheet.key, sheet.rows[i]);
+        if (ok) written += 1;
         else rejected += 1;
       }
     }
@@ -366,11 +390,33 @@ async function onApply(): Promise<void> {
       <template v-if="plan">
         <h4 class="sub kicker" data-preview>What this would do</h4>
 
-        <div v-for="s in plan.sheets" :key="s.sheetName" class="row hrow" data-preview-sheet>
-          <span class="row__name">{{ s.sheetName }}</span>
-          <span class="row__n" :data-preview-rows="s.key">{{ s.rows.length }} rows</span>
-          <span v-if="!s.importable" class="tag" data-preview-skipped>not imported</span>
-        </div>
+        <template v-for="s in plan.sheets" :key="s.sheetName">
+          <div class="row hrow" data-preview-sheet>
+            <span class="row__name">{{ s.sheetName }}</span>
+            <span class="row__n" :data-preview-rows="s.key">{{ s.rows.length }} rows</span>
+            <span v-if="!s.importable" class="tag" data-preview-skipped>not imported</span>
+          </div>
+
+          <!-- The organization's profile, field by field: it is on every
+               heading, so "1 row" is not enough to go on. -->
+          <div v-for="(p, i) in s.schoolRows || []" :key="`${s.key}-${i}`" class="org" data-preview-school>
+            <p v-if="p.refused" class="hint hint--warn" data-preview-school-refused>
+              Not written: {{ p.refused }}
+            </p>
+            <template v-else>
+              <ul v-if="p.changes.length" class="changes" data-preview-school-changes>
+                <li v-for="c in p.changes" :key="c.field" :data-preview-change="c.field">
+                  <span class="changes__field">{{ c.field }}</span>
+                  {{ c.from || '(blank)' }} → {{ c.to || '(blank)' }}
+                </li>
+              </ul>
+              <p v-else class="hint" data-preview-school-same>
+                The organization profile would not change.
+              </p>
+            </template>
+            <p v-for="(n, j) in p.notes" :key="j" class="hint" data-preview-school-note>{{ n }}</p>
+          </div>
+        </template>
 
         <p v-for="(w, i) in plan.warnings" :key="i" class="hint hint--warn" data-preview-warning>
           {{ w }}
@@ -444,6 +490,18 @@ async function onApply(): Promise<void> {
 
 .table__name, .row__name { flex: 1; color: var(--ink); }
 .row__n { color: var(--ink-muted); font-size: 12px; }
+
+.org { margin: var(--space-1) 0 var(--space-2); }
+.changes {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.1rem;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  /* An image address is one long word. */
+  overflow-wrap: anywhere;
+}
+.changes__field { color: var(--ink-muted); }
 
 .mini {
   padding: 0.2rem 0.45rem;

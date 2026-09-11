@@ -204,3 +204,15 @@ describe('what the modal is handed', () => {
     expect(w.find('[data-ie-load-error]').text()).toMatch(/team/i);
   });
 });
+
+describe('after an import', () => {
+  it('says so, so the page can reload the organization it may have rewritten', async () => {
+    // A Schools row can change the name, colours, logo and photo on every
+    // heading; nothing on screen would show it until the page was reloaded.
+    const w = mountIt();
+    await flush();
+    await w.findComponent('[data-modal-stub]' as any).vm.$emit('imported');
+    expect(w.emitted('imported')).toHaveLength(1);
+  });
+});
+

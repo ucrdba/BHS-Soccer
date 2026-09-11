@@ -39,6 +39,13 @@ const props = defineProps<{
   teams: any[];
 }>();
 
+/**
+ * Passed up after an import. A Schools row may have rewritten the
+ * organization's name, colours, logo and photo, and the page shows the old
+ * ones until something reloads it -- which reads as a restore that did not take.
+ */
+const emit = defineEmits<{ imported: [] }>();
+
 const open = ref(false);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -118,7 +125,8 @@ async function onOpen(): Promise<void> {
       :school-id="schoolId"
       :teams="teams"
       :data="data"
-      @close="open = false" />
+      @close="open = false"
+      @imported="emit('imported')" />
   </SectionShell>
 
   <p v-else class="note">

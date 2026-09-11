@@ -15,6 +15,11 @@
  * blank-skip can tell "not supplied" from "supplied empty". That distinction
  * is what stops a sparse sheet wiping columns it never mentioned.
  *
+ * **The Schools row is planned field by field**, by `planSchoolRow`, because
+ * it is the organization's own profile rather than one row among many: the
+ * preview says exactly what it would change, and refuses the row outright
+ * rather than write something wrong into every heading on the site.
+ *
  * Extracted from public/js/admin.js during Phase 6.
  */
 import { tableBySheetName, type TableDef } from './workbook';
@@ -28,6 +33,8 @@ export interface BadPosition {
   name: string;
   value: string;
 }
+import { safeImageUrl } from './theme';
+import { parseColour } from './colour';
 
 export interface PlannedSheet {
   key: string;
@@ -39,6 +46,28 @@ export interface PlannedSheet {
   /** False for a sheet the importer has no branch for — the Matrix logs. */
   importable: boolean;
   badPositions: BadPosition[];
+  /** The Schools sheet only: each row's plan, in the same order as `rows`. */
+  schoolRows?: SchoolRowPlan[];
+}
+
+export interface FieldChange {
+  /** The sheet's header, which is what the coach is looking at. */
+  field: string;
+  from: string;
+  to: string;
+}
+
+export interface SchoolRowPlan {
+  /** What to write against: the loaded organization's code, which `upsertSchool` keys on. */
+  code: string | null;
+  /** What `upsertSchool` is handed, or null when the row is refused. */
+  school: Record<string, any> | null;
+  /** Why nothing will be written, or null. */
+  refused: string | null;
+  /** Every field that would change, in header order. */
+  changes: FieldChange[];
+  /** What the preview says about a field the row leaves alone. */
+  notes: string[];
 }
 
 export interface ImportPlan {
@@ -53,6 +82,12 @@ export interface ImportPlan {
 
 export interface KnownData {
   teams: { id: string; name: string }[];
+  /**
+   * The active organization's row exactly as `fetchSchool` loaded it. That
+   * is `select *`, so a column this database has is a key on it and one it
+   * lacks is not -- which is how `planSchoolRow` knows what it may name.
+   */
+  school?: any;
 }
 
 /** Blank becomes undefined. See the module comment. */
@@ -70,6 +105,136 @@ export function resolveTeam(name: any, teams: KnownData['teams']): string | null
   if (!wanted) return null;
   const hit = (teams || []).find(t => normal(t.name) === wanted);
   return hit ? hit.id : null;
+}
+
+/** The two image columns, and the migration that adds each. */
+const IMAGE_COLUMNS = [
+  { header: 'LogoUrl', column: 'logo_url', key: 'logoUrl', noun: 'logo', migration: '0028' },
+  { header: 'HeroUrl', column: 'hero_url', key: 'heroUrl', noun: 'photo', migration: '0030' }
+] as const;
+
+const COUNTS = [['Wins', 'wins'], ['Losses', 'losses'], ['Draws', 'draws']] as const;
+
+const text = (v: any): string => (v === null || v === undefined ? '' : String(v));
+
+/**
+ * One Schools row, as the write `upsertSchool` would make and what it changes.
+ *
+ * A blank cell keeps what the organization has, as everywhere in the import.
+ * `upsertSchool` writes the name, mascot, city, colours and record whether or
+ * not they are supplied, so each is merged over the loaded row here rather
+ * than left to its defaults -- which are Beaumont's.
+ *
+ * Refused outright, with the reason, rather than written in part:
+ * - **another organization's code**, or none. A backup restores the
+ *   organization it was taken from, and `upsertSchool` would create or
+ *   overwrite whichever one the cell names.
+ * - **a name, mascot or city blank on both sides**, since `upsertSchool`
+ *   fills each with Beaumont's.
+ * - **a colour or a count it cannot read.**
+ * - **an image address the public page would not show.** Both are rendered
+ *   into an <img> on the public home page, and `safeImageUrl` would drop the
+ *   value on read; stored anyway, the admin would see it in the profile form
+ *   and visitors would see nothing.
+ *
+ * The image addresses are named only when the loaded row has the column.
+ * Until 0028 (logo) or 0030 (photo) is applied, naming it makes PostgREST
+ * refuse the whole save with 42703 -- the same rule the profile form keeps.
+ */
+export function planSchoolRow(row: Record<string, any>, current: any): SchoolRowPlan {
+  const refuse = (reason: string): SchoolRowPlan =>
+    ({ code: null, school: null, refused: reason, changes: [], notes: [] });
+
+  if (!current || !current.code) {
+    return refuse('This organization has not loaded, so there is nothing to compare the row with.');
+  }
+  const code = String(current.code);
+
+  if (!row.Code) {
+    return refuse(`The row names no organization. A backup restores only the one it came from, so its Code must read "${code}".`);
+  }
+  if (normal(row.Code) !== normal(code)) {
+    return refuse(`The row is for organization "${row.Code}", not this one ("${code}"). A backup restores only the organization it was taken from.`);
+  }
+
+  const name = row.Name ?? text(current.name);
+  const mascot = row.Mascot ?? text(current.mascot);
+  const city = row.City ?? text(current.city);
+  const league = row.League ?? text(current.league);
+
+  for (const [label, value] of [['name', name], ['mascot', mascot], ['city', city]]) {
+    if (!value.trim()) {
+      return refuse(`A ${label} is needed: the row leaves it blank and so does the organization, and saving a blank ${label} would fill in another organization's.`);
+    }
+  }
+
+  const colors: Record<string, any> = { ...(current.colors && typeof current.colors === 'object' ? current.colors : {}) };
+  for (const [header, key, label] of [['PrimaryColor', 'primary', 'Primary'], ['SecondaryColor', 'secondary', 'Secondary']]) {
+    const value = row[header];
+    if (value === undefined) continue;
+    if (!parseColour(value)) {
+      return refuse(`${label} colour "${value}" is not a colour this app can read.`);
+    }
+    colors[key] = value;
+  }
+
+  const was = current.record && typeof current.record === 'object' ? current.record : {};
+  const before: Record<string, number> = {};
+  const record: Record<string, number> = {};
+  for (const [header, key] of COUNTS) {
+    const n = Number(was[key]);
+    before[key] = Number.isInteger(n) && n >= 0 ? n : 0;
+    const value = row[header];
+    if (value === undefined) { record[key] = before[key]; continue; }
+    if (!/^\d+$/.test(value)) return refuse(`${header} "${value}" is not a whole number.`);
+    record[key] = Number(value);
+  }
+
+  const images: Record<string, string> = {};
+  const notes: string[] = [];
+  for (const img of IMAGE_COLUMNS) {
+    const value = row[img.header];
+    const hasColumn = img.column in current;
+    if (value === undefined) {
+      // Blank keeps, as elsewhere -- said, since this is the one blank that
+      // looks as though it ought to clear something.
+      if (hasColumn && text(current[img.column])) {
+        notes.push(`The file leaves the ${img.noun} address blank, so the current one is kept. Clear it in Organization profile instead.`);
+      }
+      continue;
+    }
+    if (!hasColumn) {
+      notes.push(`The ${img.noun} address is not imported: this database has no column for it until migration ${img.migration} is applied.`);
+      continue;
+    }
+    if (!safeImageUrl(value)) {
+      return refuse(`The ${img.noun} address "${value}" is not one the public page will show. It must start with https://, http:// or / (a file shipped with the app).`);
+    }
+    images[img.key] = value;
+  }
+
+  const changes: FieldChange[] = [];
+  const diff = (field: string, from: any, to: any): void => {
+    if (text(from) !== text(to)) changes.push({ field, from: text(from), to: text(to) });
+  };
+  diff('Name', current.name, name);
+  diff('Mascot', current.mascot, mascot);
+  diff('City', current.city, city);
+  diff('League', current.league, league);
+  diff('PrimaryColor', current.colors?.primary, colors.primary);
+  diff('SecondaryColor', current.colors?.secondary, colors.secondary);
+  for (const img of IMAGE_COLUMNS) {
+    if (img.key in images) diff(img.header, current[img.column], images[img.key]);
+  }
+  for (const [header, key] of COUNTS) diff(header, before[key], record[key]);
+
+  return {
+    code,
+    school: { name, mascot, city, league, ...images, colors, record },
+    refused: null,
+    changes,
+    notes
+  };
 }
 
 /**
@@ -152,7 +317,10 @@ export function planImport(
       rows,
       unknownTeams: unknownHere,
       importable: def.importable,
-      badPositions: badHere
+      badPositions: badHere,
+      ...(def.key === 'schools'
+        ? { schoolRows: rows.map(r => planSchoolRow(r, known?.school)) }
+        : {})
     });
   });
 

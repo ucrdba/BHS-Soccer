@@ -11,7 +11,8 @@
  * team_players, where minutes, ratings and recording numbers live.
  */
 import { describe, it, expect } from 'vitest';
-import { planImport, resolveTeam, cell, readyToApply } from './import-plan';
+import { planImport, resolveTeam, cell, readyToApply, planSchoolRow } from './import-plan';
+import { sheetFor, tableByKey } from './workbook';
 
 const TEAMS = [
   { id: 't1', name: 'Varsity' },
@@ -207,6 +208,168 @@ describe('positions', () => {
   it('applies when every position is 1-11 or blank', () => {
     const plan = planImport({ Players: [{ Team: 'Varsity', FirstName: 'Cy', Position: '9' }] }, known);
     expect(readyToApply(plan, {})).toBe(true);
+  });
+});
+
+describe('THE SCHOOLS ROW RESTORES THE ORGANIZATION IT CAME FROM', () => {
+  // The row as `fetchSchool` loads it -- `select *` -- so a column this
+  // database has is a key on it, and a column it lacks is not.
+  const MIGRATED = {
+    code: 'lfc', name: 'Legends FC', mascot: 'Lions', city: 'Riverside', league: 'Inland',
+    colors: { primary: '#123456', secondary: '#abcdef' },
+    record: { wins: 3, losses: 1, draws: 2 },
+    logo_url: '/img/legends.png', hero_url: 'https://example.org/pitch.jpg'
+  };
+  const { logo_url: _l, hero_url: _h, ...UNMIGRATED } = MIGRATED;
+
+  /** The Schools sheet an export of `source` writes, read back as the importer reads it. */
+  const exported = (source: any) =>
+    planImport({ Schools: sheetFor(tableByKey('schools')!, { school: source }) }, known)
+      .sheets[0].rows[0];
+
+  /** Export `source`, then plan that sheet onto a database holding `target`. */
+  const roundTrip = (source: any, target: any) =>
+    planImport(
+      { Schools: sheetFor(tableByKey('schools')!, { school: source }) },
+      { teams: TEAMS, school: target }
+    ).sheets[0].schoolRows![0];
+
+  it('KEEPS BOTH ADDRESSES through an export and a re-import', () => {
+    const p = roundTrip(MIGRATED, MIGRATED);
+
+    expect(p.refused).toBeNull();
+    expect(p.school).toMatchObject({
+      logoUrl: '/img/legends.png', heroUrl: 'https://example.org/pitch.jpg'
+    });
+    expect(p.changes).toEqual([]);
+  });
+
+  it('puts both addresses back on a database that lost them, and says so', () => {
+    const p = roundTrip(MIGRATED, { ...MIGRATED, logo_url: null, hero_url: null });
+
+    expect(p.school).toMatchObject({
+      logoUrl: '/img/legends.png', heroUrl: 'https://example.org/pitch.jpg'
+    });
+    expect(p.changes).toEqual([
+      { field: 'LogoUrl', from: '', to: '/img/legends.png' },
+      { field: 'HeroUrl', from: '', to: 'https://example.org/pitch.jpg' }
+    ]);
+  });
+
+  it('LEAVES BOTH KEYS OUT for a database without the columns', () => {
+    // Naming a column that is not there makes PostgREST refuse the WHOLE save
+    // with 42703 -- the name, the colours and the record along with it.
+    const p = roundTrip(MIGRATED, UNMIGRATED);
+
+    expect(p.refused).toBeNull();
+    expect(p.school).not.toHaveProperty('logoUrl');
+    expect(p.school).not.toHaveProperty('heroUrl');
+    expect(p.notes.join(' ')).toContain('0028');
+    expect(p.notes.join(' ')).toContain('0030');
+  });
+
+  it('decides each column on its own: 0028 applied, 0030 not', () => {
+    const { hero_url: _, ...logoOnly } = MIGRATED;
+    const p = roundTrip(MIGRATED, logoOnly);
+
+    expect(p.school!.logoUrl).toBe('/img/legends.png');
+    expect(p.school).not.toHaveProperty('heroUrl');
+  });
+
+  it('KEEPS the current address when the cell is blank, and says so', () => {
+    // Blank means "not supplied" throughout the import. Sent as '', it would
+    // be written as null and clear an address the admin typed by hand.
+    const p = roundTrip({ ...MIGRATED, logo_url: null, hero_url: null }, MIGRATED);
+
+    expect(p.school).not.toHaveProperty('logoUrl');
+    expect(p.school).not.toHaveProperty('heroUrl');
+    expect(p.changes).toEqual([]);
+    expect(p.notes.join(' ')).toMatch(/logo address.*kept/i);
+    expect(p.notes.join(' ')).toMatch(/photo address.*kept/i);
+  });
+
+  it('changes neither address from a sheet written before the columns existed', () => {
+    const p = planSchoolRow({ Code: 'lfc', Name: 'Legends FC' }, MIGRATED);
+
+    expect(p.school).not.toHaveProperty('logoUrl');
+    expect(p.school).not.toHaveProperty('heroUrl');
+  });
+
+  it('REFUSES an address the public page would not show', () => {
+    // Both are rendered into an <img> on the public home page; `safeImageUrl`
+    // would drop these on read, so they are refused before they are stored.
+    const logo = planSchoolRow({ ...exported(MIGRATED), LogoUrl: 'javascript:alert(1)' }, MIGRATED);
+    const hero = planSchoolRow({ ...exported(MIGRATED), HeroUrl: '//elsewhere.example/x.jpg' }, MIGRATED);
+
+    expect(logo.school).toBeNull();
+    expect(logo.refused).toMatch(/logo address/i);
+    expect(hero.school).toBeNull();
+    expect(hero.refused).toMatch(/photo address/i);
+  });
+
+  it('REFUSES a row for another organization', () => {
+    // A backup restores the organization it was taken from, never another.
+    const p = roundTrip({ ...MIGRATED, code: 'rfc' }, MIGRATED);
+
+    expect(p.school).toBeNull();
+    expect(p.refused).toMatch(/rfc/);
+  });
+
+  it('REFUSES a row that names no organization rather than guessing one', () => {
+    const p = planSchoolRow({ ...exported(MIGRATED), Code: undefined }, MIGRATED);
+    expect(p.school).toBeNull();
+    expect(p.refused).toBeTruthy();
+  });
+
+  it('refuses when this organization has not loaded, since there is nothing to compare', () => {
+    const p = roundTrip(MIGRATED, null);
+    expect(p.school).toBeNull();
+    expect(p.refused).toBeTruthy();
+  });
+
+  it('keeps every field a blank cell leaves out', () => {
+    const p = planSchoolRow({ Code: 'lfc' }, { ...MIGRATED, colors: { ...MIGRATED.colors, band: '#000' } });
+
+    expect(p.school).toMatchObject({
+      name: 'Legends FC', mascot: 'Lions', city: 'Riverside', league: 'Inland',
+      colors: { primary: '#123456', secondary: '#abcdef', band: '#000' },
+      record: { wins: 3, losses: 1, draws: 2 }
+    });
+  });
+
+  it('REFUSES rather than send a blank name, mascot or city', () => {
+    // upsertSchool fills each of those with Beaumont's when it is blank.
+    const p = planSchoolRow({ Code: 'lfc' }, { ...MIGRATED, city: null });
+
+    expect(p.school).toBeNull();
+    expect(p.refused).toMatch(/city/i);
+    expect(JSON.stringify(p)).not.toMatch(/beaumont|cougars/i);
+  });
+
+  it('refuses a colour or a count it cannot read', () => {
+    expect(planSchoolRow({ Code: 'lfc', PrimaryColor: 'sparkly' }, MIGRATED).refused)
+      .toMatch(/colour/i);
+    expect(planSchoolRow({ Code: 'lfc', Wins: 'three' }, MIGRATED).refused)
+      .toMatch(/wins/i);
+  });
+
+  it('lists each field it would change, from and to', () => {
+    const p = planSchoolRow({ Code: 'lfc', Name: 'Legends FC Academy', Wins: '4' }, MIGRATED);
+
+    expect(p.changes).toEqual([
+      { field: 'Name', from: 'Legends FC', to: 'Legends FC Academy' },
+      { field: 'Wins', from: '3', to: '4' }
+    ]);
+  });
+
+  it('writes with the loaded code, the one upsertSchool keys on', () => {
+    const p = roundTrip({ ...MIGRATED, code: 'LFC' }, MIGRATED);
+    expect(p.code).toBe('lfc');
+  });
+
+  it('is attached only to the Schools sheet', () => {
+    const plan = planImport({ Players: [{ Team: 'Varsity' }] }, known);
+    expect(plan.sheets[0].schoolRows).toBeUndefined();
   });
 });
 

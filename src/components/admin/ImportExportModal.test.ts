@@ -26,9 +26,11 @@ const upsertCoach = vi.fn();
 const upsertDailyThought = vi.fn();
 const upsertQuizQuestion = vi.fn();
 const upsertSoccerCategory = vi.fn();
+const upsertSchool = vi.fn();
 
 vi.mock('../../data/supabase', () => ({
   supabaseService: {
+    upsertSchool: (...a: any[]) => upsertSchool(...a),
     upsertPlayerIdentity: (...a: any[]) => upsertPlayerIdentity(...a),
     upsertTeamMembership: (...a: any[]) => upsertTeamMembership(...a),
     upsertMatch: (...a: any[]) => upsertMatch(...a),
@@ -116,7 +118,7 @@ async function choose(w: any, sheets: Record<string, any[]>) {
 
 const anyWriteCalled = () =>
   [upsertPlayerIdentity, upsertTeamMembership, upsertMatch, upsertDrillBankItem,
-    upsertCoach, upsertDailyThought, upsertQuizQuestion, upsertSoccerCategory]
+    upsertCoach, upsertDailyThought, upsertQuizQuestion, upsertSoccerCategory, upsertSchool]
     .some(fn => fn.mock.calls.length > 0);
 
 beforeEach(() => {
@@ -130,6 +132,7 @@ beforeEach(() => {
   upsertDailyThought.mockResolvedValue({ data: [{ id: 'dt1' }] });
   upsertQuizQuestion.mockResolvedValue({ ok: true });
   upsertSoccerCategory.mockResolvedValue({ ok: true });
+  upsertSchool.mockResolvedValue({ data: { id: 's1' }, error: null });
 });
 
 describe('exporting', () => {
@@ -482,5 +485,96 @@ describe('applying', () => {
     expect(upsertSoccerCategory).toHaveBeenCalledWith('s1', {
       name: 'Possession', description: undefined
     });
+  });
+});
+
+describe('THE ORGANIZATION ROW', () => {
+  // As `fetchSchool` loads it -- `select *` -- so each applied migration's
+  // column is a key on the row, and an unapplied one's is not.
+  const SCHOOL = {
+    code: 'lfc', name: 'Legends FC', mascot: 'Lions', city: 'Riverside',
+    colors: { primary: '#123456', secondary: '#abcdef' },
+    record: { wins: 3, losses: 1, draws: 2 },
+    logo_url: '/img/legends.png', hero_url: 'https://example.org/pitch.jpg'
+  };
+  const { logo_url: _l, hero_url: _h, ...UNMIGRATED } = SCHOOL;
+
+  /** The Schools sheet as this modal exports it. */
+  function exportSchools(school: any): any[] {
+    const written = stubXLSX();
+    const w = mountIE({ ...DATA, school });
+    w.find('[data-export-one="schools"]').trigger('click');
+    w.unmount();
+    return written[0].wb.sheets.Schools.rows;
+  }
+
+  async function importOnto(school: any, rows: any[]) {
+    stubXLSX();
+    const w = mountIE({ ...DATA, school });
+    await choose(w, { Schools: rows });
+    return w;
+  }
+
+  async function apply(w: any) {
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+  }
+
+  it('KEEPS BOTH ADDRESSES through an export and a re-import', async () => {
+    const w = await importOnto({ ...SCHOOL, logo_url: null, hero_url: null }, exportSchools(SCHOOL));
+    await apply(w);
+
+    expect(upsertSchool).toHaveBeenCalledWith('lfc', expect.objectContaining({
+      logoUrl: '/img/legends.png', heroUrl: 'https://example.org/pitch.jpg'
+    }));
+  });
+
+  it('shows each address it would change, from and to, before writing anything', async () => {
+    const w = await importOnto({ ...SCHOOL, logo_url: null, hero_url: '/img/old.jpg' }, exportSchools(SCHOOL));
+
+    expect(w.find('[data-preview-change="LogoUrl"]').text()).toContain('/img/legends.png');
+    const hero = w.find('[data-preview-change="HeroUrl"]').text();
+    expect(hero).toContain('/img/old.jpg');
+    expect(hero).toContain('https://example.org/pitch.jpg');
+    expect(anyWriteCalled()).toBe(false);
+  });
+
+  it('LEAVES BOTH KEYS OUT on a database without the columns, and says why', async () => {
+    const w = await importOnto(UNMIGRATED, exportSchools(SCHOOL));
+
+    const notes = w.findAll('[data-preview-school-note]').map((n: any) => n.text()).join(' ');
+    expect(notes).toContain('0028');
+    expect(notes).toContain('0030');
+
+    await apply(w);
+    const sent = upsertSchool.mock.calls[0][1];
+    expect(sent).not.toHaveProperty('logoUrl');
+    expect(sent).not.toHaveProperty('heroUrl');
+  });
+
+  it('REFUSES, in the preview, an address the public page would not show', async () => {
+    const rows = exportSchools(SCHOOL).map(r => ({ ...r, LogoUrl: 'javascript:alert(1)' }));
+    const w = await importOnto(SCHOOL, rows);
+
+    expect(w.find('[data-preview-school-refused]').text()).toMatch(/logo address/i);
+
+    await apply(w);
+    expect(upsertSchool).not.toHaveBeenCalled();
+    expect(w.find('[data-import-result]').text()).toContain('1 refused');
+  });
+
+  it('never writes another organization from a backup of it', async () => {
+    const w = await importOnto(SCHOOL, exportSchools({ ...SCHOOL, code: 'rfc' }));
+    await apply(w);
+
+    expect(upsertSchool).not.toHaveBeenCalled();
+  });
+
+  it('counts a save the database refused as refused', async () => {
+    upsertSchool.mockResolvedValue({ data: null, error: 'column "hero_url" does not exist' });
+    const w = await importOnto(SCHOOL, exportSchools(SCHOOL));
+    await apply(w);
+
+    expect(w.find('[data-import-result]').text()).toContain('1 refused');
   });
 });

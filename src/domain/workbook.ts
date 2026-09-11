@@ -73,7 +73,7 @@ export function tableDefs(): TableDef[] {
       fileName: '1_Schools_Config.xlsx',
       sheetName: 'Schools',
       headers: ['Code', 'Name', 'Mascot', 'City', 'League', 'PrimaryColor',
-        'SecondaryColor', 'Wins', 'Losses', 'Draws', 'IsDeleted'],
+        'SecondaryColor', 'LogoUrl', 'HeroUrl', 'Wins', 'Losses', 'Draws', 'IsDeleted'],
       importable: true,
       toRows: (d) => {
         const s = d.school;
@@ -83,6 +83,9 @@ export function tableDefs(): TableDef[] {
           Code: t(s.code), Name: t(s.name), Mascot: t(s.mascot), City: t(s.city),
           League: t(s.league),
           PrimaryColor: t(s.colors?.primary), SecondaryColor: t(s.colors?.secondary),
+          // The addresses exactly as stored (0028, 0030): a backup holds what
+          // the database holds. `planSchoolRow` validates them on the way back.
+          LogoUrl: t(s.logo_url), HeroUrl: t(s.hero_url),
           Wins: s.record?.wins ?? 0, Losses: s.record?.losses ?? 0, Draws: s.record?.draws ?? 0,
           IsDeleted: flag(s.is_deleted || s.isDeleted)
         }];

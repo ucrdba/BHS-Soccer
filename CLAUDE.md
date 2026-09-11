@@ -177,6 +177,8 @@ The original export shipped a hardcoded sample quiz question, a fabricated match
 
 **The import describes what it would change and applies on a second, informed press.** The original applied as it read, so a misread column was discovered after it had overwritten a season.
 
+**The Schools row restores only the organization it came from**, planned field by field by `planSchoolRow` in `domain/import-plan.ts` and written through `upsertSchool`. A blank cell keeps the current value, because `upsertSchool` writes Beaumont's name, mascot and city over a blank. So a row that would still be blank is refused, and so is one with another organization's Code or an image address `safeImageUrl` rejects. `LogoUrl` and `HeroUrl` are sent only when the loaded row has `logo_url` / `hero_url`, since naming a column that 0028 or 0030 has not added fails the whole save with 42703.
+
 **And a team is never guessed.** A spreadsheet names a team as text and the database holds uuids; a row written against the wrong team is a player on a squad they never played for, in `team_players`, where minutes, ratings and recording numbers live. Unrecognised names are put to the coach to map, and applying is refused while any are unmapped.
 
 **`MatrixLogs` is export-only** — there is no import branch for it, so a full restore silently omitted Matrix history until the preview started saying so. The **Profiles** sheet exports with its headers and no rows, because no service method reads an organization's profiles; the screen says so rather than letting an empty sheet read as "no users".

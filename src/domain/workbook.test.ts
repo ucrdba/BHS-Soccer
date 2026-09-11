@@ -146,6 +146,28 @@ describe('the rows', () => {
     });
   });
 
+  it('carries the logo and photo addresses, which an admin typed by hand', () => {
+    // Nowhere else holds them: a backup that drops them loses them for good.
+    const [row] = rowsOf('schools', {
+      school: {
+        code: 'lfc', name: 'Legends FC',
+        logo_url: '/img/legends.png', hero_url: 'https://example.org/pitch.jpg'
+      }
+    });
+
+    expect(row).toMatchObject({
+      LogoUrl: '/img/legends.png', HeroUrl: 'https://example.org/pitch.jpg'
+    });
+  });
+
+  it('leaves both addresses blank for an organization that has neither', () => {
+    // Null (migrated, never set) and absent (unmigrated) read the same way.
+    const [row] = rowsOf('schools', { school: { code: 'lfc', name: 'Legends FC', logo_url: null } });
+
+    expect(row.LogoUrl).toBe('');
+    expect(row.HeroUrl).toBe('');
+  });
+
   it('writes Home or Away rather than a boolean', () => {
     const rows = rowsOf('schedule', {
       schedule: [{ opponent: 'Yucaipa', isHome: true }, { opponent: 'Redlands', isHome: false }]
