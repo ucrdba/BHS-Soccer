@@ -77,6 +77,13 @@ describe('who we are', () => {
     expect(w.find('[data-band-who]').text()).toContain('SoCal Premier');
   });
 
+  it('brings the logo back once its address is corrected, without a reload', async () => {
+    const w = mountHero();
+    await w.find('[data-band-logo]').trigger('error');
+    await w.setProps({ logo: '/img/fixed-logo.png' });
+    expect(w.find('[data-band-logo]').attributes('src')).toBe('/img/fixed-logo.png');
+  });
+
   it('leaves the row out with neither a logo nor a league or city', () => {
     expect(mountHero({ logo: '', place: '' }).find('[data-band-who]').exists()).toBe(false);
   });
