@@ -242,7 +242,7 @@ The ones jsdom cannot make, written against real boxes:
 Against the local dev server by default, or against a deployed URL:
 
 ```
-npm run e2e -- --base-url=https://bhssoccer-demo.vercel.app
+npm run e2e -- --base-url=https://bhs-soccer-demo.vercel.app
 ```
 
 The demo project is the only database they may write to. A shared fixture
@@ -255,7 +255,7 @@ scoping by convention is not scoping.
 feature branch
      │  merge
      ▼
-   demo  ──►  bhssoccer-demo.vercel.app     demo Supabase, auto sign-in, warning
+   demo  ──►  bhs-soccer-demo.vercel.app    demo Supabase, auto sign-in, warning
      │  merge when happy
      ▼
    main  ──►  bhssoccer.org                 real Supabase, real sign-in
