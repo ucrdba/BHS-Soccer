@@ -3318,6 +3318,8 @@ class SupabaseService {
       // save with 42703 if it is named. The profile form only sends it when
       // the row it loaded already has the column.
       ...(school.logoUrl !== undefined ? { logo_url: school.logoUrl || null } : {}),
+      // The photo, for the same reasons as the logo (migration 0030).
+      ...(school.heroUrl !== undefined ? { hero_url: school.heroUrl || null } : {}),
       colors: school.colors || { primary: '#0047AB', secondary: '#FFD700' },
       record: school.record || { wins: 0, losses: 0, draws: 0 }
     };
