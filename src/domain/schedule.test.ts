@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseMatchDateTime, matchDateTime, getNextMatch,
   scheduleState, lastPlayedMatch, nextMatchCountdown,
-  shortCountdown, lastCompletedMatch
+  shortCountdown, lastCompletedMatch, upcomingMatches, longCountdown
 } from './schedule';
 
 const at = (iso: string) => new Date(iso).getTime();
@@ -215,5 +215,102 @@ describe('lastCompletedMatch', () => {
     const undated = { id: 'undated', status: 'COMPLETED', score: '9 - 0', date: 'sometime', matchOn: null };
     expect(lastCompletedMatch([undated, good])?.id).toBe('good');
     expect(lastCompletedMatch([undated])).toBeNull();
+  });
+});
+
+describe('upcomingMatches', () => {
+  const sched = [
+    { id: 'later', date: 'SEP 11 2026', time: '6:00 PM', status: 'SCHEDULED' },
+    { id: 'sooner', date: 'SEP 4 2026', time: '6:00 PM', status: 'SCHEDULED' },
+    { id: 'done', date: 'AUG 28 2026', time: '6:00 PM', status: 'COMPLETED' },
+    { id: 'odd', date: 'sometime in spring', status: 'SCHEDULED' }
+  ];
+
+  it('lists what is still ahead, soonest first, not in row order', () => {
+    expect(upcomingMatches(sched, at('2026-09-01T12:00:00')).map(m => m.id))
+      .toEqual(['sooner', 'later']);
+  });
+
+  it('leaves out completed and undated fixtures', () => {
+    const ids = upcomingMatches(sched, at('2026-08-01T12:00:00')).map(m => m.id);
+    expect(ids).not.toContain('done');
+    expect(ids).not.toContain('odd');
+  });
+
+  it('keeps a match for three hours after kickoff, then drops it', () => {
+    expect(upcomingMatches(sched, at('2026-09-04T19:00:00')).map(m => m.id))
+      .toEqual(['sooner', 'later']);
+    expect(upcomingMatches(sched, at('2026-09-04T22:00:00')).map(m => m.id))
+      .toEqual(['later']);
+  });
+
+  it('is empty when nothing is ahead', () => {
+    expect(upcomingMatches(sched, at('2026-12-01T12:00:00'))).toEqual([]);
+    expect(upcomingMatches([], at('2026-09-01T12:00:00'))).toEqual([]);
+  });
+
+  /*
+   * "Next match" and "Coming up" read the same rule, so the band and the list
+   * below it can never disagree about which fixture comes first.
+   */
+  it('always begins with the next match', () => {
+    for (const iso of ['2026-08-01T12:00:00', '2026-09-04T19:00:00', '2026-09-05T12:00:00']) {
+      const n = at(iso);
+      expect(upcomingMatches(sched, n)[0], iso).toBe(getNextMatch(sched, n));
+    }
+  });
+});
+
+describe('longCountdown', () => {
+  it('reads days and hours when a day or more remains', () => {
+    expect(longCountdown({ days: '88', hours: '21', mins: '05' })).toEqual({
+      parts: [{ value: '88', unit: 'days' }, { value: '21', unit: 'hrs' }],
+      spoken: '88 days and 21 hours until kick-off',
+      underway: false
+    });
+  });
+
+  it('reads hours and minutes inside a day', () => {
+    expect(longCountdown({ days: '00', hours: '04', mins: '12' })).toEqual({
+      parts: [{ value: '4', unit: 'hrs' }, { value: '12', unit: 'min' }],
+      spoken: '4 hours and 12 minutes until kick-off',
+      underway: false
+    });
+  });
+
+  it('reads minutes inside an hour', () => {
+    expect(longCountdown({ days: '00', hours: '00', mins: '12' })).toEqual({
+      parts: [{ value: '12', unit: 'min' }],
+      spoken: '12 minutes until kick-off',
+      underway: false
+    });
+  });
+
+  it('is singular at one', () => {
+    expect(longCountdown({ days: '01', hours: '01', mins: '00' })).toEqual({
+      parts: [{ value: '1', unit: 'day' }, { value: '1', unit: 'hr' }],
+      spoken: '1 day and 1 hour until kick-off',
+      underway: false
+    });
+    expect(longCountdown({ days: '00', hours: '01', mins: '01' })!.spoken)
+      .toBe('1 hour and 1 minute until kick-off');
+  });
+
+  /*
+   * nextMatchCountdown reads all zeroes once kick-off has passed but the match
+   * is still the next one (the three-hour grace). "0 min" would read as a
+   * clock that stopped; the match is being played.
+   */
+  it('says the match is under way once kick-off has passed', () => {
+    expect(longCountdown({ days: '00', hours: '00', mins: '00' }))
+      .toEqual({ parts: [], spoken: 'Under way', underway: true });
+  });
+
+  it('is null when there is nothing to count down to', () => {
+    expect(longCountdown(null)).toBeNull();
+  });
+
+  it('reads parts that are not numbers as zero rather than NaN', () => {
+    expect(longCountdown({ days: 'abc', hours: '', mins: 'zz' } as any)!.underway).toBe(true);
   });
 });

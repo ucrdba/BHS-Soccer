@@ -90,23 +90,30 @@ export function matchDateTime(m: any): Date | null {
  * 00/00/00 because its target was in the past.
  */
 export function getNextMatch(schedule: any[], now: number = Date.now()): any | null {
-  const candidates = (schedule || []).filter(m => m && m.status !== 'COMPLETED');
-  if (candidates.length === 0) return null;
-
-  const dated: { m: any; t: number }[] = [];
-  const undated: any[] = [];
-  candidates.forEach(m => {
-    const t = matchDateTime(m);
-    if (t) dated.push({ m, t: t.getTime() });
-    else undated.push(m);
-  });
-
-  const upcoming = dated.filter(x => x.t + GRACE_MS > now).sort((a, b) => a.t - b.t);
-  if (upcoming.length) return upcoming[0].m;
+  const upcoming = upcomingMatches(schedule, now);
+  if (upcoming.length) return upcoming[0];
 
   // Nothing we could read is still ahead. A row whose date would not parse
   // might be, so it beats announcing the season is over on a parse failure.
+  const undated = (schedule || []).filter(m => m && m.status !== 'COMPLETED' && !matchDateTime(m));
   return undated.length ? undated[0] : null;
+}
+
+/**
+ * Every fixture still ahead, soonest first.
+ *
+ * The rule getNextMatch uses -- not completed, dated, and still inside the
+ * grace period after kick-off -- so "next match" and "coming up" cannot
+ * disagree: getNextMatch is this list's first entry. Undated rows are not
+ * listed; getNextMatch falls back to one only when nothing dated remains.
+ */
+export function upcomingMatches(schedule: any[], now: number = Date.now()): any[] {
+  return (schedule || [])
+    .filter(m => m && m.status !== 'COMPLETED')
+    .map(m => ({ m, t: matchDateTime(m) }))
+    .filter((x): x is { m: any; t: Date } => !!x.t && x.t.getTime() + GRACE_MS > now)
+    .sort((a, b) => a.t.getTime() - b.t.getTime())
+    .map(x => x.m);
 }
 
 /**
@@ -175,6 +182,63 @@ export function shortCountdown(c: Countdown | null): string {
   if (days > 0) return `${days}d ${two(hours)}h`;
   if (hours > 0) return `${two(hours)}h ${two(mins)}m`;
   return `${mins}m`;
+}
+
+export interface LongCountdown {
+  /** The figures and their units, largest first: "88" "days", "21" "hrs". */
+  parts: { value: string; unit: string }[];
+  /** The whole countdown as a sentence, for a screen reader. */
+  spoken: string;
+  /** Kick-off has passed but the match is still the next one. */
+  underway: boolean;
+}
+
+/**
+ * The countdown as the home page band sets it (spec
+ * 2026-09-10-home-hero-design.md §4.4).
+ *
+ * Two figures at most, as the short countdown: days and hours, hours and
+ * minutes inside a day, or minutes inside an hour. Units are words, because
+ * the band sets the figures large and a lone "d" beside them reads as a
+ * typo; singular at one.
+ */
+export function longCountdown(c: Countdown | null): LongCountdown | null {
+  if (!c) return null;
+  const days = Number(c.days) || 0;
+  const hours = Number(c.hours) || 0;
+  const mins = Number(c.mins) || 0;
+
+  if (days === 0 && hours === 0 && mins === 0) {
+    return { parts: [], spoken: 'Under way', underway: true };
+  }
+
+  const said = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+  if (days > 0) {
+    return {
+      parts: [
+        { value: String(days), unit: days === 1 ? 'day' : 'days' },
+        { value: String(hours), unit: hours === 1 ? 'hr' : 'hrs' }
+      ],
+      spoken: `${said(days, 'day', 'days')} and ${said(hours, 'hour', 'hours')} until kick-off`,
+      underway: false
+    };
+  }
+  if (hours > 0) {
+    return {
+      parts: [
+        { value: String(hours), unit: hours === 1 ? 'hr' : 'hrs' },
+        { value: String(mins), unit: 'min' }
+      ],
+      spoken: `${said(hours, 'hour', 'hours')} and ${said(mins, 'minute', 'minutes')} until kick-off`,
+      underway: false
+    };
+  }
+  return {
+    parts: [{ value: String(mins), unit: 'min' }],
+    spoken: `${said(mins, 'minute', 'minutes')} until kick-off`,
+    underway: false
+  };
 }
 
 /**
