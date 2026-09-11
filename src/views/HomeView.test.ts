@@ -180,25 +180,76 @@ describe("the coach's message", () => {
   it('is on Home, where the squad looks', () => {
     // It lived in the practice planner only as an artefact of the app.js
     // split; a message to the squad belongs on the page the squad opens.
-    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] } });
+    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] }, auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false } });
     expect(w.find('[data-thought-text]').text()).toBe('Squeeze the space.');
   });
 
-  it('shows a guest no controls for it', () => {
-    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] } });
+  it('shows a player no controls for it', () => {
+    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] }, auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false } });
+    expect(w.find('[data-thought-text]').exists()).toBe(true);
     expect(w.find('[data-thought-new]').exists()).toBe(false);
   });
 
+  /*
+   * The coach speaking to the squad is for the squad. v-if rather than
+   * v-show: the component never mounts for a visitor, so their browser never
+   * fetches the message at all.
+   */
+  it('is not shown to a visitor', () => {
+    const w = mountHome({}, {}, { thoughts: { thoughts: [MESSAGE] } });
+    expect(w.find('[data-daily-thought]').exists()).toBe(false);
+    expect(w.text()).not.toContain('Squeeze the space.');
+  });
+
   it('takes no room at all when no message is set', () => {
-    const w = mountHome({}, {}, { thoughts: { thoughts: [] } });
+    const w = mountHome({}, {}, { thoughts: { thoughts: [] }, auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false } });
     expect(w.find('[data-daily-thought]').exists()).toBe(false);
   });
 
   it('offers a coach a way to write one', () => {
     const w = mountHome({}, {}, {
       thoughts: { thoughts: [] },
-      auth: { isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
+      auth: { isLoggedIn: true, isCoach: true, isAdmin: false, isGuest: false, canAccessRatings: true }
     });
     expect(w.find('[data-thought-new]').exists()).toBe(true);
+  });
+});
+
+describe("the organization's logo", () => {
+  /*
+   * A visitor sees the organization's logo where the squad sees the coach's
+   * message. Read from the organization's row like the name and colours, so a
+   * club shows its own -- and one with no logo shows none.
+   */
+  const WITH_LOGO = {
+    schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: '/img/legends.png' }]
+  };
+
+  it("shows a visitor the organization's own logo", () => {
+    const w = mountHome({}, WITH_LOGO);
+    const img = w.find('[data-org-logo] img');
+
+    expect(img.attributes('src')).toBe('/img/legends.png');
+    expect(img.attributes('alt')).toBe('Legends FC');
+  });
+
+  it('gives the squad the message rather than the logo', () => {
+    const w = mountHome({}, WITH_LOGO, {
+      auth: { isLoggedIn: true, isCoach: false, isAdmin: false, isGuest: false, canAccessRatings: false }
+    });
+    expect(w.find('[data-org-logo]').exists()).toBe(false);
+  });
+
+  it('leaves the space empty for an organization with no logo, rather than borrowing one', () => {
+    const w = mountHome({});
+    expect(w.find('[data-org-logo]').exists()).toBe(false);
+  });
+
+  it('refuses an address that is not a web address or a path', () => {
+    // An admin types this, and it is rendered on the public page.
+    const w = mountHome({}, {
+      schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions', logo_url: 'javascript:alert(1)' }]
+    });
+    expect(w.find('[data-org-logo]').exists()).toBe(false);
   });
 });

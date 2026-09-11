@@ -3313,6 +3313,11 @@ class SupabaseService {
       // Only when supplied. An organization that has not named a league keeps
       // its null rather than being handed Beaumont's.
       ...(school.league !== undefined ? { league: school.league || null } : {}),
+      // The same rule as the league, with one more reason: until 0028 is
+      // applied the column does not exist, and PostgREST refuses the whole
+      // save with 42703 if it is named. The profile form only sends it when
+      // the row it loaded already has the column.
+      ...(school.logoUrl !== undefined ? { logo_url: school.logoUrl || null } : {}),
       colors: school.colors || { primary: '#0047AB', secondary: '#FFD700' },
       record: school.record || { wins: 0, losses: 0, draws: 0 }
     };

@@ -28,7 +28,8 @@ import {
   guardedColour, contrastRatio,
   MIN_MARK_CONTRAST, MIN_TEXT_CONTRAST,
   PAPER_GROUND, PAPER_INK, PAPER_ACCENT_FALLBACK,
-  DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK
+  DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK,
+  safeLogoUrl
 } from '../../domain/theme';
 import { parseColour, toHex } from '../../domain/colour';
 
@@ -45,7 +46,7 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [school: any] }>();
 
 const form = ref({
-  name: '', mascot: '', city: '', league: '',
+  name: '', mascot: '', city: '', league: '', logoUrl: '',
   primary: DEFAULT_PRIMARY, secondary: DEFAULT_SECONDARY,
   wins: '0', losses: '0', draws: '0'
 });
@@ -75,6 +76,7 @@ async function load(): Promise<void> {
       mascot: fetched.mascot || '',
       city: fetched.city || '',
       league: fetched.league || '',
+      logoUrl: fetched.logo_url || '',
       primary: fetched.colors?.primary || DEFAULT_PRIMARY,
       secondary: fetched.colors?.secondary || DEFAULT_SECONDARY,
       wins: String(fetched.record?.wins ?? 0),
@@ -89,6 +91,25 @@ async function load(): Promise<void> {
 }
 
 watch(() => props.schoolCode, load, { immediate: true });
+
+/**
+ * Whether this database has the logo column yet.
+ *
+ * Read off the loaded row rather than assumed. Until 0028 is applied the
+ * column is absent, `select *` simply omits it, and naming it in the save
+ * would make PostgREST refuse the WHOLE profile with 42703 -- losing an
+ * admin's name or colour edit over a field they never touched.
+ */
+const logoColumn = computed(() => !!row.value && 'logo_url' in row.value);
+
+/** A typed address the public page would refuse, said before saving. */
+const logoError = computed<string | null>(() => {
+  const typed = form.value.logoUrl.trim();
+  if (!typed || safeLogoUrl(typed)) return null;
+  return 'A logo address must start with https://, http:// or / (a file shipped with the app).';
+});
+
+const logoPreview = computed(() => safeLogoUrl(form.value.logoUrl));
 
 /** What the two fields accept, said once so the message and the hint agree. */
 const COLOUR_FORMS = 'a hex code (#21196F), an rgb() triple (rgb(33, 25, 111)), or a colour name (navy)';
@@ -173,12 +194,14 @@ async function onSave(): Promise<void> {
     return;
   }
   if (colourError.value) { return; }
+  if (logoError.value) { error.value = logoError.value; return; }
 
   const school = {
     name,
     mascot,
     city: form.value.city.trim(),
     league: form.value.league.trim(),
+    ...(logoColumn.value ? { logoUrl: form.value.logoUrl.trim() } : {}),
     colors: {
       ...(row.value?.colors ?? {}),
       primary: form.value.primary.trim(),
@@ -239,6 +262,11 @@ async function onSave(): Promise<void> {
           <span class="kicker">League</span>
           <input v-model="form.league" data-school-league type="text" class="input" />
         </label>
+        <label class="field field--wide">
+          <span class="kicker">Logo address</span>
+          <input v-model="form.logoUrl" data-school-logo type="text" class="input"
+                 :disabled="!logoColumn" placeholder="https://… or /img/…" />
+        </label>
         <label class="field">
           <span class="kicker">Primary colour</span>
           <span class="swatch-row">
@@ -270,6 +298,13 @@ async function onSave(): Promise<void> {
       <p class="note" data-school-colour-forms>Colours accept {{ COLOUR_FORMS }}.</p>
       <p v-if="colourError" class="note note--bad" role="alert" data-school-colour-error>{{ colourError }}</p>
       <p v-for="(item, i) in substitutions" :key="i" class="note" data-school-colour-note>{{ item.reason }}</p>
+
+      <!-- Shown on the public home page, in place of the coach's message. -->
+      <p v-if="row && !logoColumn" class="note" data-school-logo-unmigrated>
+        This database has no logo column yet. Apply migration 0028 to give the organization a logo.
+      </p>
+      <p v-else-if="logoError" class="note note--bad" role="alert" data-school-logo-error>{{ logoError }}</p>
+      <img v-else-if="logoPreview" :src="logoPreview" alt="" class="logo-preview" data-school-logo-preview />
 
       <p class="note">
         The name and mascot are rendered on headings throughout the app.
@@ -305,4 +340,7 @@ async function onSave(): Promise<void> {
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
 }
+
+/* The logo as the public page will show it, before it is saved. */
+.logo-preview { width: 6rem; height: 6rem; object-fit: cover; border-radius: var(--radius-md); }
 </style>

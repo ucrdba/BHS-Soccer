@@ -20,6 +20,8 @@ export interface Branding {
   mascot: string;
   primary: string;
   secondary: string;
+  /** The organization's logo, or '' when it has none or it was refused. */
+  logoUrl: string;
 }
 
 /**
@@ -37,6 +39,22 @@ function colour(value: unknown, fallback: string): string {
   return parseColour(trimmed) ? trimmed : fallback;
 }
 
+/**
+ * A logo address the page will render, or ''.
+ *
+ * An admin types this and it is rendered into an <img> on the PUBLIC home
+ * page, so it is held to two shapes: http(s), or a root-relative path to a
+ * file shipped with the app. A protocol-relative `//host/x.png` is refused
+ * with the rest -- it looks like a path and is a different host.
+ */
+export function safeLogoUrl(value: unknown): string {
+  const url = typeof value === 'string' ? value.trim() : '';
+  if (!url) return '';
+  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  return '';
+}
+
 export function brandingFor(school: any): Branding {
   const colors = school && typeof school.colors === 'object' && school.colors !== null
     ? school.colors
@@ -48,7 +66,10 @@ export function brandingFor(school: any): Branding {
     name: (school && school.name) || '',
     mascot: (school && school.mascot) || '',
     primary: colour(colors.primary, DEFAULT_PRIMARY),
-    secondary: colour(colors.secondary, DEFAULT_SECONDARY)
+    secondary: colour(colors.secondary, DEFAULT_SECONDARY),
+    // No fallback either, for the same reason as the name: an organization
+    // that has not supplied a logo shows none, not somebody else's.
+    logoUrl: safeLogoUrl(school && school.logo_url)
   };
 }
 

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  safeLogoUrl,
   brandingFor, themeVars, contrastRatio, colourDistance, guardedColour,
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
   PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, PAPER_ACCENT_FALLBACK, DARK_MARK_FALLBACK,
@@ -23,7 +24,8 @@ describe('brandingFor', () => {
       name: 'Legends FC',
       mascot: 'Lions',
       primary: '#123456',
-      secondary: '#abcdef'
+      secondary: '#abcdef',
+      logoUrl: ''
     });
   });
 
@@ -209,5 +211,53 @@ describe('themeVars', () => {
     expect(vars['--org-mark-paper']).toBe('#0047ab');
     expect(vars['--org-text-paper']).toBe('#0047ab');
     expect(vars['--org-mark-dark']).toBe('#ffd700');
+  });
+});
+
+describe('safeLogoUrl', () => {
+  /*
+   * An admin types this and it is rendered into an <img> on the PUBLIC home
+   * page, so it is held to two shapes: http(s), or a path to a file shipped
+   * with the app.
+   */
+  it('keeps a web address', () => {
+    expect(safeLogoUrl('https://cdn.example.org/crest.png')).toBe('https://cdn.example.org/crest.png');
+    expect(safeLogoUrl('http://example.org/crest.png')).toBe('http://example.org/crest.png');
+  });
+
+  it('keeps a path to a file shipped with the app', () => {
+    expect(safeLogoUrl('/img/crest.jpg')).toBe('/img/crest.jpg');
+    expect(safeLogoUrl('  /img/crest.jpg  ')).toBe('/img/crest.jpg');
+  });
+
+  it('refuses a protocol-relative address, which looks like a path and is another host', () => {
+    expect(safeLogoUrl('//evil.example/crest.png')).toBe('');
+  });
+
+  it('refuses every other scheme', () => {
+    expect(safeLogoUrl('javascript:alert(1)')).toBe('');
+    expect(safeLogoUrl('data:image/png;base64,AAAA')).toBe('');
+    expect(safeLogoUrl('img/crest.jpg')).toBe('');
+  });
+
+  it('is empty for nothing at all', () => {
+    expect(safeLogoUrl('')).toBe('');
+    expect(safeLogoUrl(null)).toBe('');
+    expect(safeLogoUrl(42)).toBe('');
+  });
+});
+
+describe('brandingFor, the logo', () => {
+  it("reads the organization's own logo off its row", () => {
+    expect(brandingFor({ name: 'A', mascot: 'B', logo_url: '/img/a.png' }).logoUrl).toBe('/img/a.png');
+  });
+
+  it("has none when the organization has none, rather than somebody else's", () => {
+    expect(brandingFor({ name: 'A', mascot: 'B' }).logoUrl).toBe('');
+    expect(brandingFor(null).logoUrl).toBe('');
+  });
+
+  it('drops an address the page would refuse', () => {
+    expect(brandingFor({ name: 'A', mascot: 'B', logo_url: 'javascript:alert(1)' }).logoUrl).toBe('');
   });
 });

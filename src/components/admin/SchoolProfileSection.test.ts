@@ -284,3 +284,66 @@ describe('the colour fields', () => {
     expect(notes.some(n => /f5f4f4/i.test(n) && /paper/i.test(n) && /cannot be seen/i.test(n))).toBe(true);
   });
 });
+
+describe('the logo', () => {
+  /*
+   * Shown on the public home page in place of the coach's message, and read
+   * from the organization's row like everything else on this form.
+   */
+  it('shows the logo address the row carries, and a preview of it', async () => {
+    const w = await mountSection({ logo_url: '/img/legends.png' });
+
+    expect((w.find('[data-school-logo]').element as HTMLInputElement).value).toBe('/img/legends.png');
+    expect(w.find('[data-school-logo-preview]').attributes('src')).toBe('/img/legends.png');
+  });
+
+  /*
+   * Until 0028 is applied the column does not exist: `select *` omits it, and
+   * naming it in the save makes PostgREST refuse the WHOLE profile with 42703.
+   * So the field is disabled and the save leaves it out, rather than losing an
+   * admin's name or colour edit over a field they never touched.
+   */
+  it('is disabled, and says why, on a database without the column', async () => {
+    const w = await mountSection();   // CLUB carries no logo_url key at all
+
+    expect(w.find('[data-school-logo]').attributes('disabled')).toBeDefined();
+    expect(w.find('[data-school-logo-unmigrated]').text()).toMatch(/0028/);
+  });
+
+  it('leaves the logo out of the save on a database without the column', async () => {
+    const w = await mountSection();
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool).toHaveBeenCalled();
+    expect(upsertSchool.mock.calls[0][1]).not.toHaveProperty('logoUrl');
+  });
+
+  it('saves the logo once the column exists', async () => {
+    const w = await mountSection({ logo_url: null });
+    await w.find('[data-school-logo]').setValue('/img/legends.png');
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool.mock.calls[0][1].logoUrl).toBe('/img/legends.png');
+  });
+
+  it('refuses an address the public page would not show, before saving', async () => {
+    const w = await mountSection({ logo_url: null });
+    await w.find('[data-school-logo]').setValue('javascript:alert(1)');
+
+    expect(w.find('[data-school-logo-error]').exists()).toBe(true);
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+    expect(upsertSchool).not.toHaveBeenCalled();
+  });
+
+  it('clears a logo by saving an empty address', async () => {
+    const w = await mountSection({ logo_url: '/img/legends.png' });
+    await w.find('[data-school-logo]').setValue('');
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool.mock.calls[0][1].logoUrl).toBe('');
+  });
+});

@@ -52,7 +52,7 @@ describe('the organization store', () => {
 
     expect(store.branding).toEqual({
       name: 'Legends FC', mascot: 'Lions',
-      primary: '#123456', secondary: '#abcdef'
+      primary: '#123456', secondary: '#abcdef', logoUrl: ''
     });
   });
 

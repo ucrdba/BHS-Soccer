@@ -128,9 +128,22 @@ const lastResult = computed(() => {
       </div>
     </div>
 
-    <!-- Directly after the fixture: it is the coach speaking to the squad, and
-         the squad reads this page first. -->
-    <DailyThought :team-id="org.activeTeamId" :can-edit="canWriteThought" />
+    <!--
+      Directly after the fixture: it is the coach speaking to the squad, and
+      the squad reads this page first. For the squad only -- players, coaches
+      and admins -- and v-if rather than v-show, so a visitor's browser never
+      fetches the message at all.
+
+      A visitor sees the organization's logo in its place, read from the
+      organization's row like the name and colours. An organization with no
+      logo leaves the space empty rather than borrowing anybody else's.
+    -->
+    <DailyThought v-if="auth.isLoggedIn" :team-id="org.activeTeamId" :can-edit="canWriteThought" />
+    <figure v-else-if="org.branding.logoUrl" class="crest" data-org-logo>
+      <img
+        :src="org.branding.logoUrl" :alt="org.branding.name || 'Organization logo'"
+        class="crest__img" width="512" height="512" decoding="async" />
+    </figure>
 
     <section v-if="settled && schedule.record.gamesPlayed > 0" class="stats tnum">
       <div class="stat">
@@ -236,8 +249,20 @@ const lastResult = computed(() => {
 .stat__value { font-family: var(--heading-face); font-size: 20px; color: var(--mark); }
 .stat__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
+/* The organization's logo, for a visitor. Sized to sit under the fixture
+   rather than compete with it. */
+.crest { display: flex; justify-content: center; margin: var(--space-6) var(--space-4) 0; }
+
+.crest__img {
+  width: min(14rem, 64vw);
+  height: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
 @media (min-width: 768px) {
   .fixture, .stats { max-width: 40rem; margin-inline: auto; }
+  .crest { max-width: 40rem; margin-inline: auto; }
   .fixture { padding: var(--space-8) var(--space-4) 0; }
   .stats { grid-template-columns: repeat(4, 1fr); }
 }
