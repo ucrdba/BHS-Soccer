@@ -18,6 +18,7 @@ import ResultsPanel from '../components/matrix/ResultsPanel.vue';
 import PlayerBreakdownModal from '../components/matrix/PlayerBreakdownModal.vue';
 import SessionHistory from '../components/matrix/SessionHistory.vue';
 import WeightsModal from '../components/matrix/WeightsModal.vue';
+import RecordResultModal from '../components/matrix/RecordResultModal.vue';
 import SquadReportModal from '../components/matrix/SquadReportModal.vue';
 import ProgressModal from '../components/matrix/ProgressModal.vue';
 import { useMatrixStore } from '../stores/matrix';
@@ -63,6 +64,7 @@ function openFromExercise(id: string): void {
 const notice = ref<string | null>(null);
 
 const weightsOpen = ref(false);
+const resultOpen = ref(false);
 const squadOpen = ref(false);
 const progressOpen = ref(false);
 /**
@@ -218,9 +220,15 @@ watch(
         v-if="recordable" class="act" data-record-session
         :to="{ name: 'session-entry', params: { drillId: sessionDrillId } }"
       >Record a session</RouterLink>
-      <p v-else-if="sessionDrills.length" class="act act--dead" data-record-pairings>
-        Recorded as pairings, not a session
-      </p>
+      <!--
+        Not a dead label any more. head_to_head is scored from pairings rather
+        than sessions, and this is where a pairing is recorded -- the thing
+        the old sentence described but did not offer.
+      -->
+      <button
+        v-else-if="sessionDrills.length" type="button" class="act"
+        data-record-pairings @click="resultOpen = true"
+      >Record a 1v1</button>
       <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
       <button type="button" class="act" data-open-weights @click="weightsOpen = true">Weights &amp; standards</button>
       <button type="button" class="act" data-open-squad @click="squadOpen = true">Squad report</button>
@@ -267,6 +275,13 @@ watch(
       :player-id="openPlayerId" :team-id="org.activeTeamId"
       :drill-id="openPlayerDrillId"
       @close="openPlayerId = null" />
+
+    <RecordResultModal
+      v-if="chosenDrill"
+      :open="resultOpen" :team-id="org.activeTeamId"
+      :drill-id="chosenDrill.id" :drill-name="chosenDrill.name"
+      :players="matrix.players" :logs="matrix.logs"
+      @close="resultOpen = false" @saved="reload" />
 
     <WeightsModal
       v-if="isCoach"

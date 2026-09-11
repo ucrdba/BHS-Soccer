@@ -576,14 +576,31 @@ describe('recording a session', () => {
     expect(w.find('[data-no-results]').text()).toContain('Small Sided');
   });
 
-  it('does not offer to record a 1v1, and says why', async () => {
-    // Those are entered as pairings. Offering both routes for one drill would
-    // let the same day's competition be counted twice.
+  it('offers the pairing route for a 1v1, not the session one', async () => {
+    /*
+     * head_to_head is scored from pairings in matrix_logs, which name both
+     * players; a session result is one row per player and has nowhere to put
+     * the opponent. Offering both routes for one drill would also let the
+     * same day's competition be counted twice.
+     *
+     * This used to be a dead label saying so and offering nothing, which
+     * left a 1v1 exercise unrecordable by any route in the app.
+     */
     const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
     await w.find('[data-session-drill]').setValue('d-1v1');
 
     expect(w.find('[data-record-session]').exists()).toBe(false);
-    expect(w.find('[data-record-pairings]').text()).toMatch(/pairing/i);
+    expect(w.find('[data-record-pairings]').text()).toMatch(/1v1/i);
+  });
+
+  it('opens the record-a-1v1 screen on the chosen exercise', async () => {
+    const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
+    await w.find('[data-session-drill]').setValue('d-1v1');
+
+    expect(w.find('[data-result-player-a]').exists()).toBe(false);
+    await w.find('[data-record-pairings]').trigger('click');
+
+    expect(w.find('[data-result-player-a]').exists()).toBe(true);
   });
 
   it('offers to record an exercise that can be, targeting the chosen one', async () => {
