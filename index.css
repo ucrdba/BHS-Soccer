@@ -12,6 +12,9 @@
   /* Status — fixed on every ground. */
   --color-success: #10B981;
   --color-warning: #F59E0B;
+  /* Words ON a --color-warning fill. Dark on every ground: --ink turns light
+     on the pitch and ledger grounds, which is unreadable on amber. */
+  --on-warning: #201f1d;
   --color-danger: #EF4444;
 
   /* Spacing and radii, from the Classical system (4.6px step, 4px radius). */

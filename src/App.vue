@@ -13,6 +13,10 @@
  * bare ones included. A save that failed during a match is exactly the
  * failure a coach must be told about, and those screens have no header to
  * put it in.
+ *
+ * DemoNotice is the other: on the demo deployment it sits above everything, on
+ * every route, bare ones included, because a visitor on the live-match screen
+ * must know the players are made up just as much as one on the home page.
  */
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
@@ -20,6 +24,7 @@ import AppHeader from './components/layout/AppHeader.vue';
 import AppNav from './components/layout/AppNav.vue';
 import AppFooter from './components/layout/AppFooter.vue';
 import NoticeBox from './components/ui/NoticeBox.vue';
+import DemoNotice from './components/layout/DemoNotice.vue';
 import { useOrganizationStore } from './stores/organization';
 
 const org = useOrganizationStore();
@@ -30,6 +35,7 @@ onMounted(() => org.load());
 </script>
 
 <template>
+  <DemoNotice />
   <AppHeader v-if="!toolChrome" />
   <AppNav v-if="!toolChrome" />
 
