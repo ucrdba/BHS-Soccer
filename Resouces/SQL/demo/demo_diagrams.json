@@ -1,0 +1,828 @@
+{
+  "rondo": {
+    "keyframes": [
+      {
+        "time": 0,
+        "label": "Time 0 (Start Position)",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 250,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 550,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 550,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 250,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 370,
+            "y": 230,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 6,
+            "type": "defender",
+            "x": 430,
+            "y": 250,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 265,
+            "y": 150,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "text",
+            "text": "Rondo 4v2: two touches",
+            "x": 400,
+            "y": 60,
+            "color": "#FFD700"
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 1,
+        "label": "Time 1",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 250,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 550,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 550,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 250,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 470,
+            "y": 190,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 6,
+            "type": "defender",
+            "x": 430,
+            "y": 250,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 535,
+            "y": 150,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "text",
+            "text": "Rondo 4v2: two touches",
+            "x": 400,
+            "y": 60,
+            "color": "#FFD700"
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 2,
+        "label": "Time 2",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 250,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 550,
+            "y": 140,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 550,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 250,
+            "y": 340,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 470,
+            "y": 190,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 6,
+            "type": "defender",
+            "x": 480,
+            "y": 300,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 535,
+            "y": 330,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "text",
+            "text": "Rondo 4v2: two touches",
+            "x": 400,
+            "y": 60,
+            "color": "#FFD700"
+          }
+        ],
+        "drawings": []
+      }
+    ],
+    "currentFrameIndex": 0,
+    "elements": [
+      {
+        "id": 1,
+        "type": "attacker",
+        "x": 250,
+        "y": 140,
+        "color": "#0047AB",
+        "number": "1"
+      },
+      {
+        "id": 2,
+        "type": "attacker",
+        "x": 550,
+        "y": 140,
+        "color": "#0047AB",
+        "number": "2"
+      },
+      {
+        "id": 3,
+        "type": "attacker",
+        "x": 550,
+        "y": 340,
+        "color": "#0047AB",
+        "number": "3"
+      },
+      {
+        "id": 4,
+        "type": "attacker",
+        "x": 250,
+        "y": 340,
+        "color": "#0047AB",
+        "number": "4"
+      },
+      {
+        "id": 5,
+        "type": "defender",
+        "x": 370,
+        "y": 230,
+        "color": "#EF4444",
+        "number": "1"
+      },
+      {
+        "id": 6,
+        "type": "defender",
+        "x": 430,
+        "y": 250,
+        "color": "#EF4444",
+        "number": "2"
+      },
+      {
+        "id": 7,
+        "type": "ball",
+        "x": 265,
+        "y": 150,
+        "color": "#FF8C00",
+        "number": ""
+      },
+      {
+        "id": 8,
+        "type": "text",
+        "text": "Rondo 4v2: two touches",
+        "x": 400,
+        "y": 60,
+        "color": "#FFD700"
+      }
+    ],
+    "drawings": [],
+    "pitchType": "blank"
+  },
+  "overlap": {
+    "keyframes": [
+      {
+        "time": 0,
+        "label": "Time 0 (Start Position)",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 300,
+            "y": 380,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 330,
+            "y": 250,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 470,
+            "y": 150,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "defender",
+            "x": 360,
+            "y": 230,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 500,
+            "y": 120,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 6,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 335,
+            "y": 262,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 1,
+        "label": "Time 1",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 300,
+            "y": 180,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 420,
+            "y": 240,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 470,
+            "y": 150,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "defender",
+            "x": 360,
+            "y": 230,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 500,
+            "y": 120,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 6,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 300,
+            "y": 190,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 2,
+        "label": "Time 2",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 300,
+            "y": 180,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 420,
+            "y": 240,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 430,
+            "y": 90,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "defender",
+            "x": 360,
+            "y": 230,
+            "color": "#EF4444",
+            "number": "1"
+          },
+          {
+            "id": 5,
+            "type": "defender",
+            "x": 500,
+            "y": 120,
+            "color": "#EF4444",
+            "number": "2"
+          },
+          {
+            "id": 6,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "ball",
+            "x": 430,
+            "y": 100,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      }
+    ],
+    "currentFrameIndex": 0,
+    "elements": [
+      {
+        "id": 1,
+        "type": "attacker",
+        "x": 300,
+        "y": 380,
+        "color": "#0047AB",
+        "number": "1"
+      },
+      {
+        "id": 2,
+        "type": "attacker",
+        "x": 330,
+        "y": 250,
+        "color": "#0047AB",
+        "number": "2"
+      },
+      {
+        "id": 3,
+        "type": "attacker",
+        "x": 470,
+        "y": 150,
+        "color": "#0047AB",
+        "number": "3"
+      },
+      {
+        "id": 4,
+        "type": "defender",
+        "x": 360,
+        "y": 230,
+        "color": "#EF4444",
+        "number": "1"
+      },
+      {
+        "id": 5,
+        "type": "defender",
+        "x": 500,
+        "y": 120,
+        "color": "#EF4444",
+        "number": "2"
+      },
+      {
+        "id": 6,
+        "type": "gk",
+        "x": 400,
+        "y": 40,
+        "color": "#FFD700",
+        "number": ""
+      },
+      {
+        "id": 7,
+        "type": "ball",
+        "x": 335,
+        "y": 262,
+        "color": "#FF8C00",
+        "number": ""
+      }
+    ],
+    "drawings": [],
+    "pitchType": "half"
+  },
+  "crossing": {
+    "keyframes": [
+      {
+        "time": 0,
+        "label": "Time 0 (Start Position)",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 150,
+            "y": 150,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 360,
+            "y": 260,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 460,
+            "y": 280,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 400,
+            "y": 330,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 6,
+            "type": "cone",
+            "x": 330,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "cone",
+            "x": 470,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "ball",
+            "x": 160,
+            "y": 160,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 1,
+        "label": "Time 1",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 150,
+            "y": 150,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 350,
+            "y": 100,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 480,
+            "y": 110,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 390,
+            "y": 190,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 6,
+            "type": "cone",
+            "x": 330,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "cone",
+            "x": 470,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "ball",
+            "x": 160,
+            "y": 160,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      },
+      {
+        "time": 2,
+        "label": "Time 2",
+        "elements": [
+          {
+            "id": 1,
+            "type": "attacker",
+            "x": 150,
+            "y": 150,
+            "color": "#0047AB",
+            "number": "1"
+          },
+          {
+            "id": 2,
+            "type": "attacker",
+            "x": 350,
+            "y": 100,
+            "color": "#0047AB",
+            "number": "2"
+          },
+          {
+            "id": 3,
+            "type": "attacker",
+            "x": 480,
+            "y": 110,
+            "color": "#0047AB",
+            "number": "3"
+          },
+          {
+            "id": 4,
+            "type": "attacker",
+            "x": 390,
+            "y": 190,
+            "color": "#0047AB",
+            "number": "4"
+          },
+          {
+            "id": 5,
+            "type": "gk",
+            "x": 400,
+            "y": 40,
+            "color": "#FFD700",
+            "number": ""
+          },
+          {
+            "id": 6,
+            "type": "cone",
+            "x": 330,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 7,
+            "type": "cone",
+            "x": 470,
+            "y": 110,
+            "color": "#FF8C00",
+            "number": ""
+          },
+          {
+            "id": 8,
+            "type": "ball",
+            "x": 350,
+            "y": 105,
+            "color": "#FF8C00",
+            "number": ""
+          }
+        ],
+        "drawings": []
+      }
+    ],
+    "currentFrameIndex": 0,
+    "elements": [
+      {
+        "id": 1,
+        "type": "attacker",
+        "x": 150,
+        "y": 150,
+        "color": "#0047AB",
+        "number": "1"
+      },
+      {
+        "id": 2,
+        "type": "attacker",
+        "x": 360,
+        "y": 260,
+        "color": "#0047AB",
+        "number": "2"
+      },
+      {
+        "id": 3,
+        "type": "attacker",
+        "x": 460,
+        "y": 280,
+        "color": "#0047AB",
+        "number": "3"
+      },
+      {
+        "id": 4,
+        "type": "attacker",
+        "x": 400,
+        "y": 330,
+        "color": "#0047AB",
+        "number": "4"
+      },
+      {
+        "id": 5,
+        "type": "gk",
+        "x": 400,
+        "y": 40,
+        "color": "#FFD700",
+        "number": ""
+      },
+      {
+        "id": 6,
+        "type": "cone",
+        "x": 330,
+        "y": 110,
+        "color": "#FF8C00",
+        "number": ""
+      },
+      {
+        "id": 7,
+        "type": "cone",
+        "x": 470,
+        "y": 110,
+        "color": "#FF8C00",
+        "number": ""
+      },
+      {
+        "id": 8,
+        "type": "ball",
+        "x": 160,
+        "y": 160,
+        "color": "#FF8C00",
+        "number": ""
+      }
+    ],
+    "drawings": [],
+    "pitchType": "half"
+  }
+}
