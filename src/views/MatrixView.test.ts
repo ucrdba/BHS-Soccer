@@ -597,10 +597,14 @@ describe('recording a session', () => {
     const w = await mountMatrix({ coach: true, drills: DRILLS.concat([ONE_V_ONE]) });
     await w.find('[data-session-drill]').setValue('d-1v1');
 
-    expect(w.find('[data-result-player-a]').exists()).toBe(false);
+    expect(w.find('[data-quick-box]').exists()).toBe(false);
     await w.find('[data-record-pairings]').trigger('click');
 
-    expect(w.find('[data-result-player-a]').exists()).toBe(true);
+    // It opens on the typed sheet -- 1w3 means number 1 beat number 3 --
+    // because a round robin comes off paper by the column, not one pairing
+    // at a time. The picker is a tab away.
+    expect(w.find('[data-quick-box]').exists()).toBe(true);
+    expect(w.find('[data-mode-pick]').exists()).toBe(true);
   });
 
   it('offers to record an exercise that can be, targeting the chosen one', async () => {
