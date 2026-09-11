@@ -463,3 +463,100 @@ describe('typing results', () => {
     expect(w.find('[data-mode-quick]').attributes('disabled')).toBeDefined();
   });
 });
+
+describe('the picker: typing a number instead of hunting a name', () => {
+  /*
+   * Two controls over one value. On a squad of twenty-five, typing 12 beats
+   * scrolling a dropdown; the list stays because it is the only way in when
+   * the sheet is not to hand, or when nobody has a number yet.
+   */
+  it('picks the player carrying that number', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('7');
+
+    expect((w.find('[data-result-player-a]').element as HTMLSelectElement).value).toBe('p1');
+  });
+
+  it('fills the number when the name is chosen instead', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-player-b]').setValue('p3');
+
+    expect((w.find('[data-result-number-b]').element as HTMLInputElement).value).toBe('12');
+  });
+
+  it('records what was typed, the same as what was picked', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('7');
+    await w.find('[data-result-number-b]').setValue('3');
+    await w.find('[data-result-outcome="a"]').trigger('click');
+    await w.find('[data-result-save]').trigger('click');
+    await flush();
+
+    expect(logMatrixResult).toHaveBeenCalledWith(TEAM, expect.objectContaining({
+      playerAId: 'p1', playerBId: 'p2', outcome: 'a'
+    }));
+  });
+
+  it('names a number nobody carries rather than silently choosing nobody', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('99');
+
+    expect(w.find('[data-result-missing]').text()).toContain('99');
+    expect(w.find('[data-result-save]').attributes('disabled')).toBeDefined();
+  });
+
+  it('names both numbers when neither is on the squad', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('98');
+    await w.find('[data-result-number-b]').setValue('99');
+
+    expect(w.find('[data-result-missing]').text()).toContain('98 or 99');
+  });
+
+  it('says nothing about a box not filled in yet', async () => {
+    // Empty is not a miss; it is a form still being filled in.
+    const w = await mountPicker();
+    expect(w.find('[data-result-missing]').exists()).toBe(false);
+  });
+
+  it('clears the choice when the number is cleared', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('7');
+    await w.find('[data-result-number-a]').setValue('');
+
+    expect((w.find('[data-result-player-a]').element as HTMLSelectElement).value).toBe('');
+    expect(w.find('[data-result-missing]').exists()).toBe(false);
+  });
+
+  it('refuses a pairing typed into the number box', async () => {
+    // "7w3" here is the quick tab's format in the wrong place. Reading the
+    // leading 7 out of it would record a result the coach did not ask for.
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('7w3');
+
+    expect((w.find('[data-result-player-a]').element as HTMLSelectElement).value).toBe('');
+    expect(w.find('[data-result-missing]').text()).toContain('7w3');
+  });
+
+  it('keeps what was typed on screen rather than rewriting it', async () => {
+    // A half-typed number must not be corrected under the coach's fingers.
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('1');
+
+    expect((w.find('[data-result-number-a]').element as HTMLInputElement).value).toBe('1');
+  });
+
+  it('still names the outcomes by the players the numbers found', async () => {
+    const w = await mountPicker();
+    await w.find('[data-result-number-a]').setValue('7');
+    await w.find('[data-result-number-b]').setValue('3');
+
+    expect(w.find('[data-result-outcome="a"]').text()).toBe('(7) Cesar A. won');
+    expect(w.find('[data-result-outcome="b"]').text()).toBe('(3) Caleb R. won');
+  });
+
+  it('explains itself on hover', async () => {
+    const w = await mountPicker();
+    expect(w.find('[data-result-number-a]').attributes('title')).toMatch(/recording number/i);
+  });
+});

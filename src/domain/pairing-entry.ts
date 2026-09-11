@@ -113,6 +113,22 @@ export function resolvePairing(parse: PairingParse, players: any[]): ResolvedPai
   };
 }
 
+/**
+ * The player carrying a recording number, typed as text.
+ *
+ * Shared with the picker, where a number can be typed instead of hunting a
+ * name down a dropdown of twenty-five. Blank is not a miss — it is a box that
+ * has not been filled in yet — so it returns null the same as an unknown
+ * number does, and the caller decides whether to complain.
+ */
+export function playerByNumber(players: any[], text: string): any | null {
+  const raw = String(text ?? '').trim();
+  if (!/^\d{1,3}$/.test(raw)) return null;
+
+  const n = Number(raw);
+  return (players || []).find(p => p && Number(p.recordingNumber) === n) || null;
+}
+
 /** One entry box, as the screen understands it. */
 export interface EntryLine {
   text: string;

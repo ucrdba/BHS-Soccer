@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parsePairing, resolvePairing, readEntries, recordable, hasErrors,
-  isParseFailure, type PairingParse
+  isParseFailure, playerByNumber, type PairingParse
 } from './pairing-entry';
 
 const PLAYERS = [
@@ -177,5 +177,31 @@ describe('reading the whole sheet', () => {
   it('survives a squad with no recording numbers yet', () => {
     const lines = readEntries(['1w3'], [{ id: 'x', name: 'New', recordingNumber: null }], label);
     expect(lines[0].error).toMatch(/no player has recording number/i);
+  });
+});
+
+describe('finding a player by typed number', () => {
+  // The picker offers this beside the dropdown: on a squad of twenty-five,
+  // typing 12 beats hunting a name down a list.
+  it('finds the player carrying that recording number', () => {
+    expect(playerByNumber(PLAYERS, '12').id).toBe('p12');
+    expect(playerByNumber(PLAYERS, ' 3 ').id).toBe('p3');
+  });
+
+  it('is nothing for a number nobody carries', () => {
+    expect(playerByNumber(PLAYERS, '99')).toBeNull();
+  });
+
+  it('is nothing for a box not filled in yet, which is not a mistake', () => {
+    expect(playerByNumber(PLAYERS, '')).toBeNull();
+    expect(playerByNumber(PLAYERS, '   ')).toBeNull();
+  });
+
+  it('refuses anything that is not a plain number', () => {
+    // "1w3" in the number box is a pairing typed into the wrong tab, not
+    // player 1.
+    expect(playerByNumber(PLAYERS, '1w3')).toBeNull();
+    expect(playerByNumber(PLAYERS, '3a')).toBeNull();
+    expect(playerByNumber(PLAYERS, '-3')).toBeNull();
   });
 });

@@ -20,7 +20,9 @@ import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { roundRobinPlayers, roundRobinLabel, roundRobinPlayed } from '../../domain/round-robin';
-import { readEntries, recordable, hasErrors, HOW_TO_ENTER } from '../../domain/pairing-entry';
+import {
+  readEntries, recordable, hasErrors, playerByNumber, HOW_TO_ENTER
+} from '../../domain/pairing-entry';
 
 const props = defineProps<{
   open: boolean;
@@ -52,6 +54,15 @@ const playerAId = ref('');
 const playerBId = ref('');
 const outcome = ref('');
 const scoreText = ref('');
+/**
+ * The recording number typed beside each dropdown.
+ *
+ * Kept as the text that was typed rather than derived from the chosen player,
+ * so a half-typed number is not rewritten under the coach's fingers and a
+ * number nobody carries stays on screen to be corrected.
+ */
+const numberA = ref('');
+const numberB = ref('');
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -108,6 +119,31 @@ function onKeydown(index: number, e: KeyboardEvent): void {
 
 // ── the picker ────────────────────────────────────────────────────────────
 
+/**
+ * Typing a number picks the player; choosing a player fills the number.
+ *
+ * Two controls over one value, which is the point: the number is faster when
+ * the sheet is to hand, and the list is the only way in when it is not or when
+ * the squad has no numbers yet.
+ */
+function onNumber(side: 'a' | 'b', text: string): void {
+  const hit = playerByNumber(roster.value, text);
+  if (side === 'a') { numberA.value = text; playerAId.value = hit ? hit.id : ''; }
+  else { numberB.value = text; playerBId.value = hit ? hit.id : ''; }
+}
+
+function onPick(side: 'a' | 'b', id: string): void {
+  const chosen = roster.value.find(p => p.id === id) || null;
+  const num = chosen?.recordingNumber;
+  const text = num === null || num === undefined ? '' : String(num);
+  if (side === 'a') { playerAId.value = id; numberA.value = text; }
+  else { playerBId.value = id; numberB.value = text; }
+}
+
+/** A number that was typed and matched nobody. Blank is not a miss. */
+const missA = computed(() => !!numberA.value.trim() && !playerAId.value);
+const missB = computed(() => !!numberB.value.trim() && !playerBId.value);
+
 const sameTwice = computed(() =>
   !!playerAId.value && playerAId.value === playerBId.value);
 
@@ -153,6 +189,8 @@ watch(() => props.open, (open) => {
   texts.value = Array(STARTING_BOXES).fill('');
   playerAId.value = '';
   playerBId.value = '';
+  numberA.value = '';
+  numberB.value = '';
   outcome.value = '';
   scoreText.value = '';
   occurredOn.value = today();
@@ -316,25 +354,63 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 
       <!-- ── picking them ────────────────────────────────────────────── -->
       <template v-else>
+        <!--
+          A number and a list over one value. The number is faster when the
+          sheet is to hand; the list is the only way in when it is not, or
+          when the squad has no recording numbers yet.
+        -->
         <div class="pair">
-          <label class="field">
+          <div class="field">
             <span class="field__label">Player</span>
-            <select v-model="playerAId" class="input" data-result-player-a>
-              <option value="">Choose a player</option>
-              <option v-for="p in roster" :key="p.id" :value="p.id">{{ roundRobinLabel(p) }}</option>
-            </select>
-          </label>
+            <div class="who">
+              <input
+                :value="numberA" type="text" class="input who__num"
+                inputmode="numeric" autocomplete="off"
+                placeholder="No." aria-label="Player by recording number"
+                title="Type the player's recording number, or choose the name beside it."
+                :class="{ 'is-bad': missA }"
+                data-result-number-a
+                @input="onNumber('a', ($event.target as HTMLInputElement).value)" />
+              <select
+                :value="playerAId" class="input" aria-label="Player"
+                data-result-player-a
+                @change="onPick('a', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Choose a player</option>
+                <option v-for="p in roster" :key="p.id" :value="p.id">{{ roundRobinLabel(p) }}</option>
+              </select>
+            </div>
+          </div>
 
           <span class="pair__v" aria-hidden="true">v</span>
 
-          <label class="field">
+          <div class="field">
             <span class="field__label">Opponent</span>
-            <select v-model="playerBId" class="input" data-result-player-b>
-              <option value="">Choose a player</option>
-              <option v-for="p in roster" :key="p.id" :value="p.id">{{ roundRobinLabel(p) }}</option>
-            </select>
-          </label>
+            <div class="who">
+              <input
+                :value="numberB" type="text" class="input who__num"
+                inputmode="numeric" autocomplete="off"
+                placeholder="No." aria-label="Opponent by recording number"
+                title="Type the opponent's recording number, or choose the name beside it."
+                :class="{ 'is-bad': missB }"
+                data-result-number-b
+                @input="onNumber('b', ($event.target as HTMLInputElement).value)" />
+              <select
+                :value="playerBId" class="input" aria-label="Opponent"
+                data-result-player-b
+                @change="onPick('b', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Choose a player</option>
+                <option v-for="p in roster" :key="p.id" :value="p.id">{{ roundRobinLabel(p) }}</option>
+              </select>
+            </div>
+          </div>
         </div>
+
+        <p v-if="missA || missB" class="note note--bad" role="alert" data-result-missing>
+          No player has recording number
+          {{ [missA ? numberA.trim() : null, missB ? numberB.trim() : null].filter(Boolean).join(' or ') }}.
+        </p>
 
         <p v-if="sameTwice" class="note note--bad" role="alert" data-result-same>
           A player cannot play themselves.
@@ -474,6 +550,16 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
   gap: var(--space-2);
   align-items: end;
 }
+
+/* The number, then the name it resolves to. */
+.who { display: grid; grid-template-columns: 3.5rem 1fr; gap: var(--space-1); }
+
+.who__num {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  text-align: center;
+}
+
+.who__num.is-bad { border-color: var(--color-danger); }
 
 .pair__v {
   padding-bottom: var(--space-2);
