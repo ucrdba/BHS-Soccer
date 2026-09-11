@@ -404,3 +404,63 @@ describe('a logo address that does not load', () => {
     }
   });
 });
+
+describe('the photo', () => {
+  /*
+   * Shown behind the next match on the public home page, and read from the
+   * organization's row like the logo. It behaves exactly as the logo field
+   * does, because it is the same field.
+   */
+  it('shows the photo address the row carries, and a preview of it', async () => {
+    const w = await mountSection({ hero_url: '/img/legends.jpg' });
+
+    expect((w.find('[data-school-hero]').element as HTMLInputElement).value).toBe('/img/legends.jpg');
+    expect(w.find('[data-school-hero-preview]').attributes('src')).toBe('/img/legends.jpg');
+  });
+
+  it('is disabled, and says why, on a database without the column', async () => {
+    const w = await mountSection();   // CLUB carries no hero_url key at all
+
+    expect(w.find('[data-school-hero]').attributes('disabled')).toBeDefined();
+    expect(w.find('[data-school-hero-unmigrated]').text()).toMatch(/0030/);
+  });
+
+  it('leaves the photo out of the save on a database without the column', async () => {
+    const w = await mountSection({ logo_url: null });
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool.mock.calls[0][1]).not.toHaveProperty('heroUrl');
+  });
+
+  it('saves the photo once the column exists', async () => {
+    const w = await mountSection({ hero_url: null });
+    await w.find('[data-school-hero]').setValue('/img/legends.jpg');
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+
+    expect(upsertSchool.mock.calls[0][1].heroUrl).toBe('/img/legends.jpg');
+  });
+
+  it('refuses an address the public page would not show, before saving', async () => {
+    const w = await mountSection({ hero_url: null });
+    await w.find('[data-school-hero]').setValue('//evil.example/x.jpg');
+
+    expect(w.find('[data-school-hero-error]').text()).toMatch(/photo address/i);
+    await w.find('[data-school-save]').trigger('click');
+    await flush();
+    expect(upsertSchool).not.toHaveBeenCalled();
+  });
+
+  it('says the colour band shows instead when the photo does not load', async () => {
+    const w = await mountSection({ hero_url: '/img/missing.jpg' });
+    await w.find('[data-school-hero-preview]').trigger('error');
+
+    expect(w.find('[data-school-hero-broken]').text()).toMatch(/colour band/i);
+  });
+
+  it('tells the admin where the subject should sit', async () => {
+    const w = await mountSection({ hero_url: null });
+    expect(w.find('[data-school-hero-hint]').text()).toMatch(/upper or right/i);
+  });
+});

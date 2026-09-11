@@ -20,8 +20,9 @@
  * Extracted from the school profile forms in public/js/views/planner.view.js
  * during Phase 6.
  */
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch } from 'vue';
 import SectionShell from './SectionShell.vue';
+import ImageAddressField from './ImageAddressField.vue';
 import { supabaseService } from '../../data/supabase';
 import {
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
@@ -46,7 +47,7 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [school: any] }>();
 
 const form = ref({
-  name: '', mascot: '', city: '', league: '', logoUrl: '',
+  name: '', mascot: '', city: '', league: '', logoUrl: '', heroUrl: '',
   primary: DEFAULT_PRIMARY, secondary: DEFAULT_SECONDARY,
   wins: '0', losses: '0', draws: '0'
 });
@@ -59,16 +60,6 @@ const error = ref<string | null>(null);
 /** The row as last loaded, kept so a save can merge into its `colors` rather
  * than replacing it -- see the merge in onSave. */
 const row = ref<any>(null);
-
-/**
- * The address the logo preview is showing, and the one that failed to load.
- *
- * The preview follows the field after a pause rather than on every keystroke,
- * so a half-typed address is not fetched, does not fail, and does not flash a
- * warning at an admin who has not finished typing. Set at once on load.
- */
-const previewUrl = ref('');
-const brokenPreview = ref<string | null>(null);
 
 async function load(): Promise<void> {
   // No organization resolved yet: wait, rather than reading a defaulted one.
@@ -87,13 +78,13 @@ async function load(): Promise<void> {
       city: fetched.city || '',
       league: fetched.league || '',
       logoUrl: fetched.logo_url || '',
+      heroUrl: fetched.hero_url || '',
       primary: fetched.colors?.primary || DEFAULT_PRIMARY,
       secondary: fetched.colors?.secondary || DEFAULT_SECONDARY,
       wins: String(fetched.record?.wins ?? 0),
       losses: String(fetched.record?.losses ?? 0),
       draws: String(fetched.record?.draws ?? 0)
     };
-    previewUrl.value = safeImageUrl(fetched.logo_url);
   } catch (e: any) {
     error.value = e?.message || 'That organization could not be loaded.';
   } finally {
@@ -104,33 +95,25 @@ async function load(): Promise<void> {
 watch(() => props.schoolCode, load, { immediate: true });
 
 /**
- * Whether this database has the logo column yet.
+ * Whether this database has each image column yet.
  *
- * Read off the loaded row rather than assumed. Until 0028 is applied the
- * column is absent, `select *` simply omits it, and naming it in the save
- * would make PostgREST refuse the WHOLE profile with 42703 -- losing an
- * admin's name or colour edit over a field they never touched.
+ * Read off the loaded row rather than assumed. Until 0028 (logo) or 0030
+ * (photo) is applied the column is absent, `select *` simply omits it, and
+ * naming it in the save would make PostgREST refuse the WHOLE profile with
+ * 42703 -- losing an admin's name or colour edit over a field they never
+ * touched.
  */
 const logoColumn = computed(() => !!row.value && 'logo_url' in row.value);
+const heroColumn = computed(() => !!row.value && 'hero_url' in row.value);
 
 /** A typed address the public page would refuse, said before saving. */
-const logoError = computed<string | null>(() => {
-  const typed = form.value.logoUrl.trim();
-  if (!typed || safeImageUrl(typed)) return null;
-  return 'A logo address must start with https://, http:// or / (a file shipped with the app).';
-});
+const refusal = (noun: string, typed: string): string | null =>
+  (typed.trim() && !safeImageUrl(typed)
+    ? `A ${noun} address must start with https://, http:// or / (a file shipped with the app).`
+    : null);
 
-const logoPreview = computed(() => safeImageUrl(form.value.logoUrl));
-
-let previewTimer: ReturnType<typeof setTimeout> | undefined;
-watch(logoPreview, (url) => {
-  clearTimeout(previewTimer);
-  // Already showing it: the load path sets the preview directly, and waiting
-  // to set the same value again would only race a test's fake clock.
-  if (url === previewUrl.value) return;
-  previewTimer = setTimeout(() => { previewUrl.value = url; }, 400);
-});
-onBeforeUnmount(() => clearTimeout(previewTimer));
+const logoError = computed(() => refusal('logo', form.value.logoUrl));
+const heroError = computed(() => refusal('photo', form.value.heroUrl));
 
 /** What the two fields accept, said once so the message and the hint agree. */
 const COLOUR_FORMS = 'a hex code (#21196F), an rgb() triple (rgb(33, 25, 111)), or a colour name (navy)';
@@ -216,6 +199,7 @@ async function onSave(): Promise<void> {
   }
   if (colourError.value) { return; }
   if (logoError.value) { error.value = logoError.value; return; }
+  if (heroError.value) { error.value = heroError.value; return; }
 
   const school = {
     name,
@@ -223,6 +207,7 @@ async function onSave(): Promise<void> {
     city: form.value.city.trim(),
     league: form.value.league.trim(),
     ...(logoColumn.value ? { logoUrl: form.value.logoUrl.trim() } : {}),
+    ...(heroColumn.value ? { heroUrl: form.value.heroUrl.trim() } : {}),
     colors: {
       ...(row.value?.colors ?? {}),
       primary: form.value.primary.trim(),
@@ -283,11 +268,6 @@ async function onSave(): Promise<void> {
           <span class="kicker">League</span>
           <input v-model="form.league" data-school-league type="text" class="input" />
         </label>
-        <label class="field field--wide">
-          <span class="kicker">Logo address</span>
-          <input v-model="form.logoUrl" data-school-logo type="text" class="input"
-                 :disabled="!logoColumn" placeholder="https://… or /img/…" />
-        </label>
         <label class="field">
           <span class="kicker">Primary colour</span>
           <span class="swatch-row">
@@ -320,22 +300,19 @@ async function onSave(): Promise<void> {
       <p v-if="colourError" class="note note--bad" role="alert" data-school-colour-error>{{ colourError }}</p>
       <p v-for="(item, i) in substitutions" :key="i" class="note" data-school-colour-note>{{ item.reason }}</p>
 
-      <!-- Shown on the public home page, in place of the coach's message. -->
-      <p v-if="row && !logoColumn" class="note" data-school-logo-unmigrated>
-        This database has no logo column yet. Apply migration 0028 to give the organization a logo.
-      </p>
-      <p v-else-if="logoError" class="note note--bad" role="alert" data-school-logo-error>{{ logoError }}</p>
-      <template v-else-if="previewUrl">
-        <img v-show="brokenPreview !== previewUrl" :src="previewUrl" alt="" class="logo-preview"
-             data-school-logo-preview
-             @error="brokenPreview = previewUrl" @load="brokenPreview = null" />
-        <!-- Warned, not refused: the file may not be uploaded yet, and the
-             public page withdraws a logo that fails to load. -->
-        <p v-if="brokenPreview === previewUrl" class="note note--bad" role="alert" data-school-logo-broken>
-          That address did not load an image, so visitors will not see a logo. Check it is spelled
-          exactly as the file is named, including the extension (.png, .jpg).
-        </p>
-      </template>
+      <!-- Both shown on the public home page: the logo in the band's top-left
+           corner, the photo behind the next match. -->
+      <ImageAddressField
+        name="logo" label="Logo address" noun="logo" migration="0028"
+        :loaded-value="row?.logo_url ?? null" v-model="form.logoUrl"
+        :available="logoColumn" :loaded="!!row" :error="logoError"
+        when-broken="visitors will not see a logo" />
+      <ImageAddressField
+        name="hero" label="Photo address" noun="photo" migration="0030" wide
+        :loaded-value="row?.hero_url ?? null" v-model="form.heroUrl"
+        :available="heroColumn" :loaded="!!row" :error="heroError"
+        when-broken="visitors will see the colour band instead"
+        hint="Shown behind the next match on the home page. Works best with the subject in the upper or right part of the photo: the words sit bottom-left." />
 
       <p class="note">
         The name and mascot are rendered on headings throughout the app.
@@ -372,6 +349,4 @@ async function onSave(): Promise<void> {
   border-radius: var(--radius-sm);
 }
 
-/* The logo as the public page will show it, before it is saved. */
-.logo-preview { width: 6rem; height: 6rem; object-fit: cover; border-radius: var(--radius-md); }
 </style>
