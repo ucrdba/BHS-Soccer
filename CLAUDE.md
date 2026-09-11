@@ -239,7 +239,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0029_daily_thoughts_members_only.sql`.
+8. …through `supabase/migrations/0030_school_hero.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
@@ -264,7 +264,7 @@ The Supabase SQL editor may run as a role that is a **member** of `postgres` wit
 
 ## Conventions
 
-- **Component styles are scoped and style against the ground tokens in `index.css`** — `--ground`, `--surface`, `--surface-deep`, `--ink`, `--ink-muted`, `--ink-soft`, `--rule`, `--rule-strong`, `--live`, `--mark`, `--heading-face`, `--shadow-md` — never a literal colour. The same names are defined for three grounds (`paper`, `pitch`, `ledger`) under `data-ground` on `<html>`, which the router sets from `meta.ground` (`src/router/ground.ts`). The organization's colours arrive as `--org-primary` / `--org-secondary` (raw, for stroke) and `--org-mark-paper` / `--org-mark-dark` (after the 3:1 contrast guard in `domain/theme.ts`); `--mark` reads the right one per ground. The `--bhs-*` aliases are gone as of phase 5; `src/design-tokens.test.ts` walks every component and fails on one. `src/design-tokens.test.ts` guards all of this, including that no component style hardcodes a white.
+- **Component styles are scoped and style against the ground tokens in `index.css`** — `--ground`, `--surface`, `--surface-deep`, `--ink`, `--ink-muted`, `--ink-soft`, `--rule`, `--rule-strong`, `--live`, `--mark`, `--heading-face`, `--shadow-md` — never a literal colour. The same names are defined for three grounds (`paper`, `pitch`, `ledger`) under `data-ground` on `<html>`, which the router sets from `meta.ground` (`src/router/ground.ts`). The organization's colours arrive as `--org-primary` / `--org-secondary` (raw, for stroke) and `--org-mark-paper` / `--org-mark-dark` (after the 3:1 contrast guard in `domain/theme.ts`); `--mark` reads the right one per ground. The one fill on the paper ground is the home page's band, which uses `--org-band` (the primary guarded to 4.5:1 against its white text, else the dark navy) — see `docs/superpowers/specs/2026-09-10-home-hero-design.md`. The `--bhs-*` aliases are gone as of phase 5; `src/design-tokens.test.ts` walks every component and fails on one. `src/design-tokens.test.ts` guards all of this, including that no component style hardcodes a white.
 - **Routes carry `meta.chrome: 'tool'`** to render without the header, nav and footer; the touchline and session screens draw their own bars. Spec: `docs/superpowers/specs/2026-09-07-mobile-restyle-design.md`.
 - `tsconfig.json` is deliberately loose (`strict: false`, `noImplicitAny: false`) so the ported code type-checks without a rewrite. Don't tighten it as a side effect of another change.
 - **`typescript` is pinned to 5.x on purpose — do not upgrade to 7.** TypeScript 7 is the native Go rewrite and exports only `.` and `./unstable/*`; `vue-tsc` resolves `typescript/lib/tsc`, which that layout does not have, so it dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` and cannot run at all. Without it nothing type-checks a `.vue` file's script block or its templates. Deferred until `vue-tsc` supports TypeScript 7, not abandoned.

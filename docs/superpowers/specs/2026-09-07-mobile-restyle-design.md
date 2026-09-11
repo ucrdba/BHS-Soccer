@@ -95,6 +95,11 @@ They are used only as stroke, never as fill or body text:
 - On the dark grounds, `--org-secondary` is `--mark`: the recording-number
   rank colour, the standard box border, the kicker colour.
 
+**One exception, on Home.** The band at the top of the home page fills with
+`--org-band`, the organization's primary guarded to 4.5:1 against the white
+text on it. It is recorded, with its reasons, in
+`2026-09-10-home-hero-design.md` §6.4.
+
 **Contrast guard.** The spec says the interface, not the admin, adapts when an
 organization's colour would fail contrast. `src/domain/theme.ts` gains
 `contrastRatio(a, b)` (WCAG relative luminance, returns a number) and
@@ -241,6 +246,10 @@ deployment change is needed.
 
 **Home** (`HomeView.vue`, canvas 1a·1)
 
+- **Superseded in part by `2026-09-10-home-hero-design.md`.** The fixture
+  block became a band over the organization's photo, and "Coming up" and
+  "How we're doing" were added for the visitor. The bullets below describe the
+  page before that change.
 - The crest and record are the shell's; the view's own org line and "HOME OF
   THE" heading go.
 - "Next match" kicker in `--rule-strong`; opponent as a 32px heading; home or
