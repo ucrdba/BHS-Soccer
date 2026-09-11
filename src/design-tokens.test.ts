@@ -62,9 +62,15 @@ describe('the fixed tokens', () => {
     expect(css).not.toMatch(/Inter/);
   });
 
-  it('carries the five organization properties with cold-load fallbacks', () => {
-    for (const p of ['--org-primary', '--org-secondary', '--org-mark-paper', '--org-mark-dark', '--org-text-paper']) {
+  it('carries the six organization properties with cold-load fallbacks', () => {
+    for (const p of ['--org-primary', '--org-secondary', '--org-mark-paper', '--org-mark-dark', '--org-text-paper', '--org-band']) {
       expect(css, p).toMatch(new RegExp(`${p}\\s*:\\s*#[0-9a-fA-F]{6}`));
+    }
+  });
+
+  it('defines the home band tokens in :root', () => {
+    for (const t of ['--band-ink', '--band-ink-muted', '--band-shade', '--band-corner', '--band-corner-wide', '--band-text-shadow']) {
+      expect(css, t).toMatch(new RegExp(`${t}\\s*:`));
     }
   });
 });

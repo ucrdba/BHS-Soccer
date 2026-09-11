@@ -22,6 +22,8 @@ export interface Branding {
   secondary: string;
   /** The organization's logo, or '' when it has none or it was refused. */
   logoUrl: string;
+  /** The organization's photo for the home page band, or '' likewise. */
+  heroUrl: string;
 }
 
 /**
@@ -40,14 +42,15 @@ function colour(value: unknown, fallback: string): string {
 }
 
 /**
- * A logo address the page will render, or ''.
+ * An image address the page will render, or ''.
  *
- * An admin types this and it is rendered into an <img> on the PUBLIC home
- * page, so it is held to two shapes: http(s), or a root-relative path to a
- * file shipped with the app. A protocol-relative `//host/x.png` is refused
- * with the rest -- it looks like a path and is a different host.
+ * Used for both the logo and the home page photo. An admin types each, and
+ * each is rendered into an <img> on the PUBLIC home page, so both are held to
+ * two shapes: http(s), or a root-relative path to a file shipped with the app.
+ * A protocol-relative `//host/x.png` is refused with the rest -- it looks
+ * like a path and is a different host.
  */
-export function safeLogoUrl(value: unknown): string {
+export function safeImageUrl(value: unknown): string {
   const url = typeof value === 'string' ? value.trim() : '';
   if (!url) return '';
   if (url.startsWith('https://') || url.startsWith('http://')) return url;
@@ -68,8 +71,9 @@ export function brandingFor(school: any): Branding {
     primary: colour(colors.primary, DEFAULT_PRIMARY),
     secondary: colour(colors.secondary, DEFAULT_SECONDARY),
     // No fallback either, for the same reason as the name: an organization
-    // that has not supplied a logo shows none, not somebody else's.
-    logoUrl: safeLogoUrl(school && school.logo_url)
+    // that has not supplied a logo or a photo shows none, not somebody else's.
+    logoUrl: safeImageUrl(school && school.logo_url),
+    heroUrl: safeImageUrl(school && school.hero_url)
   };
 }
 
@@ -106,6 +110,9 @@ export const MIN_MARK_CONTRAST = 3;
 /** The ink each ground sets, which a mark must not be mistaken for. */
 export const PAPER_INK = '#201f1d';
 export const DARK_INK = '#F8FAFC';
+
+/** The home page band's text colour. `--org-band` is guarded against it. */
+export const BAND_INK = '#ffffff';
 
 /**
  * 4.5:1 is WCAG's floor for body-size text. A link is body-size text; a
@@ -238,6 +245,12 @@ export function themeVars(b: Branding): Record<string, string> {
     ),
     '--org-text-paper': guardedColour(
       b.primary, PAPER_GROUND, PAPER_INK, MIN_TEXT_CONTRAST, PAPER_ACCENT_FALLBACK
-    )
+    ),
+    // The home page band's fill (spec 2026-09-10-home-hero-design.md §4.1).
+    // White text sits on it, so the primary is used only when white on it
+    // clears the text floor; otherwise the dark grounds' navy.
+    '--org-band': contrastRatio(b.primary, BAND_INK) >= MIN_TEXT_CONTRAST
+      ? raw(b.primary, DEFAULT_PRIMARY.toLowerCase())
+      : DARK_GROUND.toLowerCase()
   };
 }

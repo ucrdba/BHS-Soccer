@@ -29,7 +29,7 @@ import {
   MIN_MARK_CONTRAST, MIN_TEXT_CONTRAST,
   PAPER_GROUND, PAPER_INK, PAPER_ACCENT_FALLBACK,
   DARK_GROUND, DARK_INK, DARK_MARK_FALLBACK,
-  safeLogoUrl
+  safeImageUrl
 } from '../../domain/theme';
 import { parseColour, toHex } from '../../domain/colour';
 
@@ -93,7 +93,7 @@ async function load(): Promise<void> {
       losses: String(fetched.record?.losses ?? 0),
       draws: String(fetched.record?.draws ?? 0)
     };
-    previewUrl.value = safeLogoUrl(fetched.logo_url);
+    previewUrl.value = safeImageUrl(fetched.logo_url);
   } catch (e: any) {
     error.value = e?.message || 'That organization could not be loaded.';
   } finally {
@@ -116,11 +116,11 @@ const logoColumn = computed(() => !!row.value && 'logo_url' in row.value);
 /** A typed address the public page would refuse, said before saving. */
 const logoError = computed<string | null>(() => {
   const typed = form.value.logoUrl.trim();
-  if (!typed || safeLogoUrl(typed)) return null;
+  if (!typed || safeImageUrl(typed)) return null;
   return 'A logo address must start with https://, http:// or / (a file shipped with the app).';
 });
 
-const logoPreview = computed(() => safeLogoUrl(form.value.logoUrl));
+const logoPreview = computed(() => safeImageUrl(form.value.logoUrl));
 
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 watch(logoPreview, (url) => {

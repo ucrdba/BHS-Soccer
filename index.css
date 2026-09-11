@@ -53,8 +53,32 @@
   --org-mark-dark: #FFD700;
   --org-text-paper: #0047AB;
 
+  /*
+   * --org-band is the home page band's fill: the primary when white text on
+   * it clears 4.5:1, otherwise the dark grounds' navy (src/domain/theme.ts).
+   * It is the one fill an organization colour is allowed on the paper
+   * ground -- see docs/superpowers/specs/2026-09-10-home-hero-design.md §6.4.
+   */
+  --org-band: #0047AB;
+
   /* Dark text for the rare light surface on a dark ground (a gold button). */
   --text-dark: #0F172A;
+
+  /*
+   * The home page band: white text over the organization's photo or its band
+   * colour, kept readable by two shades -- one across the band, deepening
+   * from just below the middle, and one in the bottom-left corner under the
+   * words. Tokens rather than literals, because no component style may carry
+   * a white (design-tokens.test.ts). Spec 2026-09-10-home-hero-design.md §4.2.
+   */
+  --band-ink: #ffffff;
+  --band-ink-muted: rgba(255, 255, 255, 0.85);
+  --band-shade: linear-gradient(180deg,
+    rgba(10, 12, 40, 0.6) 0%, rgba(10, 12, 40, 0) 22%, rgba(10, 12, 40, 0) 34%,
+    rgba(10, 12, 40, 0.7) 58%, rgba(10, 12, 40, 0.93) 82%, rgba(10, 12, 40, 0.97) 100%);
+  --band-corner: radial-gradient(95% 80% at 0% 100%, rgba(10, 12, 40, 0.6), transparent 70%);
+  --band-corner-wide: radial-gradient(55% 95% at 0% 100%, rgba(10, 12, 40, 0.7), transparent 72%);
+  --band-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 /* ── Grounds ─────────────────────────────────────────────────────────── */

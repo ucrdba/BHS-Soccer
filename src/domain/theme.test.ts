@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  safeLogoUrl,
+  safeImageUrl,
   brandingFor, themeVars, contrastRatio, colourDistance, guardedColour,
   DEFAULT_PRIMARY, DEFAULT_SECONDARY,
   PAPER_GROUND, DARK_GROUND, PAPER_MARK_FALLBACK, PAPER_ACCENT_FALLBACK, DARK_MARK_FALLBACK,
@@ -25,7 +25,8 @@ describe('brandingFor', () => {
       mascot: 'Lions',
       primary: '#123456',
       secondary: '#abcdef',
-      logoUrl: ''
+      logoUrl: '',
+      heroUrl: ''
     });
   });
 
@@ -163,15 +164,35 @@ describe('themeVars', () => {
     colors: { primary: 'rgb(33, 25, 111)', secondary: 'white' }
   });
 
-  it('emits the five properties, all as normalised hex', () => {
+  it('emits the six properties, all as normalised hex', () => {
     const vars = themeVars(beaumont);
     expect(Object.keys(vars).sort()).toEqual([
-      '--org-mark-dark', '--org-mark-paper', '--org-primary',
+      '--org-band', '--org-mark-dark', '--org-mark-paper', '--org-primary',
       '--org-secondary', '--org-text-paper'
     ]);
     for (const [prop, value] of Object.entries(vars)) {
       expect(value, prop).toMatch(/^#[0-9a-f]{6}$/);
     }
+  });
+
+  /*
+   * The home page band. White text sits on it, so the primary is used only
+   * when white on it clears the text floor. A light primary -- a yellow club
+   * -- would make the next match unreadable, so the band takes the dark
+   * grounds' navy instead.
+   */
+  it('fills the band with the primary when white text on it is readable', () => {
+    expect(themeVars(beaumont)['--org-band']).toBe('#21196f');
+  });
+
+  it('falls back to the dark navy when the primary is too light for white text', () => {
+    const club = brandingFor({ name: 'A', mascot: 'B', colors: { primary: '#FFD700', secondary: '#000000' } });
+    expect(themeVars(club)['--org-band']).toBe(DARK_GROUND.toLowerCase());
+  });
+
+  it('uses the historical default when the row holds nonsense', () => {
+    const vars = themeVars(brandingFor({ colors: { primary: '???', secondary: '???' } }));
+    expect(vars['--org-band']).toBe('#0047ab');
   });
 
   /*
@@ -214,36 +235,36 @@ describe('themeVars', () => {
   });
 });
 
-describe('safeLogoUrl', () => {
+describe('safeImageUrl', () => {
   /*
    * An admin types this and it is rendered into an <img> on the PUBLIC home
    * page, so it is held to two shapes: http(s), or a path to a file shipped
    * with the app.
    */
   it('keeps a web address', () => {
-    expect(safeLogoUrl('https://cdn.example.org/crest.png')).toBe('https://cdn.example.org/crest.png');
-    expect(safeLogoUrl('http://example.org/crest.png')).toBe('http://example.org/crest.png');
+    expect(safeImageUrl('https://cdn.example.org/crest.png')).toBe('https://cdn.example.org/crest.png');
+    expect(safeImageUrl('http://example.org/crest.png')).toBe('http://example.org/crest.png');
   });
 
   it('keeps a path to a file shipped with the app', () => {
-    expect(safeLogoUrl('/img/crest.jpg')).toBe('/img/crest.jpg');
-    expect(safeLogoUrl('  /img/crest.jpg  ')).toBe('/img/crest.jpg');
+    expect(safeImageUrl('/img/crest.jpg')).toBe('/img/crest.jpg');
+    expect(safeImageUrl('  /img/crest.jpg  ')).toBe('/img/crest.jpg');
   });
 
   it('refuses a protocol-relative address, which looks like a path and is another host', () => {
-    expect(safeLogoUrl('//evil.example/crest.png')).toBe('');
+    expect(safeImageUrl('//evil.example/crest.png')).toBe('');
   });
 
   it('refuses every other scheme', () => {
-    expect(safeLogoUrl('javascript:alert(1)')).toBe('');
-    expect(safeLogoUrl('data:image/png;base64,AAAA')).toBe('');
-    expect(safeLogoUrl('img/crest.jpg')).toBe('');
+    expect(safeImageUrl('javascript:alert(1)')).toBe('');
+    expect(safeImageUrl('data:image/png;base64,AAAA')).toBe('');
+    expect(safeImageUrl('img/crest.jpg')).toBe('');
   });
 
   it('is empty for nothing at all', () => {
-    expect(safeLogoUrl('')).toBe('');
-    expect(safeLogoUrl(null)).toBe('');
-    expect(safeLogoUrl(42)).toBe('');
+    expect(safeImageUrl('')).toBe('');
+    expect(safeImageUrl(null)).toBe('');
+    expect(safeImageUrl(42)).toBe('');
   });
 });
 
@@ -259,5 +280,20 @@ describe('brandingFor, the logo', () => {
 
   it('drops an address the page would refuse', () => {
     expect(brandingFor({ name: 'A', mascot: 'B', logo_url: 'javascript:alert(1)' }).logoUrl).toBe('');
+  });
+});
+
+describe('brandingFor, the photo', () => {
+  it("reads the organization's own photo off its row", () => {
+    expect(brandingFor({ name: 'A', mascot: 'B', hero_url: '/img/a.jpg' }).heroUrl).toBe('/img/a.jpg');
+  });
+
+  it("has none when the organization has none, rather than somebody else's", () => {
+    expect(brandingFor({ name: 'A', mascot: 'B' }).heroUrl).toBe('');
+    expect(brandingFor(null).heroUrl).toBe('');
+  });
+
+  it('drops an address the page would refuse', () => {
+    expect(brandingFor({ name: 'A', mascot: 'B', hero_url: '//evil.example/x.jpg' }).heroUrl).toBe('');
   });
 });
