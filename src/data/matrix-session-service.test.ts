@@ -146,9 +146,25 @@ describe('updateDrillWeights', () => {
 });
 
 describe('deleteMatrixSession', () => {
+  const SESSION = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
   it('soft-deletes rather than removing the row', async () => {
-    await supabaseService.deleteMatrixSession('sess-1');
+    await supabaseService.deleteMatrixSession(SESSION);
     expect(captured[0].op).toBe('update');
     expect(captured[0].rows![0].is_deleted).toBe(true);
+  });
+
+  /*
+   * A caller holding the wrong row shape sent the string "undefined" and
+   * Postgres answered `invalid input syntax for type uuid`, which is a crash
+   * report rather than something a coach can act on. Refused here instead,
+   * the same way the matrix_logs writers refuse one.
+   */
+  it('refuses an id that is not a uuid rather than letting Postgres say so', async () => {
+    const res = await supabaseService.deleteMatrixSession(undefined as any);
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/no database id/i);
+    expect(captured).toHaveLength(0);
   });
 });

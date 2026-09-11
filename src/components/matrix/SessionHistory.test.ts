@@ -15,6 +15,7 @@ import { createTestingPinia } from '@pinia/testing';
 import SessionHistory from './SessionHistory.vue';
 
 const fetchTeamSessionHistory = vi.fn();
+const fetchMatrixSessions = vi.fn();
 const fetchMatrixSessionResults = vi.fn();
 const fetchTimeBands = vi.fn();
 const deleteMatrixSession = vi.fn();
@@ -22,6 +23,7 @@ const deleteMatrixSession = vi.fn();
 vi.mock('../../data/supabase', () => ({
   supabaseService: {
     fetchTeamSessionHistory: (...a: any[]) => fetchTeamSessionHistory(...a),
+    fetchMatrixSessions: (...a: any[]) => fetchMatrixSessions(...a),
     fetchMatrixSessionResults: (...a: any[]) => fetchMatrixSessionResults(...a),
     fetchTimeBands: (...a: any[]) => fetchTimeBands(...a),
     deleteMatrixSession: (...a: any[]) => deleteMatrixSession(...a)
@@ -54,7 +56,8 @@ function mountHistory(opts: { canEdit?: boolean; sessions?: any[] } = {}) {
 beforeEach(() => {
   document.body.innerHTML = '';
   vi.clearAllMocks();
-  fetchTeamSessionHistory.mockResolvedValue(SESSIONS);
+  fetchMatrixSessions.mockResolvedValue(SESSIONS);
+  fetchTeamSessionHistory.mockResolvedValue([]);
   fetchMatrixSessionResults.mockResolvedValue([]);
   fetchTimeBands.mockResolvedValue([]);
   deleteMatrixSession.mockResolvedValue({ ok: true });

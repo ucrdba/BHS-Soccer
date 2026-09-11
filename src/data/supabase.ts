@@ -2291,6 +2291,13 @@ class SupabaseService {
 
   async deleteMatrixSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    // Guarded like the matrix_logs writers are. Without it a caller holding
+    // the wrong row shape sent the string "undefined" and Postgres answered
+    // `invalid input syntax for type uuid`, which is a crash report rather
+    // than something a coach can act on.
+    if (!sessionId || !this.isUuid(sessionId)) {
+      return { ok: false, error: 'That session has no database id, so it cannot be deleted.' };
+    }
     const { data, error } = await this.client!
       .from('matrix_sessions').update({ is_deleted: true }).eq('id', sessionId).select();
     if (error) { report('deleteMatrixSession', error.message); return { ok: false, error: error.message }; }

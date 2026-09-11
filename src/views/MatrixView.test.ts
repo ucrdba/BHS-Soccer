@@ -51,6 +51,7 @@ const svc = {
   fetchMatrixLogs: vi.fn(),
   deleteMatrixResult: vi.fn(),
   fetchTeamSessionHistory: vi.fn(),
+  fetchMatrixSessions: vi.fn(),
   fetchMatrixSessionResults: vi.fn(),
   fetchTimeBands: vi.fn(),
   saveMatrixSession: vi.fn(),
@@ -135,6 +136,7 @@ async function mountMatrix(opts: {
   svc.fetchTeamExercisePoints.mockResolvedValue(points);
   svc.fetchDrillsForWeighting.mockResolvedValue(drills);
   svc.fetchMatrixLogs.mockResolvedValue(logs);
+  svc.fetchMatrixSessions.mockResolvedValue([]);
   svc.fetchTeamSessionHistory.mockResolvedValue([]);
   svc.fetchMatrixSessionResults.mockResolvedValue([]);
   svc.fetchTimeBands.mockResolvedValue([]);
@@ -645,7 +647,7 @@ describe('recording a session', () => {
 
   it('reads the session history for the team', async () => {
     const w = await mountMatrix({ coach: true });
-    expect(svc.fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    expect(svc.fetchMatrixSessions).toHaveBeenCalledWith('t1');
     await switchTo(w, 'History');
     expect(w.find('[data-history]').exists()).toBe(true);
   });
@@ -706,6 +708,7 @@ describe('the reports', () => {
   });
 
   it('opens the squad report on this team', async () => {
+    svc.fetchMatrixSessions.mockResolvedValue([]);
     svc.fetchTeamSessionHistory.mockResolvedValue([]);
     const w = await mountMatrix({ coach: true });
     await w.find('[data-open-squad]').trigger('click');
@@ -715,6 +718,7 @@ describe('the reports', () => {
   });
 
   it('opens the progress chart on this team', async () => {
+    svc.fetchMatrixSessions.mockResolvedValue([]);
     svc.fetchTeamSessionHistory.mockResolvedValue([]);
     const w = await mountMatrix({ coach: true });
     await w.find('[data-open-progress]').trigger('click');

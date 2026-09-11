@@ -41,7 +41,21 @@ export const useSessionStore = defineStore('session', () => {
     if (!teamId) { loadError.value = 'Choose a team first.'; return; }
     loading.value = true;
     try {
-      const rows = await supabaseService.fetchTeamSessionHistory(teamId);
+      /*
+       * fetchMatrixSessions, NOT fetchTeamSessionHistory.
+       *
+       * The two read the same table and return different things.
+       * fetchMatrixSessions returns one row per SESSION -- id, drill_id,
+       * occurred_on and the joined drills_bank -- which is what this store
+       * and SessionHistory read. fetchTeamSessionHistory flattens to one row
+       * per RESULT in camelCase, for the progress and squad reports.
+       *
+       * This called the flattened one, so every field the history reads was
+       * undefined: the drill name fell back to "Exercise (since removed)" on
+       * every row, the dates were blank, the count was results rather than
+       * sessions, and Delete sent `undefined` to Postgres as a uuid.
+       */
+      const rows = await supabaseService.fetchMatrixSessions(teamId);
       // Null is a failed read. Showing an empty history for one would tell a
       // coach their sessions are gone.
       if (rows === null) {

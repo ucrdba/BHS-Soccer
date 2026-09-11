@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 const fetchTeamSessionHistory = vi.fn();
+const fetchMatrixSessions = vi.fn();
 const fetchMatrixSessionResults = vi.fn();
 const fetchDrillsForWeighting = vi.fn();
 const fetchTimeBands = vi.fn();
@@ -20,6 +21,7 @@ const deleteMatrixSession = vi.fn();
 vi.mock('../data/supabase', () => ({
   supabaseService: {
     fetchTeamSessionHistory: (...a: any[]) => fetchTeamSessionHistory(...a),
+    fetchMatrixSessions: (...a: any[]) => fetchMatrixSessions(...a),
     fetchMatrixSessionResults: (...a: any[]) => fetchMatrixSessionResults(...a),
     fetchDrillsForWeighting: (...a: any[]) => fetchDrillsForWeighting(...a),
     fetchTimeBands: (...a: any[]) => fetchTimeBands(...a),
@@ -50,7 +52,8 @@ const BANDS = [
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
-  fetchTeamSessionHistory.mockResolvedValue(SESSIONS);
+  fetchMatrixSessions.mockResolvedValue(SESSIONS);
+  fetchTeamSessionHistory.mockResolvedValue([]);
   fetchMatrixSessionResults.mockResolvedValue([]);
   fetchDrillsForWeighting.mockResolvedValue(DRILLS);
   fetchTimeBands.mockResolvedValue(BANDS);
@@ -62,7 +65,7 @@ describe('loading', () => {
   it('reads the history for the team', async () => {
     const s = useSessionStore();
     await s.loadHistory('t1');
-    expect(fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    expect(fetchMatrixSessions).toHaveBeenCalledWith('t1');
     expect(s.sessions).toHaveLength(2);
   });
 
@@ -84,7 +87,7 @@ describe('loading', () => {
   });
 
   it('reports a failed read rather than showing an empty history', async () => {
-    fetchTeamSessionHistory.mockResolvedValue(null);
+    fetchMatrixSessions.mockResolvedValue(null);
     const s = useSessionStore();
     await s.loadHistory('t1');
     expect(s.loadError).toBeTruthy();
@@ -181,7 +184,7 @@ describe('saving', () => {
     const s = useSessionStore();
     const { session, results } = payload();
     await s.save('t1', session, results as any);
-    expect(fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    expect(fetchMatrixSessions).toHaveBeenCalledWith('t1');
   });
 
   it('clears the edit id after a successful save', async () => {
@@ -231,7 +234,7 @@ describe('deleting a session', () => {
     const s = useSessionStore();
     await s.remove('s1', 't1');
     expect(deleteMatrixSession).toHaveBeenCalledWith('s1');
-    expect(fetchTeamSessionHistory).toHaveBeenCalledWith('t1');
+    expect(fetchMatrixSessions).toHaveBeenCalledWith('t1');
   });
 
   it('reports the refusal the database gave, not a generic message', async () => {
@@ -245,6 +248,51 @@ describe('deleting a session', () => {
     deleteMatrixSession.mockResolvedValue({ ok: false, error: 'Not your team.' });
     const s = useSessionStore();
     await s.remove('s1', 't1');
+    expect(fetchMatrixSessions).not.toHaveBeenCalled();
+  });
+});
+
+describe('the shape the history is read in', () => {
+  /*
+   * loadHistory once called fetchTeamSessionHistory, which reads the same
+   * table and returns something else: one row per RESULT, in camelCase, for
+   * the progress and squad reports. This store and SessionHistory want one
+   * row per SESSION.
+   *
+   * Every symptom followed from that one swap -- the drill name fell back to
+   * "Exercise (since removed)" on every row, the dates were blank, the count
+   * was results rather than sessions, and Delete sent the string "undefined"
+   * to Postgres as a uuid. The tests missed it because their mock returned
+   * session-shaped rows from the method that does not produce them.
+   */
+  it('reads the per-session list, not the per-result one', async () => {
+    const store = useSessionStore();
+    await store.loadHistory('t1');
+
+    expect(fetchMatrixSessions).toHaveBeenCalledWith('t1');
     expect(fetchTeamSessionHistory).not.toHaveBeenCalled();
+  });
+
+  it('holds rows carrying the fields the history screen reads', async () => {
+    const store = useSessionStore();
+    await store.loadHistory('t1');
+
+    const [row] = store.sessions;
+    // Named individually rather than deep-equalled: these four are what
+    // SessionHistory and openExisting actually reach for, and a row missing
+    // any of them renders or deletes wrongly without throwing.
+    expect(row.id).toBeTruthy();
+    expect(row.drill_id).toBeTruthy();
+    expect(row.occurred_on).toBeTruthy();
+    expect(row).toHaveProperty('drills_bank');
+  });
+
+  it('carries an id a delete can actually use', async () => {
+    const store = useSessionStore();
+    await store.loadHistory('t1');
+    await store.remove(store.sessions[0].id, 't1');
+
+    expect(deleteMatrixSession).toHaveBeenCalledWith('s1');
+    expect(deleteMatrixSession).not.toHaveBeenCalledWith(undefined);
   });
 });
