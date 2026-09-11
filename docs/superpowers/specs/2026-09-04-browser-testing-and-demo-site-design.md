@@ -1,5 +1,10 @@
 # Browser testing, and a public demo playground
 
+> **The demo-site parts are superseded by `2026-09-11-demo-accounts-design.md`.**
+> The demo now builds from `main` (no `demo` branch), with nine fixed accounts
+> instead of self-serve signup, a visitor cap and a 48-hour expiry, and its
+> database is rebuilt every night from the migrations.
+
 **Status:** approved, not yet implemented
 **Date:** 2026-09-04
 

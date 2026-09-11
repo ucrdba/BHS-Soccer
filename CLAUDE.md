@@ -40,6 +40,8 @@ The connection resolves as `TEST_DATABASE_URL` → a gitignored `.env.test` at t
 
 The two are separate databases: the harness uses the standalone Postgres on **5432**, and the CLI stack runs its own on **54322** behind the API on **54321**.
 
+**The harness connects as the `postgres` superuser, which skips every privilege check**, so a test on `withDb`'s connection cannot see a function a visitor is not allowed to execute. A visitor's statement has to be tried from a separate connection, as `authenticated`, with `request.jwt.claim.sub` set: `demo-accounts.test.ts` does this, after the demo's account locks passed every test and would still have refused every profile edit on Supabase. It cannot share the build's transaction either — PL/pgSQL checks a nested call's permission once per transaction, so a role switched to after the build is never checked.
+
 ## Layout
 
 | Location | Holds |
@@ -239,7 +241,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0030_school_hero.sql`.
+8. …through `supabase/migrations/0032_record_hand_added_columns.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
@@ -261,6 +263,28 @@ Each cost a failed migration or a rendering bug. Two habits avoid it:
 Migrations that add a column should prefer `add column if not exists` over `alter column`, so they are correct against both the live database and the declared schema. And **test a migration by running it** against `src/data/testdb/` rather than by reading it: `0027`'s own copy step failed on the unique index it had not dropped yet, and only Postgres said so.
 
 The Supabase SQL editor may run as a role that is a **member** of `postgres` without defaulting to it. `ALTER TABLE` and `CREATE POLICY` check ownership rather than privilege, so they fail with `42501: must be owner of table …` even when the privilege is reachable. `set role postgres;` immediately after `begin;` fixes it.
+
+### The demo database
+
+The demo site builds `main` like production and differs only by its Vercel
+variables (`VITE_DEMO_MODE=true`, the demo project's `VITE_SUPABASE_*`,
+`VITE_DEMO_PASSWORD`). Its database — Supabase project `nzelhvipofeqoteewvhg` —
+is **rebuilt from `main`'s migrations every night and on every migration push**
+by `.github/workflows/demo-rebuild.yml`, then given the sample program and nine
+fixed accounts. Runbook: `docs/runbooks/2026-09-11-demo-rebuild-runbook.md`.
+
+Three things follow for anyone writing a migration:
+
+- **A migration must apply to an empty database.** One that inserts data by a
+  production UUID or a Beaumont name aborts the rebuild. Put the data change in
+  its own file and add it to `SKIP` in `scripts/demo-rebuild-lib.mjs`, or add
+  the single statement to `CUTS`.
+- **A column added to production by hand breaks the demo.** The rebuilt database
+  lacks it, and the app's saves fail there with `42703`. Record it in a
+  migration with `add column if not exists`, as `0032` did.
+- **Demo SQL is never a migration.** It lives in `Resouces/SQL/demo/`, refuses a
+  database containing `bhs` or `lfc`, and must never be copied into
+  `supabase/migrations/`. Never set `VITE_DEMO_MODE` on the production project.
 
 ## Conventions
 
