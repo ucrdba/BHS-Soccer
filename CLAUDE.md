@@ -204,7 +204,7 @@ Two methods worth knowing about individually:
 
 `schools` holds organizations. `teams` belong to a school; `team_players` is the membership and carries everything that varies by team (number, position, season stats, ratings), so `players` is pure identity and one person can appear on a school team and a club team with separate statistics. `unique (school_id, player_id)` on the membership enforces one team per organization, and a composite foreign key to `teams (id, school_id)` stops that column drifting from its team's.
 
-The active team is a per-device preference in `localStorage` under `bhs_active_team_id`, resolved by `resolveActiveTeam` in `src/data/team-scope.ts` — and only honoured while the viewer still has access, so a coach removed from a team stops seeing it. Writes are team-scoped through `public.is_team_coach()`; reads stay public.
+The active team is a per-device preference in `localStorage` under `bhs_active_team_id`, resolved by `resolveActiveTeam` in `src/data/team-scope.ts` — and only honoured while the viewer still has access, so a coach removed from a team stops seeing it. Writes are team-scoped through `public.is_team_coach()`; reads stay public, with one exception: since `0029`, `daily_thoughts` is readable only by the team's own players, its coaches and admins, through `public.is_team_member()` — the coach's message is for the squad. Re-running `0015` or section 6 of `supabase_migration_auth.sql` restores the public read; re-apply `0029` after either.
 
 ### Drill categories belong to an organization
 
@@ -239,7 +239,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0028_school_logo.sql`.
+8. …through `supabase/migrations/0029_daily_thoughts_members_only.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
