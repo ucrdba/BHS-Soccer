@@ -167,7 +167,24 @@ deploy.
    views. Safe on the older app — it never sends `dnp` — but the new client
    **needs** it, or every DNP save is refused by the constraint. If it errors,
    its own transaction rolls it back; do not push until it has applied cleanly.
-9. Immediately push `main` (the owner's call). Vercel deploys production; wait
+9. **Organization-scoped writes (0039).** Before running it, see who it will
+   hold back. A coach writes only where they are assigned as a coach, so list
+   every active coach with no team assignment — each one loses write access to
+   drills, quiz, coaches and fixtures until assigned in Admin → Teams:
+
+   ```sql
+   select p.name, p.email from public.profiles p
+    where p.role = 'coach' and p.status = 'active'
+      and not exists (select 1 from public.team_coaches tc where tc.profile_id = p.id);
+   ```
+
+   Admins are unaffected: an admin is staff of every organization. Then paste
+   the whole of `supabase/migrations/0039_org_scoped_writes.sql` and run it. It
+   **refuses to finish** if any other permissive write policy is left on the
+   eight tables — one made in the dashboard, say — and names it; drop that
+   policy and run it again. Safe on the older app either way: it changes who
+   may write, not what the app sends.
+10. Immediately push `main` (the owner's call). Vercel deploys production; wait
    for the deployment to go live.
 
 ## 5. Prove the new flows on the live site

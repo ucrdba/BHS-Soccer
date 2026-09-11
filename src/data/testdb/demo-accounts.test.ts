@@ -333,16 +333,17 @@ describe.skipIf(!available)('demo_accounts.sql', () => {
     }, 60_000);
 
     // The rebuild's guard refuses any database holding a school coded 'bhs' or
-    // 'lfc' -- it is how the rebuild knows production -- and production's
-    // schools_write lets any coach or admin create or recode an organization.
-    // One visitor doing so would stop every rebuild after it, and with them
-    // the restore that bounds everything else a visitor can do. So the demo
-    // refuses the codes and the guard stays strict.
+    // 'lfc' -- it is how the rebuild knows production. One visitor creating or
+    // recoding an organization to either would stop every rebuild after it, and
+    // with them the restore that bounds everything else a visitor can do. So
+    // the demo refuses the codes and the guard stays strict.
     //
-    // As a visitor, on a committed database: RLS must be shown to allow the
-    // ordinary insert, or the refusals would prove nothing about the trigger.
-    it("refuse a visitor an organization coded 'bhs' or 'lfc', by trigger rather than by RLS", async () => {
-      await asVisitor('demo1@demo.invalid', async (visitor) => {
+    // Since 0039 only an ADMIN writes `schools`, so the trigger is exercised as
+    // the demo admin (demo9). As a visitor, on a committed database: RLS must be
+    // shown to allow the ordinary insert, or the refusals would prove nothing
+    // about the trigger.
+    it("refuse the demo admin an organization coded 'bhs' or 'lfc', by trigger rather than by RLS", async () => {
+      await asVisitor('demo9@demo.invalid', async (visitor) => {
         const reserved = /That short code is reserved on the demo site/;
 
         const lfc = await refusal(visitor,
@@ -357,13 +358,26 @@ describe.skipIf(!available)('demo_accounts.sql', () => {
         expect(defaulted?.message).toMatch(reserved);
         expect(defaulted?.message).not.toMatch(/permission denied/);
 
-        const recoded = await refusal(visitor, `update schools set code = 'LFC' where code = 'demo1'`);
+        const recoded = await refusal(visitor, `update schools set code = 'LFC' where code = 'demo9'`);
         expect(recoded?.message).toMatch(reserved);
         expect(recoded?.message).not.toMatch(/permission denied/);
 
         const ordinary = await visitor.query(
           `insert into schools (code, name, mascot) values ('demo-club', 'Demo Club', 'Kites')`);
         expect(ordinary.rowCount).toBe(1);
+      });
+    }, 60_000);
+
+    // A demo coach cannot reach the trigger at all: since 0039 no coach creates
+    // or edits an organization's row, their own included.
+    it('refuse a demo coach any organization write, reserved code or not', async () => {
+      await asVisitor('demo1@demo.invalid', async (visitor) => {
+        const created = await refusal(visitor,
+          `insert into schools (code, name, mascot) values ('demo-club', 'Demo Club', 'Kites')`);
+        expect(created?.message).toMatch(/row-level security/);
+
+        const renamed = await visitor.query(`update schools set name = 'Renamed' where code = 'demo1'`);
+        expect(renamed.rowCount).toBe(0);
       });
     }, 60_000);
   });

@@ -258,7 +258,11 @@ Two methods worth knowing about individually:
 
 `schools` holds organizations. `teams` belong to a school; `team_players` is the membership and carries everything that varies by team (number, position, season stats, ratings), so `players` is pure identity and one person can appear on a school team and a club team with separate statistics. `unique (school_id, player_id)` on the membership enforces one team per organization, and a composite foreign key to `teams (id, school_id)` stops that column drifting from its team's.
 
-The active team is a per-device preference in `localStorage` under `bhs_active_team_id`, resolved by `resolveActiveTeam` in `src/data/team-scope.ts` — and only honoured while the viewer still has access, so a coach removed from a team stops seeing it. Writes are team-scoped through `public.is_team_coach()`; reads stay public, with one exception: since `0029`, `daily_thoughts` is readable only by the team's own players, its coaches and admins, through `public.is_team_member()` — the coach's message is for the squad. Re-running `0015` or section 6 of `supabase_migration_auth.sql` restores the public read; re-apply `0029` after either.
+The active team is a per-device preference in `localStorage` under `bhs_active_team_id`, resolved by `resolveActiveTeam` in `src/data/team-scope.ts` — and only honoured while the viewer still has access, so a coach removed from a team stops seeing it. Writes are scoped to the writer's team or organization, never to their role alone. Team content — `team_players`, `practice_plans`, `daily_thoughts`, the Matrix session tables, lineups, plus/minus — goes through `public.is_team_coach()`, which admits a coach of the team **or any active admin**. Since `0039`, `schedule` and `matrix_logs` go through `public.can_write_team()`, and everything keyed on an organization through `public.is_org_staff()`: `drills_bank`, `quiz_questions` and `coaches` by `school_id`, `quiz_answers` by their question's, `players` by the organizations of their live `team_players` rows (a player on no team is any coach's to write, which adding a player and the unassigned pool both need), and `schools` by an admin alone. **An admin is staff of every organization** — running the platform is what the role is for, and an organization may have no coach assigned yet (production's club had none), so holding an admin to one organization would leave such a club writable by nobody.
+
+**A coach is staff where they coach, not where their profile says.** Signup files every profile under code `'bhs'` and approval never changes it, so a club coach's `profiles.school_id` is usually Beaumont's; `is_org_staff()` reads `team_coaches` for a coach, and admits any active admin. `current_profile_school_id()` — and `0027`'s category policy, which uses it — gets this wrong for coaches.
+
+Reads stay public, with one exception: since `0029`, `daily_thoughts` is readable only by the team's own players, its coaches and admins, through `public.is_team_member()` — the coach's message is for the squad. Re-running section 6 of `supabase_migration_auth.sql` restores every role-only write policy `0039` replaced, and it or `0015` restores the public read; re-apply `0029` and `0039` after either.
 
 ### Drill categories belong to an organization
 
@@ -298,6 +302,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
 8. …through `supabase/migrations/0038_attendance_dnp.sql`.
+9. `supabase/migrations/0039_org_scoped_writes.sql` — replaces the role-only write policy item 4's section 6 left on `schools`, `players`, `schedule`, `drills_bank`, `coaches` and `quiz_questions`, and that `0002` and `0019` copied onto `matrix_logs` and `quiz_answers`. It refuses to finish while any other permissive write policy remains on those tables, since one left over would undo it.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
