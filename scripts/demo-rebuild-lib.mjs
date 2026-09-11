@@ -197,3 +197,8 @@ export function seedSql(repo) {
   const sql = readSql(join(repo, ...DEMO_SQL, 'demo_seed.sql'));
   return stripTransactionControl(substituteDiagrams(sql, diagrams));
 }
+
+/** demo_accounts.sql: the nine accounts' copies, their profiles, and the locks. */
+export function accountsSql(repo) {
+  return stripTransactionControl(readSql(join(repo, ...DEMO_SQL, 'demo_accounts.sql')));
+}

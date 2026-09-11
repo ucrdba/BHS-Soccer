@@ -14,11 +14,12 @@ end $$;
 
 create schema if not exists auth;
 
--- Only the four columns the SQL under test actually reads.
+-- Only the columns the SQL under test actually reads.
 create table if not exists auth.users (
   id                   uuid primary key default gen_random_uuid(),
   email                text unique,
   email_confirmed_at   timestamptz,
+  encrypted_password   text,
   raw_user_meta_data   jsonb default '{}'::jsonb
 );
 
