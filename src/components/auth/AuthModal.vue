@@ -21,11 +21,19 @@
 import { ref, computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { useAuthStore } from '../../stores/auth';
+import { demoConfig, DEMO_ACCOUNTS } from '../../demo';
 
 defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const auth = useAuthStore();
+
+/**
+ * On the demo deployment the modal is an account picker: nine buttons and
+ * nothing to type. The shared password comes from the build, never from the
+ * visitor. Off everywhere else.
+ */
+const demo = demoConfig();
 
 type Tab = 'signin' | 'register' | 'verify';
 const tab = ref<Tab>('signin');
@@ -55,9 +63,10 @@ const ROLES = [
 ];
 
 const title = computed(() =>
-  tab.value === 'register' ? 'Create an account'
-    : tab.value === 'verify' ? 'Verify your email'
-      : 'Sign in');
+  demo.enabled ? 'Try the demo'
+    : tab.value === 'register' ? 'Create an account'
+      : tab.value === 'verify' ? 'Verify your email'
+        : 'Sign in');
 
 function setTab(next: Tab): void {
   tab.value = next;
@@ -142,11 +151,23 @@ async function onVerify(): Promise<void> {
     busy.value = false;
   }
 }
+
+async function onPickAccount(email: string): Promise<void> {
+  busy.value = true;
+  feedback.value = '';
+  try {
+    const res: any = await auth.login(email, demo.password);
+    if (res?.success) { emit('close'); return; }
+    fail(res?.message || 'Could not sign in to that demo account.');
+  } finally {
+    busy.value = false;
+  }
+}
 </script>
 
 <template>
   <BaseModal :open="open" :title="title" @close="emit('close')">
-    <div class="tabs" role="tablist">
+    <div v-if="!demo.enabled" class="tabs" role="tablist">
       <button
         type="button" class="tabs__btn" :class="{ 'is-on': tab === 'signin' }"
         role="tab" :aria-selected="tab === 'signin'" data-tab="signin"
@@ -167,8 +188,20 @@ async function onVerify(): Promise<void> {
       data-feedback
     >{{ feedback }}</p>
 
+    <!-- The demo: pick an account. The chain below continues with v-else-if. -->
+    <div v-if="demo.enabled" class="demo-accounts" data-demo-accounts>
+      <p class="demo-accounts__intro">Pick an account to explore. Everything here is made up.</p>
+      <button
+        v-for="a in DEMO_ACCOUNTS" :key="a.n" type="button" class="demo-account"
+        :data-demo-account="a.n" :disabled="busy" @click="onPickAccount(a.email)"
+      >
+        <span class="demo-account__label">{{ a.label }}</span>
+        <span class="demo-account__sees">{{ a.sees }}</span>
+      </button>
+    </div>
+
     <!-- Sign in -->
-    <form v-if="tab === 'signin'" data-tab-panel="signin" data-signin-submit
+    <form v-else-if="tab === 'signin'" data-tab-panel="signin" data-signin-submit
           @submit.prevent="onSignIn">
       <label class="field">
         <span class="kicker">Email</span>
@@ -280,4 +313,23 @@ form { display: flex; flex-direction: column; gap: var(--space-3); }
 .suggest__actions { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .verify__target { margin: 0 0 var(--space-3); color: var(--ink-muted); font-size: 14px; }
+
+.demo-accounts { display: flex; flex-direction: column; gap: var(--space-2); }
+.demo-accounts__intro { margin: 0 0 var(--space-2); color: var(--ink-muted); font-size: 14px; }
+.demo-account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.demo-account:hover:not(:disabled) { border-color: var(--live); }
+.demo-account__label { font-family: var(--heading-face); font-size: 16px; }
+.demo-account__sees { color: var(--ink-muted); font-size: 13px; }
 </style>
