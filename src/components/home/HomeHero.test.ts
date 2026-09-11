@@ -38,6 +38,17 @@ describe('the photo', () => {
     expect(mountHero().find('[data-band-photo]').attributes('fetchpriority')).toBe('high');
   });
 
+  /*
+   * The photo and the logo, like the address, may point at any https host an
+   * admin has typed in -- so neither should hand that host the referring
+   * page as a viewer's browser fetches it.
+   */
+  it('sends no referrer for the photo or the logo', () => {
+    const w = mountHero();
+    expect(w.find('[data-band-photo]').attributes('referrerpolicy')).toBe('no-referrer');
+    expect(w.find('[data-band-logo]').attributes('referrerpolicy')).toBe('no-referrer');
+  });
+
   it('shows the colour band when there is no photo', () => {
     const w = mountHero({ photo: '' });
     expect(w.find('[data-band-photo]').exists()).toBe(false);
