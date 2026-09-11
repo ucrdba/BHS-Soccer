@@ -16,6 +16,8 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { reportFailure, reportConnection } from '../domain/notices';
+import { isPublishableAnonKey } from './anon-key';
+import { resolveCredential } from './credentials';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -34,9 +36,14 @@ function readStoredCredential(key: string): string | null {
 }
 
 function getSupabaseUrl(): string {
-  return (window as any).ENV_SUPABASE_URL
-    || readStoredCredential('bhs_supabase_url')
-    || 'https://arsigevpgpbqluqbnhjr.supabase.co';
+  return resolveCredential(
+    {
+      runtime: (window as any).ENV_SUPABASE_URL,
+      build: import.meta.env.VITE_SUPABASE_URL,
+      stored: readStoredCredential('bhs_supabase_url')
+    },
+    'https://arsigevpgpbqluqbnhjr.supabase.co'
+  );
 }
 
 // The anon key is designed to be publishable — it ships in every Supabase
@@ -45,9 +52,14 @@ function getSupabaseUrl(): string {
 // disconnected when no credentials are configured. Value copied verbatim
 // from the original getSupabaseAnonKey() in the now-deleted supabaseClient.js.
 function getSupabaseAnonKey(): string {
-  return (window as any).ENV_SUPABASE_ANON_KEY
-    || readStoredCredential('bhs_supabase_anon_key')
-    || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw';
+  return resolveCredential(
+    {
+      runtime: (window as any).ENV_SUPABASE_ANON_KEY,
+      build: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      stored: readStoredCredential('bhs_supabase_anon_key')
+    },
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyc2lnZXZwZ3BicWx1cWJuaGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MDY2NjgsImV4cCI6MjEwMTE4MjY2OH0.UayuI-pPjvY0qfFoSHrPNanaFr02V8mrbMFxAmy6-iw'
+  );
 }
 
 let supabaseClient: SupabaseClient | null = null;
@@ -76,7 +88,7 @@ function initSupabaseClient(): void {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
 
-  if (isSupabaseEndpoint(url) && key && key.startsWith('eyJ')) {
+  if (isSupabaseEndpoint(url) && isPublishableAnonKey(key)) {
     try {
       supabaseClient = createClient(url, key, {
         auth: {
@@ -104,7 +116,7 @@ function initSupabaseClient(): void {
     }
   } else {
     supabaseClient = null;
-    const reason = `Needs a .supabase.co or loopback URL and an anon key starting eyJ. `
+    const reason = `Needs a .supabase.co or loopback URL and a publishable key (sb_publishable_... or a legacy eyJ... anon key). `
       + `Got: ${url || '(no URL)'}${key ? '' : ' and no key'}.`;
     console.log('📦 No Supabase client:', reason);
     // A state rather than a failure: every method below returns null without a
@@ -478,7 +490,7 @@ class SupabaseService {
 
   async testProfileInsert(): Promise<any> {
     if (!this.isConfigured()) {
-      return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase Anon Key (starts with eyJ...) is entered.' };
+      return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase publishable key (sb_publishable_... or a legacy eyJ... anon key) is entered.' };
     }
 
     const testEmail = `test_profile_${Date.now().toString().slice(-4)}@bhs.org`;
@@ -515,7 +527,7 @@ class SupabaseService {
     if (!this.isConfigured()) {
       return {
         success: false,
-        summaryText: '❌ Supabase Database Client is NOT connected.\n\nReason: Missing or invalid Supabase Anon Key.\n\nFix: Open Admin Center -> Enter your Supabase Anon Key (starts with "eyJ...") and click "Save Credentials".',
+        summaryText: '❌ Supabase Database Client is NOT connected.\n\nReason: Missing or invalid Supabase publishable key.\n\nFix: Open Admin Center -> Enter your project\'s publishable key ("sb_publishable_..." or a legacy "eyJ..." anon key) and click "Save Credentials".',
         tableResults: []
       };
     }
