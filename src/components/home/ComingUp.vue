@@ -28,6 +28,10 @@ defineProps<{ matches: any[]; total: number }>();
 </template>
 
 <style scoped>
+/* Sized by the column it sits in, not the window: beside the season summary
+   on a computer it is narrower than it is alone on a phone. */
+.coming { container-type: inline-size; }
+
 .coming__list { margin: var(--space-2) 0 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
 
 .coming__row {
@@ -39,7 +43,17 @@ defineProps<{ matches: any[]; total: number }>();
 }
 
 .coming__date { width: 9.5rem; flex: none; font-size: 12px; color: var(--ink-muted); }
-.coming__opp { flex: 1; font-family: var(--heading-face); font-size: 18px; color: var(--ink); overflow-wrap: anywhere; }
+/* break-word, not anywhere: a name wraps between its words, and only a single
+   word too long for the whole row is ever split. */
+.coming__opp { flex: 1; font-family: var(--heading-face); font-size: 18px; color: var(--ink); overflow-wrap: break-word; }
+
+/* Too narrow for date, opponent and side on one line -- a two-word opponent
+   was left about 50px and broke mid-word. The date takes its own line above,
+   and the opponent gets the row beside the side. */
+@container (max-width: 20rem) {
+  .coming__row { flex-wrap: wrap; row-gap: 2px; }
+  .coming__date { width: 100%; }
+}
 
 .coming__side {
   padding: 2px var(--space-2);
