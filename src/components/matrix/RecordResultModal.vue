@@ -340,7 +340,7 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
           A player cannot play themselves.
         </p>
 
-        <fieldset class="field outcomes">
+        <fieldset class="outcomes">
           <legend class="field__label">Result</legend>
           <button
             v-for="o in outcomes" :key="o.value"
@@ -391,12 +391,26 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 </template>
 
 <style scoped>
-.form { display: flex; flex-direction: column; gap: var(--space-3); }
+/*
+ * Capped rather than filling the wide modal. The modal is wide so a typed
+ * line and its reading sit side by side; a dropdown stretched to 460px is
+ * just a longer distance for the eye to travel to the same three words.
+ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 34rem;
+}
+
+/* A shade tighter than the page's own fields: this is a form to get through,
+   not one to dwell on. */
+.form :deep(.input) { min-height: 32px; font-size: 13px; }
 
 .modes { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
 .mode {
-  min-height: 34px;
+  min-height: 30px;
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -410,7 +424,7 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 .mode.is-on { border-color: var(--live); color: var(--live); }
 .mode:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.date { max-width: 12rem; }
+.date { max-width: 10rem; }
 
 .how {
   margin: 0;
@@ -431,16 +445,18 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 .boxes {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.box { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-2); align-items: center; }
+.box { display: grid; grid-template-columns: 5.5rem 1fr; gap: var(--space-2); align-items: center; }
 
 .box__input {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 0.06em;
   text-align: center;
 }
 
@@ -475,8 +491,16 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 
 .field__hint { color: var(--ink-soft); letter-spacing: 0; text-transform: none; }
 
+/*
+ * `flex-direction` is stated rather than left to the default. This carried
+ * `class="field outcomes"` at first, and .field sets `flex-direction: column`
+ * -- which turned `flex: 1 1 8rem` into a HEIGHT and stretched every outcome
+ * into a 180px slab. The .field class is gone; the explicit direction is here
+ * so re-adding it could not do that again.
+ */
 .outcomes {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: var(--space-1);
   margin: 0;
@@ -485,8 +509,8 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 }
 
 .outcome {
-  flex: 1 1 8rem;
-  min-height: 38px;
+  flex: 1 1 7rem;
+  min-height: 32px;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -494,6 +518,7 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
   color: var(--ink);
   font: inherit;
   font-size: 13px;
+  line-height: 1.3;
   cursor: pointer;
 }
 
