@@ -178,6 +178,70 @@ export function readEntries(
   });
 }
 
+// ── what is already recorded ──────────────────────────────────────────────
+
+/** One row of `matrix_logs`, as the screen shows it back. */
+export interface RecordedResult {
+  id: string;
+  occurredOn: string;
+  playerA: any | null;
+  playerB: any | null;
+  /** 'a', 'b' or 'draw', as stored — relative to playerA. */
+  outcome: string;
+  scoreText: string | null;
+  /** The pairing and its result, in words. */
+  reading: string;
+}
+
+/**
+ * A player who has left the squad still has results.
+ *
+ * The row is shown rather than hidden, because it is still being scored and a
+ * coach reconciling a sheet needs to see it. Only the name is missing.
+ */
+const nameOf = (p: any, label: (p: any) => string) => (p ? label(p) : 'a former player');
+
+/**
+ * The results already recorded against one exercise, newest first.
+ *
+ * Scoped to the drill on purpose. A pairing with no drill scores at weight 1.0
+ * and belongs to no exercise, so listing those here would offer a coach the
+ * chance to edit a result that is not the one they are looking at.
+ */
+export function describeRecorded(
+  logs: any[], players: any[], label: (p: any) => string, drillId: string
+): RecordedResult[] {
+  const find = (id: string) => (players || []).find(p => p && p.id === id) || null;
+
+  return (logs || [])
+    .filter(l => l && !l.is_deleted && !l.isDeleted)
+    .filter(l => (l.drill_id || l.drillId) === drillId)
+    .map(l => {
+      const playerA = find(l.player_a_id || l.playerAId);
+      const playerB = find(l.player_b_id || l.playerBId);
+      const outcome = l.outcome || '';
+
+      const a = nameOf(playerA, label);
+      const b = nameOf(playerB, label);
+      let reading: string;
+      if (outcome === 'draw') reading = `${a} tied with ${b}`;
+      else if (outcome === 'a') reading = `${a} beat ${b}`;
+      else if (outcome === 'b') reading = `${b} beat ${a}`;
+      else reading = `${a} v ${b}`;
+
+      return {
+        id: l.id,
+        occurredOn: l.occurred_on || l.occurredOn || '',
+        playerA,
+        playerB,
+        outcome,
+        scoreText: l.score_text ?? l.scoreText ?? null,
+        reading
+      };
+    })
+    .sort((x, y) => String(y.occurredOn).localeCompare(String(x.occurredOn)));
+}
+
 /** The lines that would be written, in the order they were typed. */
 export const recordable = (lines: EntryLine[]): EntryLine[] =>
   (lines || []).filter(l => l.resolved && !l.error);

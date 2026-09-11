@@ -21,7 +21,8 @@ import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { roundRobinPlayers, roundRobinLabel, roundRobinPlayed } from '../../domain/round-robin';
 import {
-  readEntries, recordable, hasErrors, playerByNumber, HOW_TO_ENTER
+  readEntries, recordable, hasErrors, playerByNumber, describeRecorded,
+  HOW_TO_ENTER, type RecordedResult
 } from '../../domain/pairing-entry';
 
 const props = defineProps<{
@@ -63,6 +64,16 @@ const scoreText = ref('');
  */
 const numberA = ref('');
 const numberB = ref('');
+
+/* The table of what is already recorded. */
+const editingId = ref<string | null>(null);
+const editOutcome = ref('');
+const editDate = ref('');
+const editScore = ref('');
+/** Which row has been asked to be deleted and is waiting to be told again. */
+const confirmingId = ref<string | null>(null);
+const rowError = ref<string | null>(null);
+const busyId = ref<string | null>(null);
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -174,6 +185,95 @@ const outcomes = computed(() => [
   { value: 'b', label: playerB.value ? `${roundRobinLabel(playerB.value)} won` : 'Second player won' }
 ]);
 
+// ── what is already recorded ──────────────────────────────────────────────
+
+/**
+ * Everything logged against this exercise, newest first.
+ *
+ * Read from the same `logs` the board holds, so a save that reloads the board
+ * refreshes this table without it having to fetch anything of its own.
+ */
+const recorded = computed<RecordedResult[]>(() =>
+  describeRecorded(props.logs, roster.value, roundRobinLabel, props.drillId));
+
+/** The three outcomes for one recorded row, named by that row's players. */
+function rowOutcomes(row: RecordedResult) {
+  return [
+    { value: 'a', label: row.playerA ? roundRobinLabel(row.playerA) : 'First' },
+    { value: 'draw', label: 'Draw' },
+    { value: 'b', label: row.playerB ? roundRobinLabel(row.playerB) : 'Second' }
+  ];
+}
+
+function startEdit(row: RecordedResult): void {
+  editingId.value = row.id;
+  editOutcome.value = row.outcome;
+  editDate.value = row.occurredOn;
+  editScore.value = row.scoreText || '';
+  confirmingId.value = null;
+  rowError.value = null;
+}
+
+function cancelEdit(): void {
+  editingId.value = null;
+  rowError.value = null;
+}
+
+/**
+ * Save one edited row.
+ *
+ * Every field is sent, not just the changed one: `updateMatrixResult` writes
+ * the whole row, so an update carrying only the outcome would null the date,
+ * the score and the drill the result belongs to.
+ */
+async function saveEdit(row: RecordedResult): Promise<void> {
+  rowError.value = null;
+  busyId.value = row.id;
+  try {
+    const res = await supabaseService.updateMatrixResult(row.id, {
+      playerAId: row.playerA?.id,
+      playerBId: row.playerB?.id,
+      outcome: editOutcome.value,
+      scoreText: editScore.value.trim() || null,
+      occurredOn: editDate.value || row.occurredOn,
+      drillId: props.drillId
+    });
+
+    if (!res?.ok) { rowError.value = res?.error || 'Could not change that result.'; return; }
+    editingId.value = null;
+    emit('saved');
+  } finally {
+    busyId.value = null;
+  }
+}
+
+/**
+ * Delete on a second press.
+ *
+ * The confirm IS the warning here -- unlike the duplicate-pairing case, where
+ * the warning is already on screen before the button is reached. There is
+ * nothing on a row to say that pressing Delete removes a result, so the row
+ * says it itself.
+ */
+function askDelete(row: RecordedResult): void {
+  confirmingId.value = row.id;
+  editingId.value = null;
+  rowError.value = null;
+}
+
+async function confirmDelete(row: RecordedResult): Promise<void> {
+  rowError.value = null;
+  busyId.value = row.id;
+  try {
+    const res = await supabaseService.deleteMatrixResult(row.id);
+    if (!res?.ok) { rowError.value = res?.error || 'Could not delete that result.'; return; }
+    confirmingId.value = null;
+    emit('saved');
+  } finally {
+    busyId.value = null;
+  }
+}
+
 // ── saving ────────────────────────────────────────────────────────────────
 
 /**
@@ -196,6 +296,9 @@ watch(() => props.open, (open) => {
   occurredOn.value = today();
   error.value = null;
   saved.value = null;
+  editingId.value = null;
+  confirmingId.value = null;
+  rowError.value = null;
   // A squad with no recording numbers cannot be typed at, so the picker is
   // the only way in and opening on quick entry would look broken.
   mode.value = numbered.value.length >= 2 ? 'quick' : 'pick';
@@ -446,6 +549,97 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 
       <p v-if="saved" class="note note--good" role="status" data-result-saved>{{ saved }}</p>
       <p v-if="error" class="note note--bad" role="alert" data-result-error>{{ error }}</p>
+
+      <!--
+        What has been recorded against this exercise, under both tabs.
+        Whichever way a result went in, this is where it is checked and put
+        right -- and the coach who just typed twenty of them is the one most
+        likely to need that.
+      -->
+      <section class="done" aria-labelledby="recorded-heading">
+        <h3 id="recorded-heading" class="done__head">
+          Recorded
+          <span v-if="recorded.length" class="done__count">{{ recorded.length }}</span>
+        </h3>
+
+        <p v-if="!recorded.length" class="done__empty" data-recorded-empty>
+          Nothing recorded for this exercise yet.
+        </p>
+
+        <ol v-else class="rows" data-recorded>
+          <li v-for="row in recorded" :key="row.id" class="row" data-recorded-row>
+            <template v-if="editingId === row.id">
+              <div class="row__edit">
+                <div class="row__outcomes">
+                  <button
+                    v-for="o in rowOutcomes(row)" :key="o.value"
+                    type="button" class="outcome" :class="{ 'is-on': editOutcome === o.value }"
+                    :aria-pressed="editOutcome === o.value"
+                    :data-edit-outcome="o.value" @click="editOutcome = o.value"
+                  >{{ o.label }}</button>
+                </div>
+
+                <div class="row__fields">
+                  <input
+                    v-model="editDate" type="date" class="input"
+                    aria-label="Date" data-edit-date />
+                  <input
+                    v-model="editScore" type="text" class="input"
+                    placeholder="Score" aria-label="Score" data-edit-score />
+                </div>
+
+                <div class="row__acts">
+                  <button
+                    type="button" class="btn btn--small" :disabled="busyId === row.id"
+                    data-edit-save @click="saveEdit(row)"
+                  >Save</button>
+                  <button
+                    type="button" class="btn btn--small btn--plain"
+                    data-edit-cancel @click="cancelEdit"
+                  >Cancel</button>
+                </div>
+              </div>
+              <!--
+                Which players played is not editable: that identity IS the row.
+                Correcting it is a delete and a re-entry, which is also what
+                keeps the round-robin sheet honest about what has been played.
+              -->
+              <p class="row__hint">To change who played, delete this and enter it again.</p>
+            </template>
+
+            <template v-else>
+              <span class="row__when">{{ row.occurredOn }}</span>
+              <span class="row__what" data-recorded-reading>{{ row.reading }}</span>
+              <span v-if="row.scoreText" class="row__score">{{ row.scoreText }}</span>
+
+              <span class="row__acts">
+                <template v-if="confirmingId === row.id">
+                  <button
+                    type="button" class="btn btn--small btn--danger" :disabled="busyId === row.id"
+                    data-recorded-confirm @click="confirmDelete(row)"
+                  >Delete it</button>
+                  <button
+                    type="button" class="btn btn--small btn--plain"
+                    data-recorded-keep @click="confirmingId = null"
+                  >Keep</button>
+                </template>
+                <template v-else>
+                  <button
+                    type="button" class="btn btn--small btn--plain"
+                    data-recorded-edit @click="startEdit(row)"
+                  >Edit</button>
+                  <button
+                    type="button" class="btn btn--small btn--plain"
+                    data-recorded-delete @click="askDelete(row)"
+                  >Delete</button>
+                </template>
+              </span>
+            </template>
+          </li>
+        </ol>
+
+        <p v-if="rowError" class="note note--bad" role="alert" data-recorded-error>{{ rowError }}</p>
+      </section>
     </div>
 
     <template #footer>
@@ -609,6 +803,67 @@ const onSave = () => (mode.value === 'quick' ? saveQuick() : savePick());
 }
 
 .outcome.is-on { border-color: var(--live); color: var(--live); }
+
+/* ── what is already recorded ───────────────────────────────────────────── */
+
+.done { border-top: 1px solid var(--rule); padding-top: var(--space-3); }
+
+.done__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  color: var(--ink-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.done__count { color: var(--ink-soft); }
+.done__empty { margin: 0; color: var(--ink-soft); font-size: 12px; }
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A hairline between, not a box around each: this is a list to read down. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+
+.row:last-child { border-bottom: 0; }
+
+.row__when {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.row__what { flex: 1; min-width: 12rem; color: var(--ink); }
+.row__score { color: var(--ink-muted); font-size: 12px; }
+.row__acts { display: flex; gap: var(--space-1); margin-left: auto; }
+
+.row__edit { display: flex; flex-wrap: wrap; gap: var(--space-2); width: 100%; align-items: center; }
+
+/* Its own line. Three outcomes plus a date plus a score do not fit across the
+   capped form, and letting them wrap strands one button under the other two. */
+.row__outcomes { display: flex; gap: var(--space-1); width: 100%; }
+.row__fields { display: flex; gap: var(--space-1); }
+.row__fields .input { max-width: 9rem; }
+
+.row__hint { width: 100%; margin: var(--space-1) 0 0; color: var(--ink-soft); font-size: 11px; }
 
 .note--warn { color: var(--color-warning); }
 

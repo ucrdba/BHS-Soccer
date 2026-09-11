@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parsePairing, resolvePairing, readEntries, recordable, hasErrors,
-  isParseFailure, playerByNumber, type PairingParse
+  isParseFailure, playerByNumber, describeRecorded, type PairingParse
 } from './pairing-entry';
 
 const PLAYERS = [
@@ -203,5 +203,77 @@ describe('finding a player by typed number', () => {
     expect(playerByNumber(PLAYERS, '1w3')).toBeNull();
     expect(playerByNumber(PLAYERS, '3a')).toBeNull();
     expect(playerByNumber(PLAYERS, '-3')).toBeNull();
+  });
+});
+
+describe('reading back what is recorded', () => {
+  const LOGS = [
+    { id: 'l1', drill_id: 'd1', occurred_on: '2026-09-01', player_a_id: 'p1', player_b_id: 'p3', outcome: 'a', score_text: '3-1' },
+    { id: 'l2', drill_id: 'd1', occurred_on: '2026-09-08', player_a_id: 'p4', player_b_id: 'p12', outcome: 'draw', score_text: null },
+    { id: 'l3', drill_id: 'd1', occurred_on: '2026-09-05', player_a_id: 'p1', player_b_id: 'p4', outcome: 'b', score_text: null }
+  ];
+
+  it('says who beat whom, whichever side is stored as the winner', () => {
+    const rows = describeRecorded(LOGS, PLAYERS, label, 'd1');
+    const byId = Object.fromEntries(rows.map(r => [r.id, r]));
+
+    expect(byId.l1.reading).toBe('(1) Cesar Aguilar beat (3) Caleb Ruiz');
+    expect(byId.l2.reading).toBe('(4) Dylan Pena tied with (12) Angel Reyes');
+    // Stored as 'b', so the SECOND player is the winner.
+    expect(byId.l3.reading).toBe('(4) Dylan Pena beat (1) Cesar Aguilar');
+  });
+
+  it('puts the newest first, which is what a coach just entered', () => {
+    const rows = describeRecorded(LOGS, PLAYERS, label, 'd1');
+    expect(rows.map(r => r.id)).toEqual(['l2', 'l3', 'l1']);
+  });
+
+  it('carries the id, the date and the score, so a row can be edited', () => {
+    const [, , oldest] = describeRecorded(LOGS, PLAYERS, label, 'd1');
+    expect(oldest.id).toBe('l1');
+    expect(oldest.occurredOn).toBe('2026-09-01');
+    expect(oldest.scoreText).toBe('3-1');
+    expect(oldest.outcome).toBe('a');
+  });
+
+  /*
+   * A pairing with no drill scores at weight 1.0 and belongs to no exercise.
+   * Listing one here would offer the coach the chance to edit a result that
+   * is not the one they are looking at.
+   */
+  it('shows only the exercise being recorded', () => {
+    const mixed = LOGS.concat([
+      { id: 'other', drill_id: 'd2', occurred_on: '2026-09-09', player_a_id: 'p1', player_b_id: 'p3', outcome: 'a', score_text: null },
+      { id: 'none', drill_id: null, occurred_on: '2026-09-09', player_a_id: 'p1', player_b_id: 'p3', outcome: 'a', score_text: null }
+    ] as any);
+
+    expect(describeRecorded(mixed, PLAYERS, label, 'd1').map(r => r.id))
+      .toEqual(['l2', 'l3', 'l1']);
+  });
+
+  it('leaves out what has been deleted', () => {
+    const withDeleted = LOGS.concat([
+      { id: 'gone', drill_id: 'd1', occurred_on: '2026-09-09', player_a_id: 'p1', player_b_id: 'p3', outcome: 'a', score_text: null, is_deleted: true }
+    ] as any);
+
+    expect(describeRecorded(withDeleted, PLAYERS, label, 'd1').map(r => r.id))
+      .not.toContain('gone');
+  });
+
+  it('still shows a result for a player who has left the squad', () => {
+    // The row is still being scored, and a coach reconciling a sheet needs to
+    // see it. Only the name is missing.
+    const rows = describeRecorded(
+      [{ id: 'l9', drill_id: 'd1', occurred_on: '2026-09-01', player_a_id: 'gone', player_b_id: 'p3', outcome: 'a' }],
+      PLAYERS, label, 'd1'
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reading).toBe('a former player beat (3) Caleb Ruiz');
+  });
+
+  it('is empty when nothing has been recorded yet', () => {
+    expect(describeRecorded([], PLAYERS, label, 'd1')).toEqual([]);
+    expect(describeRecorded(null as any, PLAYERS, label, 'd1')).toEqual([]);
   });
 });

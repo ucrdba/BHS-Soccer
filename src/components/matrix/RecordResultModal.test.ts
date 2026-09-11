@@ -12,10 +12,14 @@ import { mount } from '@vue/test-utils';
 import RecordResultModal from './RecordResultModal.vue';
 
 const logMatrixResult = vi.fn();
+const updateMatrixResult = vi.fn();
+const deleteMatrixResult = vi.fn();
 
 vi.mock('../../data/supabase', () => ({
   supabaseService: {
-    logMatrixResult: (...a: any[]) => logMatrixResult(...a)
+    logMatrixResult: (...a: any[]) => logMatrixResult(...a),
+    updateMatrixResult: (...a: any[]) => updateMatrixResult(...a),
+    deleteMatrixResult: (...a: any[]) => deleteMatrixResult(...a)
   }
 }));
 
@@ -68,6 +72,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   (window as any).matchMedia = vi.fn().mockReturnValue({ matches: false });
   logMatrixResult.mockResolvedValue({ ok: true });
+  updateMatrixResult.mockResolvedValue({ ok: true });
+  deleteMatrixResult.mockResolvedValue({ ok: true });
 });
 
 describe('the picker: choosing the pairing', () => {
@@ -558,5 +564,185 @@ describe('the picker: typing a number instead of hunting a name', () => {
   it('explains itself on hover', async () => {
     const w = await mountPicker();
     expect(w.find('[data-result-number-a]').attributes('title')).toMatch(/recording number/i);
+  });
+});
+
+describe('the table of what is recorded', () => {
+  /*
+   * Under both tabs, because whichever way a result went in this is where it
+   * is checked and put right -- and the coach who just typed twenty of them
+   * is the one most likely to need that.
+   */
+  const LOGS = [
+    { id: 'l1', drill_id: 'd1', occurred_on: '2026-09-01', player_a_id: 'p1', player_b_id: 'p2', outcome: 'a', score_text: '3-1', is_deleted: false },
+    { id: 'l2', drill_id: 'd1', occurred_on: '2026-09-08', player_a_id: 'p3', player_b_id: 'p2', outcome: 'draw', score_text: null, is_deleted: false }
+  ];
+
+  it('says so when nothing has been recorded yet', async () => {
+    const w = await mountModal();
+    expect(w.find('[data-recorded-empty]').exists()).toBe(true);
+    expect(w.find('[data-recorded-row]').exists()).toBe(false);
+  });
+
+  it('lists what is recorded, newest first', async () => {
+    const w = await mountModal({ logs: LOGS });
+    const readings = w.findAll('[data-recorded-reading]').map(n => n.text());
+
+    expect(readings[0]).toBe('(12) Dylan P. tied with (3) Caleb R.');
+    expect(readings[1]).toBe('(7) Cesar A. beat (3) Caleb R.');
+  });
+
+  it('is there under both tabs', async () => {
+    const quick = await mountModal({ logs: LOGS });
+    expect(quick.findAll('[data-recorded-row]')).toHaveLength(2);
+
+    const picker = await mountPicker({ logs: LOGS });
+    expect(picker.findAll('[data-recorded-row]')).toHaveLength(2);
+  });
+
+  it('shows only this exercise, not every pairing on the team', async () => {
+    const w = await mountModal({
+      logs: LOGS.concat([{ id: 'other', drill_id: 'd2', occurred_on: '2026-09-09', player_a_id: 'p1', player_b_id: 'p2', outcome: 'a', score_text: null, is_deleted: false }])
+    });
+    expect(w.findAll('[data-recorded-row]')).toHaveLength(2);
+  });
+});
+
+describe('changing a recorded result', () => {
+  const LOGS = [
+    { id: 'l1', drill_id: 'd1', occurred_on: '2026-09-01', player_a_id: 'p1', player_b_id: 'p2', outcome: 'a', score_text: '3-1', is_deleted: false }
+  ];
+
+  const edit = async (w: any) => {
+    await w.find('[data-recorded-edit]').trigger('click');
+    await w.vm.$nextTick();
+  };
+
+  it('opens on the result as stored', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+
+    expect(w.find('[data-edit-outcome="a"]').attributes('aria-pressed')).toBe('true');
+    expect((w.find('[data-edit-date]').element as HTMLInputElement).value).toBe('2026-09-01');
+    expect((w.find('[data-edit-score]').element as HTMLInputElement).value).toBe('3-1');
+  });
+
+  it('names the outcomes by that row\'s players, not by a and b', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+
+    expect(w.find('[data-edit-outcome="a"]').text()).toBe('(7) Cesar A.');
+    expect(w.find('[data-edit-outcome="b"]').text()).toBe('(3) Caleb R.');
+  });
+
+  /*
+   * updateMatrixResult writes the WHOLE row, so an update carrying only the
+   * changed field would null the date, the score and the drill the result
+   * belongs to -- which would quietly move it off this exercise and rescore
+   * it at weight 1.0.
+   */
+  it('sends every field, not only the one that changed', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+    await w.find('[data-edit-outcome="draw"]').trigger('click');
+    await w.find('[data-edit-save]').trigger('click');
+    await flush();
+
+    expect(updateMatrixResult).toHaveBeenCalledWith('l1', {
+      playerAId: 'p1', playerBId: 'p2', outcome: 'draw',
+      scoreText: '3-1', occurredOn: '2026-09-01', drillId: 'd1'
+    });
+  });
+
+  it('asks the board to re-read, because a changed result moves both players', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+    await w.find('[data-edit-outcome="b"]').trigger('click');
+    await w.find('[data-edit-save]').trigger('click');
+    await flush();
+
+    expect(w.emitted('saved')).toBeTruthy();
+  });
+
+  it('reports a refused change and stays open on the row', async () => {
+    updateMatrixResult.mockResolvedValue({
+      ok: false, error: 'The database refused that change. Coach or admin access is required.'
+    });
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+    await w.find('[data-edit-save]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-recorded-error]').text()).toMatch(/coach or admin/i);
+    expect(w.find('[data-edit-save]').exists()).toBe(true);
+  });
+
+  it('backs out without writing anything', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+    await w.find('[data-edit-outcome="draw"]').trigger('click');
+    await w.find('[data-edit-cancel]').trigger('click');
+
+    expect(updateMatrixResult).not.toHaveBeenCalled();
+    expect(w.find('[data-recorded-reading]').exists()).toBe(true);
+  });
+
+  it('says that the players themselves are not editable', async () => {
+    // That identity IS the row; correcting it is a delete and a re-entry,
+    // which is also what keeps the round-robin sheet honest.
+    const w = await mountModal({ logs: LOGS });
+    await edit(w);
+    expect(w.find('[data-recorded-row]').text()).toMatch(/delete this and enter it again/i);
+  });
+});
+
+describe('deleting a recorded result', () => {
+  const LOGS = [
+    { id: 'l1', drill_id: 'd1', occurred_on: '2026-09-01', player_a_id: 'p1', player_b_id: 'p2', outcome: 'a', score_text: null, is_deleted: false }
+  ];
+
+  /*
+   * Two presses here, unlike the duplicate-pairing warning which is already
+   * on screen before the button is reached. Nothing on a row says that
+   * pressing Delete removes a result, so the row has to say it itself.
+   */
+  it('does not delete on the first press', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await w.find('[data-recorded-delete]').trigger('click');
+
+    expect(deleteMatrixResult).not.toHaveBeenCalled();
+    expect(w.find('[data-recorded-confirm]').exists()).toBe(true);
+  });
+
+  it('deletes on the second', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await w.find('[data-recorded-delete]').trigger('click');
+    await w.find('[data-recorded-confirm]').trigger('click');
+    await flush();
+
+    expect(deleteMatrixResult).toHaveBeenCalledWith('l1');
+    expect(w.emitted('saved')).toBeTruthy();
+  });
+
+  it('lets the row be kept instead', async () => {
+    const w = await mountModal({ logs: LOGS });
+    await w.find('[data-recorded-delete]').trigger('click');
+    await w.find('[data-recorded-keep]').trigger('click');
+
+    expect(deleteMatrixResult).not.toHaveBeenCalled();
+    expect(w.find('[data-recorded-delete]').exists()).toBe(true);
+  });
+
+  it('reports a refused delete rather than removing the row on screen', async () => {
+    deleteMatrixResult.mockResolvedValue({
+      ok: false, error: 'The database refused that delete.'
+    });
+    const w = await mountModal({ logs: LOGS });
+    await w.find('[data-recorded-delete]').trigger('click');
+    await w.find('[data-recorded-confirm]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-recorded-error]').text()).toMatch(/refused/i);
+    expect(w.find('[data-recorded-row]').exists()).toBe(true);
   });
 });
