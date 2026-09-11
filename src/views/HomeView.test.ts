@@ -278,6 +278,69 @@ describe('coming up', () => {
   });
 });
 
+describe('the band and coming up stay in sync as the clock ticks', () => {
+  /*
+   * Spec §6.2: "Next match" and "coming up" read the same rule and can never
+   * disagree. The band used to read the store's cached `nextMatch`, computed
+   * once from the matches and never re-run, while `comingUp` re-read the
+   * domain function against a fresh `Date.now()` every second -- so a parent
+   * who left the tab open past a match's three-hour grace period saw the band
+   * still naming the old opponent while "coming up" had already moved on.
+   */
+  const A = row({
+    id: 'a', match_date: 'SEP 1 2026', match_time: '12:02 PM',
+    match_on: '2026-09-01', kickoff_time: '12:02:00', opponent: 'Yucaipa'
+  });
+  const B = row({
+    id: 'b', match_date: 'SEP 2 2026', match_time: '6:00 PM',
+    match_on: '2026-09-02', kickoff_time: '18:00:00', opponent: 'Redlands'
+  });
+  const C = row({
+    id: 'c', match_date: 'SEP 3 2026', match_time: '6:00 PM',
+    match_on: '2026-09-03', kickoff_time: '18:00:00', opponent: 'Hemet'
+  });
+  const D = row({
+    id: 'd', match_date: 'SEP 4 2026', match_time: '6:00 PM',
+    match_on: '2026-09-04', kickoff_time: '18:00:00', opponent: 'Sultana'
+  });
+
+  it('moves the band on to the next fixture once the grace period ends, in step with "coming up"', async () => {
+    const w = mountHome({ matches: [A, B, C, D] });
+
+    // Before the clock moves: the band names A, and "coming up" is B, C, D.
+    expect(w.find('[data-next-fixture]').text()).toBe('Yucaipa');
+    expect(w.findAll('[data-coming-row]').map(r => r.text()).join(' ')).toContain('Redlands');
+
+    // A kicks off at 12:02 and its three-hour grace ends at 15:02; advance the
+    // fake clock past that so the ticking `now` -- not a reload -- is what
+    // moves the page on.
+    vi.advanceTimersByTime(3 * 60 * 60 * 1000 + 2 * 60 * 1000 + 60 * 1000);
+    await w.vm.$nextTick();
+
+    // The band now names B, the new next match...
+    expect(w.find('[data-next-fixture]').text()).toBe('Redlands');
+    // ...and "coming up" lists what follows B (C and D), not B itself.
+    const comingText = w.findAll('[data-coming-row]').map(r => r.text()).join(' ');
+    expect(comingText).not.toContain('Redlands');
+    expect(comingText).toContain('Hemet');
+  });
+
+  it("says 'No upcoming fixtures' rather than 'Season complete' once the only fixture goes stale", async () => {
+    const w = mountHome({ matches: [A] });
+
+    // While A is still within its grace period, the page has a next match.
+    expect(w.find('[data-next-fixture]').text()).toBe('Yucaipa');
+
+    // Advance past A's grace period. Nothing is COMPLETED and nothing else is
+    // scheduled, so the schedule has simply run out -- not been finished.
+    vi.advanceTimersByTime(3 * 60 * 60 * 1000 + 2 * 60 * 1000 + 60 * 1000);
+    await w.vm.$nextTick();
+
+    expect(w.text()).toMatch(/no upcoming fixtures/i);
+    expect(w.text()).not.toMatch(/season complete/i);
+  });
+});
+
 describe('how the season is going', () => {
   it('says when the season opens before the first result', () => {
     const w = mountHome({ matches: [row()] });

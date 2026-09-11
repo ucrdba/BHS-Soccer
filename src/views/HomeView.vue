@@ -13,7 +13,8 @@ import { useOrganizationStore } from '../stores/organization';
 import { useScheduleStore } from '../stores/schedule';
 import { useAuthStore } from '../stores/auth';
 import {
-  nextMatchCountdown, longCountdown, lastCompletedMatch, upcomingMatches
+  nextMatchCountdown, longCountdown, lastCompletedMatch, upcomingMatches,
+  getNextMatch, scheduleState
 } from '../domain/schedule';
 import { displayDate, matchOutcome, recentForm } from '../domain/schedule-view';
 import DailyThought from '../components/home/DailyThought.vue';
@@ -49,7 +50,18 @@ watch(() => org.activeTeamId, (id) => { schedule.load(id); }, { immediate: true 
 /** Nothing is claimed about the season until a load has actually happened. */
 const settled = computed(() => !schedule.loading && schedule.loadedTeamId !== null);
 
-const next = computed(() => (settled.value ? schedule.nextMatch : null));
+/*
+ * "Next match" and "coming up" read the same rule off the same clock (spec
+ * §6.2), so they can never disagree: upcomingMatches(now) is the list,
+ * getNextMatch(now) is its first entry, and comingUp is what follows it. All
+ * three re-run whenever `now` ticks, rather than reading the store's
+ * `nextMatch`/`state`, which are computed once from the matches and cached
+ * until the next load -- stale the instant the grace period for the
+ * displayed match ends while the tab stays open.
+ */
+const upcoming = computed(() => (settled.value ? upcomingMatches(schedule.matches, now.value) : []));
+const next = computed(() => (settled.value ? getNextMatch(schedule.matches, now.value) : null));
+const state = computed(() => scheduleState(schedule.matches, now.value));
 
 /** "League · City" from the organization's row, or '' when it has neither. */
 const place = computed(() =>
@@ -67,16 +79,14 @@ const headline = computed(() => {
   if (schedule.loadError) return 'Schedule unavailable';
   if (!settled.value) return 'Loading the schedule…';
   if (next.value) return next.value.opponent;
-  if (schedule.state === 'empty') return 'Schedule coming soon';
-  if (schedule.state === 'stale') return 'No upcoming fixtures';
+  if (state.value === 'empty') return 'Schedule coming soon';
+  if (state.value === 'stale') return 'No upcoming fixtures';
   return 'Season complete';
 });
 
-const countdown = computed(() => {
-  // Referenced so the tick invalidates this.
-  void now.value;
-  return next.value ? longCountdown(nextMatchCountdown(schedule.matches)) : null;
-});
+const countdown = computed(() => (
+  next.value ? longCountdown(nextMatchCountdown(schedule.matches, new Date(now.value))) : null
+));
 
 const when = computed(() => {
   const m = next.value;
@@ -86,10 +96,7 @@ const when = computed(() => {
 });
 
 /** Up to three fixtures after the one the band already shows. */
-const comingUp = computed(() => {
-  void now.value;
-  return settled.value ? upcomingMatches(schedule.matches).slice(1, 4) : [];
-});
+const comingUp = computed(() => upcoming.value.slice(1, 4));
 
 /**
  * The most recent completed fixture with a readable score, in words.
@@ -126,10 +133,10 @@ const opensOn = computed(() => (next.value ? displayDate(next.value) : ''));
 
       <!-- Why there is no next match, in the words the page has always used. -->
       <p v-else-if="settled && !next" class="state">
-        <template v-if="schedule.state === 'empty'">
+        <template v-if="state === 'empty'">
           No fixtures have been added yet.<template v-if="auth.isCoach"> Add them from the Schedule tab.</template>
         </template>
-        <template v-else-if="schedule.state === 'stale'">
+        <template v-else-if="state === 'stale'">
           <template v-if="schedule.lastPlayed">
             Last match: {{ schedule.lastPlayed.opponent }} on {{ schedule.lastPlayed.date }}.
           </template>
