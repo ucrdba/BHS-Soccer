@@ -39,7 +39,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: nothing the rebuild needs runs an install script, and
+      # this keeps any dependency's postinstall from running on the runner
+      # before the step that is handed DEMO_DATABASE_URL.
+      - run: npm ci --ignore-scripts
       - name: Rebuild
         run: node scripts/demo-rebuild.mjs
         env:
