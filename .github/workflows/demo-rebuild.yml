@@ -1,0 +1,47 @@
+# Rebuilds the demo database from main: wipe, every migration, the sample
+# program, the nine accounts. Spec: docs/superpowers/specs/2026-09-11-demo-accounts-design.md.
+# Runbook: docs/runbooks/2026-09-11-demo-rebuild-runbook.md.
+name: Rebuild the demo database
+
+on:
+  schedule:
+    # 10:00 UTC: 3 am Pacific in summer, 2 am in winter.
+    - cron: '0 10 * * *'
+  push:
+    branches: [main]
+    # A migration reaches the demo the moment it lands, so the demo's code and
+    # schema are never a day apart.
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase_schema.sql'
+      - 'schema_roles.sql'
+      - 'supabase_migration_auth.sql'
+      - 'Resouces/SQL/demo/**'
+      - 'scripts/demo-rebuild.mjs'
+      - 'scripts/demo-rebuild-lib.mjs'
+      - '.github/workflows/demo-rebuild.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: demo-rebuild
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Rebuild
+        run: node scripts/demo-rebuild.mjs
+        env:
+          DEMO_DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+          DEMO_PROJECT_REF: ${{ secrets.DEMO_PROJECT_REF }}

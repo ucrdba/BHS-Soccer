@@ -202,3 +202,21 @@ export function seedSql(repo) {
 export function accountsSql(repo) {
   return stripTransactionControl(readSql(join(repo, ...DEMO_SQL, 'demo_accounts.sql')));
 }
+
+/**
+ * The whole rebuild, in order. One transaction: if any step fails, it all
+ * rolls back and last night's demo stays up.
+ */
+export function rebuildSteps(repo, asOf) {
+  if (!isIsoDate(asOf)) throw new Error(`Not a date (YYYY-MM-DD): ${asOf}`);
+  return [
+    { label: 'guard', sql: GUARD_SQL },
+    { label: 'wipe', sql: WIPE_SQL },
+    ...schemaSteps(repo),
+    { label: 'demo_seed.sql', sql: seedSql(repo) },
+    { label: 'the sample program', sql: `select public.demo_seed_template('${asOf}'::date);` },
+    { label: 'demo_accounts.sql', sql: accountsSql(repo) },
+    { label: 'the nine accounts', sql: 'select public.demo_build_accounts();' },
+    { label: 'reload the API', sql: `notify pgrst, 'reload schema';` }
+  ];
+}
