@@ -43,9 +43,12 @@ language sql
 stable
 as $$ select coalesce(current_setting('demo.rebuilding', true), '') = 'on' $$;
 
+-- security definer: it calls demo_is_rebuilding(), which visitors may not
+-- execute; without this it would run as the role that fired the trigger.
 create or replace function public.demo_lock_auth_users()
 returns trigger
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 begin
@@ -66,9 +69,12 @@ create trigger demo_lock_auth_users
   before update of email, encrypted_password on auth.users
   for each row execute function public.demo_lock_auth_users();
 
+-- security definer: it calls demo_is_rebuilding(), which visitors may not
+-- execute; without this it would run as the role that fired the trigger.
 create or replace function public.demo_lock_profiles()
 returns trigger
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 begin
@@ -131,8 +137,9 @@ begin
     update public.schools set code = format('demo%s', n) where id = copy;
     insert into public.demo_orgs (school_id, kind, account_no) values (copy, 'account', n);
 
-    -- Written directly, not through the sign-up trigger: that is production's,
-    -- and would attach a new user to 'bhs' as a pending guest.
+    -- Written directly, not through the sign-up trigger: that is production's
+    -- handle_new_user, and here it would find no 'bhs' school (the guard above
+    -- forbids one) and leave school_id null on a pending guest profile.
     insert into public.profiles (id, school_id, name, email, role, status, email_verified)
     values (uid, copy,
             case when n <= 7 then format('Demo Coach %s', n) when n = 8 then 'Demo Player' else 'Demo Admin' end,

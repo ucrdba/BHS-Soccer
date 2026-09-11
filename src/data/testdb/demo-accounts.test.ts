@@ -4,7 +4,11 @@
  * one transaction per test -- exactly the shape of the nightly rebuild.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { hasTestDb, setupDb, teardownDb, withDb } from './harness';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import { hasTestDb, setupDb, teardownDb, withDb, TEST_DB_URL } from './harness';
 import { schemaSteps, seedSql, accountsSql, runSteps } from '../../../scripts/demo-rebuild-lib.mjs';
 import { DEMO_ACCOUNTS } from '../../demo';
 
@@ -31,6 +35,8 @@ async function build(c: any) {
 }
 
 const one = async (c: any, sql: string, params: any[] = []) => (await c.query(sql, params)).rows[0];
+
+const PRELUDE_PATH = join(REPO, 'src', 'data', 'testdb', 'prelude.sql');
 
 describe.skipIf(!available)('demo_accounts.sql', () => {
   beforeAll(async () => { await setupDb([]); }, 180_000);
@@ -143,6 +149,82 @@ describe.skipIf(!available)('demo_accounts.sql', () => {
         await c.query(`update profiles set name = 'Coach Five' where email = 'demo5@demo.invalid'`);
         expect((await one(c, `select name from profiles where email = 'demo5@demo.invalid'`)).name).toBe('Coach Five');
       });
+    }, 60_000);
+
+    // On Supabase, PostgREST connects as `authenticated` on a fresh backend
+    // that never ran the rebuild. A lock trigger that is not `security
+    // definer` checks EXECUTE on demo_is_rebuilding() against whichever role
+    // fires it, and that is revoked from authenticated -- so on a real
+    // deployment every profile edit, including the display-name change above,
+    // would fail closed with "permission denied".
+    //
+    // Reproducing that needs a database the rebuild has actually COMMITTED,
+    // and a genuinely separate connection to it. The scratch database shared
+    // by every other test in this file is built inside one transaction that
+    // `withDb` always rolls back, so nothing in it is ever visible to another
+    // session -- and even if it were, PL/pgSQL caches a function's inner-call
+    // plan for the life of a session, so reusing the same connection that
+    // already ran demo_build_accounts() as postgres (superuser, which bypasses
+    // EXECUTE checks) would silently reuse that already-permitted plan and
+    // hide the bug regardless of role. This test therefore builds its own
+    // scratch database, commits it for real, and opens an independent
+    // connection to it -- the same shape as the nightly rebuild committing and
+    // PostgREST answering the next request on its own backend.
+    it('runs the locks as their owner on a real deployment, so a signed-in visitor can still edit their own profile', async () => {
+      const dbName = `bhs_demo_secdef_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      const admin = new pg.Client({ connectionString: TEST_DB_URL });
+      await admin.connect();
+      await admin.query(`create database ${dbName}`);
+      await admin.end();
+
+      const url = new URL(TEST_DB_URL);
+      url.pathname = `/${dbName}`;
+      const owner = new pg.Client({ connectionString: url.toString() });
+      await owner.connect();
+      try {
+        await owner.query(readFileSync(PRELUDE_PATH, 'utf8'));
+        await signInAccounts(owner);
+        await build(owner);
+
+        const demo1 = await one(owner, `select id from auth.users where email = 'demo1@demo.invalid'`);
+
+        const visitor = new pg.Client({ connectionString: url.toString() });
+        await visitor.connect();
+        try {
+          await visitor.query('begin');
+          await visitor.query(`select set_config('request.jwt.claim.sub', $1, true)`, [demo1.id]);
+          await visitor.query('set local role authenticated');
+
+          const update = await visitor.query(`update profiles set name = 'Coach One' where email = 'demo1@demo.invalid'`);
+          expect(update.rowCount).toBe(1);
+
+          await visitor.query('savepoint s');
+          await expect(visitor.query(`update profiles set email = 'mine@example.com' where email = 'demo1@demo.invalid'`))
+            .rejects.toThrow(/cannot change their role, status, organization, player link or email/);
+          await visitor.query('rollback to savepoint s');
+
+          await visitor.query('savepoint s2');
+          await expect(visitor.query(`update profiles set email = 'mine@example.com' where email = 'demo1@demo.invalid'`))
+            .rejects.not.toThrow(/permission denied/);
+          await visitor.query('rollback to savepoint s2');
+        } finally {
+          await visitor.query('rollback').catch(() => {});
+          await visitor.end();
+        }
+
+        const { rows } = await owner.query(
+          `select proname, prosecdef from pg_proc where proname in ('demo_lock_auth_users', 'demo_lock_profiles') order by proname`);
+        expect(rows).toEqual([
+          { proname: 'demo_lock_auth_users', prosecdef: true },
+          { proname: 'demo_lock_profiles', prosecdef: true }
+        ]);
+      } finally {
+        await owner.end();
+        const cleanup = new pg.Client({ connectionString: TEST_DB_URL });
+        await cleanup.connect();
+        await cleanup.query(`drop database if exists ${dbName} with (force)`);
+        await cleanup.end();
+      }
     }, 60_000);
   });
 
