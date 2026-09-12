@@ -112,6 +112,13 @@ function dismissAll(): void {
         >×</button>
       </div>
 
+      <!--
+        What the failure means, when the database named something we can put
+        in words. Above the Details toggle on purpose: it is the part with an
+        action behind it, and the raw text below is for forwarding.
+      -->
+      <p v-if="n.meaning" class="notice__meaning" data-notice-meaning>{{ n.meaning }}</p>
+
       <p class="notice__meta">
         <!--
           A repeat is a count rather than another box: a store retrying against
@@ -230,6 +237,13 @@ function dismissAll(): void {
   line-height: 1.5;
   /* A Postgres error arrives as one long unbroken string. */
   overflow-wrap: anywhere;
+}
+
+.notice__meaning {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .notice__method { display: block; color: var(--ink-soft); }

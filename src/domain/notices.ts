@@ -21,6 +21,12 @@ export interface Notice {
   method: string;
   /** A sentence for whoever is looking at the screen. */
   message: string;
+  /**
+   * What the database failure means, when it is one worth naming — shown
+   * beside the message, because it is the part with something to do about it.
+   * Null for everything else rather than a guess.
+   */
+  meaning: string | null;
   /** The technical text, shown only on request. */
   detail: string | null;
   /** How many times this same failure has happened in a row. */
@@ -196,6 +202,40 @@ export function describeFailure(method: string): string {
 
 // ── the detail ────────────────────────────────────────────────────────────
 
+/**
+ * The handful of database failures worth a sentence of their own.
+ *
+ * A coach who opens the detail should not have to read
+ * "new row violates row-level security policy for table stat_matches" to learn
+ * that the account does not coach that team. The raw text still follows it —
+ * that is what gets forwarded — but the first line says what happened.
+ *
+ * Deliberately short: only conditions with an action behind them. Anything
+ * else is passed through as it arrived rather than guessed at.
+ */
+const CONDITIONS: Array<{ when: RegExp; say: string }> = [
+  { when: /row-level security|\b42501\b|must be owner/i,
+    say: 'The database refused that: this account does not have rights over that team or organization.' },
+  { when: /column .* does not exist|\b42703\b/i,
+    say: 'This database is missing a column the app expects, so the latest migration has not been applied to it.' },
+  { when: /no unique or exclusion constraint|\b42P10\b/i,
+    say: 'This database is missing an index that save needs, so the latest migration has not been applied to it.' },
+  { when: /duplicate key value|\b23505\b/i,
+    say: 'Something with that name or number is already there.' },
+  { when: /violates foreign key constraint|\b23503\b/i,
+    say: 'That points at something which is no longer there. Reload the page and try again.' },
+  { when: /violates not-null constraint|\b23502\b/i,
+    say: 'A field this record requires was left empty.' },
+  { when: /jwt expired|invalid claim|not authenticated/i,
+    say: 'The sign-in has expired. Sign in again and repeat that.' }
+];
+
+/** What a database failure means, when it is one of the few worth naming. */
+export function explainCondition(text: string): string | null {
+  const found = CONDITIONS.find(c => c.when.test(text || ''));
+  return found ? found.say : null;
+}
+
 /** Whatever the caller had, as text a person can forward. */
 export function describeDetail(detail: unknown): string | null {
   if (detail === null || detail === undefined) return null;
@@ -211,6 +251,7 @@ export function describeDetail(detail: unknown): string | null {
 
   text = (text || '').trim();
   if (!text) return null;
+
   return text.length > DETAIL_LIMIT ? `${text.slice(0, DETAIL_LIMIT)}…` : text;
 }
 
@@ -299,6 +340,7 @@ export function reportFailure(method: string, detail?: unknown): Notice {
     id: ++seq,
     method,
     message: describeFailure(method),
+    meaning: text ? explainCondition(text) : null,
     detail: text,
     count: 1,
     at: Date.now()

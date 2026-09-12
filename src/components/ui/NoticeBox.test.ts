@@ -251,3 +251,26 @@ describe('the connection banner', () => {
     expect(w.findAll('[data-notice]')).toHaveLength(3);
   });
 });
+
+describe('a database refusal a coach can act on', () => {
+  it('says what it means without making them open the details', async () => {
+    reportFailure('openStatMatch',
+      'new row violates row-level security policy for table "stat_matches"');
+    const w = await mountBox();
+
+    expect(w.find('[data-notice-meaning]').text()).toMatch(/does not have rights over that team/i);
+    // Still only a sentence and its meaning until the coach asks for more.
+    expect(w.find('[data-notice-detail]').exists()).toBe(false);
+
+    await w.find('[data-notice-toggle]').trigger('click');
+    expect(w.find('[data-notice-detail]').text()).toContain('row-level security policy');
+  });
+
+  it('shows no meaning line for a failure it cannot name', async () => {
+    reportFailure('fetchTeamRoster', 'connection terminated unexpectedly');
+    const w = await mountBox();
+
+    expect(w.find('[data-notice-meaning]').exists()).toBe(false);
+    expect(w.find('[data-notice-message]').text()).toBe('The roster could not be loaded.');
+  });
+});

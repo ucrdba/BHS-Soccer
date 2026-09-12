@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   describeFailure, describeDetail, reportFailure, currentNotices,
   dismissNotice, clearNotices, subscribeToNotices, resetNotices,
-  reportConnection, currentConnection, subscribeToConnection
+  reportConnection, currentConnection, subscribeToConnection, explainCondition
 } from './notices';
 
 beforeEach(() => { resetNotices(); });
@@ -293,5 +293,37 @@ describe('the connection', () => {
 
     expect(() => reportConnection(false, 'no key')).not.toThrow();
     expect(good).toHaveBeenCalled();
+  });
+});
+
+describe('what a database failure means', () => {
+  it('names the refusal a coach will actually hit, rather than the policy', () => {
+    const n = reportFailure('openStatMatch',
+      'new row violates row-level security policy for table "stat_matches"');
+    expect(n.message).toBe('The match record could not be loaded.');
+    expect(n.meaning).toMatch(/does not have rights over that team/i);
+    // The raw text survives: it is what gets forwarded.
+    expect(n.detail).toContain('row-level security policy');
+  });
+
+  it('reads a database that is behind its migrations, both ways it says so', () => {
+    expect(explainCondition('column soccer_categories.school_id does not exist'))
+      .toMatch(/missing a column/i);
+    expect(explainCondition('there is no unique or exclusion constraint matching the ON CONFLICT specification'))
+      .toMatch(/missing an index/i);
+  });
+
+  it('translates the other conditions worth acting on', () => {
+    expect(explainCondition('duplicate key value violates unique constraint')).toMatch(/already there/i);
+    expect(explainCondition('violates foreign key constraint')).toMatch(/no longer there/i);
+    expect(explainCondition('null value in column "id" violates not-null constraint')).toMatch(/left empty/i);
+    expect(explainCondition('JWT expired')).toMatch(/sign in again/i);
+  });
+
+  // A guess would be worse than silence: the box already says what failed.
+  it('says nothing about a failure it does not recognise', () => {
+    expect(explainCondition('connection terminated unexpectedly')).toBeNull();
+    expect(reportFailure('fetchTeamRoster', 'connection terminated unexpectedly').meaning).toBeNull();
+    expect(reportFailure('fetchTeamRoster').meaning).toBeNull();
   });
 });
