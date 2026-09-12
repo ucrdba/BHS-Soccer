@@ -745,7 +745,10 @@ class SupabaseService {
 
       let q = this.client!
         .from('teams')
-        .select('id, school_id, name, season, is_public_default, schools(name, kind)')
+        // match_minutes is named here for a reason: these selects are explicit,
+        // and a column left out of them is invisible to the app however well
+        // the database holds it. seasonFullMatchMinutes reads it off the team.
+        .select('id, school_id, name, season, is_public_default, match_minutes, schools(name, kind)')
         .eq('is_deleted', false);
       // No membership: a signed-out visitor, or someone on no team. Both see
       // the public default rather than an empty app.
@@ -755,7 +758,7 @@ class SupabaseService {
       if (error) { report('fetchTeamsForViewer', error.message); return null; }
       return (data || []).map((t: any) => ({
         id: t.id, school_id: t.school_id, name: t.name, season: t.season,
-        is_public_default: t.is_public_default,
+        is_public_default: t.is_public_default, match_minutes: t.match_minutes,
         school_name: t.schools?.name || '', school_kind: t.schools?.kind || 'school'
       })).sort((a, b) => (a.school_name + a.name).localeCompare(b.school_name + b.name));
     } catch (e) {
@@ -826,12 +829,12 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     const { data, error } = await this.client!
       .from('teams')
-      .select('id, school_id, name, season, is_public_default, schools(name, kind)')
+      .select('id, school_id, name, season, is_public_default, match_minutes, schools(name, kind)')
       .eq('is_deleted', false);
     if (error) { report('fetchAllTeams', error.message); return null; }
     return (data || []).map((t: any) => ({
       id: t.id, school_id: t.school_id, name: t.name, season: t.season,
-      is_public_default: t.is_public_default,
+      is_public_default: t.is_public_default, match_minutes: t.match_minutes,
       school_name: t.schools?.name || '', school_kind: t.schools?.kind || 'school'
     })).sort((a, b) => (a.school_name + a.name).localeCompare(b.school_name + b.name));
   }

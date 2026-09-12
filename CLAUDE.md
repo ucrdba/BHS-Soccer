@@ -91,6 +91,8 @@ Held by the season report, the plus/minus sheet, the squad report and the progre
 
 High school is 80, club age groups vary. `teams.match_minutes` holds it and `seasonFullMatchMinutes` reads it. Nothing may hardcode a length, and one organization can field teams playing different ones.
 
+The column arrived late: `0034_team_match_minutes.sql` created it, after this file had described it for months while no migration made it and both team selects omitted it — so every team fell through the 80-minute fallback in `src/data/season-stats.ts`, including the clubs that do not play 80. Null still means "nobody has said", which is when that fallback is right. Two things follow: **a column the app reads must be named in `fetchTeamsForViewer` and `fetchAllTeams`**, which select explicitly and map by hand (`src/data/team-columns.test.ts` fails if `match_minutes` slips out of either), and nothing yet sets it — teams can be created but not edited, so a length is stated in SQL until a screen offers it.
+
 ### `time_bands` is a standard, not a ranking
 
 Four of the five Matrix measures — `head_to_head`, `win_loss`, `count_high` and `time_low` — rank players against each other. **`time_bands` does not: it is a match-readiness standard.** The board reports how many fell below it and marks them, rather than treating a bunched result as a problem — a squad that all clears the standard is the good outcome, and tuning the bands to spread them out defeats the point. The emphasis is strictly **additive**: it must never narrow the table or disable a sort. See `src/domain/matrix-threshold.ts`.
@@ -243,7 +245,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0033_scope_drill_names.sql`.
+8. …through `supabase/migrations/0034_team_match_minutes.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 

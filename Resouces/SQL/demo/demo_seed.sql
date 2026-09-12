@@ -610,11 +610,13 @@ begin
   returning id into sch;
   insert into public.demo_orgs (school_id, kind) values (sch, 'template');
 
-  insert into public.teams (school_id, name, season, is_public_default, created_at)
-  values (sch, 'Varsity', to_char(as_of, 'YYYY'), true, base)
+  -- 80 minutes, stated rather than left to the app's fallback: a high school
+  -- match is 80 (0034), and the demo should show the column doing its job.
+  insert into public.teams (school_id, name, season, is_public_default, match_minutes, created_at)
+  values (sch, 'Varsity', to_char(as_of, 'YYYY'), true, 80, base)
   returning id into varsity;
-  insert into public.teams (school_id, name, season, is_public_default, created_at)
-  values (sch, 'JV', to_char(as_of, 'YYYY'), false, base + interval '1 second')
+  insert into public.teams (school_id, name, season, is_public_default, match_minutes, created_at)
+  values (sch, 'JV', to_char(as_of, 'YYYY'), false, 80, base + interval '1 second')
   returning id into jv;
 
   insert into public.soccer_categories (school_id, name, description, display_order, active, created_at)
