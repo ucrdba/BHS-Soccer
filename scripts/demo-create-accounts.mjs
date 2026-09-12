@@ -105,9 +105,11 @@ export function signInReport(results, { resetPending = false } = {}) {
   return {
     lines,
     problem: `${which}: cannot sign in with DEMO_PASSWORD, so the demo's sign-in picker cannot either. `
-      + 'An account like that was registered by someone else, or with another password: delete it '
-      + '(Supabase -> Authentication -> Users) and run this script again. '
-      + '(If the reason given is a rate limit, wait a few minutes and run it again instead.)'
+      + 'Usually DEMO_PASSWORD has changed since the accounts were made: --reset-passwords --confirm '
+      + 'sets the new one on all nine (lift the password lock first — see "Changing the shared '
+      + 'password" in docs/runbooks/2026-09-11-demo-rebuild-runbook.md). An account someone else '
+      + 'registered has to be deleted instead (Supabase -> Authentication -> Users), then run this '
+      + 'script again. (If the reason given is a rate limit, wait a few minutes and run it again.)'
   };
 }
 

@@ -137,9 +137,23 @@ trigger needs ownership of `auth.users`, which Supabase's `postgres` role does
 not have. So the lock is replaced with one that lets everything through, and
 the rebuild puts the real one back:
 
-1. In the demo project's SQL editor:
+1. In the demo project's SQL editor. `set role postgres;` is not optional: the
+   editor may run as a member of `postgres` without being it, and replacing a
+   function it does not own fails with `42501` — which is easy to miss, and
+   leaves step 2 failing with a bare "Error updating user".
 
+       begin;
+       set role postgres;
        create or replace function public.demo_lock_auth_users() returns trigger language plpgsql security definer set search_path = public, pg_temp as $$ begin return new; end $$;
+       commit;
+
+   Check it took, and that you are on the demo project rather than production:
+
+       select string_agg(code, ', ' order by code) as schools_here from public.schools;
+       select pg_get_functiondef(oid) as lock_body from pg_proc where proname = 'demo_lock_auth_users';
+
+   `schools_here` must read `demo-template, demo1, …`, and `lock_body` must be
+   the short one whose body is only `begin return new; end`.
 
 2. Put the new password in `.env` as `DEMO_PASSWORD`, then:
 
@@ -159,8 +173,12 @@ Between 1 and 4 the lock is off for everyone, so do them together.
   profile lock leaves it alone until then; the rebuild builds it and locks it.
 - **Deleting one** is refused by the profile lock: deleting the user deletes
   its profile. Replace the lock with a pass-through in the demo SQL editor,
+  again with `set role postgres;` and the same two checks as above:
 
+      begin;
+      set role postgres;
       create or replace function public.demo_lock_profiles() returns trigger language plpgsql security definer set search_path = public, pg_temp as $$ begin return case when tg_op = 'DELETE' then old else new end; end $$;
+      commit;
 
   delete the user in Authentication → Users, re-create it with the script, and
   run the workflow, which puts the lock back. The rebuild fails naming any of

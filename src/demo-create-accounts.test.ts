@@ -72,14 +72,19 @@ describe('the demo account script', () => {
       expect(r.lines[0]).toBe('  demo1@demo.invalid  signs in');
     });
 
-    it('fails naming an account that cannot, and says to delete it and run again', () => {
+    // The usual cause is a DEMO_PASSWORD changed after the accounts were made,
+    // which cost a live debugging session when the message named only the other
+    // one. Both remedies, the likely one first.
+    it('fails naming an account that cannot, and gives the reset before the delete', () => {
       const r = signInReport(all({
         'demo4@demo.invalid': { signsIn: false, reason: 'Invalid login credentials' }
       }));
       expect(r.lines[3]).toBe('  demo4@demo.invalid  cannot sign in (Invalid login credentials)');
       expect(r.problem).toMatch(/^demo4@demo\.invalid: cannot sign in/);
-      expect(r.problem).toMatch(/registered by someone else, or with another password/);
+      expect(r.problem).toMatch(/--reset-passwords --confirm/);
       expect(r.problem).toMatch(/Authentication -> Users/);
+      expect(r.problem!.indexOf('--reset-passwords'))
+        .toBeLessThan(r.problem!.indexOf('Authentication -> Users'));
       expect(r.problem).not.toMatch(/demo1@/);
     });
 
