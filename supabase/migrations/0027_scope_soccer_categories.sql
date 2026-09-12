@@ -50,6 +50,15 @@ set role postgres;
 alter table public.soccer_categories
   add column if not exists school_id uuid references public.schools(id) on delete cascade;
 
+-- Production's id carries no default, though supabase_schema.sql declares
+-- `DEFAULT gen_random_uuid()` — the same drift as drills_bank.points. The copy
+-- below inserts without an id and fails there with 23502, and so does every
+-- category the app adds: upsertSoccerCategory sends no id either. A no-op
+-- where the default is already set.
+
+alter table public.soccer_categories
+  alter column id set default gen_random_uuid();
+
 -- ── 2. Stop the name being unique across the whole table ───────────────────
 --
 -- This has to come BEFORE the copy below, which deliberately creates rows
