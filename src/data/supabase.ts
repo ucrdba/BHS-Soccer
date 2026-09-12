@@ -2610,21 +2610,23 @@ class SupabaseService {
     if (drill.diagramImage) payload.diagram_image = drill.diagramImage;
     if (drill.diagramData) payload.diagram_data = drill.diagramData;
 
-    console.log('⚡ Supabase inserting drill into global `drills_bank` repository:', payload);
-
     try {
+      // (school_id, name), not name: the library is per organization, and
+      // conflicting on the name alone had one organization's save overwrite
+      // another's drill of that name. It also needed a unique index no
+      // migration created — production had one, so this worked there and
+      // answered 42P10 on any database built from the migrations. 0033 makes
+      // the index match this.
       const { data, error } = await this.client!
         .from('drills_bank')
-        .upsert([payload], { onConflict: 'name' })
+        .upsert([payload], { onConflict: 'school_id,name' })
         .select();
 
       if (error) {
         report('upsertDrillBankItem', error.message, error);
         return null;
-      } else {
-        console.log('✅ Supabase master drill saved successfully:', data);
-        return data ? data[0] : null;
       }
+      return data ? data[0] : null;
     } catch (e: any) {
       report('upsertDrillBankItem', e.message);
       return null;

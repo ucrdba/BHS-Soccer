@@ -222,6 +222,8 @@ Three things about that migration are worth knowing:
 
 `drills_bank.category` is still free TEXT rather than a foreign key, which is why `CategoriesSection.vue` shows names no category row has as their own group — the drift is visible rather than silent, and each can be adopted or merged.
 
+**A drill's name is unique per organization, since `0033_scope_drill_names.sql`** — the same fix, for the same reason. `upsertDrillBankItem` conflicted on `name` alone, which needed an index no migration created: production had one from before the migrations, so saving a drill worked there and answered `42P10` on any database built from them, the demo included. Two organizations can now both keep a "Rondo 4v2"; before, the second save overwrote the first's row.
+
 ### Auth & RBAC
 
 `src/auth.ts` exports a singleton `AuthManager` over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. Roles: `guest` / `player` / `coach` / `admin`. The guards — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; signup lands in a pending-approval state that a coach or admin clears via `approveProfile`/`rejectProfile`.
@@ -241,7 +243,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0032_record_hand_added_columns.sql`.
+8. …through `supabase/migrations/0033_scope_drill_names.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
