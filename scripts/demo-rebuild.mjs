@@ -16,7 +16,9 @@
  */
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { checkTarget, pacificDate, rebuildSteps } from './demo-rebuild-lib.mjs';
+import {
+  checkTarget, connectionInfo, pacificDate, rebuildSteps, withoutSslmode
+} from './demo-rebuild-lib.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
@@ -32,16 +34,28 @@ async function main() {
   // trust by default, so the connection is encrypted without verifying the
   // chain. Acceptable for a database that holds nothing real; the target
   // itself is checked above, twice. sslmode in the URL would override this, so
-  // it is removed.
-  const target = new URL(url);
-  target.searchParams.delete('sslmode');
-  const local = ['localhost', '127.0.0.1'].includes(target.hostname);
+  // it is removed -- textually, because a round trip through URL can re-encode
+  // the password, and pg parses the original string itself.
+  const info = connectionInfo(url);
+  const local = ['localhost', '127.0.0.1'].includes(info.host);
   const client = new pg.Client({
-    connectionString: target.toString(),
+    connectionString: withoutSslmode(url),
     ssl: local ? false : { rejectUnauthorized: false }
   });
 
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    // Which half is wrong is invisible otherwise: the pooler reports every bad
+    // password against the mapped user, and the secret cannot be read back.
+    console.error(
+      `Could not connect as ${info.user} to ${info.host}:${info.port}/${info.database} ` +
+      `— password ${info.passwordLength} characters, DEMO_DATABASE_URL fingerprint ${info.fingerprint}.`);
+    console.error(
+      'That fingerprint is the first 8 hex of sha256 over the trimmed string. ' +
+      'See the runbook to compare it with the string you meant to store.');
+    throw err;
+  }
   const started = Date.now();
   try {
     await client.query('begin');

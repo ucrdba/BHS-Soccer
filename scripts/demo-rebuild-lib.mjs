@@ -12,6 +12,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 /** Production's Supabase project. The rebuild refuses any address containing it. */
 export const PRODUCTION_REF = 'arsigevpgpbqluqbnhjr';
@@ -219,4 +220,42 @@ export function rebuildSteps(repo, asOf) {
     { label: 'the nine accounts', sql: 'select public.demo_build_accounts();' },
     { label: 'reload the API', sql: `notify pgrst, 'reload schema';` }
   ];
+}
+
+/**
+ * What a connection string points at, with nothing secret in it.
+ *
+ * A failing connection says little on its own: Supabase's session pooler
+ * reports every bad password against the user it maps to upstream, and a
+ * GitHub secret cannot be read back to compare. So the password appears only
+ * as a length and the whole string as a short fingerprint, which whoever
+ * stored it can reproduce from their own copy.
+ */
+export function connectionInfo(url) {
+  const u = new URL(url.trim());
+  return {
+    user: decodeURIComponent(u.username),
+    host: u.hostname,
+    port: u.port || '5432',
+    database: u.pathname.replace(/^\//, '') || '(none)',
+    passwordLength: u.password.length,
+    fingerprint: fingerprint(url)
+  };
+}
+
+/** The first 8 hex of sha256 over the trimmed string. */
+export function fingerprint(url) {
+  return createHash('sha256').update(String(url).trim()).digest('hex').slice(0, 8);
+}
+
+/**
+ * The string without sslmode, so it cannot override the ssl option the client
+ * sets. Removed textually: `new URL(s).toString()` can re-encode the password,
+ * and pg parses the original string itself.
+ */
+export function withoutSslmode(url) {
+  return String(url).trim()
+    .replace(/([?&])sslmode=[^&]*/gi, '$1')
+    .replace(/\?&/, '?')
+    .replace(/[?&]+$/, '');
 }

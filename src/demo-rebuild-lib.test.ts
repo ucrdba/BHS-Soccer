@@ -8,7 +8,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   PRODUCTION_REF, SKIP, checkTarget, pacificDate, isIsoDate, stripTransactionControl,
-  migrationFiles, applyCuts, schemaSteps, substituteDiagrams
+  migrationFiles, applyCuts, schemaSteps, substituteDiagrams,
+  connectionInfo, fingerprint, withoutSslmode
 } from '../scripts/demo-rebuild-lib.mjs';
 
 const REPO = process.cwd();
@@ -120,5 +121,55 @@ describe('substituteDiagrams', () => {
   it('refuses a token it has no diagram for', () => {
     expect(() => substituteDiagrams('select __DEMO_DIAGRAM_NOPE__::jsonb;', { rondo: {} }))
       .toThrow(/__DEMO_DIAGRAM_NOPE__/);
+  });
+});
+
+describe('what a failed connection may say about itself', () => {
+  const POOLER = 'postgresql://postgres.demoref:pa%40ss%3Aword@aws-0-us-west-2.pooler.supabase.com:5432/postgres';
+
+  it('names the user, host, port and database, and never the password', () => {
+    const info = connectionInfo(POOLER);
+    expect(info).toEqual({
+      user: 'postgres.demoref',
+      host: 'aws-0-us-west-2.pooler.supabase.com',
+      port: '5432',
+      database: 'postgres',
+      passwordLength: 'pa%40ss%3Aword'.length,
+      fingerprint: fingerprint(POOLER)
+    });
+    expect(JSON.stringify(info)).not.toContain('ss%3Aword');
+  });
+
+  it('fingerprints the string, not its parts, and ignores surrounding space', () => {
+    expect(fingerprint(POOLER)).toMatch(/^[0-9a-f]{8}$/);
+    expect(fingerprint(`  ${POOLER}\n`)).toBe(fingerprint(POOLER));
+    expect(fingerprint(POOLER.replace('5432', '6543'))).not.toBe(fingerprint(POOLER));
+  });
+
+  it('defaults the port and survives a string with no database path', () => {
+    const info = connectionInfo('postgresql://u:p@host/');
+    expect([info.port, info.database]).toEqual(['5432', '(none)']);
+  });
+});
+
+describe('withoutSslmode', () => {
+  // pg parses the original; a round trip through URL can re-encode the
+  // password, which is what a percent-encoded one is doing here.
+  it('leaves an untouched string exactly as it was', () => {
+    const url = 'postgresql://postgres.demoref:pa%40ss@host.pooler.supabase.com:5432/postgres';
+    expect(withoutSslmode(url)).toBe(url);
+  });
+
+  it('removes sslmode wherever it sits, and tidies what is left', () => {
+    expect(withoutSslmode('postgresql://u:p@h:5432/db?sslmode=require'))
+      .toBe('postgresql://u:p@h:5432/db');
+    expect(withoutSslmode('postgresql://u:p@h:5432/db?sslmode=require&application_name=x'))
+      .toBe('postgresql://u:p@h:5432/db?application_name=x');
+    expect(withoutSslmode('postgresql://u:p@h:5432/db?application_name=x&sslmode=verify-full'))
+      .toBe('postgresql://u:p@h:5432/db?application_name=x');
+  });
+
+  it('trims the stray newline a pasted secret carries', () => {
+    expect(withoutSslmode('postgresql://u:p@h:5432/db\n')).toBe('postgresql://u:p@h:5432/db');
   });
 });

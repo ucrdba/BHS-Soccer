@@ -101,6 +101,19 @@ The log names the failing step. The usual causes:
   an otherwise structural file is the problem, to `CUTS`.
 - **`the sign-in account demoN@demo.invalid is missing`** — re-run
   `scripts/demo-create-accounts.mjs --confirm`, then run the workflow.
+- **`password authentication failed`** — `DEMO_DATABASE_URL` is not the string
+  you meant to store: a partial paste, the password from before a reset, or the
+  direct connection rather than the Session pooler. The pooler reports every bad
+  password against the user it maps to upstream, so the name in the message is
+  not evidence. The run prints the user, host, port and database it tried, and a
+  fingerprint of the whole string; this prints the same eight characters from
+  your own copy, and nothing else:
+
+      node -e "const{createHash}=require('node:crypto');console.log(createHash('sha256').update(process.argv[1].trim()).digest('hex').slice(0,8))" "PASTE_THE_STRING"
+
+  If they differ, set the secret from a terminal rather than the web form:
+  `gh secret set DEMO_DATABASE_URL --repo <owner>/<repo>`. Nothing was touched;
+  the run stopped at the connection.
 - **`REFUSING TO REBUILD`** — the target looked like production. Check the two
   secrets first. Nothing was dropped.
 
