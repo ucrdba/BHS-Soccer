@@ -59,6 +59,20 @@ alter table public.soccer_categories
 alter table public.soccer_categories
   alter column id set default gen_random_uuid();
 
+-- display_order is production's too, and NOT NULL with no default there, so
+-- the same inserts fail on it the moment the id is satisfied. Conditional
+-- because 0032, which records the column, runs after this file: a database
+-- built from the migrations does not have it yet.
+
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'soccer_categories'
+                and column_name = 'display_order') then
+    execute 'alter table public.soccer_categories alter column display_order set default 0';
+  end if;
+end $$;
+
 -- ── 2. Stop the name being unique across the whole table ───────────────────
 --
 -- This has to come BEFORE the copy below, which deliberately creates rows
@@ -73,15 +87,36 @@ alter table public.soccer_categories
 
 -- ── 3. Copy each unscoped category into every organization ─────────────────
 
-insert into public.soccer_categories (school_id, name, description, is_deleted)
-select s.id, c.name, c.description, coalesce(c.is_deleted, false)
-  from public.soccer_categories c
- cross join public.schools s
- where c.school_id is null
-   and not exists (
-     select 1 from public.soccer_categories x
-      where x.school_id = s.id and x.name = c.name
-   );
+-- Built dynamically for the two columns above: where production has them their
+-- values belong in each copy, since the originals are deleted below, and a
+-- database built from the migrations does not have them yet.
+
+do $$
+declare
+  cols  text := '';
+  sel   text := '';
+  extra text;
+begin
+  foreach extra in array array['display_order', 'active'] loop
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'soccer_categories'
+                  and column_name = extra) then
+      cols := cols || format(', %I', extra);
+      sel  := sel  || format(', c.%I', extra);
+    end if;
+  end loop;
+
+  execute format($copy$
+    insert into public.soccer_categories (school_id, name, description, is_deleted%s)
+    select s.id, c.name, c.description, coalesce(c.is_deleted, false)%s
+      from public.soccer_categories c
+     cross join public.schools s
+     where c.school_id is null
+       and not exists (
+         select 1 from public.soccer_categories x
+          where x.school_id = s.id and x.name = c.name
+       )$copy$, cols, sel);
+end $$;
 
 -- The originals have been copied to every organization, so they belong to
 -- none. Deleted outright rather than soft-deleted: a row with a null
