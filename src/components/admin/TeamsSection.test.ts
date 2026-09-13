@@ -19,6 +19,7 @@ const createSchool = vi.fn();
 const createTeam = vi.fn();
 const assignCoachToTeam = vi.fn();
 const removeCoachFromTeam = vi.fn();
+const updateTeam = vi.fn();
 
 vi.mock('../../data/supabase', () => ({
   supabaseService: {
@@ -28,13 +29,14 @@ vi.mock('../../data/supabase', () => ({
     createSchool: (...a: any[]) => createSchool(...a),
     createTeam: (...a: any[]) => createTeam(...a),
     assignCoachToTeam: (...a: any[]) => assignCoachToTeam(...a),
-    removeCoachFromTeam: (...a: any[]) => removeCoachFromTeam(...a)
+    removeCoachFromTeam: (...a: any[]) => removeCoachFromTeam(...a),
+    updateTeam: (...a: any[]) => updateTeam(...a)
   }
 }));
 
 const TEAMS = [
-  { id: 't1', school_id: 's1', name: 'Varsity', season: '2026', school_name: 'Beaumont High', school_kind: 'school' },
-  { id: 't2', school_id: 's2', name: 'U16', season: '2026', school_name: 'Legends FC', school_kind: 'club' }
+  { id: 't1', school_id: 's1', name: 'Varsity', season: '2026', match_minutes: 80, school_name: 'Beaumont High', school_kind: 'school' },
+  { id: 't2', school_id: 's2', name: 'U16', season: '2026', match_minutes: null, school_name: 'Legends FC', school_kind: 'club' }
 ];
 
 const COACHES = [
@@ -68,6 +70,7 @@ beforeEach(() => {
   createTeam.mockResolvedValue({ ok: true, id: 't3' });
   assignCoachToTeam.mockResolvedValue({ ok: true });
   removeCoachFromTeam.mockResolvedValue({ ok: true });
+  updateTeam.mockResolvedValue({ ok: true });
 });
 
 describe('the list', () => {
@@ -228,5 +231,116 @@ describe('removing a coach', () => {
     expect(removeCoachFromTeam).toHaveBeenCalledWith('t1', 'c1');
     expect(fetchAllTeams).toHaveBeenCalledTimes(2);
     confirmSpy.mockRestore();
+  });
+});
+
+describe('editing a team', () => {
+  const openEditor = async (w: any, index = 0) => {
+    await w.findAll('[data-team-edit]')[index].trigger('click');
+    await w.vm.$nextTick();
+    return w.findAll('[data-team-row]')[index];
+  };
+
+  it('opens with what the team says now', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    expect((row.find('[data-team-edit-name]').element as HTMLInputElement).value).toBe('Varsity');
+    expect((row.find('[data-team-edit-season]').element as HTMLInputElement).value).toBe('2026');
+    expect((row.find('[data-team-edit-minutes]').element as HTMLInputElement).value).toBe('80');
+  });
+
+  // Null means nobody has said, and the app falls back to 80. An editor that
+  // showed 80 here would write it back as though someone had chosen it.
+  it('leaves an unstated match length blank rather than showing the fallback', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w, 1);
+    expect((row.find('[data-team-edit-minutes]').element as HTMLInputElement).value).toBe('');
+  });
+
+  it('saves the fields as the service names them', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    await row.find('[data-team-edit-name]').setValue('Varsity Boys');
+    await row.find('[data-team-edit-season]').setValue('2027');
+    await row.find('[data-team-edit-minutes]').setValue('70');
+    await row.find('[data-team-edit-save]').trigger('click');
+    await flush();
+
+    expect(updateTeam).toHaveBeenCalledWith('t1', { name: 'Varsity Boys', season: '2027', matchMinutes: 70 });
+    expect(fetchAllTeams).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends null for a match length cleared, not the fallback', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    await row.find('[data-team-edit-minutes]').setValue('');
+    await row.find('[data-team-edit-save]').trigger('click');
+    await flush();
+
+    expect(updateTeam.mock.calls[0][1].matchMinutes).toBeNull();
+  });
+
+  it('refuses an empty name before it asks the database', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    await row.find('[data-team-edit-name]').setValue('   ');
+    await row.find('[data-team-edit-save]').trigger('click');
+    await flush();
+
+    expect(updateTeam).not.toHaveBeenCalled();
+    expect(w.find('[data-teams-form-error]').text()).toMatch(/name/i);
+  });
+
+  // 0034's check refuses these too; catching them here makes it a sentence
+  // rather than a constraint violation.
+  it('refuses a match length that is not a whole number above zero', async () => {
+    const w = await mountTeams();
+
+    for (const bad of ['0', '-5', '45.5']) {
+      const row = await openEditor(w);
+      await row.find('[data-team-edit-minutes]').setValue(bad);
+      await row.find('[data-team-edit-save]').trigger('click');
+      await flush();
+
+      expect(updateTeam, bad).not.toHaveBeenCalled();
+      expect(w.find('[data-teams-form-error]').text()).toMatch(/minutes/i);
+    }
+  });
+
+  it('says what the database said when it refuses', async () => {
+    updateTeam.mockResolvedValue({ ok: false, error: 'There is already a team called "JV" in that organization.' });
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    await row.find('[data-team-edit-name]').setValue('JV');
+    await row.find('[data-team-edit-save]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-teams-form-error]').text()).toContain('already a team called');
+  });
+
+  it('closes without saving on cancel', async () => {
+    const w = await mountTeams();
+    const row = await openEditor(w);
+
+    await row.find('[data-team-edit-name]').setValue('Something else');
+    await row.find('[data-team-edit-cancel]').trigger('click');
+    await w.vm.$nextTick();
+
+    expect(updateTeam).not.toHaveBeenCalled();
+    expect(w.find('[data-team-edit-name]').exists()).toBe(false);
+    expect(w.findAll('[data-team-row]')[0].find('[data-team-name]').text()).toBe('Varsity');
+  });
+
+  it('edits one team at a time', async () => {
+    const w = await mountTeams();
+    await openEditor(w, 0);
+    await openEditor(w, 1);
+
+    expect(w.findAll('[data-team-edit-name]')).toHaveLength(1);
   });
 });

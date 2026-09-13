@@ -43,6 +43,62 @@ const teamOrg = ref('');
 /** Which coach is picked for which team. */
 const picked = ref<Record<string, string>>({});
 
+/**
+ * The team being edited, if any, and the draft of it.
+ *
+ * One at a time: two open editors on a list this long is a good way to save
+ * the wrong row. `minutes` is a string because the input is, and because ''
+ * has to survive as "nobody has said" rather than becoming 0.
+ */
+const editing = ref<string | null>(null);
+const draft = ref<{ name: string; season: string; minutes: string | number }>(
+  { name: '', season: '', minutes: '' });
+
+function onEdit(team: any): void {
+  editing.value = team.id;
+  draft.value = {
+    name: team.name || '',
+    season: team.season || '',
+    // Blank when unstated: showing the app's 80-minute fallback here would
+    // write it back as though somebody had chosen it (0034).
+    minutes: team.match_minutes === null || team.match_minutes === undefined ? '' : String(team.match_minutes)
+  };
+  error.value = null;
+  notice.value = null;
+}
+
+function onCancelEdit(): void {
+  editing.value = null;
+}
+
+async function onSaveEdit(teamId: string): Promise<void> {
+  const name = draft.value.name.trim();
+  if (!name) { error.value = 'A team needs a name.'; return; }
+
+  // v-model on an input[type=number] hands back a number, not a string, so
+  // this cannot assume either. An empty field is still ''.
+  const typed = String(draft.value.minutes ?? '').trim();
+  let matchMinutes: number | null = null;
+  if (typed) {
+    const n = Number(typed);
+    if (!Number.isInteger(n) || n <= 0) {
+      // The database says the same thing (0034's check); saying it here makes
+      // it a sentence rather than a constraint violation.
+      error.value = 'A match length is a whole number of minutes above zero.';
+      return;
+    }
+    matchMinutes = n;
+  }
+
+  const res = await supabaseService.updateTeam(teamId, {
+    name, season: draft.value.season.trim(), matchMinutes
+  });
+  if (report(res, `${name} saved.`)) {
+    editing.value = null;
+    await load();
+  }
+}
+
 const organizations = computed(() => {
   const seen = new Map<string, any>();
   teams.value.forEach(t => {
@@ -153,6 +209,39 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
           <span class="tag tag--live" data-team-org>{{ t.school_name }}</span>
           <span class="tag" data-team-kind>{{ t.school_kind }}</span>
           <span v-if="t.season" class="tag">{{ t.season }}</span>
+          <!--
+            Only when stated. A team with no length plays 80 by the app's
+            fallback, which is not the same as having said so.
+          -->
+          <span v-if="t.match_minutes" class="tag" data-team-minutes>{{ t.match_minutes }} min</span>
+
+          <div v-if="editing === t.id" class="teamedit">
+            <label class="field">
+              <span class="fld__label kicker">Name</span>
+              <input v-model="draft.name" type="text" class="input" data-team-edit-name />
+            </label>
+            <label class="field">
+              <span class="fld__label kicker">Season</span>
+              <input v-model="draft.season" type="text" class="input" data-team-edit-season />
+            </label>
+            <label class="field">
+              <span class="fld__label kicker">Match length</span>
+              <input
+                v-model="draft.minutes" type="number" min="1" step="1"
+                class="input teamedit__minutes" data-team-edit-minutes
+              />
+              <span class="note">minutes — blank means 80</span>
+            </label>
+            <div class="teamedit__acts">
+              <button
+                type="button" class="btn btn--go" data-team-edit-save
+                @click="onSaveEdit(t.id)"
+              >Save</button>
+              <button type="button" class="btn" data-team-edit-cancel @click="onCancelEdit">
+                Cancel
+              </button>
+            </div>
+          </div>
 
           <p class="row__coaches">
             <span v-if="coachesOf(t.id).length === 0" class="note">No coach assigned</span>
@@ -179,6 +268,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
           <button type="button" class="btn" :data-team-assign="t.id" @click="onAssign(t.id)">
             Assign
           </button>
+          <button type="button" class="btn" data-team-edit @click="onEdit(t)">Edit</button>
         </div>
       </div>
 
@@ -261,6 +351,22 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 .coach__x { border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
 
 .row__acts { display: flex; gap: var(--space-1); align-items: flex-start; }
+
+/* The editor sits inside the row it belongs to, indented enough to read as
+   part of that team rather than as a new form under the list. */
+.teamedit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  border-left: 2px solid var(--rule-strong);
+  background: var(--surface-deep);
+  border-radius: var(--radius-md);
+}
+.teamedit__minutes { width: 5rem; }
+.teamedit__acts { display: flex; gap: var(--space-1); }
 
 .forms { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-4); }
 .form { flex: 1; min-width: 15rem; display: flex; flex-direction: column; gap: var(--space-2); }

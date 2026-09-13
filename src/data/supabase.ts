@@ -954,6 +954,60 @@ class SupabaseService {
     return { ok: true, id: data[0].id };
   }
 
+  /**
+   * A team's own settings: what it is called, which season, how long a match.
+   *
+   * `matchMinutes` is null when nobody has said, which is what 0034 stores and
+   * what leaves `seasonFullMatchMinutes` on its 80-minute fallback. Writing 80
+   * instead would claim somebody chose it, so an undefined field here is left
+   * alone and an explicit null is written through.
+   *
+   * { ok, error } rather than a row, for the reason createTeam documents above:
+   * teams_write is admin-only, and an RLS refusal arrives with no error AND no
+   * rows.
+   */
+  async updateTeam(
+    teamId: string,
+    changes: { name?: string; season?: string | null; matchMinutes?: number | null } = {}
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'That team could not be identified.' };
+
+    const payload: Record<string, any> = {};
+    if (changes.name !== undefined) {
+      const name = String(changes.name).trim();
+      if (!name) return { ok: false, error: 'A team needs a name.' };
+      payload.name = name;
+    }
+    if (changes.season !== undefined) {
+      const season = changes.season === null ? null : String(changes.season).trim();
+      payload.season = season || null;
+    }
+    if (changes.matchMinutes !== undefined) {
+      const minutes = changes.matchMinutes;
+      if (minutes !== null && (!Number.isInteger(minutes) || minutes <= 0)) {
+        return { ok: false, error: 'A match length is a whole number of minutes above zero.' };
+      }
+      payload.match_minutes = minutes;
+    }
+    if (Object.keys(payload).length === 0) return { ok: true };
+
+    const { data, error } = await this.client!
+      .from('teams').update(payload).eq('id', teamId).select();
+
+    if (error) {
+      report('updateTeam', error.message, error);
+      if (error.code === '23505') {
+        return { ok: false, error: `There is already a team called "${payload.name}" in that organization.` };
+      }
+      return { ok: false, error: error.message };
+    }
+    if (!data || !data[0]) {
+      return { ok: false, error: 'The database refused that change. Editing a team requires an admin account.' };
+    }
+    return { ok: true };
+  }
+
   async searchPlayersByName(query: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured()) return null;
     const q = String(query || '').trim();

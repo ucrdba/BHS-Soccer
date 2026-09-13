@@ -123,6 +123,10 @@ declare global {
     assignCoachToTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     removeCoachFromTeam(teamId: string, profileId: string): Promise<{ ok: boolean; error?: string }>;
     createTeam(schoolId: string, name: string, season?: string): Promise<{ ok: boolean; id?: string; error?: string }>;
+    updateTeam(
+      teamId: string,
+      changes: { name?: string; season?: string | null; matchMinutes?: number | null }
+    ): Promise<{ ok: boolean; error?: string }>;
     setRecordingNumber(teamId: string, playerId: string, recordingNumber: number | null): Promise<{ ok: boolean; error?: string }>;
     setUniformNumber(teamId: string, playerId: string, number: number | null): Promise<{ ok: boolean; error?: string }>;
     fetchLineup(teamId: string, matchId?: string | null): Promise<Record<string, any> | null>;
