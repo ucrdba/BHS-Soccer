@@ -83,6 +83,8 @@ Not merely started. Enforced in `stores/plus-minus.ts`, in `append()` and **nowh
 
 Every plus/minus event is stamped with the match clock, and playing time and goal difference are *derived from those stamps*. An event recorded during a stoppage is attributed to whoever was on the pitch at a minute that has already passed; before kick-off everything stamps at 0:00 and every player finishes credited with zero minutes. The counters go up and the sheet looks right either way, which is why this needs a guard rather than care. Substitutions and starting the clock stay outside the rule.
 
+**Team goals are inside it**, and were the one statistic that escaped until the demo made it visible. `goal_for` and `goal_against` move the differential of *every* player on the pitch, so one tapped while the clock is stopped credits whoever is on at that point in the log — and `endPeriod` leaves the clock stopped, so half-time is exactly when that happens: the eleven who came on are credited for a goal the eleven who went off were on for.
+
 ### Low-minute players are the audience for the reports, not noise in them
 
 Held by the season report, the plus/minus sheet, the squad report and the progress chart alike — each asserts the inclusion rather than assuming it. NFHS rules allow unlimited substitution and re-entry, so much of the roster finishes any fixture well under a full match, and a coach reads these views to decide who to give more minutes to. **Filtering out the fringe players removes exactly the players the decision is about, invisibly.** Show the minutes beside the rate instead.

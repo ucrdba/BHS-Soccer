@@ -128,6 +128,41 @@ describe('THE CLOCK GUARD', () => {
     }
   });
 
+
+  it('gates a TEAM GOAL too: it moves the differential of everyone on the pitch', async () => {
+    // Ungated, a goal tapped at half-time credited whoever was on AFTER the
+    // substitutions, for a goal the previous eleven were on for.
+    const s = await opened();
+    expect((await s.teamGoal(true)).ok).toBe(false);
+    expect((await s.teamGoal(false)).ok).toBe(false);
+    expect(kinds(s)).not.toContain('goal_for');
+  });
+
+  it('refuses a team goal during a stoppage, not only before kick-off', async () => {
+    const s = await running();
+    await s.toggleClock();
+
+    expect((await s.teamGoal(true)).ok).toBe(false);
+    expect(s.notice).toMatch(/stopped/i);
+  });
+
+  it('says goals in the refusal, since goals are what was refused', async () => {
+    const s = await opened();
+    await s.teamGoal(true);
+    expect(s.notice).toMatch(/goal/i);
+
+    await s.toggleClock();
+    await s.toggleClock();
+    await s.teamGoal(true);
+    expect(s.notice).toMatch(/goal/i);
+  });
+
+  it('RECORDS a team goal once the clock is running', async () => {
+    const s = await running();
+    expect((await s.teamGoal(true)).ok).toBe(true);
+    expect(kinds(s)).toContain('goal_for');
+  });
+
   it('RECORDS a plus once the clock is running', async () => {
     const s = await running();
     const res = await s.append('plus', 'p1');
@@ -162,11 +197,6 @@ describe('what stays OUTSIDE the guard', () => {
     expect(s.running).toBe(true);
   });
 
-  it('lets a team goal be recorded while the clock runs', async () => {
-    const s = await running();
-    expect((await s.teamGoal(true)).ok).toBe(true);
-    expect(kinds(s)).toContain('goal_for');
-  });
 });
 
 describe('the notice', () => {

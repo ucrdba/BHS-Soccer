@@ -33,8 +33,18 @@ import {
 
 export interface WriteResult { ok: boolean; error?: string }
 
-/** Recorded against the clock, so gated on it. */
-const CLOCK_GATED: StatKind[] = ['plus', 'minus', 'shot', 'goal', 'assist'];
+/**
+ * Recorded against the clock, so gated on it.
+ *
+ * Team goals belong here as much as anything: `goal_for` and `goal_against`
+ * move the differential of EVERY player on the pitch, so one tapped while the
+ * clock is stopped credits whoever is on at that point in the log. At
+ * half-time — where `endPeriod` leaves the clock stopped — that is the eleven
+ * who came on, for a goal the eleven who went off were on for.
+ */
+const CLOCK_GATED: StatKind[] = [
+  'plus', 'minus', 'shot', 'goal', 'assist', 'goal_for', 'goal_against'
+];
 
 export const usePlusMinusStore = defineStore('plusMinus', () => {
   const events = ref<StatEvent[]>([]);
@@ -118,9 +128,9 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
     // THE RULE. See the module comment.
     if (CLOCK_GATED.includes(kind) && !running.value) {
       say(everStarted.value
-        ? 'The clock is stopped. Start it to record plus and minus.'
-        : 'Please start the clock to record plus and minus — before kick-off they '
-          + 'stamp at 0:00 and nobody is credited any minutes.');
+        ? 'The clock is stopped. Start it to record goals, plus and minus.'
+        : 'Please start the clock to record goals, plus and minus — before kick-off '
+          + 'they stamp at 0:00 and nobody is credited any minutes.');
       return { ok: false, error: notice.value };
     }
 
