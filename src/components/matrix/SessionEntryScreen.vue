@@ -26,7 +26,7 @@ import { bandFeedback } from '../../domain/band-score';
 import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult,
+  toSessionResults, presentWithoutResult, startingSessionDate,
   type EntryRow
 } from '../../domain/session-entry';
 
@@ -50,6 +50,19 @@ const saving = ref(false);
 
 const jump = ref('');
 const jumpError = ref('');
+
+/**
+ * The date box, filled rather than left blank.
+ *
+ * A recorded session opens on its own date and a new one on today. Keyed on
+ * the session being opened, so switching exercises re-seeds it and a date the
+ * coach has typed over survives every other change on the screen.
+ */
+watch(
+  () => session.editing?.occurred_on || '',
+  stored => { occurredOn.value = startingSessionDate(stored); },
+  { immediate: true }
+);
 
 const sort = ref({ by: 'recordingNumber', reversed: false });
 const rowsEl = ref<HTMLElement | null>(null);

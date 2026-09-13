@@ -13,7 +13,7 @@
  * doubling everyone's `available`).
  */
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 
 export interface WriteResult { ok: boolean; error?: string }
@@ -113,13 +113,37 @@ export const useSessionStore = defineStore('session', () => {
     await loadBands(drillId, teamId);
   }
 
+  /**
+   * Reopen a recorded session, with the row it was recorded as.
+   *
+   * The history is read when this store does not already hold the session,
+   * because SessionEntryView opens this screen straight from a URL -- the
+   * Edit button, a bookmark, a reload -- and never loads it. Without the row
+   * there is no date to show and no drill to look the standards up by: the
+   * date box opened blank, so the coach retyped it, and typing today MOVED
+   * the session, re-attributing every result in it to a day it did not
+   * happen on.
+   */
   async function openExisting(sessionId: string, teamId: string | null): Promise<void> {
     editingId.value = sessionId;
     results.value = (await supabaseService.fetchMatrixSessionResults(sessionId)) || [];
 
+    if (!sessions.value.some(s => s.id === sessionId) && teamId) await loadHistory(teamId);
+
     const session = sessions.value.find(s => s.id === sessionId);
     if (session) await loadBands(session.drill_id, teamId);
   }
+
+  /**
+   * The session being edited, or null while recording a new one.
+   *
+   * Guarded against `sessions` being undefined rather than assuming the array:
+   * a component that is still mounted when its test's pinia is torn down
+   * re-evaluates this against a disposed store, and an unhandled rejection
+   * there exits the run non-zero while every test still reports as passing.
+   */
+  const editing = computed(() =>
+    (sessions.value || []).find(s => s.id === editingId.value) || null);
 
   async function save(
     teamId: string | null, session: SessionDraft, rows: any[]
@@ -150,7 +174,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return {
-    sessions, results, bands, drills, editingId, loading, loadError,
+    sessions, results, bands, drills, editingId, editing, loading, loadError,
     loadHistory, loadDrills, loadBands, openNew, openExisting, save, remove
   };
 });

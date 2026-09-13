@@ -168,3 +168,30 @@ export function presentWithoutResult(
     return r.rawValue === null && !r.outcome;
   });
 }
+
+/**
+ * What the date box opens on.
+ *
+ * A recorded session shows its own date, and a new one shows today. Neither
+ * used to happen: the box started empty and nothing filled it, so a coach who
+ * entered twenty-five results and pressed Save was refused with "Pick the
+ * date this session happened" -- at the foot of a sheet they had scrolled
+ * past, which reads as the button doing nothing.
+ *
+ * The stored date wins for a reason beyond convenience. Reopening a session
+ * to a blank box means the coach retypes it, and typing today MOVES the
+ * session: every result in it is re-attributed to a day it did not happen on,
+ * and `not_entered` then charges whoever joined the squad in between.
+ *
+ * Local time, not `toISOString()`, which is UTC -- an evening session west of
+ * Greenwich would open on tomorrow, the one date a coach never means.
+ */
+export function startingSessionDate(stored?: string | null, now: Date = new Date()): string {
+  const kept = String(stored ?? '').trim();
+  if (kept) return kept;
+
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}

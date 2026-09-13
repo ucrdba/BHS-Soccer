@@ -145,6 +145,24 @@ describe('opening a session', () => {
     expect(fetchMatrixSessionResults).toHaveBeenCalledWith('s1');
   });
 
+  it('reads the history when the session is not already known', async () => {
+    // SessionEntryView opens this URL directly -- from the Edit button, a
+    // bookmark or a reload -- and never loads the history itself. Without
+    // this the session row is not there to read, so the date box opens blank
+    // and the coach retypes it, MOVING the session to whatever they type.
+    const s = useSessionStore();
+    await s.openExisting('s1', 't1');
+    expect(fetchMatrixSessions).toHaveBeenCalledWith('t1');
+    expect(s.sessions.find(x => x.id === 's1')?.occurred_on).toBe('2026-09-04');
+  });
+
+  it('does not re-read a history it already has', async () => {
+    const s = useSessionStore();
+    s.sessions = SESSIONS;
+    await s.openExisting('s1', 't1');
+    expect(fetchMatrixSessions).not.toHaveBeenCalled();
+  });
+
   it('loads the bands of the session being edited', async () => {
     const s = useSessionStore();
     s.sessions = SESSIONS;

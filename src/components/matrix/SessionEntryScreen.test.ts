@@ -65,8 +65,10 @@ const flush = () => new Promise(r => setTimeout(r, 0));
  * default), the way the fixed DRILLS list already seeds one per id — it lets
  * a test choose a measure without inventing a fourth drill.
  */
-async function mountGrid(opts: { drillId?: string; measure?: string } = {}) {
-  const { drillId = COOPERS, measure } = opts;
+async function mountGrid(
+  opts: { drillId?: string; measure?: string; editing?: any } = {}
+) {
+  const { drillId = COOPERS, measure, editing } = opts;
   vi.clearAllMocks();
   saveMatrixSession.mockResolvedValue({ ok: true, id: 's9' });
   fetchTimeBands.mockResolvedValue(BANDS);
@@ -83,7 +85,13 @@ async function mountGrid(opts: { drillId?: string; measure?: string } = {}) {
       plugins: [createTestingPinia({
         createSpy: vi.fn,
         stubActions: false,
-        initialState: { session: { drills, bands: BANDS } }
+        initialState: {
+          session: {
+            drills, bands: BANDS,
+            sessions: editing ? [editing] : [],
+            editingId: editing ? editing.id : null
+          }
+        }
       })],
       stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
     },
@@ -282,6 +290,54 @@ describe('a small-sided exercise', () => {
   });
 });
 
+describe('the date', () => {
+  const todayIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      + `-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  it('opens a new session on today', async () => {
+    // It used to open blank, so a coach who filled in twenty-five results and
+    // pressed Save was refused for a field at the top of the sheet -- which
+    // reads as the button doing nothing.
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    expect((w.find('[data-session-date]').element as HTMLInputElement).value)
+      .toBe(todayIso());
+  });
+
+  it('saves a new session on today without the coach touching the box', async () => {
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    for (const f of fields(w)) await f.setValue('win');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    expect(saveMatrixSession).toHaveBeenCalled();
+    expect(saveMatrixSession.mock.calls[0][1].occurredOn).toBe(todayIso());
+  });
+
+  it('opens a recorded session on ITS date, not today', async () => {
+    // Retyping it is how a correction silently MOVES a session, which
+    // re-attributes every result in it to a day it did not happen on.
+    const w = await mountGrid({
+      drillId: SMALL, measure: 'win_loss',
+      editing: { id: 's1', drill_id: SMALL, occurred_on: '2026-09-04' }
+    });
+    expect((w.find('[data-session-date]').element as HTMLInputElement).value)
+      .toBe('2026-09-04');
+  });
+
+  it('keeps a date the coach has typed over', async () => {
+    const w = await mountGrid({ drillId: COOPERS });
+    await w.find('[data-session-date]').setValue('2026-08-30');
+    for (const f of fields(w)) await f.setValue('2800');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    expect(saveMatrixSession.mock.calls[0][1].occurredOn).toBe('2026-08-30');
+  });
+});
+
 describe('saving', () => {
   const fill = async (w: any, value = '2800') => {
     for (const f of fields(w)) await f.setValue(value);
@@ -310,8 +366,10 @@ describe('saving', () => {
   });
 
   it('will not save without a date', async () => {
+    // The box opens on today, so this is a coach who has cleared it.
     const w = await mountGrid({ drillId: COOPERS });
     await fill(w);
+    await w.find('[data-session-date]').setValue('');
     await w.find('[data-session-save]').trigger('click');
     await flush();
 

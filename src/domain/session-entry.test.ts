@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult
+  toSessionResults, presentWithoutResult, startingSessionDate
 } from './session-entry';
 
 const PLAYERS = [
@@ -229,5 +229,30 @@ describe('present with nothing recorded', () => {
   it('does not object to a player who was not there', () => {
     expect(presentWithoutResult(PLAYERS, blankEntries(PLAYERS, 'time_bands'), 'time_bands'))
       .toEqual([]);
+  });
+});
+
+describe('startingSessionDate', () => {
+  it('shows a recorded session its own date', () => {
+    // Reopening one from the history and finding the box empty means the
+    // coach retypes it -- and typing today silently MOVES the session, which
+    // re-attributes every result in it to a day it did not happen on.
+    expect(startingSessionDate('2026-09-04')).toBe('2026-09-04');
+  });
+
+  it('starts a new session on today', () => {
+    const now = new Date(2026, 8, 13, 9, 0);
+    expect(startingSessionDate(null, now)).toBe('2026-09-13');
+  });
+
+  it('reads today in LOCAL time', () => {
+    // A bare toISOString() is UTC: an evening session west of Greenwich would
+    // open on tomorrow's date, which is the one day a coach never means.
+    const evening = new Date(2026, 8, 12, 23, 30);
+    expect(startingSessionDate('', evening)).toBe('2026-09-12');
+  });
+
+  it('pads a single-digit month and day', () => {
+    expect(startingSessionDate(undefined, new Date(2026, 0, 5, 12, 0))).toBe('2026-01-05');
   });
 });
