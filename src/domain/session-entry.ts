@@ -195,3 +195,33 @@ export function startingSessionDate(stored?: string | null, now: Date = new Date
   const dd = String(now.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+/**
+ * Give every player still without a result the same one.
+ *
+ * A small-sided session is two sides of the same squad, so the fast entry is
+ * one press for the whole sheet and then a flip of the side that won —
+ * twenty-five dropdowns is exactly the paper-beats-screen problem the grid
+ * exists to solve.
+ *
+ * It fills BLANKS only. A result the coach has already chosen is theirs, so a
+ * press late in entry cannot wipe the rows already done; re-setting a sheet
+ * means changing those rows by hand, which is the trade that keeps the button
+ * safe to press.
+ *
+ * A player who is not marked `present` is left entirely alone — filling an
+ * absent row would credit them for a game they did not play, and (since an
+ * outcome implies attendance) quietly mark them there.
+ */
+export function fillBlankOutcomes(
+  entries: Record<string, EntryRow>, outcome: string
+): Record<string, EntryRow> {
+  const out: Record<string, EntryRow> = {};
+  Object.keys(entries || {}).forEach(id => {
+    const row = entries[id];
+    out[id] = row.attendance === 'present' && !row.outcome
+      ? { ...row, outcome }
+      : row;
+  });
+  return out;
+}

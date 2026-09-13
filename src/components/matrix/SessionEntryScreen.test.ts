@@ -290,6 +290,67 @@ describe('a small-sided exercise', () => {
   });
 });
 
+describe('filling a small-sided sheet in one press', () => {
+  const outcomes = (w: any) =>
+    fields(w).map((f: any) => (f.element as HTMLSelectElement).value);
+
+  it('offers Won, Drew and Lost on a W/D/L exercise', async () => {
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    expect(w.findAll('[data-fill-outcome]').map((b: any) => b.text()))
+      .toEqual(['Won', 'Drew', 'Lost']);
+  });
+
+  it('offers nothing of the sort on a counted exercise', async () => {
+    // There is no sensible squad-wide Cooper's distance, and a button that
+    // wrote one would be filling in results nobody ran.
+    const w = await mountGrid({ drillId: COOPERS });
+    expect(w.findAll('[data-fill-outcome]')).toHaveLength(0);
+  });
+
+  it('offers nothing of the sort on a banded exercise', async () => {
+    const w = await mountGrid({ drillId: LAPS, measure: 'time_bands' });
+    expect(w.findAll('[data-fill-outcome]')).toHaveLength(0);
+  });
+
+  it('gives every untouched player the result', async () => {
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-fill-outcome]')[2].trigger('click');   // Lost
+    expect(outcomes(w)).toEqual(['loss', 'loss', 'loss']);
+  });
+
+  it('KEEPS a result already chosen', async () => {
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await fields(w)[0].setValue('win');
+    await w.findAll('[data-fill-outcome]')[2].trigger('click');   // Lost
+
+    const got = outcomes(w);
+    expect(got[0]).toBe('win');
+    expect(got.slice(1)).toEqual(['loss', 'loss']);
+  });
+
+  it('leaves a player who was not there out of it', async () => {
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-attendance]')[0].setValue('excused');
+    await w.findAll('[data-fill-outcome]')[0].trigger('click');   // Won
+    await flush();
+
+    expect(saveMatrixSession).not.toHaveBeenCalled();
+    expect(outcomes(w)[0]).toBe('');
+  });
+
+  it('leaves the sheet ready to save', async () => {
+    // The whole point: one press instead of twenty-five dropdowns.
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-fill-outcome]')[1].trigger('click');   // Drew
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    expect(saveMatrixSession).toHaveBeenCalled();
+    expect(saveMatrixSession.mock.calls[0][2].map((r: any) => r.outcome))
+      .toEqual(['draw', 'draw', 'draw']);
+  });
+});
+
 describe('the date', () => {
   const todayIso = () => {
     const d = new Date();

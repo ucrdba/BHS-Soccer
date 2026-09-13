@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult, startingSessionDate
+  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes
 } from './session-entry';
 
 const PLAYERS = [
@@ -254,5 +254,46 @@ describe('startingSessionDate', () => {
 
   it('pads a single-digit month and day', () => {
     expect(startingSessionDate(undefined, new Date(2026, 0, 5, 12, 0))).toBe('2026-01-05');
+  });
+});
+
+describe('fillBlankOutcomes', () => {
+  const grid = () => blankEntries(PLAYERS, 'win_loss');
+
+  it('gives every untouched player the outcome', () => {
+    // The whole point: a small-sided session is two sides, so one press sets
+    // the squad and the coach flips the side that won.
+    const out = fillBlankOutcomes(grid(), 'loss');
+    expect(Object.values(out).map(r => r.outcome)).toEqual(['loss', 'loss', 'loss']);
+  });
+
+  it('KEEPS a result the coach has already chosen', () => {
+    const e = grid();
+    e.p2 = { ...e.p2, outcome: 'win' };
+    const out = fillBlankOutcomes(e, 'loss');
+    expect(out.p2.outcome).toBe('win');
+    expect(out.p1.outcome).toBe('loss');
+  });
+
+  it('leaves a player who was not there out of it', () => {
+    // Filling an absent row would credit them for a game they did not play,
+    // and mark them present into the bargain.
+    const e = grid();
+    e.p3 = { ...e.p3, attendance: 'excused' };
+    const out = fillBlankOutcomes(e, 'win');
+    expect(out.p3.outcome).toBe('');
+    expect(out.p3.attendance).toBe('excused');
+  });
+
+  it('leaves a no-show out of it too', () => {
+    const e = grid();
+    e.p1 = { ...e.p1, attendance: 'unexcused' };
+    expect(fillBlankOutcomes(e, 'draw').p1.outcome).toBe('');
+  });
+
+  it('does not mutate the grid it was given', () => {
+    const e = grid();
+    fillBlankOutcomes(e, 'win');
+    expect(e.p1.outcome).toBe('');
   });
 });

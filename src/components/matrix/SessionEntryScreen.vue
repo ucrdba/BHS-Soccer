@@ -26,7 +26,7 @@ import { bandFeedback } from '../../domain/band-score';
 import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult, startingSessionDate,
+  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes,
   type EntryRow
 } from '../../domain/session-entry';
 
@@ -72,6 +72,13 @@ const measure = computed(() => drill.value?.measure || 'count_high');
 const isBanded = computed(() => measure.value === 'time_bands');
 const isOutcome = computed(() => measure.value === 'win_loss');
 
+/** The squad-wide results, in the same order as each row's dropdown. */
+const FILL_OPTIONS = [
+  { value: 'win', label: 'Won' },
+  { value: 'draw', label: 'Drew' },
+  { value: 'loss', label: 'Lost' }
+];
+
 const live = computed(() => (props.players || []).filter(p => !p?.is_deleted && !p?.isDeleted));
 
 /** The order on screen, which the keyboard follows. */
@@ -115,6 +122,17 @@ function onOutcome(playerId: string, outcome: string): void {
   const row = entries.value[playerId];
   if (!row) return;
   entries.value[playerId] = { ...row, outcome, attendance: outcome ? 'present' : row.attendance };
+}
+
+/**
+ * One press for the whole sheet.
+ *
+ * A small-sided session is two sides of the same squad, so the fast entry is
+ * "everyone lost" and then a flip of the side that won. It fills blanks only
+ * and skips anyone not marked here — see `fillBlankOutcomes`.
+ */
+function onFillOutcomes(outcome: string): void {
+  entries.value = fillBlankOutcomes(entries.value, outcome);
 }
 
 function onAttendance(playerId: string, attendance: string): void {
@@ -281,6 +299,16 @@ async function onSave(): Promise<void> {
 
     <p v-if="jumpError" class="hint hint--bad" role="status" data-jump-error>{{ jumpError }}</p>
 
+    <div v-if="isOutcome" class="fill" data-fill>
+      <span class="fill__label">Fill the rest</span>
+      <button
+        v-for="o in FILL_OPTIONS" :key="o.value"
+        type="button" class="btn" data-fill-outcome
+        @click="onFillOutcomes(o.value)"
+      >{{ o.label }}</button>
+      <span class="fill__note">Players you have already set keep their result.</span>
+    </div>
+
     <p v-if="isBanded && session.bands.length === 0" class="hint" data-no-bands>
       No standards set for this squad yet. Times are recorded, and score once
       the standards are entered.
@@ -394,6 +422,23 @@ async function onSave(): Promise<void> {
 .format__note { font-size: 11.5px; line-height: 1.4; color: var(--ink); }
 
 .head { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+
+.fill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.fill__label {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.fill__note { font-size: 11.5px; color: var(--ink-soft); }
 
 .fld { display: flex; flex-direction: column; gap: 4px; }
 .fld--wide { flex: 1; min-width: 14rem; }
