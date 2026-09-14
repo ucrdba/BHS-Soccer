@@ -45,6 +45,21 @@ const teamOrg = ref('');
 const picked = ref<Record<string, string>>({});
 
 /**
+ * Which teams' "Invite a coach" disclosure has been opened.
+ *
+ * `InviteControl` is mounted only once true, because it reads for its team on
+ * mount -- mounting it for every row regardless of the closed <details> would
+ * fire a read per team platform-wide on every visit to this screen. Once
+ * opened it stays mounted on close, so a coach revoking or re-opening an
+ * invitation does not lose the control's state.
+ */
+const invitingCoach = ref<Record<string, boolean>>({});
+
+function onInviteToggle(teamId: string, e: Event): void {
+  if ((e.target as HTMLDetailsElement).open) invitingCoach.value[teamId] = true;
+}
+
+/**
  * The team being edited, if any, and the draft of it.
  *
  * One at a time: two open editors on a list this long is a good way to save
@@ -258,9 +273,9 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
             </span>
           </p>
 
-          <details class="invitecoach" data-team-invite>
+          <details class="invitecoach" data-team-invite @toggle="onInviteToggle(t.id, $event)">
             <summary class="kicker">Invite a coach</summary>
-            <InviteControl :team-id="t.id" role="coach" :subject="t.name" />
+            <InviteControl v-if="invitingCoach[t.id]" :team-id="t.id" role="coach" :subject="t.name" />
           </details>
         </div>
 

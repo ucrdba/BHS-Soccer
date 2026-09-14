@@ -115,6 +115,20 @@ describe('the list', () => {
     const w = await mountTeams();
     expect(w.findAll('[data-team-invite]')).toHaveLength(w.findAll('[data-team-row]').length);
   });
+
+  it('does not mount the invite control before its disclosure is opened', async () => {
+    const w = await mountTeams();
+    expect(w.findAllComponents({ name: 'InviteControl' })).toHaveLength(0);
+  });
+
+  it('mounts the invite control for a team once its disclosure is opened', async () => {
+    const w = await mountTeams();
+    const details = w.find('[data-team-invite]');
+    (details.element as HTMLDetailsElement).open = true;
+    await details.trigger('toggle');
+
+    expect(w.findAllComponents({ name: 'InviteControl' })).toHaveLength(1);
+  });
 });
 
 describe('creating an organization', () => {
