@@ -103,6 +103,28 @@ describe('the queue', () => {
     expect(w.find('[data-approvals-refused]').text()).toBe('That player already has an account.');
   });
 
+  it('says the roster read failed rather than offering an empty list', async () => {
+    // A null return is not the same as a genuinely empty roster: showing
+    // only "New roster entry" lets a coach approve a duplicate for someone
+    // who already has an unlinked entry the failed read could not surface.
+    fetchUnlinkedRosterEntries.mockResolvedValue(null);
+    const w = await mountQueue();
+    expect(w.find('[data-request-roster-error]').exists()).toBe(true);
+    expect((w.find('[data-request-approve]').element as HTMLButtonElement).disabled).toBe(true);
+
+    await w.find('[data-request-approve]').trigger('click');
+    await flush();
+    expect(approvePlayerRequest).not.toHaveBeenCalled();
+  });
+
+  it('says the team read failed rather than offering an empty picker', async () => {
+    fetchPendingRequests.mockResolvedValue([TEAMLESS]);
+    fetchJoinableTeams.mockResolvedValue(null);
+    const w = await mountQueue(true);
+    expect(w.find('[data-request-teams-error]').exists()).toBe(true);
+    expect(w.find('[data-request-team]').exists()).toBe(false);
+  });
+
   it('approves a coach request onto its team, with no roster picker', async () => {
     fetchPendingRequests.mockResolvedValue([COACH]);
     const w = await mountQueue(true);
