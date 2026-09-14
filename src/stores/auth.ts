@@ -17,7 +17,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { auth } from '../auth';
-import { checkEmail, type EmailCheck } from '../auth/email-typo';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<any>(null);
@@ -68,24 +67,8 @@ export const useAuthStore = defineStore('auth', () => {
     sync();
   }
 
-  /**
-   * Inspect an address before registering with it.
-   *
-   * checkEmail has been imported into src/auth.ts and never called, and
-   * coaches.view.js branches on a `res.emailSuggestion` that RegisterResult
-   * never carries -- so this tested module has never actually run. Wired up
-   * here, at the point registration happens.
-   *
-   * A suggestion is an OFFER, never a verdict. An unfamiliar domain is
-   * ordinary for a club coach and unknowable from here, so the caller must
-   * leave keeping the typed address an equally easy path.
-   */
-  function inspectEmail(email: string): EmailCheck {
-    return checkEmail(email);
-  }
-
   return {
     user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn,
-    sync, login, register, logout, inspectEmail
+    sync, login, register, logout
   };
 });

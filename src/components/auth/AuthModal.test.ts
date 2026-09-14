@@ -126,9 +126,6 @@ describe('registering', () => {
 
   it('refuses an address that cannot be one, without calling register', async () => {
     const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({
-      valid: false, suggestion: null, reason: 'That does not look like an email address.'
-    });
 
     await fillRegister(wrapper, 'nonsense');
     await setValue(wrapper, '[data-field="regRole"]', 'guest');
@@ -141,9 +138,6 @@ describe('registering', () => {
 
   it('offers a correction with both answers equally available', async () => {
     const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({
-      valid: true, suggestion: 'coach@gmail.com', reason: 'Did you mean gmail.com?'
-    });
 
     await fillRegister(wrapper, 'coach@gmial.com');
     await setValue(wrapper, '[data-field="regRole"]', 'guest');
@@ -158,9 +152,6 @@ describe('registering', () => {
 
   it('registers with the typed address when that is chosen', async () => {
     const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({
-      valid: true, suggestion: 'coach@gmail.com', reason: 'Did you mean gmail.com?'
-    });
     (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
 
     await fillRegister(wrapper, 'coach@gmial.com');
@@ -177,9 +168,6 @@ describe('registering', () => {
 
   it('registers with the correction when that is chosen', async () => {
     const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({
-      valid: true, suggestion: 'coach@gmail.com', reason: 'Did you mean gmail.com?'
-    });
     (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
 
     await fillRegister(wrapper, 'coach@gmial.com');
@@ -196,7 +184,6 @@ describe('registering', () => {
 
   it('shows a registration failure inline', async () => {
     const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({ valid: true, suggestion: null, reason: null });
     (store.register as any).mockResolvedValue({ success: false, message: 'Already registered.' });
 
     await fillRegister(wrapper);

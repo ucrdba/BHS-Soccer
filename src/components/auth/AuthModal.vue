@@ -23,6 +23,7 @@ import BaseModal from '../ui/BaseModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { demoConfig, DEMO_ACCOUNTS } from '../../demo';
 import { supabaseService } from '../../data/supabase';
+import { checkEmail } from '../../auth/email-typo';
 import type { JoinableTeam } from '../../types';
 
 const props = defineProps<{ open: boolean; initialTab?: 'signin' | 'register'; initialEmail?: string }>();
@@ -147,16 +148,14 @@ function onRegister(): void {
   if (needsTeam.value && !regTeam.value) { fail('Choose the team you are joining.'); return; }
 
   const typed = regEmail.value.trim().toLowerCase();
-  const check = auth.inspectEmail(typed);
+  const check = checkEmail(typed);
 
-  // Not an address at all: nothing to send anywhere. A testing-pinia stub with
-  // no return value configured yields no check at all -- treated the same as
-  // a check that raised no objection, rather than crashing on it.
-  if (check && !check.valid) { fail(check.reason || 'That does not look like an email address.'); return; }
+  // Not an address at all: nothing to send anywhere.
+  if (!check.valid) { fail(check.reason || 'That does not look like an email address.'); return; }
 
   // A near miss. Offered, never enforced -- both answers go on screen and
   // nothing is sent until one is chosen.
-  if (check?.suggestion) {
+  if (check.suggestion) {
     suggestion.value = check.suggestion;
     suggestionReason.value = check.reason;
     return;
