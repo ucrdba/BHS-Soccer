@@ -65,13 +65,56 @@ Push `main` (the owner's call). Vercel deploys production.
 ## Rollback
 
 The client and the migration are independent enough to roll back separately.
-To undo the migration, restore the previous triggers by re-running
-`supabase/migrations/0013_signup_without_email_confirmation.sql` and section 5
-of `supabase_migration_auth.sql` (the guard), then:
+To undo the migration, run this block first — it restores both pre-0035
+functions in place (same names, so the existing triggers pick them up with no
+further change) before dropping anything 0035 added:
 
 ```sql
 begin;
 set role postgres;
+
+-- Pre-0035 body, verbatim from supabase_migration_auth.sql section 4.
+-- 0035's version calls promote_confirmed_profile(); this one does not, so it
+-- must be back in place before that function is dropped below.
+create or replace function public.handle_user_confirmed()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+  set
+    email_verified = true,
+    status = case when requested_role = 'guest' or requested_role is null then 'active' else 'pending_approval' end,
+    role = case when requested_role = 'guest' or requested_role is null then 'guest' else role end
+  where id = new.id;
+  return new;
+end;
+$$;
+
+-- Pre-0035 body and attributes (SECURITY DEFINER), verbatim from
+-- supabase_migration_auth.sql section 5 — the function only, not the
+-- policies or grants around it.
+create or replace function public.guard_profile_privileged_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or public.current_profile_role() = 'admin' then
+    return new;
+  end if;
+  if new.role is distinct from old.role
+     or new.status is distinct from old.status
+     or new.school_id is distinct from old.school_id then
+    raise exception 'Only an admin can change role, status, or school assignment.';
+  end if;
+  return new;
+end;
+$$;
+
 drop function if exists public.create_invitation(text, uuid, text, uuid);
 drop function if exists public.revoke_invitation(uuid);
 drop function if exists public.pending_requests();
@@ -82,5 +125,19 @@ drop function if exists public.team_linked_players(uuid);
 drop function if exists public.promote_confirmed_profile(uuid);
 drop table if exists public.invitations;
 alter table public.profiles drop column if exists requested_team_id;
+
 commit;
 ```
+
+Then, as a separate step, re-run
+`supabase/migrations/0013_signup_without_email_confirmation.sql` to restore
+`handle_new_user`. Run it after the block above, not before or instead of it:
+0013's own `handle_new_user` does not call `promote_confirmed_profile` or
+anything else the block drops, so it is safe to apply once the block has
+committed.
+
+Do not re-run `supabase_migration_auth.sql` as part of this rollback, not even
+"just section 5": that section also re-creates `profiles_select` as
+`for select using (is_deleted = false)`, which would let any anonymous caller
+read every profile's email again — undoing `0001_tighten_profiles_select.sql`
+— for the sake of a guard function the explicit block above already restores.
