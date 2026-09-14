@@ -38,7 +38,7 @@ const auth = useAuthStore();
  */
 const demo = demoConfig();
 
-type Tab = 'signin' | 'register' | 'sent';
+type Tab = 'signin' | 'register' | 'sent' | 'reset' | 'newpassword';
 const tab = ref<Tab>('signin');
 const busy = ref(false);
 const feedback = ref('');
@@ -46,6 +46,9 @@ const feedbackKind = ref<'error' | 'info'>('error');
 
 const email = ref('');
 const password = ref('');
+const resetEmail = ref('');
+const newPassword = ref('');
+const newPasswordAgain = ref('');
 
 const regName = ref('');
 const regEmail = ref('');
@@ -85,7 +88,7 @@ async function loadTeams(): Promise<void> {
 
 watch(() => props.open, (open) => {
   if (!open) return;
-  setTab(props.initialTab || 'signin');
+  setTab(auth.recovering ? 'newpassword' : (props.initialTab || 'signin'));
   if (props.initialEmail) regEmail.value = props.initialEmail;
 }, { immediate: true });
 
@@ -93,7 +96,9 @@ const title = computed(() =>
   demo.enabled ? 'Try the demo'
     : tab.value === 'register' ? 'Create an account'
       : tab.value === 'sent' ? 'Check your email'
-        : 'Sign in');
+        : tab.value === 'reset' ? 'Reset your password'
+          : tab.value === 'newpassword' ? 'Set a new password'
+            : 'Sign in');
 
 function setTab(next: Tab): void {
   tab.value = next;
@@ -105,6 +110,35 @@ function setTab(next: Tab): void {
 function fail(message: string): void {
   feedback.value = message;
   feedbackKind.value = 'error';
+}
+
+function info(message: string): void {
+  feedback.value = message;
+  feedbackKind.value = 'info';
+}
+
+async function onResetRequest(): Promise<void> {
+  busy.value = true;
+  feedback.value = '';
+  try {
+    const res: any = await auth.requestPasswordReset(resetEmail.value.trim());
+    if (res?.success) info(res.message); else fail(res?.message || 'The reset email could not be sent.');
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function onNewPassword(): Promise<void> {
+  if (newPassword.value !== newPasswordAgain.value) { fail('The two passwords do not match.'); return; }
+  busy.value = true;
+  feedback.value = '';
+  try {
+    const res: any = await auth.completePasswordReset(newPassword.value);
+    if (res?.success) { emit('close'); return; }
+    fail(res?.message || 'That password could not be set.');
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function onSignIn(): Promise<void> {
@@ -179,7 +213,7 @@ async function onPickAccount(email: string): Promise<void> {
 
 <template>
   <BaseModal :open="open" :title="title" @close="emit('close')">
-    <div v-if="!demo.enabled" class="tabs" role="tablist">
+    <div v-if="!demo.enabled && (tab === 'signin' || tab === 'register')" class="tabs" role="tablist">
       <button
         type="button" class="tabs__btn" :class="{ 'is-on': tab === 'signin' }"
         role="tab" :aria-selected="tab === 'signin'" data-tab="signin"
@@ -227,6 +261,9 @@ async function onPickAccount(email: string): Promise<void> {
       </label>
       <button type="submit" class="btn btn--go" :disabled="busy">
         {{ busy ? 'Signing in…' : 'Sign in' }}
+      </button>
+      <button type="button" class="btn btn--plain" data-forgot @click="setTab('reset')">
+        Forgot password?
       </button>
     </form>
 
@@ -292,8 +329,39 @@ async function onPickAccount(email: string): Promise<void> {
       </button>
     </form>
 
+    <!-- Reset -->
+    <form v-else-if="tab === 'reset'" data-tab-panel="reset" data-reset-submit @submit.prevent="onResetRequest">
+      <label class="field">
+        <span class="kicker">Email</span>
+        <input v-model="resetEmail" type="email" class="input" required autocomplete="email"
+               data-field="resetEmail" />
+      </label>
+      <button type="submit" class="btn btn--go" :disabled="busy">
+        {{ busy ? 'Sending…' : 'Send a reset link' }}
+      </button>
+      <button type="button" class="btn btn--plain" @click="setTab('signin')">Back to sign in</button>
+    </form>
+
+    <!-- New password, after opening a reset link -->
+    <form v-else-if="tab === 'newpassword'" data-tab-panel="newpassword" data-newpassword-submit
+          @submit.prevent="onNewPassword">
+      <label class="field">
+        <span class="kicker">New password</span>
+        <input v-model="newPassword" type="password" class="input" required minlength="6"
+               autocomplete="new-password" data-field="newPassword" />
+      </label>
+      <label class="field">
+        <span class="kicker">Again</span>
+        <input v-model="newPasswordAgain" type="password" class="input" required minlength="6"
+               autocomplete="new-password" data-field="newPasswordAgain" />
+      </label>
+      <button type="submit" class="btn btn--go" :disabled="busy">
+        {{ busy ? 'Saving…' : 'Set password' }}
+      </button>
+    </form>
+
     <!-- Sent -->
-    <div v-else data-tab-panel="sent" class="sent">
+    <div v-else-if="tab === 'sent'" data-tab-panel="sent" class="sent">
       <p>We sent a link to <strong>{{ sentTo }}</strong>. Open it to confirm your account.</p>
       <p class="note">
         If a coach invited this address, confirming connects you to your team. Otherwise

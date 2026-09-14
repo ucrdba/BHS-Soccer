@@ -257,3 +257,57 @@ describe('registering', () => {
     expect((wrapper.find('[data-field="regEmail"]').element as HTMLInputElement).value).toBe('kid@example.com');
   });
 });
+
+describe('a forgotten password', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  it('is reached from sign in', async () => {
+    const { wrapper } = mountAuth();
+    await wrapper.find('[data-forgot]').trigger('click');
+    expect(wrapper.find('[data-tab-panel="reset"]').exists()).toBe(true);
+  });
+
+  it('sends the link and shows the same answer for any address', async () => {
+    const { wrapper, store } = mountAuth();
+    (store.requestPasswordReset as any).mockResolvedValue({
+      success: true, message: 'If a@example.com has an account, a link to set a new password is on its way.'
+    });
+    await wrapper.find('[data-forgot]').trigger('click');
+    await setValue(wrapper, '[data-field="resetEmail"]', 'a@example.com');
+    await wrapper.find('[data-reset-submit]').trigger('submit');
+    await flush();
+    expect(store.requestPasswordReset).toHaveBeenCalledWith('a@example.com');
+    expect(wrapper.find('[data-feedback]').text()).toMatch(/If a@example.com has an account/);
+  });
+
+  it('asks for the new password when a reset link was opened', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    await wrapper.setProps({ open: true });
+    expect(wrapper.find('[data-tab-panel="newpassword"]').exists()).toBe(true);
+  });
+
+  it('refuses two passwords that differ, before sending either', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    await wrapper.setProps({ open: true });
+    await setValue(wrapper, '[data-field="newPassword"]', 'secret123');
+    await setValue(wrapper, '[data-field="newPasswordAgain"]', 'secret124');
+    await wrapper.find('[data-newpassword-submit]').trigger('submit');
+    expect(store.completePasswordReset).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-feedback]').text()).toMatch(/do not match/);
+  });
+
+  it('sets the password and closes', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    (store.completePasswordReset as any).mockResolvedValue({ success: true, message: 'Password changed.' });
+    await wrapper.setProps({ open: true });
+    await setValue(wrapper, '[data-field="newPassword"]', 'secret123');
+    await setValue(wrapper, '[data-field="newPasswordAgain"]', 'secret123');
+    await wrapper.find('[data-newpassword-submit]').trigger('submit');
+    await flush();
+    expect(store.completePasswordReset).toHaveBeenCalledWith('secret123');
+    expect(wrapper.emitted('close')).toBeTruthy();
+  });
+});

@@ -9,7 +9,7 @@
  * distinction is the point: a person may coach a school team and a club
  * team, and confusing the two is the failure the control exists to prevent.
  */
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import AuthModal from '../auth/AuthModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { useOrganizationStore } from '../../stores/organization';
@@ -37,6 +37,9 @@ onMounted(() => {
   authTab.value = 'register';
   authOpen.value = true;
 });
+
+/** A reset link signs the person in; the header opens the modal to ask for the new password. */
+watch(() => auth.recovering, (recovering) => { if (recovering) authOpen.value = true; }, { immediate: true });
 
 /** The first letter of the organization's name; nothing before it loads. */
 const initial = computed(() => (org.branding.name || '').trim().charAt(0).toUpperCase());

@@ -140,3 +140,18 @@ describe('passwords', () => {
     expect(await svc.updatePassword('x')).toEqual({ ok: false, error: 'Password should be at least 6 characters.' });
   });
 });
+
+describe('completeEmailLink', () => {
+  it('recognises a password reset link, so the app can ask for the new password', async () => {
+    window.history.replaceState({}, '', '/#access_token=abc&type=recovery');
+    svc.client.auth.getSession = vi.fn().mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
+    expect(await svc.completeEmailLink()).toEqual({ outcome: 'recovery' });
+    expect(window.location.hash).toBe('');
+  });
+
+  it('still reports an ordinary confirmation as confirmed', async () => {
+    window.history.replaceState({}, '', '/#access_token=abc&type=signup');
+    svc.client.auth.getSession = vi.fn().mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
+    expect(await svc.completeEmailLink()).toEqual({ outcome: 'confirmed' });
+  });
+});

@@ -151,4 +151,10 @@ describe('AppHeader', () => {
     expect(record.attributes('role')).toBe('group');
     expect(record.attributes('aria-label')).toBe('Season record');
   });
+
+  it('opens the account modal when a password reset link was opened', async () => {
+    const w = mountWith({ auth: { recovering: true, isSignedIn: true, isGuest: true, role: 'guest', user: { name: 'Fan' } } });
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: 'AuthModal' }).props('open')).toBe(true);
+  });
 });

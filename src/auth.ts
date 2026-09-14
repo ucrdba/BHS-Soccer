@@ -71,6 +71,7 @@ function humanizeAuthError(error?: { message: string } | null): string {
 export class AuthManager {
   currentUser: AppUser;
   private subscribers: Array<(user: AppUser) => void>;
+  private recovering = false;
 
   constructor() {
     this.currentUser = GUEST_USER;
@@ -83,6 +84,7 @@ export class AuthManager {
     this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
 
     supabaseService.onAuthStateChange((_event, changedSession) => {
+      if (_event === 'PASSWORD_RECOVERY') this.recovering = true;
       // Deferred via setTimeout: this callback runs while GoTrueClient holds its
       // navigator.locks lock, and loadProfileForSession() awaits another `auth`
       // call (getUser()) — awaiting that here, inside the callback's synchronous
@@ -208,6 +210,45 @@ export class AuthManager {
 
   canEditMatrix(): boolean {
     return this.isCoach();
+  }
+
+  /** A password reset link was opened: the next thing to ask for is a new password. */
+  beginPasswordRecovery(): void {
+    this.recovering = true;
+    this.notifySubscribers();
+  }
+
+  isRecovering(): boolean {
+    return this.recovering;
+  }
+
+  /**
+   * Send a reset link.
+   *
+   * The answer is the same whether or not the address has an account: this
+   * form must not be a way to find out who is registered.
+   */
+  async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+    const clean = String(email || '').trim().toLowerCase();
+    if (!clean) return { success: false, message: 'Enter the email address you signed up with.' };
+    if (!supabaseService.isConfigured()) {
+      return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
+    }
+    const res = await supabaseService.requestPasswordReset(clean);
+    if (!res.ok && /rate limit|too many/i.test(res.error || '')) {
+      return { success: false, message: 'Too many reset emails were asked for. Wait a few minutes and try again.' };
+    }
+    if (!res.ok) return { success: false, message: 'The reset email could not be sent. Try again in a moment.' };
+    return { success: true, message: `If ${clean} has an account, a link to set a new password is on its way.` };
+  }
+
+  async completePasswordReset(password: string): Promise<{ success: boolean; message: string }> {
+    if (String(password || '').length < 6) return { success: false, message: 'Use at least 6 characters.' };
+    const res = await supabaseService.updatePassword(password);
+    if (!res.ok) return { success: false, message: res.error || 'That password could not be set.' };
+    this.recovering = false;
+    this.notifySubscribers();
+    return { success: true, message: 'Password changed. You are signed in.' };
   }
 
   subscribe(callback: (user: AppUser) => void): void {

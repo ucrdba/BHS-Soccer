@@ -87,4 +87,15 @@ describe.skipIf(!available)('AuthManager against a live stack', () => {
     expect(res.success).toBe(false);
     expect(res.message).not.toMatch(/not configured/i);
   });
+
+  it('gives the same answer for an address with no account, so the form cannot be used to find one', async () => {
+    // GoTrue itself does not reveal whether the address is registered; this
+    // pins that AuthManager passes that through rather than looking the
+    // address up first and only succeeding for a real one.
+    const res = await auth.requestPasswordReset('nobody-at-all@example.test');
+    expect(res).toEqual({
+      success: true,
+      message: 'If nobody-at-all@example.test has an account, a link to set a new password is on its way.'
+    });
+  });
 });

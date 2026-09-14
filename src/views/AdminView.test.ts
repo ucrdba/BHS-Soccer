@@ -31,6 +31,7 @@ vi.mock('../auth', () => ({
     isAdmin: () => true,
     isLoggedIn: () => true,
     canAccessRatings: () => true,
+    isRecovering: () => false,
     subscribe: () => () => {},
     loginUser: vi.fn(),
     registerUser: vi.fn(),

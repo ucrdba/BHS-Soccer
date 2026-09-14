@@ -28,6 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
   /** True for a signed-out visitor, a fan, or an account still awaiting approval. */
   const isGuest = ref(true);
   const isSignedIn = ref(false);
+  const recovering = ref(false);
 
   function sync(): void {
     const u = auth.getCurrentUser();
@@ -39,6 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
     canAccessRatings.value = auth.canAccessRatings();
     isGuest.value = !u || u.role === 'guest';
     isSignedIn.value = !!u && u.id !== 'user_guest';
+    recovering.value = auth.isRecovering();
   }
 
   sync();
@@ -67,8 +69,18 @@ export const useAuthStore = defineStore('auth', () => {
     sync();
   }
 
+  async function requestPasswordReset(email: string) {
+    return auth.requestPasswordReset(email);
+  }
+
+  async function completePasswordReset(password: string) {
+    const res = await auth.completePasswordReset(password);
+    sync();
+    return res;
+  }
+
   return {
-    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn,
-    sync, login, register, logout
+    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn, recovering,
+    sync, login, register, logout, requestPasswordReset, completePasswordReset
   };
 });

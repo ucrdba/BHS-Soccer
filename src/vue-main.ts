@@ -47,14 +47,16 @@ async function boot(): Promise<void> {
   // this has to run BEFORE auth.init() reads the session -- otherwise init
   // sees a signed-out browser and the player lands on the guest home page
   // having just confirmed their account.
+  let link: { outcome: string } | null = null;
   try {
-    await supabaseService.completeEmailLink();
+    link = await supabaseService.completeEmailLink();
   } catch (err) {
     console.warn('Email link completion notice:', err);
   }
 
   try {
     await auth.init();
+    if (link?.outcome === 'recovery') auth.beginPasswordRecovery();
     const rows = await supabaseService.fetchRoles();
     setRoles((rows as RoleRow[]) ?? []);
   } catch (err) {

@@ -233,6 +233,8 @@ class SupabaseService {
    *                  opened the email on a phone. The account IS confirmed.
    *   'error'      — the link was expired or already used
    *   'none'       — an ordinary page load, no auth parameters present
+   *   'recovery'   — a password reset link; signed in, and must be asked for
+   *                  a new password
    */
   async completeEmailLink(): Promise<{ outcome: string; message?: string }> {
     if (!this.isConfigured()) return { outcome: 'none' };
@@ -247,6 +249,11 @@ class SupabaseService {
     const hasError = hash.includes('error=') || search.includes('error=');
     const hasCode = /[?&]code=/.test(search);
     if (!hasTokens && !hasError && !hasCode) return { outcome: 'none' };
+
+    // A password reset link signs the person in to set a new password, and
+    // detectSessionInUrl has already fired PASSWORD_RECOVERY before anything
+    // in the app subscribed -- so the link itself is what says so.
+    const isRecovery = /[#&?]type=recovery(&|$)/.test(hash + search);
 
     // Strip the parameters either way: leaving tokens in the address bar means
     // they survive a copied link, a screenshot, or the browser history.
@@ -268,7 +275,7 @@ class SupabaseService {
     try {
       const { data } = await this.client!.auth.getSession();
       clean();
-      if (data?.session) return { outcome: 'confirmed' };
+      if (data?.session) return { outcome: isRecovery ? 'recovery' : 'confirmed' };
       return { outcome: 'verified' };
     } catch {
       clean();
