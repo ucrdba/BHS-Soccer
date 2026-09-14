@@ -73,20 +73,31 @@ export function helpSections(): HelpSection[] {
         body: `
           <p>The site has a public side and a coaching side. Anyone can see the roster, the schedule
           and the next fixture without signing in. Everything else &mdash; ratings, practice plans,
-          the Competitive Matrix &mdash; needs an account, and an account needs approving.</p>
+          the Competitive Matrix &mdash; needs an account that is connected to a team.</p>
           <h4>Signing up</h4>
           <ol class="help-steps">
-            <li>Click <b>Sign In</b>, then <b>Create an account</b>, using an email you actually read.</li>
-            <li>Check your inbox for a <b>6-digit code</b> and type it into the box on screen. The
-                code expires after about an hour, so if it has sat overnight, register again for a
-                fresh one.</li>
-            <li>Wait for a coach or admin to approve you. Until then you can sign in, but you see the public site.</li>
+            <li>Click <b>Sign in</b>, then <b>Register</b>, using an email you actually read. Choose
+                what you are &mdash; <b>Player</b> or <b>Coach or staff</b> &mdash; and pick your team
+                from the list, or choose <b>Fan or parent</b> to see the public pages only.</li>
+            <li>Check your inbox for an email with a link, and open it. That confirms your address.
+                There is no code to type.</li>
+            <li>The site then asks you to <b>choose your password</b>. This is the password you sign in
+                with from now on; it replaces the one you typed when signing up.</li>
+            <li>If a coach invited your address, you are connected to your team the moment you confirm.
+                Otherwise your request waits for your team's coach to approve it (or an admin, for a
+                coach). A fan is let straight in.</li>
           </ol>
+          ${N('Invited, and already have an account?', `<p>Nothing to register. Sign in as usual
+            and you are connected to the team you were invited to.</p>`)}
           ${N('If the email does not arrive', `<p>Check your spam folder first &mdash; mail from a
             new domain often lands there until the address is recognised. Marking it
             <em>Not spam</em> helps every player who signs up after you. If it is genuinely not
             there, ask a coach to check whether that address already has an account: registering
             an address twice sends nothing the second time.</p>`)}
+          ${N('Forgotten your password?', `<p>Click <b>Sign in</b>, then <b>Forgot password?</b>, and
+            enter your address. If it has an account, a link to set a new one arrives by email. That is
+            also the way in if you confirmed your email and chose <b>Later</b> instead of a password,
+            or if opening the link never asked you for one.</p>`)}
           ${N('If you are stuck at pending', `<p>Approval is not automatic and no reminder is sent.
             Message whoever runs the program &mdash; it takes them about four seconds.</p>`)}
           <h4>What each role can do</h4>
@@ -570,20 +581,29 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
       {
         id: 'ex-coach', part: 'Worked examples', title: 'Add a coach and give them a team', roles: [ADMIN],
         body: `
-          <p>Two separate things: the person needs an <b>account</b>, and that account needs
-          <b>assigning</b> to each team they coach. Having the coach role on its own grants nothing.</p>
-          <h4>Worked example &mdash; a new assistant for JV</h4>
+          <p>A coach needs an <b>account</b> connected to each team they coach. Having the coach role
+          on its own grants nothing. There are two ways in, and both put them on the team's staff.</p>
+          <h4>Worked example &mdash; invite a new assistant for JV</h4>
           <ol class="help-steps">
-            <li>Ask them to sign up themselves at <b>Sign In &rarr; Create an account</b>, choosing
-                <b>Coach</b> as the role they are asking for.</li>
-            <li>Open <span class="help-path">Admin panel</span> and find them under
-                <b>pending approvals</b>. Approve them &mdash; they are now a coach with no teams.</li>
-            <li>Under <b>Teams &amp; Coach Assignments</b>, find <b>JV</b>, pick their name from the
-                <em>assign a coach</em> list, and click <b>Assign</b>.</li>
+            <li>Open <span class="help-path">Admin panel</span> &rsaquo; <b>Squads and organizations</b>, find <b>JV</b>, and open
+                <b>Invite a coach</b>. Enter their email and click <b>Invite</b>.</li>
+            <li>The app does not send an email. Copy the link it shows and send it to them yourself.</li>
+            <li>They register with that address and confirm it by the emailed link. Confirming puts them
+                on JV's staff &mdash; there is nothing to approve. If that address already has an
+                account, they are connected the next time they sign in.</li>
           </ol>
-          ${W('Approving is not assigning', `<p>This is the single most common confusion. An approved
-            coach with no team assignment can sign in and see the public site and nothing else. If a
-            new coach says the app looks empty, check their assignments first.</p>`)}
+          <h4>Or &mdash; approve a coach who asked</h4>
+          <ol class="help-steps">
+            <li>They register choosing <b>Coach or staff</b> and their team, and confirm their email.</li>
+            <li>Their request appears under <b>Waiting for approval</b> in the admin panel. Approving it
+                adds them to the staff of the team they picked. Only an admin can approve a coach.</li>
+          </ol>
+          ${N('Players are invited by their coach', `<p>A coach invites a player from that player's
+            bio on the roster, which connects the account to that exact roster entry. Player requests
+            go to the team's coaches to approve.</p>`)}
+          ${N('Another team later', `<p>To add an existing coach to a second team, pick their name
+            from the <em>pick a coach</em> list on that team and click <b>Assign</b>, or invite their
+            address to it.</p>`)}
           ${N('Removing access', `<p>The &times; beside their name on a team removes that
             assignment immediately. Their account stays; only that team's write access goes.</p>`)}`
       },

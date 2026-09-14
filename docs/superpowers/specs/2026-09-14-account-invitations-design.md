@@ -290,3 +290,37 @@ the role allows; the invite control's three states.
 - **`profiles.school_id` holds one organization.** A person invited to a
   school team and a club team gets both memberships, which is what access is
   read from, but their profile names the first organization redeemed.
+
+## Amendments (2026-09-14, after the final review)
+
+**A. The password typed at sign-up no longer survives confirmation.** An
+unconfirmed Supabase account keeps the password from its *first* sign-up, so a
+stranger who signed up first with someone else's address could sign in as that
+person once the real owner opened the confirmation link — and, with an
+invitation waiting, be on a squad of minors. This was verified on a local
+Supabase stack: a `security definer` function fired by the confirmation
+trigger can set `auth.users.encrypted_password = ''`; afterwards the pre-set
+password is refused (`invalid_credentials`), the link still issues a session,
+and `PUT /auth/v1/user { password }` on that session sets one that signs in. So
+`handle_user_confirmed` clears it whenever a confirmation email was sent, and
+the app asks the person to choose a password straight after the link. The cost:
+every new account chooses its password twice, and someone who closes that
+prompt must use *Forgot password* next time. Accounts created already confirmed,
+or confirmed by GoTrue's admin create (which sends no link), keep theirs.
+
+**B. An existing account is connected at sign-in.** Redemption at confirmation
+only reaches a profile still at `pending_verification`, so inviting a parent, a
+player with a school account, or a coach to a second team connected nothing.
+The redeeming moved into `redeem_invitations()`, which confirmation calls, and
+the app calls `redeem_my_invitations()` after signing in; it refuses an account
+that is not active or has no confirmed address. It never demotes a coach or an
+admin, never re-points an account already linked to a different roster entry,
+skips deleted teams and roster entries that have left their team, and only
+sets the profile's organization when it has none.
+
+**C. An admin approves any waiting request as a player or a coach.** Pending
+accounts can carry a `requested_role` of `guest` (conflicting invitations) or
+`admin`/null (the sign-up trigger before this change), and the queue offered
+them a player approval that the database always refused. An admin may now
+approve any waiting request as either, and the queue marks those rows "asked
+for no team role" and asks which. A coach still approves player requests only.

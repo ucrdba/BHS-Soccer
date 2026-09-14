@@ -5,6 +5,48 @@ Do these in order. The client must not be deployed before step 3 passes.
 
 ## 1. Apply the migration to production
 
+### Before applying
+
+Check each of these in **the production project** first.
+
+a. **Authentication → Providers: only Email is enabled.** Any external provider
+   (Google, Apple, …) creates users that arrive already confirmed, and an
+   account that arrives confirmed has its invitations redeemed at insert —
+   without anyone having proved the address.
+
+b. The confirmation trigger clears the password typed at sign-up (see
+   `handle_user_confirmed` in the migration), which needs `postgres` to be able
+   to update `auth.users`:
+
+   ```sql
+   select has_table_privilege('postgres', 'auth.users', 'UPDATE');   -- true
+   ```
+
+   If this is false, stop: confirmations would fail.
+
+c. The profile guard trusts every `SECURITY DEFINER` function, because those
+   write as their owner. Review the ones that update profiles, and make sure
+   each checks its caller:
+
+   ```sql
+   select proname from pg_proc
+    where prosecdef and pronamespace = 'public'::regnamespace
+      and prosrc ilike '%update%profiles%'
+    order by 1;
+   ```
+
+d. See what the approval queue will show once the new client is live:
+
+   ```sql
+   select requested_role, count(*) from public.profiles
+    where status = 'pending_approval' group by 1;
+   ```
+
+   Rows whose `requested_role` is not `player` or `coach` are shown to admins
+   as "asked for no team role", to approve as either.
+
+### Applying
+
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
 2. Paste the whole of `supabase/migrations/0035_account_invitations.sql` and run it.
    It carries its own `begin`, `set role postgres` and `commit`.
@@ -17,8 +59,16 @@ Do these in order. The client must not be deployed before step 3 passes.
    select proname from pg_proc
     where proname in ('create_invitation','pending_requests','approve_player_request',
                       'approve_coach_request','reject_request','revoke_invitation',
-                      'team_linked_players','promote_confirmed_profile')
-    order by 1;                                                                -- 8 rows
+                      'team_linked_players','promote_confirmed_profile',
+                      'redeem_invitations','redeem_my_invitations')
+    order by 1;                                                                -- 10 rows
+   ```
+
+4. Tell PostgREST about the new functions, or the app's calls to them answer
+   "function not found" until it next reloads on its own:
+
+   ```sql
+   notify pgrst, 'reload schema';
    ```
 
 Safe before the new client: the current one sends no team, so its sign-ups
@@ -51,7 +101,10 @@ anyone else until this is done.
 
 1. Register on the production site with an address you own that is **not** a
    Supabase team member. The confirmation email arrives within a minute.
-2. Open the link. Sign in: the app says the request is waiting for approval.
+2. Open the link. The app asks you to **choose your password**. Before
+   choosing one, check that the password typed at sign-up no longer signs in
+   (open the site in a private window and try it: it is refused). Then choose
+   one, and sign in with it: the app says the request is waiting for approval.
 3. Use **Forgot password?** with the same address. The reset email arrives, the
    link opens the app asking for a new password, and the new password signs in.
 
@@ -61,6 +114,22 @@ Supabase → Logs → Auth before deploying anything.
 ## 4. Deploy the client
 
 Push `main` (the owner's call). Vercel deploys production.
+
+## 5. Smoke test the live site
+
+With addresses you own, none of them a Supabase team member:
+
+1. **An invitation connects a new account.** As a coach, open a player's bio
+   and invite a test address. Register with that address, open the
+   confirmation link and choose a password. The account is signed in and linked
+   to that roster entry (the bio says *Account linked*).
+2. **An admin approves a request as a coach.** Register a second address
+   choosing **Coach or staff** and a team, and confirm it. As an admin, open
+   **Waiting for approval**, approve it, and check that the person now appears
+   on that team's staff.
+3. **An existing account is connected at sign-in.** Invite an address that
+   already has an account to a team. Sign in with it: it is connected to that
+   team without registering again.
 
 ## Rollback
 
@@ -72,6 +141,61 @@ further change) before dropping anything 0035 added:
 ```sql
 begin;
 set role postgres;
+
+-- Pre-0035 body, verbatim from
+-- supabase/migrations/0013_signup_without_email_confirmation.sql. Restored
+-- first, in the same transaction as the drops below: 0035's version writes
+-- profiles.requested_team_id and calls promote_confirmed_profile(), so no
+-- moment may exist where sign-ups run it against a dropped column or function.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  resolved_school_id uuid;
+  requested text;
+  already_confirmed boolean;
+  new_status text;
+  new_role text;
+begin
+  select id into resolved_school_id from public.schools where code = 'bhs' limit 1;
+  requested := coalesce(new.raw_user_meta_data ->> 'requested_role', 'guest');
+
+  -- True when "Confirm email" is off: GoTrue stamps email_confirmed_at at
+  -- insert, so there will be no later UPDATE for handle_user_confirmed to see.
+  already_confirmed := new.email_confirmed_at is not null;
+
+  if already_confirmed then
+    -- Same rules as handle_user_confirmed. Keep the two in step.
+    new_status := case when requested = 'guest' or requested is null
+                       then 'active' else 'pending_approval' end;
+    new_role   := 'guest';
+  else
+    new_status := 'pending_verification';
+    new_role   := 'guest';
+  end if;
+
+  insert into public.profiles (id, school_id, name, email, role, requested_role, status, email_verified, team_level)
+  values (
+    new.id,
+    resolved_school_id,
+    coalesce(new.raw_user_meta_data ->> 'name', 'Team User'),
+    new.email,
+    new_role,
+    requested,
+    new_status,
+    already_confirmed,
+    case requested
+      when 'coach' then 'Boys Varsity Staff'
+      when 'player' then 'Boys Varsity Player'
+      else 'Fan / Public'
+    end
+  );
+  return new;
+end;
+$$;
 
 -- Pre-0035 body, verbatim from supabase_migration_auth.sql section 4.
 -- 0035's version calls promote_confirmed_profile(); this one does not, so it
@@ -122,19 +246,18 @@ drop function if exists public.approve_player_request(uuid, uuid, uuid);
 drop function if exists public.approve_coach_request(uuid, uuid);
 drop function if exists public.reject_request(uuid);
 drop function if exists public.team_linked_players(uuid);
+drop function if exists public.redeem_my_invitations();
 drop function if exists public.promote_confirmed_profile(uuid);
+drop function if exists public.redeem_invitations(uuid);
 drop table if exists public.invitations;
 alter table public.profiles drop column if exists requested_team_id;
 
 commit;
 ```
 
-Then, as a separate step, re-run
-`supabase/migrations/0013_signup_without_email_confirmation.sql` to restore
-`handle_new_user`. Run it after the block above, not before or instead of it:
-0013's own `handle_new_user` does not call `promote_confirmed_profile` or
-anything else the block drops, so it is safe to apply once the block has
-committed.
+The block restores all three functions itself, so there is no separate step
+to re-run 0013. Afterwards, `notify pgrst, 'reload schema';` so PostgREST forgets the dropped
+functions.
 
 Do not re-run `supabase_migration_auth.sql` as part of this rollback, not even
 "just section 5": that section also re-creates `profiles_select` as
