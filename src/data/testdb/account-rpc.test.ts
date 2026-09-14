@@ -439,7 +439,8 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
       await db.owner.query(`update auth.users set email = $2 where id = $1`, [taker.id, invited]);
 
       await db.asUser(taker.id, async (c) => {
-        await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toThrow(/email address has been changed/);
+        await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toThrow(
+          /^This account's email address has been changed, so invitations are not connected to it automatically\.$/);
       });
       expect(await one(db.owner, `select player_id, role from public.profiles where id = $1`, [taker.id]))
         .toEqual({ player_id: null, role: 'guest' });

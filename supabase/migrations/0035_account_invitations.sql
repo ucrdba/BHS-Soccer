@@ -264,6 +264,18 @@ begin
 
   select lower(u.email) into proven from auth.users u where u.id = p_user_id;
 
+  -- The address confirmed is not the one signed up with (profiles.email, which
+  -- handle_new_user wrote and the guard stops visitors editing): redeem nothing,
+  -- and put the account in front of a person. This is order-independent -- it
+  -- does not rely on note_email_change having stamped the profile, which a
+  -- single UPDATE of both email and email_confirmed_at runs after this
+  -- confirmation trigger -- and it only matters if an unconfirmed account could
+  -- ever hold a session.
+  if proven is distinct from lower(prof.email) then
+    update public.profiles set status = 'pending_approval', email_verified = true where id = p_user_id;
+    return;
+  end if;
+
   -- Invitations naming different roster entries: apply none, and put the
   -- account in front of a person who can tell who it is.
   if (select count(distinct i.player_id)
@@ -379,10 +391,11 @@ create trigger on_auth_user_confirmed
 -- An account holder who could change their address to an invited one would be
 -- connected to that invitation at their next sign-in, taking someone else's
 -- place. GoTrue rewrites auth.users.email when an email change completes, and on
--- the local stack one click by the account holder -- on the link sent to their
--- old address -- was enough, so nothing here may depend on the invitee. This
--- marks the account rather than blocking the change: redeem_my_invitations
--- refuses any account carrying the mark.
+-- the local stack -- with Secure email change on -- one click by the account
+-- holder, on the link sent to their old address, was enough, so nothing here
+-- may depend on the invitee or on that setting. This marks the account rather
+-- than blocking the change: redeem_my_invitations refuses any account carrying
+-- the mark.
 create or replace function public.note_email_change()
 returns trigger
 language plpgsql
@@ -688,7 +701,7 @@ begin
   -- An address changed since the account was made may be someone else's
   -- invited one (see note_email_change in section 4).
   if exists (select 1 from public.profiles p where p.id = auth.uid() and p.email_changed_at is not null) then
-    raise exception 'This account''s email address has been changed, so invitations are not connected to it automatically. Ask an admin to connect it.';
+    raise exception 'This account''s email address has been changed, so invitations are not connected to it automatically.';
   end if;
   return public.redeem_invitations(auth.uid(), false);
 end;

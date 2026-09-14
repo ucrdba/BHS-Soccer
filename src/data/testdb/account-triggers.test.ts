@@ -320,7 +320,44 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     await db.owner.query(`update public.profiles set email = $2 where id = $1`, [u.id, addressA]);
     await confirm(db.owner, u.id);
 
-    expect(await profile(db, u.id)).toMatchObject({ role: 'guest', status: 'active' });
+    // The two addresses disagree, so confirmation redeems nothing and a person
+    // decides (see the next test).
+    expect(await profile(db, u.id)).toMatchObject({ role: 'guest', status: 'pending_approval', player_id: null });
+    expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
+      .toEqual({ accepted_at: null });
+  });
+
+  it('redeems nothing at confirmation when the address changed before confirming', async () => {
+    // Sign up with A, change auth.users.email to an invited B, then confirm:
+    // the address confirmed is not the one signed up with, so a person decides.
+    const team = await makeTeam(db.owner);
+    const player = await makeRosterEntry(db.owner, team);
+    const addressA = `${uniq()}@example.com`;
+    const addressB = `${uniq()}@example.com`;
+    const inv = await invite(db.owner, { email: addressB, team, role: 'player', playerId: player });
+
+    const u = await signUp(db.owner, { email: addressA, role: 'guest' });
+    await db.owner.query(`update auth.users set email = $2 where id = $1`, [u.id, addressB]);
+    await confirm(db.owner, u.id);
+
+    expect(await profile(db, u.id)).toMatchObject({
+      status: 'pending_approval', email_verified: true, role: 'guest', player_id: null
+    });
+    expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
+      .toEqual({ accepted_at: null });
+  });
+
+  it('redeems nothing when the address and the confirmation change in one statement', async () => {
+    // The confirmation trigger runs before note_email_change here (triggers
+    // fire in name order), so the check cannot rely on the stamp.
+    const team = await makeTeam(db.owner);
+    const addressB = `${uniq()}@example.com`;
+    const inv = await invite(db.owner, { email: addressB, team, role: 'coach' });
+
+    const u = await signUp(db.owner, { role: 'guest' });
+    await db.owner.query(`update auth.users set email = $2, email_confirmed_at = now() where id = $1`, [u.id, addressB]);
+
+    expect(await profile(db, u.id)).toMatchObject({ status: 'pending_approval', role: 'guest' });
     expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
       .toEqual({ accepted_at: null });
   });

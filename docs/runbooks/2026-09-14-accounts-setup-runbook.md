@@ -76,9 +76,12 @@ d. See what the approval queue will show once the new client is live:
    as "asked for no team role", to approve as either.
 
 e. **Authentication → Providers → Email → Secure email change** is on. The
-   invitation protection does not depend on it (an account whose address
-   changed is never connected automatically), but without it one click by the
-   account holder changes the address.
+   invitation protection does not depend on it: an account whose address
+   changed is never connected automatically, whatever this is set to. Turn it
+   on anyway. Do not count on it to stop an address changing, though — on a
+   local Supabase stack with it on (`double_confirm_changes = true`), the
+   address still changed after one click by the account holder, on the link
+   sent to their old address.
 
 ## 4. Apply the migration and deploy the client back to back
 
@@ -87,6 +90,11 @@ typed at sign-up, and only the new client asks for a new one. Between applying
 the migration and the new site going live, anyone who confirms an email has
 that password cleared and cannot sign in until the new site is live, where
 **Forgot password?** gets them in. Keep the gap to minutes.
+
+Before applying anything, the client must already be merged to `main` with its
+gates green (`npm test`, `npm run typecheck`, `npm run build` all exit 0), so
+the only thing between the migration and the new site is the push and the
+deploy.
 
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
 2. Paste the whole of `supabase/migrations/0035_account_invitations.sql` and run it.
@@ -153,12 +161,30 @@ With addresses you own, none of them a Supabase team member.
    link(s) it emails. Sign in with the account: it is not connected to that
    team, and the coach still sees the invitation as open.
 
+### Troubleshooting: an account whose address changed
+
+An account whose email address has changed is never connected to invitations
+at sign-in, and the app has no screen to connect it. If the person asks, first
+check that they really own the address now on the account. Then, in the SQL
+Editor of the production project, as `postgres`:
+
+```sql
+set role postgres;
+update public.profiles set email_changed_at = null where id = '<profile id>';
+```
+
+Ask them to sign in again; their open invitations are connected then. Clearing
+it re-opens automatic connection for **later** invitations to that account too,
+not just the ones waiting now.
+
 ## Rollback
 
 The client and the migration are independent enough to roll back separately,
 with one exception: rolling back the client alone, with 0035 still applied,
 reopens the gap described in step 4 — confirming clears the sign-up password
-and the old client does not ask for a new one. To undo the migration, run this block first — it restores both pre-0035
+and the old client does not ask for a new one.
+
+To undo the migration, run this block first — it restores the pre-0035
 functions in place (same names, so the existing triggers pick them up with no
 further change) before dropping anything 0035 added:
 
