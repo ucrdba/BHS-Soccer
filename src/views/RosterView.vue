@@ -172,7 +172,8 @@ async function onRemove(p: Player): Promise<void> {
 
     <PlayerDetailModal
       :open="detailFor !== null" :player="detailFor"
-      :can-see-ratings="canSeeRatings" @close="detailFor = null" />
+      :can-see-ratings="canSeeRatings" :can-invite="canEdit" :team-id="org.activeTeamId"
+      @close="detailFor = null" />
 
     <PlayerFormModal
       v-if="canEdit"

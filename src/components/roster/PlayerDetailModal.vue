@@ -10,6 +10,7 @@
  */
 import { computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
+import InviteControl from '../accounts/InviteControl.vue';
 import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain/player-row';
 import { lineupGrade } from '../../domain/lineup';
 import { skillBars } from '../../domain/player-skills';
@@ -23,7 +24,10 @@ const props = withDefaults(defineProps<{
    * forgets the prop shows nothing rather than everything.
    */
   canSeeRatings?: boolean;
-}>(), { canSeeRatings: false });
+  /** A coach of this team may invite the player to create their account. */
+  canInvite?: boolean;
+  teamId?: string | null;
+}>(), { canSeeRatings: false, canInvite: false, teamId: null });
 const emit = defineEmits<{ close: [] }>();
 
 const photo = computed(() => photoOrPlaceholder(props.player?.photo));
@@ -92,6 +96,11 @@ const skills = computed(() => skillBars(props.player?.ratings));
           <div class="skill__track"><div class="skill__fill" :style="{ width: s.pct + '%' }" data-skill-fill /></div>
         </div>
       </section>
+
+      <section v-if="canInvite && teamId" class="account" data-bio-account>
+        <p class="kicker kicker--accent">Account</p>
+        <InviteControl :team-id="teamId" role="player" :player-id="player.id" :subject="player.name" />
+      </section>
     </div>
   </BaseModal>
 </template>
@@ -137,6 +146,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
 .figure__label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
 
 .skills { margin-top: var(--space-6); }
+.account { margin-top: var(--space-6); }
 .skill { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); }
 .skill__row { display: flex; align-items: baseline; justify-content: space-between; }
 .skill__name { font-size: 13.5px; color: var(--ink); }

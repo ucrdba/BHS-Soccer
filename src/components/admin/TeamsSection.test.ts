@@ -54,7 +54,10 @@ const flush = async () => {
 };
 
 async function mountTeams() {
-  const w = mount(TeamsSection, { attachTo: document.body });
+  const w = mount(TeamsSection, {
+    attachTo: document.body,
+    global: { stubs: { InviteControl: true } }
+  });
   await flush();
   await w.vm.$nextTick();
   return w;
@@ -106,6 +109,11 @@ describe('the list', () => {
 
     expect(w.find('[data-teams-error]').exists()).toBe(true);
     expect(w.find('[data-team-row]').exists()).toBe(false);
+  });
+
+  it('offers a coach invitation on every team', async () => {
+    const w = await mountTeams();
+    expect(w.findAll('[data-team-invite]')).toHaveLength(w.findAll('[data-team-row]').length);
   });
 });
 

@@ -19,6 +19,7 @@
  */
 import { ref, computed, onMounted } from 'vue';
 import SectionShell from './SectionShell.vue';
+import InviteControl from '../accounts/InviteControl.vue';
 import { supabaseService } from '../../data/supabase';
 
 const teams = ref<any[]>([]);
@@ -256,6 +257,11 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
               >&times;</button>
             </span>
           </p>
+
+          <details class="invitecoach" data-team-invite>
+            <summary class="kicker">Invite a coach</summary>
+            <InviteControl :team-id="t.id" role="coach" :subject="t.name" />
+          </details>
         </div>
 
         <div class="row__acts">
@@ -349,6 +355,8 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
 }
 
 .coach__x { border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
+
+.invitecoach { margin-top: var(--space-2); }
 
 .row__acts { display: flex; gap: var(--space-1); align-items: flex-start; }
 
