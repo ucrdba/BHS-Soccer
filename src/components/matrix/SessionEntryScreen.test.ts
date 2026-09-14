@@ -351,6 +351,65 @@ describe('filling a small-sided sheet in one press', () => {
   });
 });
 
+describe('resetting the Result column', () => {
+  const outcomes = (w: any) =>
+    fields(w).map((f: any) => (f.element as HTMLSelectElement).value);
+
+  it('sits with the fill buttons on a W/D/L exercise, and nowhere else', async () => {
+    const small = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    expect(small.find('[data-fill-reset]').text()).toBe('Reset');
+
+    const coopers = await mountGrid({ drillId: COOPERS });
+    expect(coopers.find('[data-fill-reset]').exists()).toBe(false);
+  });
+
+  it('clears every result once the coach confirms', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-fill-outcome]')[2].trigger('click');   // Lost
+    await fields(w)[0].setValue('win');
+
+    await w.find('[data-fill-reset]').trigger('click');
+
+    expect(confirm).toHaveBeenCalled();
+    expect(outcomes(w)).toEqual(['', '', '']);
+    confirm.mockRestore();
+  });
+
+  it('keeps every result when the coach backs out', async () => {
+    // One tap beside Lost would otherwise wipe a sheet already entered.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-fill-outcome]')[2].trigger('click');   // Lost
+
+    await w.find('[data-fill-reset]').trigger('click');
+
+    expect(outcomes(w)).toEqual(['loss', 'loss', 'loss']);
+    confirm.mockRestore();
+  });
+
+  it('does not ask when there is nothing to clear', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.find('[data-fill-reset]').trigger('click');
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('leaves attendance alone', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
+    await w.findAll('[data-attendance]')[1].setValue('excused');
+    await w.findAll('[data-fill-outcome]')[0].trigger('click');   // Won
+    await w.find('[data-fill-reset]').trigger('click');
+
+    expect(w.findAll('[data-attendance]')
+      .map((a: any) => (a.element as HTMLSelectElement).value))
+      .toEqual(['present', 'excused', 'present']);
+    confirm.mockRestore();
+  });
+});
+
 describe('the date', () => {
   const todayIso = () => {
     const d = new Date();

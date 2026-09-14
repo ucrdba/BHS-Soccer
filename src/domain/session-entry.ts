@@ -225,3 +225,19 @@ export function fillBlankOutcomes(
   });
   return out;
 }
+
+/**
+ * Empty the Result column, and nothing else.
+ *
+ * Attendance is left exactly as it was: who was there is a separate fact from
+ * how their side did, and returning every row to the measure's default would
+ * quietly undo absences the coach has already marked.
+ */
+export function clearOutcomes(entries: Record<string, EntryRow>): Record<string, EntryRow> {
+  const out: Record<string, EntryRow> = {};
+  Object.keys(entries || {}).forEach(id => {
+    const row = entries[id];
+    out[id] = row.outcome ? { ...row, outcome: '' } : row;
+  });
+  return out;
+}

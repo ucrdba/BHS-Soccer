@@ -26,7 +26,7 @@ import { bandFeedback } from '../../domain/band-score';
 import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes,
+  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes, clearOutcomes,
   type EntryRow
 } from '../../domain/session-entry';
 
@@ -133,6 +133,21 @@ function onOutcome(playerId: string, outcome: string): void {
  */
 function onFillOutcomes(outcome: string): void {
   entries.value = fillBlankOutcomes(entries.value, outcome);
+}
+
+/**
+ * Empty the Result column, after asking.
+ *
+ * It sits beside Lost, and a mis-tap would wipe a sheet already entered with
+ * nothing on screen to say so -- so it confirms, but only when there is
+ * something to lose. Attendance is kept; see `clearOutcomes`.
+ */
+function onResetOutcomes(): void {
+  const set = Object.values(entries.value).filter(r => r.outcome).length;
+  if (!set) return;
+  const who = `${set} player${set === 1 ? '' : 's'}`;
+  if (!window.confirm(`Clear the result for ${who}? Attendance is kept.`)) return;
+  entries.value = clearOutcomes(entries.value);
 }
 
 function onAttendance(playerId: string, attendance: string): void {
@@ -306,6 +321,7 @@ async function onSave(): Promise<void> {
         type="button" class="btn" data-fill-outcome
         @click="onFillOutcomes(o.value)"
       >{{ o.label }}</button>
+      <button type="button" class="btn" data-fill-reset @click="onResetOutcomes">Reset</button>
       <span class="fill__note">Players you have already set keep their result.</span>
     </div>
 

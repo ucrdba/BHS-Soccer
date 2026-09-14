@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes
+  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes, clearOutcomes
 } from './session-entry';
 
 const PLAYERS = [
@@ -295,5 +295,28 @@ describe('fillBlankOutcomes', () => {
     const e = grid();
     fillBlankOutcomes(e, 'win');
     expect(e.p1.outcome).toBe('');
+  });
+});
+
+describe('clearOutcomes', () => {
+  it('empties every result on the sheet', () => {
+    const e = fillBlankOutcomes(blankEntries(PLAYERS, 'win_loss'), 'loss');
+    expect(Object.values(clearOutcomes(e)).map(r => r.outcome)).toEqual(['', '', '']);
+  });
+
+  it('leaves attendance exactly as it was', () => {
+    // Reset is the Result column. Who was there is a separate fact, and
+    // flipping everyone back to the default would undo absences already marked.
+    const e = fillBlankOutcomes(blankEntries(PLAYERS, 'win_loss'), 'win');
+    e.p2 = { ...e.p2, attendance: 'excused' };
+    e.p3 = { ...e.p3, attendance: 'unexcused' };
+    expect(Object.values(clearOutcomes(e)).map(r => r.attendance))
+      .toEqual(['present', 'excused', 'unexcused']);
+  });
+
+  it('does not mutate the grid it was given', () => {
+    const e = fillBlankOutcomes(blankEntries(PLAYERS, 'win_loss'), 'draw');
+    clearOutcomes(e);
+    expect(e.p1.outcome).toBe('draw');
   });
 });
