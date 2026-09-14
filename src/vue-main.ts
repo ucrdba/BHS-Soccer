@@ -57,6 +57,9 @@ async function boot(): Promise<void> {
   try {
     await auth.init();
     if (link?.outcome === 'recovery') auth.beginPasswordRecovery();
+    // Confirming cleared the password typed at sign-up (see 0035's
+    // handle_user_confirmed), so the person must choose one now.
+    if (link?.outcome === 'confirmed') auth.beginPasswordSetup();
     const rows = await supabaseService.fetchRoles();
     setRoles((rows as RoleRow[]) ?? []);
   } catch (err) {

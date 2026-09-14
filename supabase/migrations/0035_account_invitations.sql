@@ -251,6 +251,19 @@ security definer
 set search_path = public
 as $$
 begin
+  -- An unconfirmed account keeps the password its FIRST sign-up typed, so
+  -- someone who signs up first with another person's address could sign in
+  -- as them once the real owner opens the confirmation link -- on a squad of
+  -- minors. Clearing it here refuses that password; the link still signs the
+  -- owner in, and the app then asks them to choose their own.
+  -- Only when a confirmation email was actually sent: GoTrue's admin create
+  -- (auth.admin.createUser with email_confirm, as scripts/demo-create-accounts.mjs
+  -- does) inserts and then confirms in a second statement that fires this
+  -- trigger, and that password was set by an admin and is meant to work. Nor
+  -- at insert, for the same reason.
+  if new.confirmation_sent_at is not null then
+    update auth.users set encrypted_password = '' where id = new.id;
+  end if;
   perform public.promote_confirmed_profile(new.id);
   return new;
 end;

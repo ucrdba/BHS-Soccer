@@ -72,6 +72,7 @@ export class AuthManager {
   currentUser: AppUser;
   private subscribers: Array<(user: AppUser) => void>;
   private recovering = false;
+  private purpose: 'reset' | 'setup' = 'reset';
 
   constructor() {
     this.currentUser = GUEST_USER;
@@ -84,7 +85,7 @@ export class AuthManager {
     this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
 
     supabaseService.onAuthStateChange((_event, changedSession) => {
-      if (_event === 'PASSWORD_RECOVERY') this.recovering = true;
+      if (_event === 'PASSWORD_RECOVERY') { this.recovering = true; this.purpose = 'reset'; }
       // Deferred via setTimeout: this callback runs while GoTrueClient holds its
       // navigator.locks lock, and loadProfileForSession() awaits another `auth`
       // call (getUser()) — awaiting that here, inside the callback's synchronous
@@ -171,7 +172,7 @@ export class AuthManager {
       return { success: false, message: humanizeAuthError(result?.error) };
     }
 
-    return { success: true, requiresVerification: true, message: 'Check your email for a link to confirm your account.' };
+    return { success: true, requiresVerification: true, message: 'Check your email for a link to confirm your account. When you open it you will choose your password.' };
   }
 
   async logout(): Promise<void> {
@@ -216,11 +217,29 @@ export class AuthManager {
   /** A password reset link was opened: the next thing to ask for is a new password. */
   beginPasswordRecovery(): void {
     this.recovering = true;
+    this.purpose = 'reset';
+    this.notifySubscribers();
+  }
+
+  /**
+   * A confirmation link was opened. Confirming clears the password typed at
+   * sign-up (0035's handle_user_confirmed: whoever signed up first with an
+   * address set it, and it may not have been the owner), so the next thing to
+   * ask for is the password they will sign in with.
+   */
+  beginPasswordSetup(): void {
+    this.recovering = true;
+    this.purpose = 'setup';
     this.notifySubscribers();
   }
 
   isRecovering(): boolean {
     return this.recovering;
+  }
+
+  /** Whether the password prompt is a reset or the first password after confirming. */
+  passwordPurpose(): 'reset' | 'setup' {
+    return this.purpose;
   }
 
   /** The person opened a reset link but backed out without setting a password. */
@@ -253,9 +272,13 @@ export class AuthManager {
     if (String(password || '').length < 6) return { success: false, message: 'Use at least 6 characters.' };
     const res = await supabaseService.updatePassword(password);
     if (!res.ok) return { success: false, message: res.error || 'That password could not be set.' };
+    const purpose = this.purpose;
     this.recovering = false;
     this.notifySubscribers();
-    return { success: true, message: 'Password changed. You are signed in.' };
+    return {
+      success: true,
+      message: purpose === 'setup' ? 'Password set. You are signed in.' : 'Password changed. You are signed in.'
+    };
   }
 
   subscribe(callback: (user: AppUser) => void): void {

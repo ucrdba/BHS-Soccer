@@ -155,6 +155,35 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     expect(await profile(db, u.id)).toMatchObject({ player_id: null, role: 'guest', status: 'active' });
   });
 
+  it('clears the password typed at sign-up when the email is confirmed', async () => {
+    // Whoever signs up first with an address sets the password; the owner
+    // confirming it later must not leave that stranger able to sign in.
+    const u = await signUp(db.owner, { passwordHash: 'hash' });
+    await confirm(db.owner, u.id);
+    expect(await one(db.owner, `select encrypted_password from auth.users where id = $1`, [u.id]))
+      .toEqual({ encrypted_password: '' });
+  });
+
+  it('keeps the password of an account created already confirmed', async () => {
+    // Admin-created accounts (the demo's, for one) are made confirmed with a password.
+    const u = await signUp(db.owner, { passwordHash: 'hash', confirmed: true });
+    expect(await one(db.owner, `select encrypted_password from auth.users where id = $1`, [u.id]))
+      .toEqual({ encrypted_password: 'hash' });
+  });
+
+  it("keeps the password of an admin-created account GoTrue confirms in a second statement", async () => {
+    // auth.admin.createUser({ email_confirm: true }) inserts the user and then
+    // confirms it with an UPDATE, which fires the confirmation trigger -- but
+    // no confirmation email was ever sent, so nobody else can have set the
+    // password. scripts/demo-create-accounts.mjs creates the demo's this way.
+    const u = await one(db.owner,
+      `insert into auth.users (email, encrypted_password) values ($1, 'hash') returning id`,
+      [`${uniq()}@example.com`]);
+    await confirm(db.owner, u.id);
+    expect(await one(db.owner, `select encrypted_password from auth.users where id = $1`, [u.id]))
+      .toEqual({ encrypted_password: 'hash' });
+  });
+
   it('will not let a visitor run the promotion themselves', async () => {
     const u = await signUp(db.owner, { role: 'coach' });
     await db.asUser(u.id, async (c) => {

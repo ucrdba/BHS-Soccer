@@ -287,6 +287,27 @@ describe('a forgotten password', () => {
     expect(wrapper.find('[data-tab-panel="newpassword"]').exists()).toBe(true);
   });
 
+  it('asks a person who just confirmed their email to choose a password', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    (store as any).passwordPurpose = 'setup';
+    await wrapper.setProps({ open: true });
+    expect(wrapper.find('[data-tab-panel="newpassword"]').exists()).toBe(true);
+    expect(wrapper.find('[data-newpassword-setup]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Choose your password');
+    expect(wrapper.find('[data-newpassword-cancel]').text()).toBe('Later');
+  });
+
+  it('does not describe a reset as a first password', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    (store as any).passwordPurpose = 'reset';
+    await wrapper.setProps({ open: true });
+    expect(wrapper.find('[data-newpassword-setup]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Set a new password');
+    expect(wrapper.find('[data-newpassword-cancel]').text()).toBe('Not now');
+  });
+
   it('refuses two passwords that differ, before sending either', async () => {
     const { wrapper, store } = mountAuth({ open: false });
     (store as any).recovering = true;

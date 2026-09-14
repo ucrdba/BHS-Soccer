@@ -92,12 +92,20 @@ watch(() => props.open, (open) => {
   if (props.initialEmail) regEmail.value = props.initialEmail;
 }, { immediate: true });
 
+/**
+ * The password prompt after a confirmation link rather than a reset link.
+ * Confirming clears the password typed at sign-up -- whoever signed up first
+ * with an address set it, and it may not have been the owner -- so the person
+ * chooses the one they will actually sign in with.
+ */
+const settingUp = computed(() => auth.passwordPurpose === 'setup');
+
 const title = computed(() =>
   demo.enabled ? 'Try the demo'
     : tab.value === 'register' ? 'Create an account'
       : tab.value === 'sent' ? 'Check your email'
         : tab.value === 'reset' ? 'Reset your password'
-          : tab.value === 'newpassword' ? 'Set a new password'
+          : tab.value === 'newpassword' ? (settingUp.value ? 'Choose your password' : 'Set a new password')
             : 'Sign in');
 
 function setTab(next: Tab): void {
@@ -347,9 +355,10 @@ async function onPickAccount(email: string): Promise<void> {
       <button type="button" class="btn btn--plain" @click="setTab('signin')">Back to sign in</button>
     </form>
 
-    <!-- New password, after opening a reset link -->
+    <!-- New password, after opening a reset link or a confirmation link -->
     <form v-else-if="tab === 'newpassword'" data-tab-panel="newpassword" data-newpassword-submit
           @submit.prevent="onNewPassword">
+      <p v-if="settingUp" class="note" data-newpassword-setup>Your email is confirmed. Choose the password you will sign in with — it replaces the one typed when signing up.</p>
       <label class="field">
         <span class="kicker">New password</span>
         <input v-model="newPassword" type="password" class="input" required minlength="6"
@@ -363,14 +372,13 @@ async function onPickAccount(email: string): Promise<void> {
       <button type="submit" class="btn btn--go" :disabled="busy">
         {{ busy ? 'Saving…' : 'Set password' }}
       </button>
-      <button type="button" class="btn btn--plain" data-newpassword-cancel @click="onCancelRecovery">
-        Not now
-      </button>
+      <button type="button" class="btn btn--plain" data-newpassword-cancel @click="onCancelRecovery">{{ settingUp ? 'Later' : 'Not now' }}</button>
+      <p v-if="settingUp" class="note" data-newpassword-later>Without a password you will need Forgot password to sign in next time.</p>
     </form>
 
     <!-- Sent -->
     <div v-else-if="tab === 'sent'" data-tab-panel="sent" class="sent">
-      <p>We sent a link to <strong>{{ sentTo }}</strong>. Open it to confirm your account.</p>
+      <p>We sent a link to <strong>{{ sentTo }}</strong> to confirm your account. When you open it you will choose your password.</p>
       <p class="note">
         If a coach invited this address, confirming connects you to your team. Otherwise
         your request goes to the team's coach, or to an admin for a coach's request.

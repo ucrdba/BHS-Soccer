@@ -99,14 +99,17 @@ export async function makeRosterEntry(owner: pg.Client, team: { id: string; scho
 
 /** An auth.users row, as GoTrue writes one; the triggers make the profile. */
 export async function signUp(owner: pg.Client, opts: {
-  email?: string; role?: string; teamId?: string; name?: string; confirmed?: boolean;
+  email?: string; role?: string; teamId?: string; name?: string; confirmed?: boolean; passwordHash?: string;
 } = {}): Promise<{ id: string; email: string }> {
   const email = opts.email ?? `${uniq()}@example.com`;
   const meta: Record<string, string> = { name: opts.name ?? 'Test Person', requested_role: opts.role ?? 'guest' };
   if (opts.teamId) meta.requested_team_id = opts.teamId;
+  // GoTrue stamps confirmation_sent_at when it emails the confirmation link;
+  // an account created already confirmed was never sent one.
   const u = await one(owner,
-    `insert into auth.users (email, raw_user_meta_data, email_confirmed_at) values ($1, $2, $3) returning id`,
-    [email, meta, opts.confirmed ? new Date() : null]);
+    `insert into auth.users (email, raw_user_meta_data, email_confirmed_at, confirmation_sent_at, encrypted_password)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [email, meta, opts.confirmed ? new Date() : null, opts.confirmed ? null : new Date(), opts.passwordHash ?? null]);
   return { id: u.id, email };
 }
 

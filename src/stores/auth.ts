@@ -29,6 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isGuest = ref(true);
   const isSignedIn = ref(false);
   const recovering = ref(false);
+  /** 'setup' after a confirmation link (choose a first password), 'reset' after a reset link. */
+  const passwordPurpose = ref<'reset' | 'setup'>('reset');
 
   function sync(): void {
     const u = auth.getCurrentUser();
@@ -41,6 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
     isGuest.value = !u || u.role === 'guest';
     isSignedIn.value = !!u && u.id !== 'user_guest';
     recovering.value = auth.isRecovering();
+    passwordPurpose.value = auth.passwordPurpose();
   }
 
   sync();
@@ -85,7 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn, recovering,
+    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn, recovering, passwordPurpose,
     sync, login, register, logout, requestPasswordReset, completePasswordReset, cancelPasswordRecovery
   };
 });

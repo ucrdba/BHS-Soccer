@@ -41,6 +41,20 @@ describe('password recovery', () => {
     expect(auth.isRecovering()).toBe(false);
   });
 
+  it('beginPasswordSetup asks for a password, for choosing one rather than resetting it', () => {
+    auth.beginPasswordSetup();
+    expect(auth.isRecovering()).toBe(true);
+    expect(auth.passwordPurpose()).toBe('setup');
+  });
+
+  it('beginPasswordRecovery is a reset, even after a setup was begun', () => {
+    auth.beginPasswordSetup();
+    auth.cancelPasswordRecovery();
+    auth.beginPasswordRecovery();
+    expect(auth.isRecovering()).toBe(true);
+    expect(auth.passwordPurpose()).toBe('reset');
+  });
+
   it('signing out clears recovery too, so it cannot leak to the next person', async () => {
     auth.beginPasswordRecovery();
     expect(auth.isRecovering()).toBe(true);
