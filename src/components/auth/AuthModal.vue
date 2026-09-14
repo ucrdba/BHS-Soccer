@@ -141,6 +141,11 @@ async function onNewPassword(): Promise<void> {
   }
 }
 
+function onCancelRecovery(): void {
+  auth.cancelPasswordRecovery();
+  setTab('signin');
+}
+
 async function onSignIn(): Promise<void> {
   busy.value = true;
   feedback.value = '';
@@ -357,6 +362,9 @@ async function onPickAccount(email: string): Promise<void> {
       </label>
       <button type="submit" class="btn btn--go" :disabled="busy">
         {{ busy ? 'Saving…' : 'Set password' }}
+      </button>
+      <button type="button" class="btn btn--plain" data-newpassword-cancel @click="onCancelRecovery">
+        Not now
       </button>
     </form>
 

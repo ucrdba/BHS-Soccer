@@ -79,8 +79,13 @@ export const useAuthStore = defineStore('auth', () => {
     return res;
   }
 
+  function cancelPasswordRecovery(): void {
+    auth.cancelPasswordRecovery();
+    sync();
+  }
+
   return {
     user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn, recovering,
-    sync, login, register, logout, requestPasswordReset, completePasswordReset
+    sync, login, register, logout, requestPasswordReset, completePasswordReset, cancelPasswordRecovery
   };
 });

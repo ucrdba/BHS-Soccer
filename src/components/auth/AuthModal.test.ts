@@ -310,4 +310,13 @@ describe('a forgotten password', () => {
     expect(store.completePasswordReset).toHaveBeenCalledWith('secret123');
     expect(wrapper.emitted('close')).toBeTruthy();
   });
+
+  it('offers a way out, back to sign in, without setting a password', async () => {
+    const { wrapper, store } = mountAuth({ open: false });
+    (store as any).recovering = true;
+    await wrapper.setProps({ open: true });
+    await wrapper.find('[data-newpassword-cancel]').trigger('click');
+    expect(store.cancelPasswordRecovery).toHaveBeenCalled();
+    expect(wrapper.find('[data-tab-panel="signin"]').exists()).toBe(true);
+  });
 });

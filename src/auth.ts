@@ -176,6 +176,7 @@ export class AuthManager {
 
   async logout(): Promise<void> {
     await supabaseService.signOutUser();
+    this.recovering = false;
     this.setCurrentUser(GUEST_USER);
   }
 
@@ -220,6 +221,12 @@ export class AuthManager {
 
   isRecovering(): boolean {
     return this.recovering;
+  }
+
+  /** The person opened a reset link but backed out without setting a password. */
+  cancelPasswordRecovery(): void {
+    this.recovering = false;
+    this.notifySubscribers();
   }
 
   /**
