@@ -263,4 +263,263 @@ create trigger on_auth_user_confirmed
   when (old.email_confirmed_at is null and new.email_confirmed_at is not null)
   execute function public.handle_user_confirmed();
 
+-- ─── 5. The functions the app calls ────────────────────────────────────────
+--
+-- Each checks its caller before doing anything, and refuses with a sentence
+-- the app shows as-is. Coaches handle players on their own team; only an admin
+-- handles coaches, so a coach can never create another coach.
+
+create or replace function public.create_invitation(
+  p_email text, p_team_id uuid, p_role text, p_player_id uuid default null
+)
+returns public.invitations
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  addr   text := lower(trim(coalesce(p_email, '')));
+  team   public.teams%rowtype;
+  result public.invitations;
+begin
+  if addr !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    raise exception 'That does not look like an email address.';
+  end if;
+
+  select * into team from public.teams where id = p_team_id and not coalesce(is_deleted, false);
+  if not found then
+    raise exception 'That team does not exist.';
+  end if;
+
+  if p_role = 'player' then
+    if not public.is_team_coach(p_team_id) then
+      raise exception 'Only a coach of this team can invite its players.';
+    end if;
+    if p_player_id is null or not exists (
+      select 1 from public.team_players tp
+       where tp.team_id = p_team_id and tp.player_id = p_player_id and not coalesce(tp.is_deleted, false)
+    ) then
+      raise exception 'That player is not on this team''s roster.';
+    end if;
+    if exists (select 1 from public.profiles p where p.player_id = p_player_id) then
+      raise exception 'That player already has an account.';
+    end if;
+  elsif p_role = 'coach' then
+    if public.current_profile_role() <> 'admin' then
+      raise exception 'Only an admin can invite a coach.';
+    end if;
+    p_player_id := null;
+  else
+    raise exception 'An invitation is for a player or a coach.';
+  end if;
+
+  if exists (
+    select 1 from public.invitations i
+     where i.email = addr and i.team_id = p_team_id and i.accepted_at is null and i.revoked_at is null
+  ) then
+    raise exception 'That address already has an open invitation to this team.';
+  end if;
+
+  insert into public.invitations (email, school_id, team_id, role, player_id, invited_by)
+  values (addr, team.school_id, p_team_id, p_role, p_player_id, auth.uid())
+  returning * into result;
+  return result;
+end;
+$$;
+
+create or replace function public.revoke_invitation(p_invitation_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inv public.invitations%rowtype;
+begin
+  select * into inv from public.invitations where id = p_invitation_id;
+  if not found then
+    raise exception 'That invitation does not exist.';
+  end if;
+  if inv.role = 'coach' and public.current_profile_role() <> 'admin' then
+    raise exception 'Only an admin can withdraw a coach''s invitation.';
+  end if;
+  if inv.role = 'player' and not public.is_team_coach(inv.team_id) then
+    raise exception 'Only a coach of this team can withdraw its invitations.';
+  end if;
+  if inv.accepted_at is not null then
+    raise exception 'That invitation has already been used.';
+  end if;
+  update public.invitations set revoked_at = now() where id = p_invitation_id and revoked_at is null;
+end;
+$$;
+
+create or replace function public.pending_requests()
+returns table (
+  id uuid, name text, email text, requested_role text, requested_team_id uuid,
+  team_name text, school_name text, created_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.name, p.email, p.requested_role, p.requested_team_id, t.name, s.name, p.created_at
+    from public.profiles p
+    left join public.teams t on t.id = p.requested_team_id
+    left join public.schools s on s.id = t.school_id
+   where p.status = 'pending_approval'
+     and not coalesce(p.is_deleted, false)
+     and (
+       public.current_profile_role() = 'admin'
+       or (p.requested_role = 'player'
+           and p.requested_team_id is not null
+           and public.is_team_coach(p.requested_team_id))
+     )
+   order by p.created_at;
+$$;
+
+create or replace function public.approve_player_request(
+  p_profile_id uuid, p_team_id uuid, p_player_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  prof public.profiles%rowtype;
+  team public.teams%rowtype;
+  pid  uuid := p_player_id;
+begin
+  select * into prof from public.profiles where id = p_profile_id for update;
+  if not found or prof.status <> 'pending_approval' then
+    raise exception 'That request is no longer waiting.';
+  end if;
+  if prof.requested_role <> 'player' then
+    raise exception 'That is not a request to join as a player.';
+  end if;
+  if p_team_id is null then
+    raise exception 'Choose the team to place them on.';
+  end if;
+  if p_team_id is distinct from prof.requested_team_id and public.current_profile_role() <> 'admin' then
+    raise exception 'Only an admin can place a request on a team other than the one requested.';
+  end if;
+  if not public.is_team_coach(p_team_id) then
+    raise exception 'Only a coach of that team can approve its players.';
+  end if;
+
+  select * into team from public.teams where id = p_team_id and not coalesce(is_deleted, false);
+  if not found then
+    raise exception 'That team does not exist.';
+  end if;
+
+  if pid is null then
+    insert into public.players (name, class_year) values (prof.name, '') returning id into pid;
+    insert into public.team_players (team_id, school_id, player_id) values (p_team_id, team.school_id, pid);
+  else
+    if not exists (
+      select 1 from public.team_players tp
+       where tp.team_id = p_team_id and tp.player_id = pid and not coalesce(tp.is_deleted, false)
+    ) then
+      raise exception 'That player is not on this team''s roster.';
+    end if;
+    if exists (select 1 from public.profiles p where p.player_id = pid) then
+      raise exception 'That player already has an account.';
+    end if;
+  end if;
+
+  update public.profiles
+     set role = 'player', status = 'active', school_id = team.school_id, player_id = pid
+   where id = p_profile_id;
+  return pid;
+end;
+$$;
+
+create or replace function public.approve_coach_request(p_profile_id uuid, p_team_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  prof public.profiles%rowtype;
+  team public.teams%rowtype;
+begin
+  if public.current_profile_role() <> 'admin' then
+    raise exception 'Only an admin can approve a coach.';
+  end if;
+  select * into prof from public.profiles where id = p_profile_id for update;
+  if not found or prof.status <> 'pending_approval' then
+    raise exception 'That request is no longer waiting.';
+  end if;
+  if prof.requested_role <> 'coach' then
+    raise exception 'That is not a request to join as a coach.';
+  end if;
+  select * into team from public.teams where id = p_team_id and not coalesce(is_deleted, false);
+  if not found then
+    raise exception 'Choose the team to place them on.';
+  end if;
+
+  insert into public.team_coaches (team_id, profile_id) values (p_team_id, p_profile_id)
+  on conflict do nothing;
+  update public.profiles
+     set role = 'coach', status = 'active', school_id = team.school_id
+   where id = p_profile_id;
+end;
+$$;
+
+create or replace function public.reject_request(p_profile_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  prof public.profiles%rowtype;
+begin
+  select * into prof from public.profiles where id = p_profile_id for update;
+  if not found or prof.status <> 'pending_approval' then
+    raise exception 'That request is no longer waiting.';
+  end if;
+  if prof.requested_role = 'player' and prof.requested_team_id is not null then
+    if not public.is_team_coach(prof.requested_team_id) then
+      raise exception 'Only a coach of that team can refuse its players.';
+    end if;
+  elsif public.current_profile_role() <> 'admin' then
+    raise exception 'Only an admin can refuse that request.';
+  end if;
+  update public.profiles set status = 'rejected' where id = p_profile_id;
+end;
+$$;
+
+create or replace function public.team_linked_players(p_team_id uuid)
+returns table (player_id uuid)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.player_id
+    from public.profiles p
+    join public.team_players tp
+      on tp.player_id = p.player_id and tp.team_id = p_team_id and not coalesce(tp.is_deleted, false)
+   where public.is_team_coach(p_team_id);
+$$;
+
+revoke all on function public.create_invitation(text, uuid, text, uuid) from public, anon;
+revoke all on function public.revoke_invitation(uuid)                   from public, anon;
+revoke all on function public.pending_requests()                        from public, anon;
+revoke all on function public.approve_player_request(uuid, uuid, uuid)  from public, anon;
+revoke all on function public.approve_coach_request(uuid, uuid)         from public, anon;
+revoke all on function public.reject_request(uuid)                      from public, anon;
+revoke all on function public.team_linked_players(uuid)                 from public, anon;
+
+grant execute on function public.create_invitation(text, uuid, text, uuid) to authenticated;
+grant execute on function public.revoke_invitation(uuid)                   to authenticated;
+grant execute on function public.pending_requests()                        to authenticated;
+grant execute on function public.approve_player_request(uuid, uuid, uuid)  to authenticated;
+grant execute on function public.approve_coach_request(uuid, uuid)         to authenticated;
+grant execute on function public.reject_request(uuid)                      to authenticated;
+grant execute on function public.team_linked_players(uuid)                 to authenticated;
+
 commit;

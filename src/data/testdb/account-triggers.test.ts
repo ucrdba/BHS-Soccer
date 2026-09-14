@@ -204,4 +204,16 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
       .toEqual({ accepted_at: null });
   });
+
+  it('can be applied a second time', async () => {
+    const { readFileSync } = await import('node:fs');
+    const sql = readFileSync('supabase/migrations/0035_account_invitations.sql', 'utf8')
+      .replace(/^\s*(begin|commit)\s*;\s*$/gim, '');
+    await db.owner.query('begin');
+    try {
+      await db.owner.query(sql);
+    } finally {
+      await db.owner.query('rollback');
+    }
+  });
 });
