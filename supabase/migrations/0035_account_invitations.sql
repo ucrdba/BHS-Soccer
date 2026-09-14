@@ -56,6 +56,10 @@ grant select on table public.invitations to authenticated;
 alter table public.profiles
   add column if not exists requested_team_id uuid references public.teams(id) on delete set null;
 
+-- Stamped by note_email_change (section 4) when auth.users.email changes; an
+-- account carrying it is never connected to invitations at sign-in.
+alter table public.profiles add column if not exists email_changed_at timestamptz;
+
 -- ─── 2. The guard on privileged profile columns ────────────────────────────
 --
 -- SECURITY INVOKER, so current_user is whoever is actually writing. A visitor's
@@ -79,7 +83,8 @@ alter table public.profiles
 -- address it does not control before confirming one it does. requested_role
 -- too: it decides whose queue a request lands in and what approving it makes
 -- the account, so a waiting player could otherwise turn their request into a
--- coach's.
+-- coach's. email_changed_at too: clearing it would put an account whose
+-- address changed back in reach of redeem_my_invitations.
 
 create or replace function public.guard_profile_privileged_columns()
 returns trigger
@@ -98,10 +103,11 @@ begin
      or new.status is distinct from old.status
      or new.school_id is distinct from old.school_id
      or new.email is distinct from old.email
+     or new.email_changed_at is distinct from old.email_changed_at
      or new.player_id is distinct from old.player_id
      or new.requested_role is distinct from old.requested_role
      or new.requested_team_id is distinct from old.requested_team_id then
-    raise exception 'Only an admin can change role, status, school, email, roster link, requested role or requested team.';
+    raise exception 'Only an admin can change role, status, school, email, email change time, roster link, requested role or requested team.';
   end if;
   return new;
 end;
@@ -356,6 +362,34 @@ create trigger on_auth_user_confirmed
   for each row
   when (old.email_confirmed_at is null and new.email_confirmed_at is not null)
   execute function public.handle_user_confirmed();
+
+-- An account holder who could change their address to an invited one would be
+-- connected to that invitation at their next sign-in, taking someone else's
+-- place. GoTrue rewrites auth.users.email when an email change completes, and on
+-- the local stack one click by the account holder -- on the link sent to their
+-- old address -- was enough, so nothing here may depend on the invitee. This
+-- marks the account rather than blocking the change: redeem_my_invitations
+-- refuses any account carrying the mark.
+create or replace function public.note_email_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles set email_changed_at = now() where id = new.id;
+  return new;
+end;
+$$;
+
+revoke all on function public.note_email_change() from public, anon, authenticated;
+
+drop trigger if exists on_auth_user_email_changed on auth.users;
+create trigger on_auth_user_email_changed
+  after update of email on auth.users
+  for each row
+  when (old.email is distinct from new.email)
+  execute function public.note_email_change();
 
 -- ─── 5. The functions the app calls ────────────────────────────────────────
 --
@@ -637,6 +671,11 @@ begin
        and u.email_confirmed_at is not null
   ) then
     raise exception 'Only an active account with a confirmed email can accept invitations.';
+  end if;
+  -- An address changed since the account was made may be someone else's
+  -- invited one (see note_email_change in section 4).
+  if exists (select 1 from public.profiles p where p.id = auth.uid() and p.email_changed_at is not null) then
+    raise exception 'This account''s email address has been changed, so invitations are not connected to it automatically. Ask an admin to connect it.';
   end if;
   return public.redeem_invitations(auth.uid());
 end;

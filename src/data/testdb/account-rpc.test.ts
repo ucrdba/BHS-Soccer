@@ -410,6 +410,25 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
       });
     });
 
+    it('refuses an account whose email address was changed to an invited one', async () => {
+      // Otherwise an account holder could change their address to an invited
+      // one -- on the local stack one click of their own was enough -- and
+      // take that place at their next sign-in.
+      const team = await makeTeam(db.owner);
+      const player = await makeRosterEntry(db.owner, team);
+      const invited = `${uniq()}@example.com`;
+      const inv = await invite(db.owner, { email: invited, team, role: 'player', playerId: player });
+      const taker = await signUp(db.owner, { confirmed: true });
+      await db.owner.query(`update auth.users set email = $2 where id = $1`, [taker.id, invited]);
+
+      await db.asUser(taker.id, async (c) => {
+        await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toThrow(/email address has been changed/);
+      });
+      expect(await one(db.owner, `select player_id, role from public.profiles where id = $1`, [taker.id]))
+        .toEqual({ player_id: null, role: 'guest' });
+      expect(await accepted(inv.id)).toBeNull();
+    });
+
     it('refuses an account that is not active yet', async () => {
       const team = await makeTeam(db.owner);
       const pending = await request(db, 'player', team.id);

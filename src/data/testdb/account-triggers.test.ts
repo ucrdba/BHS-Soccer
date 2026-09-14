@@ -244,13 +244,41 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
 
     for (const change of [
       `role = 'coach'`, `status = 'rejected'`, `player_id = '${player}'`, `requested_team_id = '${team.id}'`,
-      `email = 'someone@example.com'`, `requested_role = 'coach'`
+      `email = 'someone@example.com'`, `requested_role = 'coach'`, `email_changed_at = now()`
     ]) {
       await db.asUser(u.id, async (c) => {
         await expect(c.query(`update public.profiles set ${change} where id = $1`, [u.id]))
           .rejects.toThrow(/Only an admin/);
       });
     }
+  });
+
+  it('refuses a visitor clearing the mark that their email address changed', async () => {
+    // Clearing it would put the account back in reach of sign-in redemption.
+    const u = await signUp(db.owner, { confirmed: true });
+    await db.owner.query(`update public.profiles set email_changed_at = now() where id = $1`, [u.id]);
+    await db.asUser(u.id, async (c) => {
+      await expect(c.query(`update public.profiles set email_changed_at = null where id = $1`, [u.id]))
+        .rejects.toThrow(/Only an admin/);
+    });
+    const row = await one(db.owner, `select email_changed_at from public.profiles where id = $1`, [u.id]);
+    expect(row.email_changed_at).not.toBeNull();
+  });
+
+  it('marks the profile when the account\'s email address changes, and not otherwise', async () => {
+    // GoTrue rewrites auth.users.email when an email change completes; the
+    // owner connection stands in for it. The stamp is written by a definer
+    // function, so this also proves the profile guard lets it through.
+    const changed = await signUp(db.owner, { confirmed: true });
+    const same = await signUp(db.owner, { confirmed: true });
+
+    await db.owner.query(`update auth.users set email = $2 where id = $1`, [changed.id, `${uniq()}@example.com`]);
+    await db.owner.query(`update auth.users set email = email, raw_user_meta_data = '{}' where id = $1`, [same.id]);
+
+    const stamped = await one(db.owner, `select email_changed_at from public.profiles where id = $1`, [changed.id]);
+    expect(stamped.email_changed_at).not.toBeNull();
+    expect(await one(db.owner, `select email_changed_at from public.profiles where id = $1`, [same.id]))
+      .toEqual({ email_changed_at: null });
   });
 
   it('still lets a visitor change their own name', async () => {

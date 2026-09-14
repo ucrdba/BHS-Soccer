@@ -45,6 +45,11 @@ d. See what the approval queue will show once the new client is live:
    Rows whose `requested_role` is not `player` or `coach` are shown to admins
    as "asked for no team role", to approve as either.
 
+e. **Authentication → Providers → Email → Secure email change** is on. The
+   invitation protection does not depend on it (an account whose address
+   changed is never connected automatically), but without it one click by the
+   account holder changes the address.
+
 ### Applying
 
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
@@ -55,13 +60,15 @@ d. See what the approval queue will show once the new client is live:
    ```sql
    select count(*) from public.invitations;                                   -- 0
    select column_name from information_schema.columns
-    where table_name = 'profiles' and column_name = 'requested_team_id';       -- 1 row
+    where table_name = 'profiles'
+      and column_name in ('requested_team_id', 'email_changed_at');            -- 2 rows
    select proname from pg_proc
     where proname in ('create_invitation','pending_requests','approve_player_request',
                       'approve_coach_request','reject_request','revoke_invitation',
                       'team_linked_players','promote_confirmed_profile',
-                      'redeem_invitations','redeem_my_invitations')
-    order by 1;                                                                -- 10 rows
+                      'redeem_invitations','redeem_my_invitations',
+                      'note_email_change')
+    order by 1;                                                                -- 11 rows
    ```
 
 4. Tell PostgREST about the new functions, or the app's calls to them answer
@@ -249,7 +256,10 @@ drop function if exists public.team_linked_players(uuid);
 drop function if exists public.redeem_my_invitations();
 drop function if exists public.promote_confirmed_profile(uuid);
 drop function if exists public.redeem_invitations(uuid);
+drop trigger if exists on_auth_user_email_changed on auth.users;
+drop function if exists public.note_email_change();
 drop table if exists public.invitations;
+alter table public.profiles drop column if exists email_changed_at;
 alter table public.profiles drop column if exists requested_team_id;
 
 commit;
