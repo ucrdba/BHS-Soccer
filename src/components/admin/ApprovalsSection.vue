@@ -29,8 +29,14 @@ const notice = ref<string | null>(null);
 const refused = ref<string | null>(null);
 const busyId = ref<string | null>(null);
 
-/** Per request: the team to place them on, and the roster entry ('' = a new one). */
-const choice = ref<Record<string, { teamId: string; playerId: string }>>({});
+/**
+ * Per request: the team to place them on, the roster entry ('' = a new one),
+ * and the role to approve it as. For a player or coach request the role is
+ * the one requested; for a request that asked for no team role -- 'guest'
+ * from conflicting invitations, or 'admin'/null left by the old sign-up
+ * trigger, which only an admin ever sees -- the admin chooses it.
+ */
+const choice = ref<Record<string, { teamId: string; playerId: string; role: 'player' | 'coach' }>>({});
 /** Unlinked roster entries, per team id. */
 const rosters = ref<Record<string, { id: string; name: string }[]>>({});
 const teams = ref<JoinableTeam[]>([]);
@@ -49,6 +55,13 @@ const rows = computed(() => requests.value || []);
 
 function who(r: PendingRequest): string { return r.name || r.email; }
 
+/** Whether the request itself named a team role. */
+function isClear(r: PendingRequest): boolean { return r.requested_role === 'player' || r.requested_role === 'coach'; }
+
+function roleOf(r: PendingRequest): 'player' | 'coach' {
+  return choice.value[r.id]?.role || (r.requested_role === 'coach' ? 'coach' : 'player');
+}
+
 function teamLabel(r: PendingRequest): string {
   const teamId = choice.value[r.id]?.teamId;
   if (teamId && teamId === r.requested_team_id && r.team_name) {
@@ -60,7 +73,7 @@ function teamLabel(r: PendingRequest): string {
 
 async function loadRosters(): Promise<void> {
   const wanted = new Set(
-    rows.value.filter(r => r.requested_role === 'player')
+    rows.value.filter(r => roleOf(r) === 'player')
       .map(r => choice.value[r.id]?.teamId).filter(Boolean) as string[]);
   for (const teamId of wanted) {
     if (rosters.value[teamId]) continue;
@@ -84,7 +97,11 @@ async function load(): Promise<void> {
     }
     requests.value = found;
     for (const r of found) {
-      if (!choice.value[r.id]) choice.value[r.id] = { teamId: r.requested_team_id || '', playerId: '' };
+      if (!choice.value[r.id]) {
+        choice.value[r.id] = {
+          teamId: r.requested_team_id || '', playerId: '', role: r.requested_role === 'coach' ? 'coach' : 'player'
+        };
+      }
     }
     if (props.isAdmin && found.some(r => !r.requested_team_id)) {
       const foundTeams = await supabaseService.fetchJoinableTeams();
@@ -100,7 +117,12 @@ async function load(): Promise<void> {
 onMounted(load);
 
 async function onTeamChosen(r: PendingRequest, teamId: string): Promise<void> {
-  choice.value[r.id] = { teamId, playerId: '' };
+  choice.value[r.id] = { teamId, playerId: '', role: roleOf(r) };
+  await loadRosters();
+}
+
+async function onRoleChosen(r: PendingRequest, role: 'player' | 'coach'): Promise<void> {
+  choice.value[r.id] = { ...choice.value[r.id], playerId: '', role };
   await loadRosters();
 }
 
@@ -111,21 +133,21 @@ async function onApprove(r: PendingRequest): Promise<void> {
   if (!c?.teamId) { refused.value = 'Choose the team to place them on first.'; return; }
   // Belt and braces for the disabled Approve button: a failed roster read
   // must never be silently treated as an empty one.
-  if (r.requested_role === 'player' && failedRosters.value[c.teamId]) {
+  if (c.role === 'player' && failedRosters.value[c.teamId]) {
     refused.value = ROSTER_ERROR;
     return;
   }
 
   const team = teamLabel(r) || 'that team';
   const entry = rosters.value[c.teamId]?.find(p => p.id === c.playerId)?.name;
-  const text = r.requested_role === 'coach'
+  const text = c.role === 'coach'
     ? `Make ${who(r)} a coach of ${team}?\n\nThey will be able to change that squad's data.`
     : `Put ${who(r)} on ${team} as a player, ${entry ? `linked to ${entry}` : 'as a new roster entry'}?`;
   if (!window.confirm(text)) return;
 
   busyId.value = r.id;
   try {
-    const res = r.requested_role === 'coach'
+    const res = c.role === 'coach'
       ? await supabaseService.approveCoachRequest(r.id, c.teamId)
       : await supabaseService.approvePlayerRequest(r.id, c.teamId, c.playerId || null);
     if (!res.ok) { refused.value = res.error || 'That approval was refused.'; return; }
@@ -171,7 +193,8 @@ async function onReject(r: PendingRequest): Promise<void> {
       <div class="row__who">
         <strong class="row__name">{{ r.name || 'No name given' }}</strong>
         <span class="row__email">{{ r.email }}</span>
-        <span class="tag tag--live">{{ r.requested_role === 'coach' ? 'Coach' : 'Player' }}</span>
+        <span v-if="isClear(r)" class="tag tag--live">{{ r.requested_role === 'coach' ? 'Coach' : 'Player' }}</span>
+        <span v-else class="note" data-request-unclear>asked for no team role</span>
         <span v-if="r.requested_team_id" class="tag" data-request-team-label>{{ teamLabel(r) }}</span>
         <span v-else class="note">named no team</span>
       </div>
@@ -192,7 +215,16 @@ async function onReject(r: PendingRequest): Promise<void> {
         </template>
 
         <select
-          v-if="r.requested_role === 'player' && choice[r.id]?.teamId"
+          v-if="!isClear(r)"
+          class="input" :value="roleOf(r)" data-request-role aria-label="Approve as"
+          @change="onRoleChosen(r, ($event.target as HTMLSelectElement).value as 'player' | 'coach')"
+        >
+          <option value="player">As a player</option>
+          <option value="coach">As a coach</option>
+        </select>
+
+        <select
+          v-if="roleOf(r) === 'player' && choice[r.id]?.teamId"
           v-model="choice[r.id].playerId" class="input" data-request-player
         >
           <option value="">New roster entry</option>
@@ -200,12 +232,12 @@ async function onReject(r: PendingRequest): Promise<void> {
         </select>
 
         <p
-          v-if="r.requested_role === 'player' && choice[r.id]?.teamId && failedRosters[choice[r.id].teamId]"
+          v-if="roleOf(r) === 'player' && choice[r.id]?.teamId && failedRosters[choice[r.id].teamId]"
           class="note note--bad" role="alert" data-request-roster-error
         >{{ ROSTER_ERROR }}</p>
 
         <button type="button" class="btn btn--go"
-                :disabled="busyId === r.id || (r.requested_role === 'player' && !!failedRosters[choice[r.id]?.teamId])"
+                :disabled="busyId === r.id || (roleOf(r) === 'player' && !!failedRosters[choice[r.id]?.teamId])"
                 data-request-approve @click="onApprove(r)">Approve</button>
         <button type="button" class="btn" :disabled="busyId === r.id"
                 data-request-reject @click="onReject(r)">Refuse</button>

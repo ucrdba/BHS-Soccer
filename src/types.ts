@@ -325,7 +325,8 @@ export interface PendingRequest {
   id: string;
   name: string;
   email: string;
-  requested_role: 'player' | 'coach';
+  /** 'player' or 'coach'; anything else ('guest', 'admin', or null from older sign-ups) asked for no team role. */
+  requested_role: string;
   requested_team_id: string | null;
   team_name: string | null;
   school_name: string | null;

@@ -149,6 +149,43 @@ describe('the queue', () => {
     expect(approvePlayerRequest).toHaveBeenCalledWith('u3', 't9', null);
   });
 
+  describe('a request that asked for no team role', () => {
+    // requested_role 'guest' (conflicting invitations), or 'admin'/null from the
+    // old sign-up trigger. Only an admin sees these, and chooses the role.
+    const UNCLEAR = { ...PLAYER, id: 'u4', name: 'Dee Ellis', requested_role: 'guest' };
+
+    it('says so, and asks which role to approve it as', async () => {
+      fetchPendingRequests.mockResolvedValue([UNCLEAR]);
+      const w = await mountQueue(true);
+      expect(w.find('[data-request-unclear]').text()).toBe('asked for no team role');
+      expect(w.find('[data-request-row] .tag--live').exists()).toBe(false);
+      const role = w.find('[data-request-role]');
+      expect(role.findAll('option').map(o => (o.element as HTMLOptionElement).value)).toEqual(['player', 'coach']);
+      expect((role.element as HTMLSelectElement).value).toBe('player');
+    });
+
+    it('approves it as a coach when coach is chosen', async () => {
+      fetchPendingRequests.mockResolvedValue([UNCLEAR]);
+      const w = await mountQueue(true);
+      await w.find('[data-request-role]').setValue('coach');
+      await flush();
+      expect(w.find('[data-request-player]').exists()).toBe(false);
+      await w.find('[data-request-approve]').trigger('click');
+      await flush();
+      expect(approveCoachRequest).toHaveBeenCalledWith('u4', 't1');
+      expect(approvePlayerRequest).not.toHaveBeenCalled();
+    });
+
+    it('approves it as a player by default, with the roster picker', async () => {
+      fetchPendingRequests.mockResolvedValue([{ ...UNCLEAR, requested_role: null }]);
+      const w = await mountQueue(true);
+      expect(w.find('[data-request-player]').exists()).toBe(true);
+      await w.find('[data-request-approve]').trigger('click');
+      await flush();
+      expect(approvePlayerRequest).toHaveBeenCalledWith('u4', 't1', null);
+    });
+  });
+
   it('refuses a request after confirming, and keeps the account', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const w = await mountQueue();

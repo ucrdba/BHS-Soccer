@@ -252,6 +252,51 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
     });
   });
 
+  describe('a request that asked for no team role', () => {
+    // An account whose invitations named different roster entries lands in the
+    // queue with requested_role 'guest'; the old sign-up trigger left 'admin'
+    // or nothing. Only an admin sees these, and must be able to settle them.
+    async function unclear(teamId?: string) {
+      const u = await signUp(db.owner, { confirmed: true, name: 'Sam Unclear' });
+      await db.owner.query(
+        `update public.profiles set status = 'pending_approval', requested_role = 'guest', requested_team_id = $2
+          where id = $1`, [u.id, teamId ?? null]);
+      return u.id;
+    }
+
+    it('lets an admin approve it as a player', async () => {
+      const team = await makeTeam(db.owner);
+      const admin = await makeAdmin(db.owner);
+      const req = await unclear();
+      await db.asUser(admin, async (c) => {
+        await c.query(`select public.approve_player_request($1, $2)`, [req, team.id]);
+        expect(await one(c, `select role, status from public.profiles where id = $1`, [req]))
+          .toEqual({ role: 'player', status: 'active' });
+      });
+    });
+
+    it('lets an admin approve it as a coach', async () => {
+      const team = await makeTeam(db.owner);
+      const admin = await makeAdmin(db.owner);
+      const req = await unclear();
+      await db.asUser(admin, async (c) => {
+        await c.query(`select public.approve_coach_request($1, $2)`, [req, team.id]);
+        expect(await one(c, `select role, status from public.profiles where id = $1`, [req]))
+          .toEqual({ role: 'coach', status: 'active' });
+      });
+    });
+
+    it('refuses a coach approving it as a player, even on their own team', async () => {
+      const team = await makeTeam(db.owner);
+      const coach = await makeCoach(db.owner, team);
+      const req = await unclear(team.id);
+      await db.asUser(coach, async (c) => {
+        await expect(c.query(`select public.approve_player_request($1, $2)`, [req, team.id]))
+          .rejects.toThrow(/not a request to join as a player/);
+      });
+    });
+  });
+
   describe('approve_coach_request and reject_request', () => {
     it('refuses a coach approving a coach, and lets an admin', async () => {
       const team = await makeTeam(db.owner);

@@ -493,7 +493,12 @@ begin
   if not found or prof.status <> 'pending_approval' then
     raise exception 'That request is no longer waiting.';
   end if;
-  if prof.requested_role <> 'player' then
+  -- A coach settles player requests only. An admin may settle any waiting
+  -- request as a player -- including one that asked for no team role (an
+  -- account whose invitations named different roster entries, or one the old
+  -- sign-up trigger left as 'admin' or NULL), which nobody could act on else.
+  if prof.requested_role is distinct from 'player'
+     and coalesce(public.current_profile_role(), 'guest') <> 'admin' then
     raise exception 'That is not a request to join as a player.';
   end if;
   if p_team_id is null then
@@ -555,9 +560,8 @@ begin
   if not found or prof.status <> 'pending_approval' then
     raise exception 'That request is no longer waiting.';
   end if;
-  if prof.requested_role <> 'coach' then
-    raise exception 'That is not a request to join as a coach.';
-  end if;
+  -- No check on requested_role: only an admin gets this far, and an admin may
+  -- settle any waiting request as a coach.
   select * into team from public.teams where id = p_team_id and not coalesce(is_deleted, false);
   if not found then
     raise exception 'Choose the team to place them on.';
