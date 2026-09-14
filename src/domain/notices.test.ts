@@ -320,6 +320,21 @@ describe('what a database failure means', () => {
     expect(explainCondition('JWT expired')).toMatch(/sign in again/i);
   });
 
+  it('does not call a primary-key collision a taken name', () => {
+    // Renaming a drill hit drills_bank_pkey, and the box said "something with
+    // that name or number is already there" -- for a name nothing else had.
+    // Sending the coach off to pick a different name fixes nothing.
+    const text = 'duplicate key value violates unique constraint "drills_bank_pkey"';
+    expect(explainCondition(text)).not.toMatch(/name or number/i);
+    expect(explainCondition(text)).toMatch(/reload/i);
+  });
+
+  it('still calls a taken name a taken name', () => {
+    expect(explainCondition(
+      'duplicate key value violates unique constraint "drills_bank_school_name_key"'))
+      .toMatch(/already there/i);
+  });
+
   // A guess would be worse than silence: the box already says what failed.
   it('says nothing about a failure it does not recognise', () => {
     expect(explainCondition('connection terminated unexpectedly')).toBeNull();

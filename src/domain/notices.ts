@@ -220,6 +220,11 @@ const CONDITIONS: Array<{ when: RegExp; say: string }> = [
     say: 'This database is missing a column the app expects, so the latest migration has not been applied to it.' },
   { when: /no unique or exclusion constraint|\b42P10\b/i,
     say: 'This database is missing an index that save needs, so the latest migration has not been applied to it.' },
+  // Before the general 23505: a primary key is not a name the coach chose.
+  // Renaming a drill hit drills_bank_pkey and was told the name was taken,
+  // which sends them to pick another name and fixes nothing.
+  { when: /_pkey\b/i,
+    say: 'The app tried to add this as a new record when it already exists. Reload the page and try again.' },
   { when: /duplicate key value|\b23505\b/i,
     say: 'Something with that name or number is already there.' },
   { when: /violates foreign key constraint|\b23503\b/i,

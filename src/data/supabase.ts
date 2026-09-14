@@ -2668,6 +2668,34 @@ class SupabaseService {
     if (drill.diagramData) payload.diagram_data = drill.diagramData;
 
     try {
+      // An edit of a known drill is an UPDATE, by id. It used to go through
+      // the upsert below with its id in the payload, which cannot rename: the
+      // new name matches no row, so `on conflict (school_id, name)` does not
+      // fire, Postgres inserts, and the insert's id collides with the drill's
+      // own primary key (23505 drills_bank_pkey). `on conflict` handles only
+      // the constraint it names. Renaming "1v1 Gauntlet (Continuous)" to
+      // "1 v 1" failed exactly that way.
+      //
+      // By id, it also keeps everything that references the drill -- matrix
+      // sessions, pairings, plan rows -- so a rename renames it everywhere.
+      // school_id and id stay out of the body: the row is already named, so
+      // either could only ever move it.
+      if (payload.id) {
+        const { id, school_id, ...changes } = payload;
+        const { data, error } = await this.client!
+          .from('drills_bank')
+          .update(changes)
+          .eq('id', id)
+          .select();
+
+        if (error) {
+          report('upsertDrillBankItem', error.message, error);
+          return null;
+        }
+        // No error and no row is RLS declining the write.
+        return data && data.length ? data[0] : null;
+      }
+
       // (school_id, name), not name: the library is per organization, and
       // conflicting on the name alone had one organization's save overwrite
       // another's drill of that name. It also needed a unique index no
