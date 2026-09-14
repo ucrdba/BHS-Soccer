@@ -2,10 +2,12 @@
 --
 -- Spec: docs/superpowers/specs/2026-09-14-account-invitations-design.md
 --
--- APPLY BEFORE DEPLOYING THE MATCHING CLIENT. The current client sends no
--- requested_team_id, so until it is deployed its player and coach sign-ups
--- become pending requests with no team, which pending_requests() shows to
--- admins.
+-- APPLY IMMEDIATELY BEFORE DEPLOYING THE MATCHING CLIENT (runbook step 4). From
+-- here on confirming an email clears the password typed at sign-up, and only
+-- the new client asks for another, so keep the gap to minutes. The current
+-- client also sends no requested_team_id, so until it is deployed its player
+-- and coach sign-ups become pending requests with no team, which
+-- pending_requests() shows to admins.
 --
 -- Supersedes the sign-up half of supabase_migration_auth.sql and of 0013: both
 -- triggers on auth.users are replaced, and re-created with drop-if-exists, so

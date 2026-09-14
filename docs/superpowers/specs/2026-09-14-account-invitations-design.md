@@ -229,11 +229,19 @@ design depends on cannot happen.
 
 ## Rollout
 
-1. Apply `0035` to production. Safe before the client: the current client
-   sends no `requested_team_id`, so its sign-ups become organization-less
-   `pending_approval` rows, which `pending_requests()` shows to admins.
-2. Complete the mail setup and test it.
-3. Deploy the client.
+The runbook (`docs/runbooks/2026-09-14-accounts-setup-runbook.md`) holds the
+order, which changed after Amendment A: once `0035` clears the sign-up password
+at confirmation, only the new client asks for another, so the migration and the
+client go out back to back.
+
+1. Complete the mail setup and prove delivery on the current site.
+2. Apply `0035` to production and deploy the client immediately after. Until
+   the client is live, anyone who confirms an email cannot sign in with the
+   password they typed and needs *Forgot password* once it is; the current
+   client's sign-ups also send no `requested_team_id` and become
+   organization-less `pending_approval` rows, which `pending_requests()` shows
+   to admins.
+3. Prove the new flows on the live site.
 
 **Existing accounts are untouched.** Active profiles keep their role, school
 and links. Profiles already at `pending_approval` stay in the queue with no

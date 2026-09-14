@@ -1,11 +1,41 @@
 # Accounts: setup and rollout
 
 Spec: `docs/superpowers/specs/2026-09-14-account-invitations-design.md`.
-Do these in order. The client must not be deployed before step 3 passes.
+Do these in order.
 
-## 1. Apply the migration to production
+## 1. Connect a mail provider
 
-### Before applying
+Supabase's built-in mailer sends a handful of emails an hour, and only to your
+own project team's addresses. Confirmation and reset links will not reach
+anyone else until this is done.
+
+1. Create an account with a provider — Resend or Postmark both have free tiers.
+2. Verify a sending domain you control (add the DNS records the provider
+   gives you). A `vercel.app` address cannot be used.
+3. Create an SMTP credential in the provider. Check the provider's own SMTP
+   page for the current values; at the time of writing:
+   - **Resend:** host `smtp.resend.com`, port `465`, username `resend`, password = an API key.
+   - **Postmark:** host `smtp.postmarkapp.com`, port `587`, username and password = the server API token.
+4. Supabase → Authentication → **SMTP Settings** → enable custom SMTP, enter the
+   values, and set the sender to an address on the verified domain.
+5. Supabase → Authentication → **URL Configuration**: Site URL = the production
+   site. Redirect URLs include the production site, the demo site and
+   `http://localhost:3000`.
+6. Leave **Authentication → Providers → Email → Confirm email ON.** An
+   invitation is only safe because of it: with it off, accounts arrive already
+   confirmed, invitations are redeemed at sign-up, and anyone who knows an
+   invited address can take that place.
+
+## 2. Prove delivery on the current site
+
+Register on the production site, as it is today, with an address you own that
+is **not** a Supabase team member. The confirmation email arrives within a
+minute.
+
+If it does not arrive, stop: check the provider's activity log and Supabase →
+Logs → Auth before going further.
+
+## 3. Before applying
 
 Check each of these in **the production project** first.
 
@@ -50,7 +80,13 @@ e. **Authentication → Providers → Email → Secure email change** is on. The
    changed is never connected automatically), but without it one click by the
    account holder changes the address.
 
-### Applying
+## 4. Apply the migration and deploy the client back to back
+
+Pick a quiet time. Once 0035 is applied, confirming an email clears the password
+typed at sign-up, and only the new client asks for a new one. Between applying
+the migration and the new site going live, anyone who confirms an email has
+that password cleared and cannot sign in until the new site is live, where
+**Forgot password?** gets them in. Keep the gap to minutes.
 
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
 2. Paste the whole of `supabase/migrations/0035_account_invitations.sql` and run it.
@@ -78,53 +114,24 @@ e. **Authentication → Providers → Email → Secure email change** is on. The
    notify pgrst, 'reload schema';
    ```
 
-Safe before the new client: the current one sends no team, so its sign-ups
-arrive as requests with no team, which admins see in the queue.
+5. Immediately push `main` (the owner's call). Vercel deploys production; wait
+   for the deployment to go live.
 
-## 2. Connect a mail provider
+## 5. Prove the new flows on the live site
 
-Supabase's built-in mailer sends a handful of emails an hour, and only to your
-own project team's addresses. Confirmation and reset links will not reach
-anyone else until this is done.
+With addresses you own, none of them a Supabase team member.
 
-1. Create an account with a provider — Resend or Postmark both have free tiers.
-2. Verify a sending domain you control (add the DNS records the provider
-   gives you). A `vercel.app` address cannot be used.
-3. Create an SMTP credential in the provider. Check the provider's own SMTP
-   page for the current values; at the time of writing:
-   - **Resend:** host `smtp.resend.com`, port `465`, username `resend`, password = an API key.
-   - **Postmark:** host `smtp.postmarkapp.com`, port `587`, username and password = the server API token.
-4. Supabase → Authentication → **SMTP Settings** → enable custom SMTP, enter the
-   values, and set the sender to an address on the verified domain.
-5. Supabase → Authentication → **URL Configuration**: Site URL = the production
-   site. Redirect URLs include the production site, the demo site and
-   `http://localhost:3000`.
-6. Leave **Authentication → Providers → Email → Confirm email ON.** An
-   invitation is only safe because of it: with it off, accounts arrive already
-   confirmed, invitations are redeemed at sign-up, and anyone who knows an
-   invited address can take that place.
+### Passwords
 
-## 3. Prove delivery
-
-1. Register on the production site with an address you own that is **not** a
-   Supabase team member. The confirmation email arrives within a minute.
-2. Open the link. The app asks you to **choose your password**. Before
-   choosing one, check that the password typed at sign-up no longer signs in
-   (open the site in a private window and try it: it is refused). Then choose
-   one, and sign in with it: the app says the request is waiting for approval.
-3. Use **Forgot password?** with the same address. The reset email arrives, the
+1. Register on the production site with a fresh address. Open the confirmation
+   link. The app asks you to **choose your password**. Before choosing one,
+   check that the password typed at sign-up no longer signs in (open the site
+   in a private window and try it: it is refused). Then choose one, and sign in
+   with it: the app says the request is waiting for approval.
+2. Use **Forgot password?** with the same address. The reset email arrives, the
    link opens the app asking for a new password, and the new password signs in.
 
-If either email does not arrive, stop: check the provider's activity log and
-Supabase → Logs → Auth before deploying anything.
-
-## 4. Deploy the client
-
-Push `main` (the owner's call). Vercel deploys production.
-
-## 5. Smoke test the live site
-
-With addresses you own, none of them a Supabase team member:
+### Smoke test
 
 1. **An invitation connects a new account.** As a coach, open a player's bio
    and invite a test address. Register with that address, open the
@@ -137,11 +144,21 @@ With addresses you own, none of them a Supabase team member:
 3. **An existing account is connected at sign-in.** Invite an address that
    already has an account to a team. Sign in with it: it is connected to that
    team without registering again.
+4. **An account whose email was changed is not connected.** Invite an address
+   you own that has no account. Change a different, active test account's
+   address to the invited one. The app has no screen for this, so use that
+   account's session against the Auth API — `PUT <project URL>/auth/v1/user`
+   with headers `apikey: <anon key>` and `Authorization: Bearer <its access
+   token>` and body `{ "email": "<invited address>" }` — then open the change
+   link(s) it emails. Sign in with the account: it is not connected to that
+   team, and the coach still sees the invitation as open.
 
 ## Rollback
 
-The client and the migration are independent enough to roll back separately.
-To undo the migration, run this block first — it restores both pre-0035
+The client and the migration are independent enough to roll back separately,
+with one exception: rolling back the client alone, with 0035 still applied,
+reopens the gap described in step 4 — confirming clears the sign-up password
+and the old client does not ask for a new one. To undo the migration, run this block first — it restores both pre-0035
 functions in place (same names, so the existing triggers pick them up with no
 further change) before dropping anything 0035 added:
 
