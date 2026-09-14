@@ -156,6 +156,11 @@ begin
      order by i.created_at
   loop
     if inv.role = 'player' then
+      -- Serializes two callers linking the same roster entry at once, so the
+      -- second one sees the first's link instead of racing it: an invitee
+      -- confirming for inv.player_id while a coach approves another request
+      -- onto the same roster entry.
+      perform 1 from public.players where id = inv.player_id for update;
       -- The roster entry may have been claimed by another account since.
       if exists (select 1 from public.profiles p where p.player_id = inv.player_id and p.id <> p_user_id) then
         continue;
@@ -268,6 +273,14 @@ create trigger on_auth_user_confirmed
 -- Each checks its caller before doing anything, and refuses with a sentence
 -- the app shows as-is. Coaches handle players on their own team; only an admin
 -- handles coaches, so a coach can never create another coach.
+--
+-- Every such check is written to FAIL CLOSED. A signed-in caller with no
+-- profiles row makes current_profile_role() and is_team_coach() both return
+-- NULL (0005_multi_team_schema.sql), and in PL/pgSQL `if NULL <> 'admin'` and
+-- `if not NULL` both evaluate to NULL, which skips the raise -- silently
+-- granting the privileged path instead of refusing it. Every comparison here
+-- is wrapped in coalesce(..., 'guest') / coalesce(..., false) so a caller with
+-- no profile compares as the least-privileged case, not as "unknown".
 
 create or replace function public.create_invitation(
   p_email text, p_team_id uuid, p_role text, p_player_id uuid default null
@@ -292,7 +305,7 @@ begin
   end if;
 
   if p_role = 'player' then
-    if not public.is_team_coach(p_team_id) then
+    if not coalesce(public.is_team_coach(p_team_id), false) then
       raise exception 'Only a coach of this team can invite its players.';
     end if;
     if p_player_id is null or not exists (
@@ -305,7 +318,7 @@ begin
       raise exception 'That player already has an account.';
     end if;
   elsif p_role = 'coach' then
-    if public.current_profile_role() <> 'admin' then
+    if coalesce(public.current_profile_role(), 'guest') <> 'admin' then
       raise exception 'Only an admin can invite a coach.';
     end if;
     p_player_id := null;
@@ -340,10 +353,10 @@ begin
   if not found then
     raise exception 'That invitation does not exist.';
   end if;
-  if inv.role = 'coach' and public.current_profile_role() <> 'admin' then
+  if inv.role = 'coach' and coalesce(public.current_profile_role(), 'guest') <> 'admin' then
     raise exception 'Only an admin can withdraw a coach''s invitation.';
   end if;
-  if inv.role = 'player' and not public.is_team_coach(inv.team_id) then
+  if inv.role = 'player' and not coalesce(public.is_team_coach(inv.team_id), false) then
     raise exception 'Only a coach of this team can withdraw its invitations.';
   end if;
   if inv.accepted_at is not null then
@@ -401,10 +414,11 @@ begin
   if p_team_id is null then
     raise exception 'Choose the team to place them on.';
   end if;
-  if p_team_id is distinct from prof.requested_team_id and public.current_profile_role() <> 'admin' then
+  if p_team_id is distinct from prof.requested_team_id
+     and coalesce(public.current_profile_role(), 'guest') <> 'admin' then
     raise exception 'Only an admin can place a request on a team other than the one requested.';
   end if;
-  if not public.is_team_coach(p_team_id) then
+  if not coalesce(public.is_team_coach(p_team_id), false) then
     raise exception 'Only a coach of that team can approve its players.';
   end if;
 
@@ -423,6 +437,10 @@ begin
     ) then
       raise exception 'That player is not on this team''s roster.';
     end if;
+    -- Serializes two callers linking the same roster entry at once, so the
+    -- second one sees the first's link instead of racing it: a coach approving
+    -- this request onto pid while an invitee confirms for the same pid.
+    perform 1 from public.players where id = pid for update;
     if exists (select 1 from public.profiles p where p.player_id = pid) then
       raise exception 'That player already has an account.';
     end if;
@@ -445,7 +463,7 @@ declare
   prof public.profiles%rowtype;
   team public.teams%rowtype;
 begin
-  if public.current_profile_role() <> 'admin' then
+  if coalesce(public.current_profile_role(), 'guest') <> 'admin' then
     raise exception 'Only an admin can approve a coach.';
   end if;
   select * into prof from public.profiles where id = p_profile_id for update;
@@ -482,10 +500,10 @@ begin
     raise exception 'That request is no longer waiting.';
   end if;
   if prof.requested_role = 'player' and prof.requested_team_id is not null then
-    if not public.is_team_coach(prof.requested_team_id) then
+    if not coalesce(public.is_team_coach(prof.requested_team_id), false) then
       raise exception 'Only a coach of that team can refuse its players.';
     end if;
-  elsif public.current_profile_role() <> 'admin' then
+  elsif coalesce(public.current_profile_role(), 'guest') <> 'admin' then
     raise exception 'Only an admin can refuse that request.';
   end if;
   update public.profiles set status = 'rejected' where id = p_profile_id;

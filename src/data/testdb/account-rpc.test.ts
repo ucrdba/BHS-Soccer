@@ -6,6 +6,7 @@
  * the coach approval the profile guard used to refuse.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { hasTestDb } from './harness';
 import {
   buildAccountsDb, one, uniq, makeTeam, makeRosterEntry, signUp, confirm, makeCoach, makeAdmin, invite,
@@ -304,6 +305,37 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
       });
       await db.asUser(outsider, async (c) => {
         expect((await c.query(`select player_id from public.team_linked_players($1)`, [team.id])).rows).toEqual([]);
+      });
+    });
+  });
+
+  describe('a signed-in caller with no profile', () => {
+    it('is refused every privileged action rather than let through', async () => {
+      const team = await makeTeam(db.owner);
+      const coachReq = await request(db, 'coach', team.id);
+      const playerReq = await request(db, 'player', team.id);
+      const openInvite = await invite(db.owner, { email: `${uniq()}@example.com`, team, role: 'coach' });
+      const ghost = randomUUID();
+
+      await db.asUser(ghost, async (c) => {
+        await expect(c.query(`select public.create_invitation($1, $2, 'coach')`, [`${uniq()}@example.com`, team.id]))
+          .rejects.toThrow(/Only/);
+      });
+      await db.asUser(ghost, async (c) => {
+        await expect(c.query(`select public.approve_coach_request($1, $2)`, [coachReq, team.id]))
+          .rejects.toThrow(/Only/);
+      });
+      await db.asUser(ghost, async (c) => {
+        await expect(c.query(`select public.approve_player_request($1, $2)`, [playerReq, team.id]))
+          .rejects.toThrow(/Only/);
+      });
+      await db.asUser(ghost, async (c) => {
+        await expect(c.query(`select public.revoke_invitation($1)`, [openInvite.id]))
+          .rejects.toThrow(/Only/);
+      });
+      await db.asUser(ghost, async (c) => {
+        await expect(c.query(`select public.reject_request($1)`, [playerReq]))
+          .rejects.toThrow(/Only/);
       });
     });
   });
