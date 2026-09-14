@@ -1,16 +1,19 @@
 /**
  * The coaching staff, and the accounts waiting to be let in.
  *
- * Everything here takes the organization explicitly. `fetchCoaches`,
- * `upsertCoach` and `fetchPendingApprovals` all declare
- * `schoolId: string = 'bhs'`, so a bare call shows a club coach Beaumont's
- * staff — which is exactly what app.core.js:523 does today.
+ * The staff list takes the organization explicitly. `fetchCoaches` and
+ * `upsertCoach` both declare `schoolId: string = 'bhs'`, so a bare call shows
+ * a club coach Beaumont's staff — which is exactly what app.core.js:523 does
+ * today. `loadPending` needs no such argument: `pending_requests()` decides
+ * who sees what from the caller's own identity, not from a school id passed
+ * in.
  */
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 import { auth } from '../auth';
 import { toCoaches, sortedCoaches, type Coach } from '../domain/coach-row';
+import type { PendingRequest } from '../types';
 
 export interface CoachForm {
   /** NOT NULL in the database. */
@@ -28,7 +31,7 @@ export interface WriteResult { ok: boolean; error?: string }
 
 export const useCoachesStore = defineStore('coaches', () => {
   const coaches = ref<Coach[]>([]);
-  const pending = ref<any[]>([]);
+  const pending = ref<PendingRequest[]>([]);
   const loading = ref(false);
   const loadError = ref<string | null>(null);
   const loadedSchoolId = ref<string | null>(null);
@@ -50,15 +53,14 @@ export const useCoachesStore = defineStore('coaches', () => {
     }
   }
 
-  /** Only a coach or admin may see this, and RLS enforces it regardless. */
-  async function loadPending(schoolId: string | null): Promise<void> {
-    if (!schoolId || !(auth.isCoach() || auth.isAdmin())) { pending.value = []; return; }
-    try {
-      pending.value = await auth.getPendingApprovals(schoolId);
-    } catch (err) {
-      console.error('Pending approvals load failed:', err);
-      pending.value = [];
-    }
+  /**
+   * The requests this viewer may act on, for the count and the link.
+   * pending_requests() decides who sees what; the page does not approve
+   * anything itself -- one queue, in the admin panel, rather than two that drift.
+   */
+  async function loadPending(): Promise<void> {
+    if (!(auth.isCoach() || auth.isAdmin())) { pending.value = []; return; }
+    pending.value = (await supabaseService.fetchPendingRequests()) || [];
   }
 
   function validate(f: CoachForm): string | null {
@@ -128,34 +130,8 @@ export const useCoachesStore = defineStore('coaches', () => {
     return { ok: true };
   }
 
-  async function approve(userId: string, schoolId: string | null): Promise<WriteResult> {
-    const ok = await auth.approveUserAccess(userId);
-    if (!ok) {
-      return {
-        ok: false,
-        error: 'Could not approve that account. You may not have permission, '
-          + 'or it may already have been actioned.'
-      };
-    }
-    await loadPending(schoolId);
-    return { ok: true };
-  }
-
-  async function reject(userId: string, schoolId: string | null): Promise<WriteResult> {
-    const ok = await auth.rejectUserAccess(userId);
-    if (!ok) {
-      return {
-        ok: false,
-        error: 'Could not reject that account. You may not have permission, '
-          + 'or it may already have been actioned.'
-      };
-    }
-    await loadPending(schoolId);
-    return { ok: true };
-  }
-
   return {
     coaches, pending, loading, loadError, loadedSchoolId, staff,
-    load, loadPending, addCoach, updateCoach, removeCoach, approve, reject
+    load, loadPending, addCoach, updateCoach, removeCoach
   };
 });

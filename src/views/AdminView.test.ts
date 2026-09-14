@@ -20,16 +20,11 @@ import { createTestingPinia } from '@pinia/testing';
 import AdminView from './AdminView.vue';
 import { setRoles } from '../auth/permissions';
 
-const getPendingApprovals = vi.fn();
-
 // The whole module is replaced, so it needs everything the auth STORE
 // touches as well -- the store is created by createTestingPinia and calls
 // into this on setup.
 vi.mock('../auth', () => ({
   auth: {
-    getPendingApprovals: (...a: any[]) => getPendingApprovals(...a),
-    approveUserAccess: vi.fn(),
-    rejectUserAccess: vi.fn(),
     getCurrentUser: () => ({ id: 'u1', name: 'Admin', role: 'admin', status: 'active' }),
     getRole: () => 'admin',
     isCoach: () => true,
@@ -57,7 +52,10 @@ vi.mock('../data/supabase', () => ({
     fetchQuizBank: vi.fn().mockResolvedValue([]),
     // DiagnosticsSection reads this synchronously to label its header, so the
     // double needs it even though this suite is about which sections render.
-    isConfigured: vi.fn().mockReturnValue(true)
+    isConfigured: vi.fn().mockReturnValue(true),
+    // ApprovalsSection reads this on mount; an incomplete mock leaves an
+    // unhandled rejection, which exits non-zero while every test "passes".
+    fetchPendingRequests: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -95,7 +93,6 @@ async function mountAdmin(opts: { coach?: boolean; admin?: boolean } = {}) {
 beforeEach(() => {
   document.body.innerHTML = '';
   vi.clearAllMocks();
-  getPendingApprovals.mockResolvedValue([]);
   setRoles(ADMIN_ROLES as any);
 });
 

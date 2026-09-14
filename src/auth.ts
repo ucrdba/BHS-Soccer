@@ -182,37 +182,6 @@ export class AuthManager {
     };
   }
 
-  async approveUserAccess(userId: string): Promise<boolean> {
-    const row = await supabaseService.approveProfile(userId);
-    if (row) this.notifySubscribers();
-    return !!row;
-  }
-
-  async rejectUserAccess(userId: string): Promise<boolean> {
-    const row = await supabaseService.rejectProfile(userId);
-    if (row) this.notifySubscribers();
-    return !!row;
-  }
-
-  /**
-   * Accounts awaiting approval, for one organization.
-   *
-   * The argument is not optional by accident. Calling `fetchPendingApprovals`
-   * without one used to show a club admin Beaumont's pending signups — people
-   * requesting access to an organization that is not theirs — and the
-   * substitution made that invisible at the call site.
-   *
-   * This passed `schoolId || LEGACY_DEFAULT_ORG` for the benefit of
-   * public/js/admin.js, which Phase 7 deleted. Nothing substitutes now: with
-   * no organization the service queries nothing and returns null, and an
-   * unresolved organization produces an empty queue rather than somebody
-   * else's.
-   */
-  async getPendingApprovals(schoolId?: string): Promise<AppUser[]> {
-    const rows = await supabaseService.fetchPendingApprovals(schoolId as string);
-    return (rows || []).map(mapProfileRowToAppUser);
-  }
-
   async logout(): Promise<void> {
     await supabaseService.signOutUser();
     this.setCurrentUser(GUEST_USER);

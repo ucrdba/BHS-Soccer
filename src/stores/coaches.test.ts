@@ -13,9 +13,7 @@ import { setActivePinia, createPinia } from 'pinia';
 const fetchCoaches = vi.fn();
 const upsertCoach = vi.fn();
 const deleteCoach = vi.fn();
-const getPendingApprovals = vi.fn();
-const approveUserAccess = vi.fn();
-const rejectUserAccess = vi.fn();
+const fetchPendingRequests = vi.fn();
 const isCoach = vi.fn();
 const isAdmin = vi.fn();
 
@@ -23,15 +21,13 @@ vi.mock('../data/supabase', () => ({
   supabaseService: {
     fetchCoaches: (...a: any[]) => fetchCoaches(...a),
     upsertCoach: (...a: any[]) => upsertCoach(...a),
-    deleteCoach: (...a: any[]) => deleteCoach(...a)
+    deleteCoach: (...a: any[]) => deleteCoach(...a),
+    fetchPendingRequests: (...a: any[]) => fetchPendingRequests(...a)
   }
 }));
 
 vi.mock('../auth', () => ({
   auth: {
-    getPendingApprovals: (...a: any[]) => getPendingApprovals(...a),
-    approveUserAccess: (...a: any[]) => approveUserAccess(...a),
-    rejectUserAccess: (...a: any[]) => rejectUserAccess(...a),
     isCoach: () => isCoach(),
     isAdmin: () => isAdmin()
   }
@@ -53,9 +49,7 @@ beforeEach(() => {
   fetchCoaches.mockResolvedValue([row()]);
   upsertCoach.mockResolvedValue({ id: 'c1' });
   deleteCoach.mockResolvedValue(undefined);
-  getPendingApprovals.mockResolvedValue([]);
-  approveUserAccess.mockResolvedValue(true);
-  rejectUserAccess.mockResolvedValue(true);
+  fetchPendingRequests.mockResolvedValue([]);
   isCoach.mockReturnValue(true);
   isAdmin.mockReturnValue(false);
 });
@@ -175,53 +169,29 @@ describe('removing a coach', () => {
   });
 });
 
-describe('pending approvals', () => {
-  it('passes the organization, not the default', async () => {
+describe('pending requests', () => {
+  it('reads the requests this viewer may act on', async () => {
+    isCoach.mockReturnValue(true);
+    fetchPendingRequests.mockResolvedValue([{ id: 'u1' }]);
     const s = useCoachesStore();
-    await s.loadPending('s1');
-    expect(getPendingApprovals).toHaveBeenCalledWith('s1');
+    await s.loadPending();
+    expect(s.pending).toEqual([{ id: 'u1' }]);
   });
 
-  it('does not fetch them for someone who may not act on them', async () => {
+  it('reads nothing for a visitor who is neither coach nor admin', async () => {
     isCoach.mockReturnValue(false);
     isAdmin.mockReturnValue(false);
     const s = useCoachesStore();
-    await s.loadPending('s1');
-    expect(getPendingApprovals).not.toHaveBeenCalled();
+    await s.loadPending();
+    expect(fetchPendingRequests).not.toHaveBeenCalled();
     expect(s.pending).toEqual([]);
   });
 
-  it('lets an admin who is not a coach see them', async () => {
-    isCoach.mockReturnValue(false);
-    isAdmin.mockReturnValue(true);
+  it('shows nobody waiting when the read fails, without breaking the page', async () => {
+    isCoach.mockReturnValue(true);
+    fetchPendingRequests.mockResolvedValue(null);
     const s = useCoachesStore();
-    await s.loadPending('s1');
-    expect(getPendingApprovals).toHaveBeenCalled();
-  });
-
-  it('approves and refreshes the queue', async () => {
-    const s = useCoachesStore();
-    expect((await s.approve('u1', 's1')).ok).toBe(true);
-    expect(approveUserAccess).toHaveBeenCalledWith('u1');
-    expect(getPendingApprovals).toHaveBeenCalled();
-  });
-
-  it('explains a refused approval', async () => {
-    approveUserAccess.mockResolvedValue(false);
-    const s = useCoachesStore();
-    expect((await s.approve('u1', 's1')).error).toMatch(/permission|actioned/i);
-  });
-
-  it('rejects and refreshes the queue', async () => {
-    const s = useCoachesStore();
-    expect((await s.reject('u1', 's1')).ok).toBe(true);
-    expect(rejectUserAccess).toHaveBeenCalledWith('u1');
-  });
-
-  it('survives a failed pending load without breaking the page', async () => {
-    getPendingApprovals.mockRejectedValue(new Error('nope'));
-    const s = useCoachesStore();
-    await s.loadPending('s1');
+    await s.loadPending();
     expect(s.pending).toEqual([]);
   });
 });

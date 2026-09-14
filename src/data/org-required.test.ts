@@ -45,7 +45,6 @@ afterEach(() => {
 const CASES: Array<{ method: string; call: () => Promise<any>; expected: any }> = [
   // Returns null.
   { method: 'getSchoolUuid', call: () => svc.getSchoolUuid(undefined), expected: null },
-  { method: 'fetchPendingApprovals', call: () => svc.fetchPendingApprovals(undefined), expected: null },
   { method: 'fetchPlayers', call: () => svc.fetchPlayers(undefined), expected: null },
   { method: 'fetchSoccerCategories', call: () => svc.fetchSoccerCategories(undefined), expected: null },
   { method: 'fetchCategoryUsage', call: () => svc.fetchCategoryUsage(undefined), expected: null },

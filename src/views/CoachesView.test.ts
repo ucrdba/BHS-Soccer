@@ -53,7 +53,8 @@ function mountCoaches(opts: {
             isGuest: !canEdit, canAccessRatings: canEdit
           }
         }
-      })]
+      })],
+      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } }
     }
   });
 }
@@ -105,8 +106,7 @@ describe('what a visitor may do', () => {
     // This queue lets somebody into the application.
     const w = mountCoaches({ canEdit: false, pending: PENDING });
     expect(w.find('[data-pending-queue]').exists()).toBe(false);
-    expect(w.find('[data-approve]').exists()).toBe(false);
-    expect(w.find('[data-reject]').exists()).toBe(false);
+    expect(w.find('[data-pending-review]').exists()).toBe(false);
     expect(w.text()).not.toContain('player@club.test');
   });
 });
@@ -159,35 +159,16 @@ describe('what a coach may do', () => {
 });
 
 describe('the approval queue', () => {
-  it('lists who is waiting, with what they asked for', () => {
+  it('says how many are waiting and links to the admin panel', () => {
     const w = mountCoaches({ canEdit: true, pending: PENDING });
     expect(w.find('[data-pending-queue]').exists()).toBe(true);
-    expect(w.text()).toContain('New Player');
-    expect(w.text()).toContain('player@club.test');
-    expect(w.text()).toContain('player');
+    expect(w.find('[data-pending-review]').exists()).toBe(true);
+    expect(w.find('[data-pending-count]').text()).toBe('1 account is waiting for approval.');
   });
 
   it('is absent when nobody is waiting', () => {
-    expect(mountCoaches({ canEdit: true, pending: [] })
-      .find('[data-pending-queue]').exists()).toBe(false);
-  });
-
-  it('offers approve and reject per row', () => {
-    const w = mountCoaches({ canEdit: true, pending: PENDING });
-    expect(w.findAll('[data-approve]')).toHaveLength(1);
-    expect(w.findAll('[data-reject]')).toHaveLength(1);
-  });
-
-  it('asks before rejecting, but not before approving', async () => {
-    // Rejecting is the destructive half.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const w = mountCoaches({ canEdit: true, pending: PENDING });
-
-    await w.find('[data-approve]').trigger('click');
-    expect(confirmSpy).not.toHaveBeenCalled();
-
-    await w.find('[data-reject]').trigger('click');
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('New Player'));
-    confirmSpy.mockRestore();
+    const w = mountCoaches({ canEdit: true, pending: [] });
+    expect(w.find('[data-pending-queue]').exists()).toBe(false);
+    expect(w.find('[data-pending-review]').exists()).toBe(false);
   });
 });

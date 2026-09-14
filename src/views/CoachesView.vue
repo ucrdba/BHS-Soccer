@@ -5,10 +5,8 @@
  * Cut out of public/js/views/planner.view.js:530, where it sat among 1,800
  * lines belonging to the practice planner. Nothing else came with it.
  *
- * The approval queue lives here rather than in the admin panel because this
- * is the screen about who is on the staff, and letting someone in is the same
- * question. It is only fetched for a coach or admin, and RLS enforces that
- * regardless of what this component does.
+ * The approval queue itself lives in the admin panel; this page says how many
+ * are waiting and links there, so there is one queue rather than two that drift.
  */
 import { ref, computed, watch } from 'vue';
 import CoachFormModal from '../components/coaches/CoachFormModal.vue';
@@ -35,7 +33,7 @@ const settled = computed(() => !store.loading && store.loadedSchoolId !== null);
 
 watch(schoolId, (id) => {
   store.load(id);
-  store.loadPending(id);
+  store.loadPending();
 }, { immediate: true });
 
 function openAdd(): void {
@@ -76,17 +74,6 @@ async function onRemove(c: Coach): Promise<void> {
   const res = await store.removeCoach(c.id, schoolId.value);
   notice.value = res?.ok ? `${c.name} removed.` : (res?.error || 'Could not remove.');
 }
-
-async function onApprove(userId: string, name: string): Promise<void> {
-  const res = await store.approve(userId, schoolId.value);
-  notice.value = res?.ok ? `${name} approved.` : (res?.error || 'Could not approve.');
-}
-
-async function onReject(userId: string, name: string): Promise<void> {
-  if (!window.confirm(`Reject ${name}'s request for access?`)) return;
-  const res = await store.reject(userId, schoolId.value);
-  notice.value = res?.ok ? `${name} rejected.` : (res?.error || 'Could not reject.');
-}
 </script>
 
 <template>
@@ -109,24 +96,13 @@ async function onReject(userId: string, name: string): Promise<void> {
       {{ store.loadError }}
     </p>
 
-    <!-- Waiting to be let in. Coaches and admins only. -->
-    <section v-if="canEdit && store.pending.length" class="queue" data-pending-queue>
-      <h2 class="queue__title kicker">Waiting for approval</h2>
-      <ul class="queue__list">
-        <li v-for="u in store.pending" :key="u.id" class="queue__row hrow" data-pending-row>
-          <span class="queue__who">
-            <strong>{{ u.name || u.email }}</strong>
-            <span class="queue__meta">{{ u.email }} · asked for {{ u.role }}</span>
-          </span>
-          <span class="queue__acts">
-            <button type="button" class="btn btn--small btn--go" data-approve
-                    @click="onApprove(u.id, u.name || u.email)">Approve</button>
-            <button type="button" class="btn btn--small btn--plain" data-reject
-                    @click="onReject(u.id, u.name || u.email)">Reject</button>
-          </span>
-        </li>
-      </ul>
-    </section>
+    <!-- One queue, in the admin panel. This says it exists. -->
+    <p v-if="canEdit && store.pending.length" class="queue" data-pending-queue>
+      <span data-pending-count>
+        {{ store.pending.length }} {{ store.pending.length === 1 ? 'account is' : 'accounts are' }} waiting for approval.
+      </span>
+      <RouterLink :to="{ name: 'admin' }" class="btn btn--small btn--go" data-pending-review>Review</RouterLink>
+    </p>
 
     <p v-if="!settled" class="empty">Loading the coaching staff…</p>
     <p v-else-if="store.staff.length === 0" class="empty" data-empty>
@@ -179,18 +155,20 @@ async function onReject(userId: string, name: string): Promise<void> {
 .staff__title { font-family: var(--heading-face); font-weight: 500; font-size: 24px; color: var(--mark); }
 .staff__org { margin-top: var(--space-1); }
 
-/* Accounts waiting to be let in: an emphasised rule, not a filled panel. */
+/* Says the queue exists, and points at the admin panel: an emphasised rule,
+   not a filled panel. */
 .queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
   margin: var(--space-4) 0 var(--space-6);
-  padding-left: var(--space-3);
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
   border-left: 2px solid var(--rule-strong);
+  color: var(--ink);
+  font-size: 14px;
 }
-
-.queue__title { margin: 0 0 var(--space-2); }
-.queue__list { margin: 0; padding: 0; list-style: none; }
-.queue__who { display: flex; flex-direction: column; color: var(--ink); font-size: 14px; }
-.queue__meta { color: var(--ink-muted); font-size: 12px; }
-.queue__acts { display: flex; gap: var(--space-1); }
 
 .grid { display: flex; flex-direction: column; }
 

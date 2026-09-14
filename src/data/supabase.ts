@@ -559,58 +559,6 @@ class SupabaseService {
     }
   }
 
-  async approveProfile(userId: string): Promise<any> {
-    if (!this.isConfigured() || !userId) return null;
-    try {
-      const { data: existing, error: fetchError } = await this.client!
-        .from('profiles')
-        .select('requested_role')
-        .eq('id', userId)
-        .maybeSingle();
-      if (fetchError || !existing) { report('approveProfile', fetchError?.message); return null; }
-
-      const { data, error } = await this.client!
-        .from('profiles')
-        .update({ status: 'active', role: existing.requested_role || 'player' })
-        .eq('id', userId)
-        .select();
-      if (error) { report('approveProfile', error.message); return null; }
-      return data ? data[0] : null;
-    } catch (e: any) {
-      report('approveProfile', e.message);
-      return null;
-    }
-  }
-
-  async rejectProfile(userId: string): Promise<any> {
-    if (!this.isConfigured() || !userId) return null;
-    try {
-      const { data, error } = await this.client!
-        .from('profiles')
-        .update({ status: 'rejected' })
-        .eq('id', userId)
-        .select();
-      if (error) { report('rejectProfile', error.message); return null; }
-      return data ? data[0] : null;
-    } catch (e: any) {
-      report('rejectProfile', e.message);
-      return null;
-    }
-  }
-
-  async fetchPendingApprovals(schoolId: string): Promise<any> {
-    schoolId = orgOrNull('fetchPendingApprovals', schoolId);
-    if (!schoolId) return null;
-    if (!this.isConfigured()) return null;
-    const { data, error } = await this.client!
-      .from('profiles')
-      .select('*')
-      .eq('status', 'pending_approval')
-      .order('created_at', { ascending: true });
-    if (error) { report('fetchPendingApprovals', error.message); return null; }
-    return data;
-  }
-
   async testProfileInsert(): Promise<any> {
     if (!this.isConfigured()) {
       return { success: false, error: 'Supabase client is not connected. Make sure a valid Supabase publishable key (sb_publishable_... or a legacy eyJ... anon key) is entered.' };

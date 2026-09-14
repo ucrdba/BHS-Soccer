@@ -183,9 +183,6 @@ declare global {
     onAuthStateChange(callback: (event: string, session: Record<string, any> | null) => void): unknown;
     verifyOtp(email: string, token: string): Promise<SupabaseAuthResult | null>;
     fetchOwnProfile(): Promise<Record<string, any> | null>;
-    approveProfile(userId: string): Promise<Record<string, any> | null>;
-    rejectProfile(userId: string): Promise<Record<string, any> | null>;
-    fetchPendingApprovals(schoolCode: string): Promise<Record<string, any>[] | null>;
     fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
     fetchMatrixStandings(teamId: string): Promise<Record<string, any>[] | null>;
     fetchMatrixLogs(teamId: string): Promise<Record<string, any>[] | null>;

@@ -2,99 +2,133 @@
 /**
  * Accounts waiting for approval.
  *
- * **The most consequential control in the application.** Approving a signup
- * hands somebody a coach's access to a squad of minors, so the confirmation
- * names the person and the role rather than asking "are you sure?".
+ * **The most consequential control in the application.** Approving hands
+ * somebody access to a squad of minors, so the confirmation names the person,
+ * the team and the role.
  *
- * Rejecting is not deletion — it sets a status, and the panel says so,
- * because otherwise a coach will assume a mis-click is unrecoverable and
- * leave a real person locked out rather than ask.
+ * The list comes from pending_requests(), which returns only what the caller
+ * may act on: a coach sees player requests for their own teams, an admin sees
+ * everything. Nothing here filters by organization, because a filter in the
+ * browser is not a boundary -- the old queue took an organization and ignored
+ * it.
  *
- * The list is scoped to the ORGANIZATION and never fetched bare.
- * `getPendingApprovals()` without one falls back to a legacy default, which
- * showed a club admin Beaumont's signups — a fixed bug this must not
- * reintroduce.
+ * Refusing is not deletion: it sets a status, and the confirmation says so, or
+ * a coach assumes a mis-click is unrecoverable.
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import SectionShell from './SectionShell.vue';
-import { auth } from '../../auth';
+import { supabaseService } from '../../data/supabase';
+import type { PendingRequest, JoinableTeam } from '../../types';
 
-const props = defineProps<{ schoolId: string | null }>();
+const props = defineProps<{ isAdmin: boolean }>();
 
-const pending = ref<any[] | null>(null);
+const requests = ref<PendingRequest[] | null>(null);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
 const notice = ref<string | null>(null);
+const refused = ref<string | null>(null);
 const busyId = ref<string | null>(null);
 
-const rows = computed(() => pending.value || []);
+/** Per request: the team to place them on, and the roster entry ('' = a new one). */
+const choice = ref<Record<string, { teamId: string; playerId: string }>>({});
+/** Unlinked roster entries, per team id. */
+const rosters = ref<Record<string, { id: string; name: string }[]>>({});
+const teams = ref<JoinableTeam[]>([]);
+
+const rows = computed(() => requests.value || []);
+
+function who(r: PendingRequest): string { return r.name || r.email; }
+
+function teamLabel(r: PendingRequest): string {
+  const teamId = choice.value[r.id]?.teamId;
+  if (teamId && teamId === r.requested_team_id && r.team_name) {
+    return r.school_name ? `${r.team_name} · ${r.school_name}` : r.team_name;
+  }
+  const t = teams.value.find(x => x.id === teamId);
+  return t ? `${t.name} · ${t.schoolName}` : '';
+}
+
+async function loadRosters(): Promise<void> {
+  const wanted = new Set(
+    rows.value.filter(r => r.requested_role === 'player')
+      .map(r => choice.value[r.id]?.teamId).filter(Boolean) as string[]);
+  for (const teamId of wanted) {
+    if (rosters.value[teamId]) continue;
+    rosters.value[teamId] = (await supabaseService.fetchUnlinkedRosterEntries(teamId)) || [];
+  }
+}
 
 async function load(): Promise<void> {
-  loadError.value = null;
-
-  if (!props.schoolId) {
-    // Never bare: the fallback is another organization's list.
-    loadError.value = 'No organization resolved yet, so there is nobody to show.';
-    pending.value = null;
-    return;
-  }
-
   loading.value = true;
+  loadError.value = null;
   try {
-    pending.value = await auth.getPendingApprovals(props.schoolId);
-  } catch {
-    // A failed read shown as "nobody is waiting" leaves a real person
-    // waiting indefinitely.
-    loadError.value = 'Could not load the accounts waiting for approval.';
-    pending.value = null;
+    const found = await supabaseService.fetchPendingRequests();
+    if (found === null) {
+      // "Nobody is waiting" for a failed read leaves a real person waiting.
+      loadError.value = 'Could not load the accounts waiting for approval.';
+      requests.value = null;
+      return;
+    }
+    requests.value = found;
+    for (const r of found) {
+      if (!choice.value[r.id]) choice.value[r.id] = { teamId: r.requested_team_id || '', playerId: '' };
+    }
+    if (props.isAdmin && found.some(r => !r.requested_team_id)) {
+      teams.value = (await supabaseService.fetchJoinableTeams()) || [];
+    }
+    await loadRosters();
   } finally {
     loading.value = false;
   }
 }
 
-watch(() => props.schoolId, load, { immediate: true });
+onMounted(load);
 
-function describe(u: any): string {
-  const role = String(u.requestedRole || u.role || 'access').toUpperCase();
-  return `${u.name || u.email} — ${role}`;
+async function onTeamChosen(r: PendingRequest, teamId: string): Promise<void> {
+  choice.value[r.id] = { teamId, playerId: '' };
+  await loadRosters();
 }
 
-async function onApprove(u: any): Promise<void> {
-  const role = String(u.requestedRole || u.role || 'access').toUpperCase();
-  const ok = window.confirm(
-    `Give ${u.name || u.email} ${role} access?\n\n`
-    + `They will be able to see and change whatever that role allows for this `
-    + `organization. You can change it again afterwards.`
-  );
-  if (!ok) return;
+async function onApprove(r: PendingRequest): Promise<void> {
+  notice.value = null;
+  refused.value = null;
+  const c = choice.value[r.id];
+  if (!c?.teamId) { refused.value = 'Choose the team to place them on first.'; return; }
 
-  busyId.value = u.id;
+  const team = teamLabel(r) || 'that team';
+  const entry = rosters.value[c.teamId]?.find(p => p.id === c.playerId)?.name;
+  const text = r.requested_role === 'coach'
+    ? `Make ${who(r)} a coach of ${team}?\n\nThey will be able to change that squad's data.`
+    : `Put ${who(r)} on ${team} as a player, ${entry ? `linked to ${entry}` : 'as a new roster entry'}?`;
+  if (!window.confirm(text)) return;
+
+  busyId.value = r.id;
   try {
-    const done = await auth.approveUserAccess(u.id);
-    notice.value = done
-      ? `${u.name || u.email} approved.`
-      : 'That approval was refused by the database.';
-    if (done) await load();
+    const res = r.requested_role === 'coach'
+      ? await supabaseService.approveCoachRequest(r.id, c.teamId)
+      : await supabaseService.approvePlayerRequest(r.id, c.teamId, c.playerId || null);
+    if (!res.ok) { refused.value = res.error || 'That approval was refused.'; return; }
+    notice.value = `${who(r)} approved.`;
+    rosters.value = {};
+    await load();
   } finally {
     busyId.value = null;
   }
 }
 
-async function onReject(u: any): Promise<void> {
+async function onReject(r: PendingRequest): Promise<void> {
+  notice.value = null;
+  refused.value = null;
   const ok = window.confirm(
-    `Refuse ${u.name || u.email}?\n\n`
-    + `Their account is kept and marked as rejected rather than deleted, so `
-    + `this can be undone by approving them later.`
-  );
+    `Refuse ${who(r)}?\n\nTheir account is kept and marked as refused rather than deleted.`);
   if (!ok) return;
 
-  busyId.value = u.id;
+  busyId.value = r.id;
   try {
-    const done = await auth.rejectUserAccess(u.id);
-    notice.value = done
-      ? `${u.name || u.email} refused. Their account is kept.`
-      : 'That was refused by the database.';
-    if (done) await load();
+    const res = await supabaseService.rejectRequest(r.id);
+    if (!res.ok) { refused.value = res.error || 'That was refused.'; return; }
+    notice.value = `${who(r)} refused. Their account is kept.`;
+    await load();
   } finally {
     busyId.value = null;
   }
@@ -107,47 +141,53 @@ async function onReject(u: any): Promise<void> {
     :badge="`${rows.length} waiting`"
     data-approvals
   >
+    <p v-if="loading && !requests" class="note">Loading…</p>
+    <p v-else-if="loadError" class="note note--bad" role="alert" data-approvals-error>{{ loadError }}</p>
+    <p v-else-if="rows.length === 0" class="note" data-approvals-empty>Nobody is waiting.</p>
 
-    <p v-if="loading" class="note">Loading…</p>
-    <p v-else-if="loadError" class="note note--bad" role="alert" data-approvals-error>
-      {{ loadError }}
-    </p>
-    <p v-else-if="rows.length === 0" class="note" data-approvals-empty>
-      Nobody is waiting.
-    </p>
-
-    <div v-for="u in rows" :key="u.id" class="row hrow" data-approval-row>
+    <div v-for="r in rows" :key="r.id" class="row hrow" data-request-row>
       <div class="row__who">
-        <strong class="row__name" data-approval-name>{{ u.name || 'No name given' }}</strong>
-        <span class="row__email" data-approval-email>{{ u.email }}</span>
-        <span class="tag tag--live" data-approval-role>
-          asked for {{ String(u.requestedRole || u.role || 'access').toUpperCase() }}
-        </span>
+        <strong class="row__name">{{ r.name || 'No name given' }}</strong>
+        <span class="row__email">{{ r.email }}</span>
+        <span class="tag tag--live">{{ r.requested_role === 'coach' ? 'Coach' : 'Player' }}</span>
+        <span v-if="r.requested_team_id" class="tag" data-request-team-label>{{ teamLabel(r) }}</span>
+        <span v-else class="note">named no team</span>
       </div>
 
       <div class="row__acts">
-        <button
-          type="button" class="btn btn--go" :disabled="busyId === u.id"
-          data-approval-approve @click="onApprove(u)"
-        >Approve</button>
-        <button
-          type="button" class="btn" :disabled="busyId === u.id"
-          data-approval-reject @click="onReject(u)"
-        >Refuse</button>
+        <select
+          v-if="!r.requested_team_id && isAdmin"
+          class="input" :value="choice[r.id]?.teamId" data-request-team
+          @change="onTeamChosen(r, ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">— choose a team —</option>
+          <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.name }} · {{ t.schoolName }}</option>
+        </select>
+
+        <select
+          v-if="r.requested_role === 'player' && choice[r.id]?.teamId"
+          v-model="choice[r.id].playerId" class="input" data-request-player
+        >
+          <option value="">New roster entry</option>
+          <option v-for="p in rosters[choice[r.id].teamId] || []" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+
+        <button type="button" class="btn btn--go" :disabled="busyId === r.id"
+                data-request-approve @click="onApprove(r)">Approve</button>
+        <button type="button" class="btn" :disabled="busyId === r.id"
+                data-request-reject @click="onReject(r)">Refuse</button>
       </div>
     </div>
 
+    <p v-if="refused" class="note note--bad" role="alert" data-approvals-refused>{{ refused }}</p>
     <p v-if="notice" class="note note--good" role="status" data-approvals-notice>{{ notice }}</p>
   </SectionShell>
 </template>
 
 <style scoped>
-
 .row { align-items: center; }
-
 .row__who { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
 .row__name { color: var(--ink); font-size: 14px; }
 .row__email { color: var(--ink-muted); font-size: 13px; }
-
-.row__acts { display: flex; gap: var(--space-1); }
+.row__acts { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 </style>

@@ -65,7 +65,7 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
 
     <ApprovalsSection
       v-if="isCoach"
-      :school-id="schoolId" data-admin-approvals />
+      :is-admin="isAdmin" data-admin-approvals />
 
     <TeamsSection v-if="mayManage" data-admin-manage />
 
