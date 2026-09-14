@@ -23,6 +23,8 @@ export interface AccountsDb {
   owner: pg.Client;
   /** Runs fn on a new `authenticated` connection as userId, in a transaction that is rolled back. */
   asUser(userId: string, fn: (c: pg.Client) => Promise<void>): Promise<void>;
+  /** Runs fn on a new `anon` connection with no user, in a transaction that is rolled back. */
+  asAnon(fn: (c: pg.Client) => Promise<void>): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -52,21 +54,24 @@ export async function buildAccountsDb(): Promise<AccountsDb> {
     throw err;
   }
 
+  const visit = async (role: 'authenticated' | 'anon', userId: string, fn: (c: pg.Client) => Promise<void>) => {
+    const c = new pg.Client({ connectionString: url.toString() });
+    await c.connect();
+    try {
+      await c.query('begin');
+      await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);
+      await c.query(`set local role ${role}`);
+      await fn(c);
+    } finally {
+      await c.query('rollback').catch(() => {});
+      await c.end().catch(() => {});
+    }
+  };
+
   return {
     owner,
-    async asUser(userId, fn) {
-      const c = new pg.Client({ connectionString: url.toString() });
-      await c.connect();
-      try {
-        await c.query('begin');
-        await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);
-        await c.query('set local role authenticated');
-        await fn(c);
-      } finally {
-        await c.query('rollback').catch(() => {});
-        await c.end().catch(() => {});
-      }
-    },
+    asUser: (userId, fn) => visit('authenticated', userId, fn),
+    asAnon: (fn) => visit('anon', '', fn),
     close: drop
   };
 }

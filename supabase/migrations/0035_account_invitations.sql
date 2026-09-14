@@ -108,7 +108,117 @@ create trigger guard_profile_privileged_columns
   before update on public.profiles
   for each row execute function public.guard_profile_privileged_columns();
 
--- ─── 3. promote_confirmed_profile: the one place access is granted ─────────
+-- ─── 3. Redeeming invitations ──────────────────────────────────────────────
+--
+-- redeem_invitations does the work for both moments an invitation is used:
+-- confirmation (promote_confirmed_profile, for a new account) and sign-in
+-- (redeem_my_invitations in section 5, for an account that already existed
+-- when it was invited). Callable by neither visitors nor anon: it trusts
+-- p_user_id, so each caller decides whose invitations may be redeemed.
+
+create or replace function public.redeem_invitations(p_user_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inv      public.invitations%rowtype;
+  now_prof public.profiles%rowtype;
+  redeemed integer := 0;
+  school   uuid;
+  -- profiles.email is the visitor's to edit (until the guard in section 2
+  -- refused it, an account still pending_verification could set it to an
+  -- invited minor's address and then confirm one it controls).
+  -- auth.users.email is the address the confirmation actually proved, so
+  -- invitations are matched against that instead.
+  proven   text;
+begin
+  select lower(u.email) into proven from auth.users u where u.id = p_user_id;
+  if proven is null then
+    return 0;
+  end if;
+
+  -- Invitations naming different roster entries: apply none. Guessing which
+  -- person someone is puts a player on a squad they never played for. The
+  -- caller decides what that means for the account.
+  if (select count(distinct i.player_id)
+        from public.invitations i
+       where i.email = proven
+         and i.accepted_at is null and i.revoked_at is null
+         and i.role = 'player') > 1 then
+    return 0;
+  end if;
+
+  for inv in
+    select * from public.invitations i
+     where i.email = proven
+       and i.accepted_at is null and i.revoked_at is null
+     order by i.created_at
+  loop
+    -- A team deleted since the invitation was sent grants nothing.
+    if not exists (select 1 from public.teams t where t.id = inv.team_id and not coalesce(t.is_deleted, false)) then
+      continue;
+    end if;
+
+    -- Read afresh each time: an earlier invitation in this loop may have changed it.
+    select * into now_prof from public.profiles where id = p_user_id for update;
+    if not found then
+      return redeemed;
+    end if;
+
+    if inv.role = 'player' then
+      -- The roster entry may have left the team since it was invited.
+      if not exists (
+        select 1 from public.team_players tp
+         where tp.team_id = inv.team_id and tp.player_id = inv.player_id and not coalesce(tp.is_deleted, false)
+      ) then
+        continue;
+      end if;
+      -- Serializes two callers linking the same roster entry at once, so the
+      -- second one sees the first's link instead of racing it: an invitee
+      -- confirming for inv.player_id while a coach approves another request
+      -- onto the same roster entry.
+      perform 1 from public.players where id = inv.player_id for update;
+      -- The roster entry may have been claimed by another account since.
+      if exists (select 1 from public.profiles p where p.player_id = inv.player_id and p.id <> p_user_id) then
+        continue;
+      end if;
+      -- An account is one person: one already linked to someone else's roster
+      -- entry is not re-pointed by an invitation.
+      if now_prof.player_id is not null and now_prof.player_id <> inv.player_id then
+        continue;
+      end if;
+      update public.profiles
+         set player_id = inv.player_id,
+             role = case when role in ('coach', 'admin') then role else 'player' end
+       where id = p_user_id;
+    else
+      insert into public.team_coaches (team_id, profile_id)
+      values (inv.team_id, p_user_id)
+      on conflict do nothing;
+      update public.profiles
+         set role = case when role = 'admin' then 'admin' else 'coach' end
+       where id = p_user_id;
+    end if;
+
+    -- The first organization redeemed is the one the profile names, unless it
+    -- already names one.
+    school := coalesce(school, inv.school_id);
+    update public.invitations set accepted_at = now(), accepted_by = p_user_id where id = inv.id;
+    redeemed := redeemed + 1;
+  end loop;
+
+  if redeemed > 0 then
+    update public.profiles set school_id = school where id = p_user_id and school_id is null;
+  end if;
+  return redeemed;
+end;
+$$;
+
+revoke all on function public.redeem_invitations(uuid) from public, anon, authenticated;
+
+-- promote_confirmed_profile: the one place an invitation is redeemed at sign-up.
 --
 -- Only a profile still at pending_verification is touched, so a later
 -- confirmation cannot knock a settled account back into the queue.
@@ -121,14 +231,7 @@ set search_path = public
 as $$
 declare
   prof     public.profiles%rowtype;
-  inv      public.invitations%rowtype;
-  redeemed integer := 0;
-  school   uuid;
-  -- profiles.email is the visitor's to edit (until this trigger guards it, an
-  -- account still pending_verification could set it to an invited minor's
-  -- address and then confirm one it controls). auth.users.email is the
-  -- address the confirmation actually proved, so invitations are matched
-  -- against that instead.
+  redeemed integer;
   proven   text;
 begin
   select * into prof from public.profiles where id = p_user_id for update;
@@ -138,8 +241,8 @@ begin
 
   select lower(u.email) into proven from auth.users u where u.id = p_user_id;
 
-  -- Invitations naming different roster entries: apply none. Guessing which
-  -- person someone is puts a player on a squad they never played for.
+  -- Invitations naming different roster entries: apply none, and put the
+  -- account in front of a person who can tell who it is.
   if (select count(distinct i.player_id)
         from public.invitations i
        where i.email = proven
@@ -149,42 +252,11 @@ begin
     return;
   end if;
 
-  for inv in
-    select * from public.invitations i
-     where i.email = proven
-       and i.accepted_at is null and i.revoked_at is null
-     order by i.created_at
-  loop
-    if inv.role = 'player' then
-      -- Serializes two callers linking the same roster entry at once, so the
-      -- second one sees the first's link instead of racing it: an invitee
-      -- confirming for inv.player_id while a coach approves another request
-      -- onto the same roster entry.
-      perform 1 from public.players where id = inv.player_id for update;
-      -- The roster entry may have been claimed by another account since.
-      if exists (select 1 from public.profiles p where p.player_id = inv.player_id and p.id <> p_user_id) then
-        continue;
-      end if;
-      update public.profiles
-         set player_id = inv.player_id,
-             role = case when role = 'coach' then 'coach' else 'player' end
-       where id = p_user_id;
-    else
-      insert into public.team_coaches (team_id, profile_id)
-      values (inv.team_id, p_user_id)
-      on conflict do nothing;
-      update public.profiles set role = 'coach' where id = p_user_id;
-    end if;
-
-    -- The first organization redeemed is the one the profile names.
-    school := coalesce(school, inv.school_id);
-    update public.invitations set accepted_at = now(), accepted_by = p_user_id where id = inv.id;
-    redeemed := redeemed + 1;
-  end loop;
+  redeemed := public.redeem_invitations(p_user_id);
 
   if redeemed > 0 then
     update public.profiles
-       set status = 'active', email_verified = true, school_id = school
+       set status = 'active', email_verified = true
      where id = p_user_id;
   elsif prof.requested_role in ('player', 'coach') then
     update public.profiles set status = 'pending_approval', email_verified = true where id = p_user_id;
@@ -537,6 +609,31 @@ as $$
    where public.is_team_coach(p_team_id);
 $$;
 
+-- Connects an account that already existed when it was invited: a parent, a
+-- player with a school account, a coach invited to a second team. Confirmation
+-- only redeems for a profile still at pending_verification, so the app calls
+-- this at sign-in. Only for the caller's own proven address, and only once the
+-- account is active -- a request still waiting is decided by a person.
+create or replace function public.redeem_my_invitations()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles p
+      join auth.users u on u.id = p.id
+     where p.id = auth.uid()
+       and p.status = 'active'
+       and u.email_confirmed_at is not null
+  ) then
+    raise exception 'Only an active account with a confirmed email can accept invitations.';
+  end if;
+  return public.redeem_invitations(auth.uid());
+end;
+$$;
+
 revoke all on function public.create_invitation(text, uuid, text, uuid) from public, anon;
 revoke all on function public.revoke_invitation(uuid)                   from public, anon;
 revoke all on function public.pending_requests()                        from public, anon;
@@ -544,6 +641,7 @@ revoke all on function public.approve_player_request(uuid, uuid, uuid)  from pub
 revoke all on function public.approve_coach_request(uuid, uuid)         from public, anon;
 revoke all on function public.reject_request(uuid)                      from public, anon;
 revoke all on function public.team_linked_players(uuid)                 from public, anon;
+revoke all on function public.redeem_my_invitations()                  from public, anon;
 
 grant execute on function public.create_invitation(text, uuid, text, uuid) to authenticated;
 grant execute on function public.revoke_invitation(uuid)                   to authenticated;
@@ -552,5 +650,6 @@ grant execute on function public.approve_player_request(uuid, uuid, uuid)  to au
 grant execute on function public.approve_coach_request(uuid, uuid)         to authenticated;
 grant execute on function public.reject_request(uuid)                      to authenticated;
 grant execute on function public.team_linked_players(uuid)                 to authenticated;
+grant execute on function public.redeem_my_invitations()                  to authenticated;
 
 commit;

@@ -172,6 +172,7 @@ declare global {
       Promise<import('./types').AccountResult<string>>;
     approveCoachRequest(profileId: string, teamId: string): Promise<import('./types').AccountResult>;
     rejectRequest(profileId: string): Promise<import('./types').AccountResult>;
+    redeemMyInvitations(): Promise<import('./types').AccountResult<number>>;
     requestPasswordReset(email: string): Promise<import('./types').AccountResult>;
     updatePassword(password: string): Promise<import('./types').AccountResult>;
     authRedirectUrl(): string;

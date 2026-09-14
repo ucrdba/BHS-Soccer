@@ -60,6 +60,9 @@ describe('InviteControl', () => {
     await flush();
     expect(createInvitation).toHaveBeenCalledWith('Kid@Example.com', 't1', 'player', 'p1');
     expect(w.find('[data-invite-notice]').text()).toMatch(/does not email/i);
+    // An address that already has an account is connected at its next sign-in.
+    expect(w.find('[data-invite-notice]').text())
+      .toContain('If they already have an account, they are connected the next time they sign in.');
   });
 
   it('shows an open invitation with the sign-up link to send', async () => {

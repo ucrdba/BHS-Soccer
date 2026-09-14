@@ -108,6 +108,21 @@ describe('the request functions', () => {
   });
 });
 
+describe('connecting an existing account to its invitations', () => {
+  it('calls redeem_my_invitations with no arguments and returns the count', async () => {
+    rpcResult = { data: 2, error: null };
+    expect(await svc.redeemMyInvitations()).toEqual({ ok: true, data: 2 });
+    expect(rpcCalls).toEqual([{ fn: 'redeem_my_invitations', args: undefined }]);
+  });
+
+  it('hands back a refusal without announcing it, since the person did not ask for this', async () => {
+    rpcResult = { data: null, error: { message: 'Only an active account with a confirmed email can accept invitations.' } };
+    expect(await svc.redeemMyInvitations())
+      .toEqual({ ok: false, error: 'Only an active account with a confirmed email can accept invitations.' });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});
+
 describe('teams to join', () => {
   it('lists teams by organization, then name', async () => {
     fromRows.teams = [

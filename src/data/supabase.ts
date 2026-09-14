@@ -470,6 +470,25 @@ class SupabaseService {
     return this.accountRpc('reject_request', { p_profile_id: profileId });
   }
 
+  /**
+   * Connect the signed-in account to invitations sent to its address after it
+   * already existed. Returns how many were redeemed.
+   *
+   * Deliberately NOT through accountRpc: this runs on every sign-in without
+   * the person asking for it, so a refusal or failure must not put a notice
+   * on their screen. The caller decides, and ignores it.
+   */
+  async redeemMyInvitations(): Promise<AccountResult<number>> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    try {
+      const { data, error } = await this.client!.rpc('redeem_my_invitations');
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, data: Number(data) || 0 };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   async requestPasswordReset(email: string): Promise<AccountResult> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud authentication is not configured.' };
     try {

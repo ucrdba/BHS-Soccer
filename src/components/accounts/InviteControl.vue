@@ -70,7 +70,7 @@ async function onInvite(): Promise<void> {
     const res = await supabaseService.createInvitation(
       address, props.teamId, props.role, props.role === 'player' ? (props.playerId || null) : null);
     if (!res.ok) { error.value = res.error || 'That invitation was refused.'; return; }
-    notice.value = `Invited ${address.toLowerCase()}. The app does not email it — send them the link below.`;
+    notice.value = `Invited ${address.toLowerCase()}. The app does not email it — send them the link below. If they already have an account, they are connected the next time they sign in.`;
     email.value = '';
     await load();
   } finally {

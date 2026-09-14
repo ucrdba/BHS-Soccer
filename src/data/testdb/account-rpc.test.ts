@@ -309,6 +309,100 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
     });
   });
 
+  describe('redeem_my_invitations', () => {
+    // Redemption at confirmation only reaches a profile at pending_verification,
+    // so an address that already has an account -- a parent, a player with a
+    // school account, a coach invited to a second team -- is connected when it
+    // next signs in, by this.
+    const emailOf = async (id: string) =>
+      (await one(db.owner, `select email from auth.users where id = $1`, [id])).email as string;
+    const accepted = async (invId: string) =>
+      (await one(db.owner, `select accepted_at from public.invitations where id = $1`, [invId])).accepted_at;
+
+    it('links an active fan invited as a player', async () => {
+      const team = await makeTeam(db.owner);
+      const player = await makeRosterEntry(db.owner, team);
+      const fan = await signUp(db.owner, { confirmed: true });
+      const inv = await invite(db.owner, { email: fan.email, team, role: 'player', playerId: player });
+
+      await db.asUser(fan.id, async (c) => {
+        expect(await one(c, `select public.redeem_my_invitations() as n`)).toEqual({ n: 1 });
+        expect(await one(c, `select role, status, player_id, school_id from public.profiles where id = $1`, [fan.id]))
+          .toEqual({ role: 'player', status: 'active', player_id: player, school_id: team.school_id });
+        // The fan cannot read invitations, so the owner checks it once this commits.
+        await c.query('commit');
+      });
+      expect(await one(db.owner, `select accepted_by from public.invitations where id = $1`, [inv.id]))
+        .toEqual({ accepted_by: fan.id });
+    });
+
+    it('gives an active coach invited to a second team a place on its staff, and keeps them a coach', async () => {
+      const first = await makeTeam(db.owner);
+      const second = await makeTeam(db.owner);
+      const coach = await makeCoach(db.owner, first);
+      await invite(db.owner, { email: await emailOf(coach), team: second, role: 'coach' });
+
+      await db.asUser(coach, async (c) => {
+        expect(await one(c, `select public.redeem_my_invitations() as n`)).toEqual({ n: 1 });
+        expect(await one(c, `select role, school_id from public.profiles where id = $1`, [coach]))
+          .toEqual({ role: 'coach', school_id: first.school_id });
+        expect((await c.query(`select team_id from public.team_coaches where profile_id = $1 order by team_id`, [coach]))
+          .rows.map((r: any) => r.team_id).sort()).toEqual([first.id, second.id].sort());
+      });
+    });
+
+    it('keeps an admin invited as a coach an admin', async () => {
+      const team = await makeTeam(db.owner);
+      const admin = await makeAdmin(db.owner);
+      await invite(db.owner, { email: await emailOf(admin), team, role: 'coach' });
+
+      await db.asUser(admin, async (c) => {
+        expect(await one(c, `select public.redeem_my_invitations() as n`)).toEqual({ n: 1 });
+        expect(await one(c, `select role from public.profiles where id = $1`, [admin])).toEqual({ role: 'admin' });
+        expect(await one(c,
+          `select count(*)::int as n from public.team_coaches where team_id = $1 and profile_id = $2`, [team.id, admin]))
+          .toEqual({ n: 1 });
+      });
+    });
+
+    it('refuses an account that is not active yet', async () => {
+      const team = await makeTeam(db.owner);
+      const pending = await request(db, 'player', team.id);
+      await invite(db.owner, { email: await emailOf(pending), team, role: 'coach' });
+
+      await db.asUser(pending, async (c) => {
+        await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toThrow(/active account/);
+      });
+    });
+
+    it('does not re-link a player already linked to a different roster entry, and leaves the invitation open', async () => {
+      const team = await makeTeam(db.owner);
+      const mine = await makeRosterEntry(db.owner, team);
+      const other = await makeRosterEntry(db.owner, team);
+      const holder = await signUp(db.owner, { confirmed: true });
+      await db.owner.query(`update public.profiles set role = 'player', player_id = $2 where id = $1`, [holder.id, mine]);
+      const inv = await invite(db.owner, { email: holder.email, team, role: 'player', playerId: other });
+
+      await db.asUser(holder.id, async (c) => {
+        expect(await one(c, `select public.redeem_my_invitations() as n`)).toEqual({ n: 0 });
+        expect(await one(c, `select player_id from public.profiles where id = $1`, [holder.id]))
+          .toEqual({ player_id: mine });
+        await c.query('commit');
+      });
+      expect(await accepted(inv.id)).toBeNull();
+    });
+
+    it('cannot be run by a visitor who is not signed in, nor redeem_invitations by anyone', async () => {
+      const fan = await signUp(db.owner, { confirmed: true });
+      await db.asAnon(async (c) => {
+        await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toMatchObject({ code: '42501' });
+      });
+      await db.asUser(fan.id, async (c) => {
+        await expect(c.query(`select public.redeem_invitations($1)`, [fan.id])).rejects.toMatchObject({ code: '42501' });
+      });
+    });
+  });
+
   describe('a signed-in caller with no profile', () => {
     it('is refused every privileged action rather than let through', async () => {
       const team = await makeTeam(db.owner);

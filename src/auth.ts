@@ -83,6 +83,9 @@ export class AuthManager {
     const sessionResult = await supabaseService.getSession();
     const session = sessionResult?.data?.session;
     this.currentUser = session ? (await this.loadProfileForSession()) || GUEST_USER : GUEST_USER;
+    if (session && this.currentUser.status === 'active' && this.currentUser.id !== GUEST_USER.id) {
+      await this.connectInvitations();
+    }
 
     supabaseService.onAuthStateChange((_event, changedSession) => {
       if (_event === 'PASSWORD_RECOVERY') { this.recovering = true; this.purpose = 'reset'; }
@@ -101,6 +104,25 @@ export class AuthManager {
   private async loadProfileForSession(): Promise<AppUser | null> {
     const row = await supabaseService.fetchOwnProfile();
     return row ? mapProfileRowToAppUser(row) : null;
+  }
+
+  /**
+   * Connect an account that already existed when it was invited -- a parent,
+   * a player with a school account, a coach invited to a second team.
+   * Confirmation only redeems invitations for a brand-new account, so this runs
+   * at sign-in. The person did not ask for it, so a refusal or failure is
+   * ignored rather than shown; a redemption reloads the profile so the new
+   * role and team show at once.
+   */
+  private async connectInvitations(): Promise<void> {
+    try {
+      const res = await supabaseService.redeemMyInvitations();
+      if (!res?.ok || !(Number(res.data) > 0)) return;
+      const profile = await this.loadProfileForSession();
+      if (profile) this.setCurrentUser(profile);
+    } catch {
+      // Not the person's action; nothing to tell them.
+    }
   }
 
   private setCurrentUser(user: AppUser): void {
@@ -143,7 +165,8 @@ export class AuthManager {
     }
 
     this.setCurrentUser(profile);
-    return { success: true, user: profile };
+    await this.connectInvitations();
+    return { success: true, user: this.currentUser };
   }
 
   async registerUser(

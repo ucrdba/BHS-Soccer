@@ -155,6 +155,51 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     expect(await profile(db, u.id)).toMatchObject({ player_id: null, role: 'guest', status: 'active' });
   });
 
+  it('does not redeem an invitation to a team deleted since', async () => {
+    const team = await makeTeam(db.owner);
+    const email = `${uniq()}@example.com`;
+    const inv = await invite(db.owner, { email, team, role: 'coach' });
+    await db.owner.query(`update public.teams set is_deleted = true where id = $1`, [team.id]);
+
+    const u = await signUp(db.owner, { email });
+    await confirm(db.owner, u.id);
+
+    expect(await profile(db, u.id)).toMatchObject({ role: 'guest', status: 'active' });
+    expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
+      .toEqual({ accepted_at: null });
+  });
+
+  it('does not redeem a player invitation whose roster entry has left the team', async () => {
+    const team = await makeTeam(db.owner);
+    const player = await makeRosterEntry(db.owner, team);
+    const email = `${uniq()}@example.com`;
+    const inv = await invite(db.owner, { email, team, role: 'player', playerId: player });
+    await db.owner.query(`update public.team_players set is_deleted = true where team_id = $1 and player_id = $2`,
+      [team.id, player]);
+
+    const u = await signUp(db.owner, { email });
+    await confirm(db.owner, u.id);
+
+    expect(await profile(db, u.id)).toMatchObject({ role: 'guest', player_id: null });
+    expect(await one(db.owner, `select accepted_at from public.invitations where id = $1`, [inv.id]))
+      .toEqual({ accepted_at: null });
+  });
+
+  it('does not redeem a revoked invitation', async () => {
+    const team = await makeTeam(db.owner);
+    const email = `${uniq()}@example.com`;
+    await invite(db.owner, { email, team, role: 'coach' });
+    await db.owner.query(`update public.invitations set revoked_at = now() where email = $1`, [email]);
+
+    const u = await signUp(db.owner, { email });
+    await confirm(db.owner, u.id);
+
+    expect(await profile(db, u.id)).toMatchObject({ role: 'guest', status: 'active' });
+    expect(await one(db.owner,
+      `select count(*)::int as n from public.team_coaches where team_id = $1 and profile_id = $2`, [team.id, u.id]))
+      .toEqual({ n: 0 });
+  });
+
   it('clears the password typed at sign-up when the email is confirmed', async () => {
     // Whoever signs up first with an address sets the password; the owner
     // confirming it later must not leave that stranger able to sign in.
