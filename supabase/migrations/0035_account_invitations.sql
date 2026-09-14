@@ -73,7 +73,10 @@ alter table public.profiles
 --
 -- player_id and requested_team_id join the guarded columns: a visitor who could
 -- set their own player_id could attach themselves to any roster entry and read
--- that team's members-only content.
+-- that team's members-only content. email joins them too: promote_confirmed_profile
+-- matches invitations against auth.users.email, the address confirmation proved, but
+-- an editable profiles.email would otherwise let a pending account be walked onto an
+-- address it does not control before confirming one it does.
 
 create or replace function public.guard_profile_privileged_columns()
 returns trigger
@@ -91,9 +94,10 @@ begin
   if new.role is distinct from old.role
      or new.status is distinct from old.status
      or new.school_id is distinct from old.school_id
+     or new.email is distinct from old.email
      or new.player_id is distinct from old.player_id
      or new.requested_team_id is distinct from old.requested_team_id then
-    raise exception 'Only an admin can change role, status, school, roster link or requested team.';
+    raise exception 'Only an admin can change role, status, school, email, roster link or requested team.';
   end if;
   return new;
 end;
@@ -120,17 +124,25 @@ declare
   inv      public.invitations%rowtype;
   redeemed integer := 0;
   school   uuid;
+  -- profiles.email is the visitor's to edit (until this trigger guards it, an
+  -- account still pending_verification could set it to an invited minor's
+  -- address and then confirm one it controls). auth.users.email is the
+  -- address the confirmation actually proved, so invitations are matched
+  -- against that instead.
+  proven   text;
 begin
   select * into prof from public.profiles where id = p_user_id for update;
   if not found or prof.status <> 'pending_verification' then
     return;
   end if;
 
+  select lower(u.email) into proven from auth.users u where u.id = p_user_id;
+
   -- Invitations naming different roster entries: apply none. Guessing which
   -- person someone is puts a player on a squad they never played for.
   if (select count(distinct i.player_id)
         from public.invitations i
-       where i.email = lower(prof.email)
+       where i.email = proven
          and i.accepted_at is null and i.revoked_at is null
          and i.role = 'player') > 1 then
     update public.profiles set status = 'pending_approval', email_verified = true where id = p_user_id;
@@ -139,7 +151,7 @@ begin
 
   for inv in
     select * from public.invitations i
-     where i.email = lower(prof.email)
+     where i.email = proven
        and i.accepted_at is null and i.revoked_at is null
      order by i.created_at
   loop
