@@ -16,9 +16,19 @@ import { createTestingPinia } from '@pinia/testing';
 import AuthModal from './AuthModal.vue';
 import { useAuthStore } from '../../stores/auth';
 
-function mountAuth() {
+const fetchJoinableTeams = vi.fn();
+vi.mock('../../data/supabase', () => ({
+  supabaseService: { fetchJoinableTeams: (...a: any[]) => fetchJoinableTeams(...a) }
+}));
+const TEAMS = [
+  { id: 't1', name: 'U14', season: null, schoolName: 'Hawks FC' },
+  { id: 't2', name: 'Varsity', season: '2026', schoolName: 'Riverside High' }
+];
+const flush = async () => { for (let i = 0; i < 3; i++) await new Promise(r => setTimeout(r, 0)); };
+
+function mountAuth(props: Record<string, any> = {}) {
   const wrapper = mount(AuthModal, {
-    props: { open: true },
+    props: { open: true, ...props },
     global: {
       plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: true })]
     },
@@ -87,21 +97,6 @@ describe('signing in', () => {
     expect(wrapper.emitted('close')).toBeFalsy();
   });
 
-  it('opens the verify tab when the account is unverified', async () => {
-    const { wrapper, store } = mountAuth();
-    (store.login as any).mockResolvedValue({
-      success: false, isPendingVerification: true, user: { email: 'coach@club.test' }
-    });
-
-    await setValue(wrapper, '[data-field="email"]', 'coach@club.test');
-    await setValue(wrapper, '[data-field="password"]', 'secret');
-    await wrapper.find('[data-signin-submit]').trigger('submit');
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(wrapper.find('[data-tab-panel="verify"]').exists()).toBe(true);
-    expect(wrapper.find('[data-verify-target]').text()).toContain('coach@club.test');
-  });
-
   it('never uses a blocking alert', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const { wrapper, store } = mountAuth();
@@ -117,7 +112,10 @@ describe('signing in', () => {
 });
 
 describe('registering', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    fetchJoinableTeams.mockResolvedValue([]);
+  });
 
   async function fillRegister(w: any, email = 'coach@club.test') {
     await w.find('[data-tab="register"]').trigger('click');
@@ -126,19 +124,6 @@ describe('registering', () => {
     await setValue(w, '[data-field="regPassword"]', 'secret123');
   }
 
-  it('registers and opens the verify tab', async () => {
-    const { wrapper, store } = mountAuth();
-    (store.inspectEmail as any).mockReturnValue({ valid: true, suggestion: null, reason: null });
-    (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
-
-    await fillRegister(wrapper);
-    await wrapper.find('[data-register-submit]').trigger('submit');
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(store.register).toHaveBeenCalled();
-    expect(wrapper.find('[data-tab-panel="verify"]').exists()).toBe(true);
-  });
-
   it('refuses an address that cannot be one, without calling register', async () => {
     const { wrapper, store } = mountAuth();
     (store.inspectEmail as any).mockReturnValue({
@@ -146,6 +131,7 @@ describe('registering', () => {
     });
 
     await fillRegister(wrapper, 'nonsense');
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
     await wrapper.find('[data-register-submit]').trigger('submit');
     await new Promise(r => setTimeout(r, 0));
 
@@ -160,6 +146,7 @@ describe('registering', () => {
     });
 
     await fillRegister(wrapper, 'coach@gmial.com');
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
     await wrapper.find('[data-register-submit]').trigger('submit');
     await new Promise(r => setTimeout(r, 0));
 
@@ -177,6 +164,7 @@ describe('registering', () => {
     (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
 
     await fillRegister(wrapper, 'coach@gmial.com');
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
     await wrapper.find('[data-register-submit]').trigger('submit');
     await new Promise(r => setTimeout(r, 0));
 
@@ -195,6 +183,7 @@ describe('registering', () => {
     (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
 
     await fillRegister(wrapper, 'coach@gmial.com');
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
     await wrapper.find('[data-register-submit]').trigger('submit');
     await new Promise(r => setTimeout(r, 0));
 
@@ -211,6 +200,7 @@ describe('registering', () => {
     (store.register as any).mockResolvedValue({ success: false, message: 'Already registered.' });
 
     await fillRegister(wrapper);
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
     await wrapper.find('[data-register-submit]').trigger('submit');
     await new Promise(r => setTimeout(r, 0));
 
@@ -218,25 +208,65 @@ describe('registering', () => {
   });
 });
 
-describe('verifying', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+describe('registering', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    fetchJoinableTeams.mockResolvedValue(TEAMS);
+  });
 
-  it('closes once the code is accepted', async () => {
-    const { wrapper, store } = mountAuth();
-    (store.login as any).mockResolvedValue({
-      success: false, isPendingVerification: true, user: { email: 'c@club.test' }
+  async function openRegister(props: Record<string, any> = {}) {
+    const m = mountAuth(props);
+    await m.wrapper.find('[data-tab="register"]').trigger('click');
+    await flush();
+    return m;
+  }
+
+  it('lists teams grouped by organization', async () => {
+    const { wrapper } = await openRegister();
+    expect(wrapper.findAll('[data-field="regTeam"] optgroup').map(g => g.attributes('label')))
+      .toEqual(['Hawks FC', 'Riverside High']);
+  });
+
+  it('asks which team a player or coach is joining', async () => {
+    const { wrapper, store } = await openRegister();
+    await setValue(wrapper, '[data-field="regName"]', 'Ana Ruiz');
+    await setValue(wrapper, '[data-field="regEmail"]', 'ana@example.com');
+    await setValue(wrapper, '[data-field="regPassword"]', 'secret123');
+    await setValue(wrapper, '[data-field="regRole"]', 'player');
+    await wrapper.find('[data-register-submit]').trigger('submit');
+    expect(store.register).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-feedback]').text()).toMatch(/Choose the team/);
+  });
+
+  it('does not ask a fan for a team', async () => {
+    const { wrapper } = await openRegister();
+    await setValue(wrapper, '[data-field="regRole"]', 'guest');
+    expect(wrapper.find('[data-field="regTeam"]').exists()).toBe(false);
+  });
+
+  it('sends the team with the registration, and then says to check for a link', async () => {
+    const { wrapper, store } = await openRegister();
+    (store.register as any).mockResolvedValue({ success: true, requiresVerification: true });
+    await setValue(wrapper, '[data-field="regName"]', 'Ana Ruiz');
+    await setValue(wrapper, '[data-field="regEmail"]', 'ana@example.com');
+    await setValue(wrapper, '[data-field="regPassword"]', 'secret123');
+    await setValue(wrapper, '[data-field="regRole"]', 'player');
+    await setValue(wrapper, '[data-field="regTeam"]', 't1');
+    await wrapper.find('[data-register-submit]').trigger('submit');
+    await flush();
+
+    expect(store.register).toHaveBeenCalledWith({
+      name: 'Ana Ruiz', email: 'ana@example.com', password: 'secret123', role: 'player', teamId: 't1'
     });
-    await setValue(wrapper, '[data-field="email"]', 'c@club.test');
-    await setValue(wrapper, '[data-field="password"]', 'x');
-    await wrapper.find('[data-signin-submit]').trigger('submit');
-    await new Promise(r => setTimeout(r, 0));
+    expect(wrapper.find('[data-tab-panel="sent"]').text()).toContain('ana@example.com');
+    expect(wrapper.text()).not.toMatch(/6-digit|code/i);
+  });
 
-    (store.verifyOtp as any).mockResolvedValue({ success: true, user: { name: 'C' } });
-    await setValue(wrapper, '[data-field="otp"]', '123456');
-    await wrapper.find('[data-verify-submit]').trigger('submit');
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(store.verifyOtp).toHaveBeenCalledWith('c@club.test', '123456');
-    expect(wrapper.emitted('close')).toBeTruthy();
+  it('opens on registration with the invited address filled in', async () => {
+    const { wrapper } = mountAuth({ open: false, initialTab: 'register', initialEmail: 'kid@example.com' });
+    await wrapper.setProps({ open: true });
+    await flush();
+    expect(wrapper.find('[data-tab-panel="register"]').exists()).toBe(true);
+    expect((wrapper.find('[data-field="regEmail"]').element as HTMLInputElement).value).toBe('kid@example.com');
   });
 });

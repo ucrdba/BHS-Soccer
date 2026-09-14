@@ -6,7 +6,7 @@
 
 import type {
   AppUser, UserRole,
-  LoginResult, RegisterResult, OtpVerifyResult
+  LoginResult, RegisterResult
 } from './types';
 
 import { checkEmail } from './auth/email-typo';
@@ -27,16 +27,20 @@ const ROLES = {
 const GUEST_USER: AppUser = {
   id: 'user_guest',
   name: 'Public Visitor',
-  email: 'guest@cougars-fan.com',
+  email: '',
   role: ROLES.GUEST,
   status: 'active',
   emailVerified: true,
-  schoolId: 'bhs',
-  schoolName: 'Beaumont High School',
-  teamLevel: 'Fan',
-  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
+  schoolId: null
 };
 
+/**
+ * A profile row as the app sees it.
+ *
+ * It used to label every user "Beaumont High School, Boys Varsity" whatever
+ * their row said, so a club coach signed in under somebody else's crest. The
+ * organization comes from the row now, and nothing substitutes one.
+ */
 function mapProfileRowToAppUser(row: Record<string, any>): AppUser {
   return {
     id: row.id,
@@ -44,13 +48,12 @@ function mapProfileRowToAppUser(row: Record<string, any>): AppUser {
     email: row.email,
     role: row.role,
     requestedRole: row.requested_role || undefined,
+    requestedTeamId: row.requested_team_id || undefined,
     status: row.status,
     emailVerified: !!row.email_verified,
-    schoolId: 'bhs',
-    schoolName: 'Beaumont High School',
-    teamLevel: row.team_level || 'Boys Varsity',
+    schoolId: row.school_id || null,
     playerId: row.player_id || undefined,
-    avatar: row.avatar_url || 'assets/bhs_cougars_logo.png',
+    avatar: row.avatar_url || undefined,
     createdAt: row.created_at
       ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : undefined
@@ -60,7 +63,7 @@ function mapProfileRowToAppUser(row: Record<string, any>): AppUser {
 function humanizeAuthError(error?: { message: string } | null): string {
   const msg = error?.message || '';
   if (/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
-  if (/email not confirmed/i.test(msg)) return 'Please confirm your email before signing in.';
+  if (/email not confirmed/i.test(msg)) return 'Confirm your email first: open the link we sent you, then sign in.';
   if (/user already registered/i.test(msg)) return 'An account with this email already exists. Try signing in instead.';
   return msg || 'Something went wrong. Please try again.';
 }
@@ -119,12 +122,17 @@ export class AuthManager {
     }
 
     if (profile.status === 'pending_verification') {
-      this.setCurrentUser(profile);
-      return { success: false, isPendingVerification: true, user: profile, message: 'Please enter your 6-digit email verification code to complete registration.' };
+      await supabaseService.signOutUser();
+      return { success: false, isPendingVerification: true, message: 'Confirm your email first: open the link we sent you, then sign in.' };
     }
     if (profile.status === 'pending_approval') {
       this.setCurrentUser(profile);
-      return { success: false, isPendingApproval: true, user: profile, message: 'Your account email is verified! Request for Coach / Player access is currently pending Coach Bob / AD approval.' };
+      return {
+        success: false, isPendingApproval: true, user: profile,
+        message: profile.requestedRole === 'coach'
+          ? 'Your request to join as a coach is waiting for an admin to approve it.'
+          : "Your request is waiting for the team's coach to approve it."
+      };
     }
     if (profile.status === 'rejected') {
       await supabaseService.signOutUser();
@@ -135,51 +143,33 @@ export class AuthManager {
     return { success: true, user: profile };
   }
 
-  async registerUser({ name, email, password, role }: { name: string; email: string; password?: string; role?: string }): Promise<RegisterResult> {
+  async registerUser(
+    { name, email, password, role, teamId }:
+    { name: string; email: string; password?: string; role?: string; teamId?: string | null }
+  ): Promise<RegisterResult> {
     const cleanName = String(name || '').trim();
     const cleanEmail = String(email || '').trim().toLowerCase();
     const roleValue = ((role || ROLES.GUEST) as string).toLowerCase();
 
     if (!cleanName || !cleanEmail || !password) {
-      return { success: false, message: 'Please provide Name, Email, and Password.' };
+      return { success: false, message: 'Please provide a name, an email and a password.' };
+    }
+    if (roleValue !== ROLES.GUEST && !teamId) {
+      return { success: false, message: 'Choose the team you are joining.' };
     }
     if (!supabaseService.isConfigured()) {
       return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
     }
 
-    const result = await supabaseService.signUpUser(cleanEmail, password, { name: cleanName, requested_role: roleValue });
+    const metadata: Record<string, string> = { name: cleanName, requested_role: roleValue };
+    if (roleValue !== ROLES.GUEST && teamId) metadata.requested_team_id = teamId;
+
+    const result = await supabaseService.signUpUser(cleanEmail, password, metadata);
     if (!result || result.error) {
       return { success: false, message: humanizeAuthError(result?.error) };
     }
 
-    return { success: true, requiresVerification: true, message: 'Account created — check your email for a 6-digit verification code.' };
-  }
-
-  async verifyUserOtp(email: string, inputCode: string): Promise<OtpVerifyResult> {
-    if (!supabaseService.isConfigured()) {
-      return { success: false, message: 'Cloud authentication is not configured for this deployment.' };
-    }
-
-    const result = await supabaseService.verifyOtp(String(email || '').trim().toLowerCase(), String(inputCode || '').trim());
-    if (!result || result.error) {
-      return { success: false, message: 'Incorrect or expired verification code. Please try again.' };
-    }
-
-    const profile = await this.loadProfileForSession();
-    if (!profile) {
-      return { success: false, message: 'Verification succeeded but the account profile could not be loaded.' };
-    }
-
-    this.setCurrentUser(profile);
-
-    return {
-      success: true,
-      user: profile,
-      status: profile.status,
-      message: profile.status === 'pending_approval'
-        ? `📩 Email verified successfully! Your request for ${(profile.requestedRole || '').toUpperCase()} access is now pending Coach Bob & Athletic Director approval.`
-        : `🎉 Email verified! Welcome, ${profile.name}!`
-    };
+    return { success: true, requiresVerification: true, message: 'Check your email for a link to confirm your account.' };
   }
 
   async logout(): Promise<void> {

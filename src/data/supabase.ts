@@ -329,18 +329,6 @@ class SupabaseService {
     return this.client!.auth.onAuthStateChange(callback);
   }
 
-  async verifyOtp(email: string, token: string): Promise<any> {
-    if (!this.isConfigured()) return null;
-    try {
-      const { data, error } = await this.client!.auth.verifyOtp({ email, token, type: 'signup' });
-      if (error) report('Auth', error.message);
-      return { data, error };
-    } catch (e) {
-      report('Auth', e);
-      return null;
-    }
-  }
-
   async fetchOwnProfile(): Promise<any> {
     if (!this.isConfigured()) return null;
     try {

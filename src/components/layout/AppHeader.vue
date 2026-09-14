@@ -9,17 +9,34 @@
  * distinction is the point: a person may coach a school team and a club
  * team, and confusing the two is the failure the control exists to prevent.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import AuthModal from '../auth/AuthModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { useOrganizationStore } from '../../stores/organization';
 import { useScheduleStore } from '../../stores/schedule';
 import { teamGroups } from '../../domain/team-switcher';
+import { readSignupEmail } from '../../domain/signup-link';
 
 const auth = useAuthStore();
 const org = useOrganizationStore();
 const schedule = useScheduleStore();
 const authOpen = ref(false);
+const authTab = ref<'signin' | 'register'>('signin');
+const signupEmail = ref('');
+
+/**
+ * An invited person arrives on ?signup=<address>: open registration with it
+ * filled in. The link connects nobody -- the invitation in the database does,
+ * when they confirm the address.
+ */
+onMounted(() => {
+  let email: string | null = null;
+  try { email = readSignupEmail(window.location.search); } catch { email = null; }
+  if (email === null) return;
+  signupEmail.value = email;
+  authTab.value = 'register';
+  authOpen.value = true;
+});
 
 /** The first letter of the organization's name; nothing before it loads. */
 const initial = computed(() => (org.branding.name || '').trim().charAt(0).toUpperCase());
@@ -46,7 +63,12 @@ const record = computed(() => (
 ));
 const showRecord = computed(() => !!record.value && record.value.gamesPlayed > 0);
 
-const accountLabel = computed(() => auth.isGuest ? 'Sign in' : 'Sign out');
+/**
+ * Signed in is not the same as not a guest: a fan and an account waiting for
+ * approval both hold the guest role, and were offered "Sign in" with no way to
+ * sign out.
+ */
+const accountLabel = computed(() => auth.isSignedIn ? 'Sign out' : 'Sign in');
 const badgeText = computed(() => String(auth.role || '').toUpperCase());
 
 function onTeamChange(e: Event): void {
@@ -55,7 +77,7 @@ function onTeamChange(e: Event): void {
 }
 
 async function onAccountClick(): Promise<void> {
-  if (auth.isGuest) { authOpen.value = true; return; }
+  if (!auth.isSignedIn) { authTab.value = 'signin'; authOpen.value = true; return; }
   await auth.logout();
 }
 </script>
@@ -107,7 +129,9 @@ async function onAccountClick(): Promise<void> {
       </span>
     </div>
 
-    <AuthModal :open="authOpen" @close="authOpen = false" />
+    <AuthModal
+      :open="authOpen" :initial-tab="authTab" :initial-email="signupEmail"
+      @close="authOpen = false" />
   </header>
 </template>
 

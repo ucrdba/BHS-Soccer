@@ -191,11 +191,12 @@ export interface AppUser {
   email: string;
   role: UserRole;
   requestedRole?: UserRole;
+  /** The team a pending request named, if any. */
+  requestedTeamId?: string;
   status: UserStatus;
   emailVerified: boolean;
-  schoolId: string;
-  schoolName: string;
-  teamLevel: string;
+  /** The organization the profile names; null for a guest or a request that named no team. */
+  schoolId: string | null;
   playerId?: string;
   avatar?: string;
   createdAt?: string;

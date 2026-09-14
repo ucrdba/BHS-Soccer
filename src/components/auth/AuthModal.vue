@@ -18,12 +18,14 @@
  * a club coach's address is ordinary and unknowable from here, and the person
  * overruling it must have an easy path rather than a fight.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { useAuthStore } from '../../stores/auth';
 import { demoConfig, DEMO_ACCOUNTS } from '../../demo';
+import { supabaseService } from '../../data/supabase';
+import type { JoinableTeam } from '../../types';
 
-defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean; initialTab?: 'signin' | 'register'; initialEmail?: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const auth = useAuthStore();
@@ -35,7 +37,7 @@ const auth = useAuthStore();
  */
 const demo = demoConfig();
 
-type Tab = 'signin' | 'register' | 'verify';
+type Tab = 'signin' | 'register' | 'sent';
 const tab = ref<Tab>('signin');
 const busy = ref(false);
 const feedback = ref('');
@@ -49,41 +51,59 @@ const regEmail = ref('');
 const regPassword = ref('');
 const regRole = ref('coach');
 
-const otp = ref('');
-const verifyEmail = ref('');
-
 /** Set when checkEmail offers a correction; both answers are then on screen. */
 const suggestion = ref<string | null>(null);
 const suggestionReason = ref<string | null>(null);
 
 const ROLES = [
-  { value: 'coach', label: '👔 Coach / Staff Member (Full Access)' },
-  { value: 'player', label: '⚽ Player (Roster & Ratings)' },
-  { value: 'guest', label: '👤 Public Visitor / Fan (Public Matches Only)' }
+  { value: 'coach', label: 'Coach or staff' },
+  { value: 'player', label: 'Player' },
+  { value: 'guest', label: 'Fan or parent — public pages only' }
 ];
+
+const regTeam = ref('');
+const teams = ref<JoinableTeam[]>([]);
+const sentTo = ref('');
+const needsTeam = computed(() => regRole.value !== 'guest');
+
+/** Teams grouped under their organization, which is how a person recognises their own. */
+const teamGroups = computed(() => {
+  const groups: { school: string; teams: JoinableTeam[] }[] = [];
+  for (const t of teams.value) {
+    let g = groups.find(x => x.school === t.schoolName);
+    if (!g) { g = { school: t.schoolName, teams: [] }; groups.push(g); }
+    g.teams.push(t);
+  }
+  return groups;
+});
+
+async function loadTeams(): Promise<void> {
+  if (teams.value.length) return;
+  teams.value = (await supabaseService.fetchJoinableTeams()) || [];
+}
+
+watch(() => props.open, (open) => {
+  if (!open) return;
+  setTab(props.initialTab || 'signin');
+  if (props.initialEmail) regEmail.value = props.initialEmail;
+}, { immediate: true });
 
 const title = computed(() =>
   demo.enabled ? 'Try the demo'
     : tab.value === 'register' ? 'Create an account'
-      : tab.value === 'verify' ? 'Verify your email'
+      : tab.value === 'sent' ? 'Check your email'
         : 'Sign in');
 
 function setTab(next: Tab): void {
   tab.value = next;
   feedback.value = '';
   suggestion.value = null;
+  if (next === 'register') void loadTeams();
 }
 
 function fail(message: string): void {
   feedback.value = message;
   feedbackKind.value = 'error';
-}
-
-function openVerify(target: string): void {
-  verifyEmail.value = target;
-  tab.value = 'verify';
-  feedback.value = 'We emailed you a 6-digit verification code. Enter it below.';
-  feedbackKind.value = 'info';
 }
 
 async function onSignIn(): Promise<void> {
@@ -92,7 +112,7 @@ async function onSignIn(): Promise<void> {
   try {
     const res: any = await auth.login(email.value.trim(), password.value);
     if (res?.success) { emit('close'); return; }
-    if (res?.isPendingVerification) { openVerify(res.user?.email || email.value.trim()); return; }
+    if (res?.isPendingVerification) { fail(res.message); return; }
     fail(res?.message || 'Could not sign in.');
   } finally {
     busy.value = false;
@@ -109,11 +129,12 @@ async function submitRegistration(withEmail: string): Promise<void> {
       name: regName.value.trim(),
       email: withEmail,
       password: regPassword.value,
-      role: regRole.value
+      role: regRole.value,
+      teamId: needsTeam.value ? regTeam.value : null
     });
     if (res?.success) {
-      if (res.requiresVerification) openVerify(withEmail);
-      else emit('close');
+      sentTo.value = withEmail;
+      tab.value = 'sent';
       return;
     }
     fail(res?.message || 'Could not create the account.');
@@ -123,33 +144,25 @@ async function submitRegistration(withEmail: string): Promise<void> {
 }
 
 function onRegister(): void {
+  if (needsTeam.value && !regTeam.value) { fail('Choose the team you are joining.'); return; }
+
   const typed = regEmail.value.trim().toLowerCase();
   const check = auth.inspectEmail(typed);
 
-  // Not an address at all: nothing to send anywhere.
-  if (!check.valid) { fail(check.reason || 'That does not look like an email address.'); return; }
+  // Not an address at all: nothing to send anywhere. A testing-pinia stub with
+  // no return value configured yields no check at all -- treated the same as
+  // a check that raised no objection, rather than crashing on it.
+  if (check && !check.valid) { fail(check.reason || 'That does not look like an email address.'); return; }
 
   // A near miss. Offered, never enforced -- both answers go on screen and
   // nothing is sent until one is chosen.
-  if (check.suggestion) {
+  if (check?.suggestion) {
     suggestion.value = check.suggestion;
     suggestionReason.value = check.reason;
     return;
   }
 
   void submitRegistration(typed);
-}
-
-async function onVerify(): Promise<void> {
-  busy.value = true;
-  feedback.value = '';
-  try {
-    const res: any = await auth.verifyOtp(verifyEmail.value, otp.value.trim());
-    if (res?.success) { emit('close'); return; }
-    fail(res?.message || 'That code was not accepted.');
-  } finally {
-    busy.value = false;
-  }
 }
 
 async function onPickAccount(email: string): Promise<void> {
@@ -245,6 +258,18 @@ async function onPickAccount(email: string): Promise<void> {
         </select>
       </label>
 
+      <label v-if="needsTeam" class="field">
+        <span class="kicker">Team</span>
+        <select v-model="regTeam" class="input" data-field="regTeam">
+          <option value="">— choose your team —</option>
+          <optgroup v-for="g in teamGroups" :key="g.school" :label="g.school">
+            <option v-for="t in g.teams" :key="t.id" :value="t.id">
+              {{ t.name }}<template v-if="t.season"> · {{ t.season }}</template>
+            </option>
+          </optgroup>
+        </select>
+      </label>
+
       <!--
         Both answers, equally reachable. The check cannot know every
         legitimate domain, so overruling it must not be a fight.
@@ -268,23 +293,15 @@ async function onPickAccount(email: string): Promise<void> {
       </button>
     </form>
 
-    <!-- Verify -->
-    <form v-else data-tab-panel="verify" data-verify-submit @submit.prevent="onVerify">
-      <p class="verify__target">
-        Code sent to <strong data-verify-target>{{ verifyEmail }}</strong>
+    <!-- Sent -->
+    <div v-else data-tab-panel="sent" class="sent">
+      <p>We sent a link to <strong>{{ sentTo }}</strong>. Open it to confirm your account.</p>
+      <p class="note">
+        If a coach invited this address, confirming connects you to your team. Otherwise
+        your request goes to the team's coach, or to an admin for a coach's request.
       </p>
-      <label class="field">
-        <span class="kicker">6-digit code</span>
-        <input v-model="otp" type="text" inputmode="numeric" class="input"
-               required autocomplete="one-time-code" maxlength="6" data-field="otp" />
-      </label>
-      <button type="submit" class="btn btn--go" :disabled="busy">
-        {{ busy ? 'Checking…' : 'Verify' }}
-      </button>
-      <button type="button" class="btn btn--plain" @click="setTab('signin')">
-        Back to sign in
-      </button>
-    </form>
+      <button type="button" class="btn btn--go" @click="emit('close')">Done</button>
+    </div>
   </BaseModal>
 </template>
 
@@ -312,7 +329,7 @@ form { display: flex; flex-direction: column; gap: var(--space-3); }
 .suggest__text { margin: 0 0 var(--space-2); color: var(--rule-strong); font-size: 13px; }
 .suggest__actions { display: flex; flex-direction: column; gap: var(--space-2); }
 
-.verify__target { margin: 0 0 var(--space-3); color: var(--ink-muted); font-size: 14px; }
+.sent { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .demo-accounts { display: flex; flex-direction: column; gap: var(--space-2); }
 .demo-accounts__intro { margin: 0 0 var(--space-2); color: var(--ink-muted); font-size: 14px; }

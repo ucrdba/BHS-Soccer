@@ -34,7 +34,6 @@ vi.mock('../auth', () => ({
     subscribe: () => () => {},
     loginUser: vi.fn(),
     registerUser: vi.fn(),
-    verifyUserOtp: vi.fn(),
     logout: vi.fn()
   }
 }));

@@ -26,8 +26,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isCoach = ref(false);
   const isAdmin = ref(false);
   const canAccessRatings = ref(false);
-  /** True for a signed-out visitor or an account still awaiting approval. */
+  /** True for a signed-out visitor, a fan, or an account still awaiting approval. */
   const isGuest = ref(true);
+  const isSignedIn = ref(false);
 
   function sync(): void {
     const u = auth.getCurrentUser();
@@ -38,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin.value = auth.isAdmin();
     canAccessRatings.value = auth.canAccessRatings();
     isGuest.value = !u || u.role === 'guest';
+    isSignedIn.value = !!u && u.id !== 'user_guest';
   }
 
   sync();
@@ -55,14 +57,8 @@ export const useAuthStore = defineStore('auth', () => {
     return res;
   }
 
-  async function register(f: { name: string; email: string; password: string; role: string }) {
+  async function register(f: { name: string; email: string; password: string; role: string; teamId: string | null }) {
     const res = await auth.registerUser(f);
-    sync();
-    return res;
-  }
-
-  async function verifyOtp(email: string, code: string) {
-    const res = await auth.verifyUserOtp(email, code);
     sync();
     return res;
   }
@@ -89,7 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest,
-    sync, login, register, verifyOtp, logout, inspectEmail
+    user, role, isLoggedIn, isCoach, isAdmin, canAccessRatings, isGuest, isSignedIn,
+    sync, login, register, logout, inspectEmail
   };
 });

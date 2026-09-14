@@ -40,7 +40,7 @@ function mountWith(opts: {
           },
           auth: {
             isCoach: false, isAdmin: false, canAccessRatings: false,
-            isGuest: true, isLoggedIn: false, role: 'guest', user: null,
+            isGuest: true, isSignedIn: false, isLoggedIn: false, role: 'guest', user: null,
             ...(opts.auth || {})
           }
         }
@@ -135,9 +135,14 @@ describe('AppHeader', () => {
     expect(guest.find('[data-account-btn]').text()).toBe('Sign in');
     expect(guest.find('[data-role-badge]').exists()).toBe(false);
 
-    const coach = mountWith({ auth: { isGuest: false, isLoggedIn: true, role: 'coach', user: { name: 'Sam' } } });
+    const coach = mountWith({ auth: { isGuest: false, isSignedIn: true, isLoggedIn: true, role: 'coach', user: { name: 'Sam' } } });
     expect(coach.find('[data-account-btn]').text()).toBe('Sign out');
     expect(coach.find('[data-role-badge]').text()).toBe('COACH');
+  });
+
+  it('offers sign-out to a signed-in fan, who holds the guest role', async () => {
+    const w = mountWith({ auth: { isGuest: true, isSignedIn: true, role: 'guest', user: { name: 'Fan' } } });
+    expect(w.text()).toContain('Sign out');
   });
 
   it('names the record for assistive tech on a real group', () => {

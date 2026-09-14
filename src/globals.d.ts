@@ -181,7 +181,6 @@ declare global {
     signOutUser(): Promise<{ error: { message: string } | null } | null>;
     getSession(): Promise<{ data: { session: Record<string, any> | null }; error: unknown }>;
     onAuthStateChange(callback: (event: string, session: Record<string, any> | null) => void): unknown;
-    verifyOtp(email: string, token: string): Promise<SupabaseAuthResult | null>;
     fetchOwnProfile(): Promise<Record<string, any> | null>;
     fetchRoles(): Promise<Array<{ name: string; permissions: Record<string, boolean> }> | null>;
     fetchMatrixStandings(teamId: string): Promise<Record<string, any>[] | null>;
