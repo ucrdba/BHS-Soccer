@@ -18,6 +18,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { reportFailure, reportConnection } from '../domain/notices';
 import { isPublishableAnonKey } from './anon-key';
 import { resolveCredential } from './credentials';
+import type { JoinableTeam, PendingRequest, Invitation, AccountResult } from '../types';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -373,6 +374,128 @@ class SupabaseService {
     } catch (e) {
       report('fetchOwnProfile', e);
       return null;
+    }
+  }
+
+  // ── Accounts: invitations, requests, passwords ───────────────────────────
+  //
+  // Every privileged decision is made in Postgres by 0035's functions, which
+  // check their caller and refuse in words. These pass arguments by the names
+  // those functions declare and hand the refusal back unchanged.
+
+  private async accountRpc<T = unknown>(fn: string, args: Record<string, any>): Promise<AccountResult<T>> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    try {
+      const { data, error } = await this.client!.rpc(fn, args);
+      if (error) { report(fn, error.message); return { ok: false, error: error.message }; }
+      return { ok: true, data: data as T };
+    } catch (e: any) {
+      report(fn, e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
+  /**
+   * Every live team a new account may ask to join. `teams` is publicly
+   * readable, so this works signed out -- which is when sign-up needs it.
+   */
+  async fetchJoinableTeams(): Promise<JoinableTeam[] | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await this.client!
+      .from('teams')
+      .select('id, name, season, schools(name)')
+      .eq('is_deleted', false)
+      .order('name', { ascending: true });
+    if (error) { report('fetchJoinableTeams', error.message); return null; }
+    return (data || [])
+      .map((t: any) => ({ id: t.id, name: t.name, season: t.season ?? null, schoolName: t.schools?.name || '' }))
+      .sort((a, b) => a.schoolName.localeCompare(b.schoolName) || a.name.localeCompare(b.name));
+  }
+
+  async createInvitation(
+    email: string, teamId: string, role: 'player' | 'coach', playerId: string | null
+  ): Promise<AccountResult<Invitation>> {
+    return this.accountRpc<Invitation>('create_invitation', {
+      p_email: email, p_team_id: teamId, p_role: role, p_player_id: playerId
+    });
+  }
+
+  async revokeInvitation(invitationId: string): Promise<AccountResult> {
+    return this.accountRpc('revoke_invitation', { p_invitation_id: invitationId });
+  }
+
+  /** Open invitations to a team. RLS shows them to its coaches and admins only. */
+  async fetchTeamInvitations(teamId: string): Promise<Invitation[] | null> {
+    if (!this.isConfigured() || !teamId) return null;
+    const { data, error } = await this.client!
+      .from('invitations')
+      .select('id, email, role, player_id, team_id, created_at')
+      .eq('team_id', teamId)
+      .is('accepted_at', null)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: true });
+    if (error) { report('fetchTeamInvitations', error.message); return null; }
+    return (data || []) as Invitation[];
+  }
+
+  /** Which of a team's roster entries already have an account. */
+  async fetchLinkedPlayerIds(teamId: string): Promise<string[] | null> {
+    const res = await this.accountRpc<{ player_id: string }[]>('team_linked_players', { p_team_id: teamId });
+    return res.ok ? (res.data || []).map(r => r.player_id) : null;
+  }
+
+  /** The roster entries a request could be linked to: on the team, with no account. */
+  async fetchUnlinkedRosterEntries(teamId: string): Promise<{ id: string; name: string }[] | null> {
+    const [roster, linked] = await Promise.all([this.fetchTeamRoster(teamId), this.fetchLinkedPlayerIds(teamId)]);
+    if (roster === null || linked === null) return null;
+    const taken = new Set(linked);
+    return roster
+      .map((m: any) => ({ id: m?.players?.id, name: m?.players?.name || '' }))
+      .filter(p => p.id && !taken.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** The requests this caller may act on -- decided by the database, not by a filter here. */
+  async fetchPendingRequests(): Promise<PendingRequest[] | null> {
+    const res = await this.accountRpc<PendingRequest[]>('pending_requests', {});
+    return res.ok ? (res.data || []) : null;
+  }
+
+  async approvePlayerRequest(profileId: string, teamId: string, playerId: string | null): Promise<AccountResult<string>> {
+    return this.accountRpc<string>('approve_player_request', {
+      p_profile_id: profileId, p_team_id: teamId, p_player_id: playerId
+    });
+  }
+
+  async approveCoachRequest(profileId: string, teamId: string): Promise<AccountResult> {
+    return this.accountRpc('approve_coach_request', { p_profile_id: profileId, p_team_id: teamId });
+  }
+
+  async rejectRequest(profileId: string): Promise<AccountResult> {
+    return this.accountRpc('reject_request', { p_profile_id: profileId });
+  }
+
+  async requestPasswordReset(email: string): Promise<AccountResult> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud authentication is not configured.' };
+    try {
+      const { error } = await this.client!.auth.resetPasswordForEmail(email, { redirectTo: this.authRedirectUrl() });
+      if (error) { report('Auth', error.message); return { ok: false, error: error.message }; }
+      return { ok: true };
+    } catch (e: any) {
+      report('Auth', e);
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
+  async updatePassword(password: string): Promise<AccountResult> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud authentication is not configured.' };
+    try {
+      const { error } = await this.client!.auth.updateUser({ password });
+      if (error) { report('Auth', error.message); return { ok: false, error: error.message }; }
+      return { ok: true };
+    } catch (e: any) {
+      report('Auth', e);
+      return { ok: false, error: e?.message || String(e) };
     }
   }
 

@@ -160,6 +160,20 @@ declare global {
     deleteTeamMembership(teamId: string, playerId: string): Promise<{ ok: boolean; error?: string }>;
 
     // Real Supabase Auth
+    fetchJoinableTeams(): Promise<import('./types').JoinableTeam[] | null>;
+    createInvitation(email: string, teamId: string, role: 'player' | 'coach', playerId: string | null):
+      Promise<import('./types').AccountResult<import('./types').Invitation>>;
+    revokeInvitation(invitationId: string): Promise<import('./types').AccountResult>;
+    fetchTeamInvitations(teamId: string): Promise<import('./types').Invitation[] | null>;
+    fetchLinkedPlayerIds(teamId: string): Promise<string[] | null>;
+    fetchUnlinkedRosterEntries(teamId: string): Promise<{ id: string; name: string }[] | null>;
+    fetchPendingRequests(): Promise<import('./types').PendingRequest[] | null>;
+    approvePlayerRequest(profileId: string, teamId: string, playerId: string | null):
+      Promise<import('./types').AccountResult<string>>;
+    approveCoachRequest(profileId: string, teamId: string): Promise<import('./types').AccountResult>;
+    rejectRequest(profileId: string): Promise<import('./types').AccountResult>;
+    requestPasswordReset(email: string): Promise<import('./types').AccountResult>;
+    updatePassword(password: string): Promise<import('./types').AccountResult>;
     authRedirectUrl(): string;
     completeEmailLink(): Promise<{ outcome: string; message?: string }>;
     signUpUser(email: string, password: string, metadata?: Record<string, any>): Promise<SupabaseAuthResult | null>;

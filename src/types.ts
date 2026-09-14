@@ -308,3 +308,42 @@ export interface ConfirmModalOptions {
   onConfirm: () => void;
   onCancel?: () => void;
 }
+
+// ─── Accounts: invitations, requests, passwords ─────────────────────────────
+
+/** A team a new account may ask to join, labelled by its organization. */
+export interface JoinableTeam {
+  id: string;
+  name: string;
+  season: string | null;
+  schoolName: string;
+}
+
+/** A row of public.pending_requests(): only the requests the caller may act on. */
+export interface PendingRequest {
+  id: string;
+  name: string;
+  email: string;
+  requested_role: 'player' | 'coach';
+  requested_team_id: string | null;
+  team_name: string | null;
+  school_name: string | null;
+  created_at: string;
+}
+
+/** An open invitation, as a team's coaches may read it. */
+export interface Invitation {
+  id: string;
+  email: string;
+  role: 'player' | 'coach';
+  player_id: string | null;
+  team_id: string;
+  created_at: string;
+}
+
+/** An account write: the database's own sentence when it refuses. */
+export interface AccountResult<T = unknown> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+}
