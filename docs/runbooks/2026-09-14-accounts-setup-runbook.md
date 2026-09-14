@@ -255,7 +255,7 @@ drop function if exists public.reject_request(uuid);
 drop function if exists public.team_linked_players(uuid);
 drop function if exists public.redeem_my_invitations();
 drop function if exists public.promote_confirmed_profile(uuid);
-drop function if exists public.redeem_invitations(uuid);
+drop function if exists public.redeem_invitations(uuid, boolean);
 drop trigger if exists on_auth_user_email_changed on auth.users;
 drop function if exists public.note_email_change();
 drop table if exists public.invitations;

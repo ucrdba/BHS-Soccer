@@ -125,8 +125,19 @@ create trigger guard_profile_privileged_columns
 -- (redeem_my_invitations in section 5, for an account that already existed
 -- when it was invited). Callable by neither visitors nor anon: it trusts
 -- p_user_id, so each caller decides whose invitations may be redeemed.
+--
+-- p_take_school says whose organization the profile names afterwards. At
+-- confirmation (true) the first redeemed invitation's wins: handle_new_user
+-- filled school_id from whatever team was picked at sign-up, and someone
+-- invited into another organization belongs to that one. At sign-in (false) an
+-- existing account keeps the organization it already names.
+--
+-- The earlier one-argument version is dropped first: create or replace with a
+-- different signature would leave it beside this one, still trusting any id.
 
-create or replace function public.redeem_invitations(p_user_id uuid)
+drop function if exists public.redeem_invitations(uuid);
+
+create or replace function public.redeem_invitations(p_user_id uuid, p_take_school boolean)
 returns integer
 language plpgsql
 security definer
@@ -212,21 +223,21 @@ begin
        where id = p_user_id;
     end if;
 
-    -- The first organization redeemed is the one the profile names, unless it
-    -- already names one.
+    -- The first organization redeemed.
     school := coalesce(school, inv.school_id);
     update public.invitations set accepted_at = now(), accepted_by = p_user_id where id = inv.id;
     redeemed := redeemed + 1;
   end loop;
 
   if redeemed > 0 then
-    update public.profiles set school_id = school where id = p_user_id and school_id is null;
+    update public.profiles set school_id = school
+     where id = p_user_id and (p_take_school or school_id is null);
   end if;
   return redeemed;
 end;
 $$;
 
-revoke all on function public.redeem_invitations(uuid) from public, anon, authenticated;
+revoke all on function public.redeem_invitations(uuid, boolean) from public, anon, authenticated;
 
 -- promote_confirmed_profile: the one place an invitation is redeemed at sign-up.
 --
@@ -262,7 +273,7 @@ begin
     return;
   end if;
 
-  redeemed := public.redeem_invitations(p_user_id);
+  redeemed := public.redeem_invitations(p_user_id, true);
 
   if redeemed > 0 then
     update public.profiles
@@ -677,7 +688,7 @@ begin
   if exists (select 1 from public.profiles p where p.id = auth.uid() and p.email_changed_at is not null) then
     raise exception 'This account''s email address has been changed, so invitations are not connected to it automatically. Ask an admin to connect it.';
   end if;
-  return public.redeem_invitations(auth.uid());
+  return public.redeem_invitations(auth.uid(), false);
 end;
 $$;
 

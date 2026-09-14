@@ -396,6 +396,23 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
       });
     });
 
+    it('keeps the organization an account already names when it is connected at sign-in', async () => {
+      const a = await makeTeam(db.owner);
+      const b = await makeTeam(db.owner);
+      const holder = await signUp(db.owner, { confirmed: true });
+      await db.owner.query(`update public.profiles set school_id = $2 where id = $1`, [holder.id, a.school_id]);
+      await invite(db.owner, { email: holder.email, team: b, role: 'coach' });
+
+      await db.asUser(holder.id, async (c) => {
+        expect(await one(c, `select public.redeem_my_invitations() as n`)).toEqual({ n: 1 });
+        expect(await one(c, `select role, school_id from public.profiles where id = $1`, [holder.id]))
+          .toEqual({ role: 'coach', school_id: a.school_id });
+        expect(await one(c,
+          `select count(*)::int as n from public.team_coaches where team_id = $1 and profile_id = $2`, [b.id, holder.id]))
+          .toEqual({ n: 1 });
+      });
+    });
+
     it('keeps an admin invited as a coach an admin', async () => {
       const team = await makeTeam(db.owner);
       const admin = await makeAdmin(db.owner);
@@ -462,7 +479,7 @@ describe.skipIf(!available)('0035: inviting, approving and rejecting', () => {
         await expect(c.query(`select public.redeem_my_invitations()`)).rejects.toMatchObject({ code: '42501' });
       });
       await db.asUser(fan.id, async (c) => {
-        await expect(c.query(`select public.redeem_invitations($1)`, [fan.id])).rejects.toMatchObject({ code: '42501' });
+        await expect(c.query(`select public.redeem_invitations($1, true)`, [fan.id])).rejects.toMatchObject({ code: '42501' });
       });
     });
   });

@@ -289,7 +289,9 @@ the role allows; the invite control's three states.
   profile and wants its own change.
 - **`profiles.school_id` holds one organization.** A person invited to a
   school team and a club team gets both memberships, which is what access is
-  read from, but their profile names the first organization redeemed.
+  read from, but their profile names one organization: the first redeemed at
+  confirmation, or, when an existing account is connected at sign-in, the one
+  it already named.
 
 ## Amendments (2026-09-14, after the final review)
 
@@ -315,8 +317,12 @@ The redeeming moved into `redeem_invitations()`, which confirmation calls, and
 the app calls `redeem_my_invitations()` after signing in; it refuses an account
 that is not active or has no confirmed address. It never demotes a coach or an
 admin, never re-points an account already linked to a different roster entry,
-skips deleted teams and roster entries that have left their team, and only
-sets the profile's organization when it has none.
+skips deleted teams and roster entries that have left their team. Which
+organization the profile names depends on the moment: at confirmation the first
+redeemed invitation's organization wins, replacing the one taken from the team
+picked at sign-up, so someone invited into another organization belongs to it;
+at sign-in an existing account keeps the organization it already names, and
+takes the first redeemed one only when it names none.
 
 **C. An admin approves any waiting request as a player or a coach.** Pending
 accounts can carry a `requested_role` of `guest` (conflicting invitations) or

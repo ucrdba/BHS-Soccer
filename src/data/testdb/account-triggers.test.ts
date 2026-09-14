@@ -85,6 +85,24 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     expect(used.accepted_by).toBe(u.id);
   });
 
+  it('takes the organization of the invitation, not of the team picked at sign-up, at confirmation', async () => {
+    // soccer_categories_write keys on the profile's school, so someone invited
+    // into B who picked a team in A would otherwise write A's categories.
+    const a = await makeTeam(db.owner);
+    const b = await makeTeam(db.owner);
+    const player = await makeRosterEntry(db.owner, b);
+    const email = `${uniq()}@example.com`;
+    await invite(db.owner, { email, team: b, role: 'player', playerId: player });
+
+    const u = await signUp(db.owner, { role: 'player', teamId: a.id, email });
+    expect(await profile(db, u.id)).toMatchObject({ school_id: a.school_id });
+    await confirm(db.owner, u.id);
+
+    expect(await profile(db, u.id)).toMatchObject({
+      role: 'player', status: 'active', school_id: b.school_id, player_id: player
+    });
+  });
+
   it('puts an invited coach on the team staff at confirmation', async () => {
     const team = await makeTeam(db.owner);
     const email = `${uniq()}@example.com`;
@@ -314,6 +332,26 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     await db.owner.query('begin');
     try {
       await db.owner.query(sql);
+    } finally {
+      await db.owner.query('rollback');
+    }
+  });
+
+  it('leaves no one-argument redeem_invitations behind when re-applied over the earlier version', async () => {
+    // create or replace with a different signature makes a second function,
+    // which would still trust any id it is given.
+    const { readFileSync } = await import('node:fs');
+    const sql = readFileSync('supabase/migrations/0035_account_invitations.sql', 'utf8')
+      .replace(/^\s*(begin|commit)\s*;\s*$/gim, '');
+    await db.owner.query('begin');
+    try {
+      await db.owner.query(`create or replace function public.redeem_invitations(p_user_id uuid)
+        returns integer language sql as $$ select 0 $$`);
+      await db.owner.query(sql);
+      const { rows } = await db.owner.query(
+        `select pg_get_function_identity_arguments(oid) as args from pg_proc
+          where proname = 'redeem_invitations' and pronamespace = 'public'::regnamespace`);
+      expect(rows).toEqual([{ args: 'p_user_id uuid, p_take_school boolean' }]);
     } finally {
       await db.owner.query('rollback');
     }
