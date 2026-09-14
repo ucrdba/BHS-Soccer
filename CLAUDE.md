@@ -109,6 +109,19 @@ A coach with a clipboard and a stopwatch enters twenty-five times one-handed, so
 
 **The date box is filled, never blank.** It started empty and nothing set it, so a coach who entered twenty-five results and pressed Save was refused with "Pick the date this session happened" — for a field at the top of a sheet they had scrolled past, which reads as the button doing nothing rather than as a refusal. A new session now opens on today (local time: `toISOString()` is UTC, and an evening session west of Greenwich would open on tomorrow) and a recorded one opens on **its own** date. The second matters more than the convenience: reopening to a blank box means the coach retypes it, and typing today *moves* the session — every result in it is re-attributed to a day it did not happen on, and `not_entered` then charges whoever joined the squad in between. `startingSessionDate` in `domain/session-entry.ts` holds both, and `session.openExisting` reads the history when the store does not already hold the session, because `SessionEntryView` opens that screen straight from a URL and never loads it.
 
+### Accounts are granted at confirmation, never at sign-up
+
+Since `0035_account_invitations.sql`. A person reaches their team one of two ways: a coach **invites** their address (a player onto a roster entry, or — admins only — a coach onto a team), or they **request** a team at sign-up and are approved. Runbook: `docs/runbooks/2026-09-14-accounts-setup-runbook.md`.
+
+- **`promote_confirmed_profile` is the only place access is granted, and it runs when the email is confirmed.** Redeeming an invitation at sign-up would let anyone who knows a player's address sign up as them and be put on the team. It only touches a profile still at `pending_verification`, so a late confirmation cannot knock a settled account back into the queue. It matches invitations against `lower(auth.users.email)` — the address the confirmation just proved — never `profiles.email`, which a visitor could otherwise edit toward someone else's invited address; the privileged-column guard already refuses a visitor changing their own `profiles.email`, which is what keeps that address trustworthy. **"Confirm email" must stay on** — with it off, every account arrives confirmed and invitations are redeemed at sign-up.
+- **Every privileged account write is a `security definer` function that checks its caller** — `create_invitation`, `revoke_invitation`, `pending_requests`, `approve_player_request`, `approve_coach_request`, `reject_request`, `team_linked_players`. A coach handles players on their own team; only an admin handles coaches. `pending_requests()` returns only what the caller may act on; do not filter the queue in the browser instead. Every such check reads `coalesce(public.current_profile_role(), 'guest')` or `coalesce(public.is_team_coach(x), false)`, never a bare comparison: a signed-in caller with no `profiles` row makes both helpers return NULL, and in PL/pgSQL a NULL condition skips the `raise` instead of tripping it, silently granting the privileged path rather than refusing it. A new account function has to fail closed the same way.
+- **`guard_profile_privileged_columns` is `security invoker` and lets a change through when `current_user` is not `anon` or `authenticated`.** Inside a definer function `auth.uid()` is still the coach's — it comes from the JWT — so the old `auth.uid()`-only test refused every coach approval. It must not name the `auth` schema itself: as the visitor, that lookup needs schema USAGE, so it asks `public.current_profile_role()` (a definer) instead. It also guards `player_id` and `requested_team_id`: a visitor who could set their own `player_id` could attach themselves to any roster entry.
+- **Linking a roster entry locks the player row first.** `approve_player_request` and `promote_confirmed_profile` both run `select … from public.players where id = … for update` before checking whether that player already has an account, so a coach approving a request and an invited player confirming — onto the same roster entry, at the same moment — serialize instead of racing each other onto it. There is deliberately no unique index on `profiles.player_id` yet: one could abort the migration against production data nobody has audited. That is a follow-up, not an oversight.
+- **Invitation emails live in `invitations`, never on `players`**, which is publicly readable. The app sends no invitation email; `InviteControl` shows a `?signup=<address>` link (`domain/signup-link.ts`) for the coach to send.
+- **A password-reset link puts the app into a recovery prompt, and either backing out or signing out clears it.** "Not now" on the set-password screen calls `cancelPasswordRecovery()`, and `AuthManager.logout()` clears the same flag — neither leaves the app stuck asking for a new password from someone who never asked to set one.
+- **Test account permissions on an `authenticated` connection** — `src/data/testdb/accounts-db.ts` builds a committed database from the migrations and hands out visitor connections. Every permission bug in this area has passed the superuser harness.
+- `profiles_select` still lets any coach read every profile across organizations, and `profiles.school_id` names one organization even for someone on a school team and a club team. Both are known and left open by the spec.
+
 ### Recording numbers are assigned by the coach, in a block
 
 `team_players.recording_number` is unique per team, and that shapes both ends of the feature.
@@ -201,7 +214,7 @@ Supabase rows are **snake_case** (`class_year`, `matrix_stats`, `coach_notes`, `
 
 Credentials resolve in order: `window.ENV_SUPABASE_URL` / `ENV_SUPABASE_ANON_KEY` → `localStorage['bhs_supabase_url' / 'bhs_supabase_anon_key']` (settable from the admin panel via `setCredentials`) → a hardcoded project URL and anon key in the file. If none produce a valid client, every service method returns `null` — so "nothing loaded from the DB" is usually an unconfigured client, not a query bug.
 
-**Ten service methods default `schoolId` to `'bhs'`, and calling one without an argument is a multi-tenant bug that will not announce itself.** `getSchoolUuid`, `fetchPendingApprovals`, `fetchPlayers`, `fetchSoccerCategories`, `fetchDrillsBank`, `upsertDrillBankItem`, `fetchSchool`, `upsertSchool`, `fetchCoaches` and `upsertCoach` all fall through `requireOrg`, which warns and returns `'bhs'`. A club coach calling one bare is silently served Beaumont's data. **Always pass the resolved organization.** Where a team-scoped equivalent exists — `fetchTeamRoster(teamId)` for the roster — prefer it: it has no default to fall through.
+**Nine service methods default `schoolId` to `'bhs'`, and calling one without an argument is a multi-tenant bug that will not announce itself.** `getSchoolUuid`, `fetchPlayers`, `fetchSoccerCategories`, `fetchDrillsBank`, `upsertDrillBankItem`, `fetchSchool`, `upsertSchool`, `fetchCoaches` and `upsertCoach` all fall through `requireOrg`, which warns and returns `'bhs'`. A club coach calling one bare is silently served Beaumont's data. **Always pass the resolved organization.** Where a team-scoped equivalent exists — `fetchTeamRoster(teamId)` for the roster — prefer it: it has no default to fall through.
 
 Removing the defaults is worth doing and is not small, since it wants its own commit rather than being folded into a view.
 
@@ -236,7 +249,7 @@ Three things about that migration are worth knowing:
 
 ### Auth & RBAC
 
-`src/auth.ts` exports a singleton `AuthManager` over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. Roles: `guest` / `player` / `coach` / `admin`. The guards — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; signup lands in a pending-approval state that a coach or admin clears via `approveProfile`/`rejectProfile`.
+`src/auth.ts` exports a singleton `AuthManager` over **real Supabase Auth** (`auth.users`), joined to a `public.profiles` row holding `role`, `status`, `school_id`, `player_id`. Roles: `guest` / `player` / `coach` / `admin`. The guards — `auth.isCoach()`, `auth.isAdmin()`, `auth.canAccessRatings()`, `auth.isLoggedIn()` — all additionally require `status === 'active'`; sign-up records a request and grants nothing; access is granted only when the email is confirmed — see *Accounts* below.
 
 These client-side guards are **UI affordances only. Real enforcement lives in the RLS policies** in `supabase_migration_auth.sql`; a new privileged operation needs a policy there, not just an `isCoach()` check.
 
@@ -253,7 +266,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0034_team_match_minutes.sql`.
+8. …through `supabase/migrations/0035_account_invitations.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
