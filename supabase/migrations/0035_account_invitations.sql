@@ -76,7 +76,10 @@ alter table public.profiles
 -- that team's members-only content. email joins them too: promote_confirmed_profile
 -- matches invitations against auth.users.email, the address confirmation proved, but
 -- an editable profiles.email would otherwise let a pending account be walked onto an
--- address it does not control before confirming one it does.
+-- address it does not control before confirming one it does. requested_role
+-- too: it decides whose queue a request lands in and what approving it makes
+-- the account, so a waiting player could otherwise turn their request into a
+-- coach's.
 
 create or replace function public.guard_profile_privileged_columns()
 returns trigger
@@ -96,8 +99,9 @@ begin
      or new.school_id is distinct from old.school_id
      or new.email is distinct from old.email
      or new.player_id is distinct from old.player_id
+     or new.requested_role is distinct from old.requested_role
      or new.requested_team_id is distinct from old.requested_team_id then
-    raise exception 'Only an admin can change role, status, school, email, roster link or requested team.';
+    raise exception 'Only an admin can change role, status, school, email, roster link, requested role or requested team.';
   end if;
   return new;
 end;

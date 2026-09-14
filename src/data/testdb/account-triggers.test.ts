@@ -237,14 +237,14 @@ describe.skipIf(!available)('0035: sign-up and confirmation', () => {
     });
   });
 
-  it('refuses a visitor changing their own role, status, roster link or requested team', async () => {
+  it('refuses a visitor changing their own role, status, roster link, requested role or requested team', async () => {
     const team = await makeTeam(db.owner);
     const player = await makeRosterEntry(db.owner, team);
     const u = await signUp(db.owner, { confirmed: true });
 
     for (const change of [
       `role = 'coach'`, `status = 'rejected'`, `player_id = '${player}'`, `requested_team_id = '${team.id}'`,
-      `email = 'someone@example.com'`
+      `email = 'someone@example.com'`, `requested_role = 'coach'`
     ]) {
       await db.asUser(u.id, async (c) => {
         await expect(c.query(`update public.profiles set ${change} where id = $1`, [u.id]))

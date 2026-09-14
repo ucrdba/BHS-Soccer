@@ -81,15 +81,24 @@ const teamGroups = computed(() => {
   return groups;
 });
 
+/** Set when the team list failed to load: an empty picker would read as "there are no teams". */
+const teamsError = ref(false);
+
 async function loadTeams(): Promise<void> {
   if (teams.value.length) return;
-  teams.value = (await supabaseService.fetchJoinableTeams()) || [];
+  const found = await supabaseService.fetchJoinableTeams();
+  // A failure is not cached: the next time registration opens reads again.
+  teamsError.value = found === null;
+  teams.value = found || [];
 }
 
 watch(() => props.open, (open) => {
   if (!open) return;
   setTab(auth.recovering ? 'newpassword' : (props.initialTab || 'signin'));
   if (props.initialEmail) regEmail.value = props.initialEmail;
+  // An invited address is almost always a coach's invitation for a roster
+  // entry, so the form starts on player; the person can still change it.
+  if (props.initialTab === 'register' && props.initialEmail) regRole.value = 'player';
 }, { immediate: true });
 
 /**
@@ -307,6 +316,7 @@ async function onPickAccount(email: string): Promise<void> {
         </select>
       </label>
 
+      <p v-if="needsTeam && teamsError" class="note note--bad" role="alert" data-teams-error>The list of teams could not be loaded. Close this and try again.</p>
       <label v-if="needsTeam" class="field">
         <span class="kicker">Team</span>
         <select v-model="regTeam" class="input" data-field="regTeam">

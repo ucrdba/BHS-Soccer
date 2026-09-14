@@ -164,6 +164,16 @@ describe('completeEmailLink', () => {
     expect(window.location.hash).toBe('');
   });
 
+  it('ignores a sign-up link, which carries an address in the hash and no tokens', async () => {
+    window.history.replaceState({}, '', '/#signup=kid%40example.com');
+    svc.client.auth.getSession = vi.fn();
+    expect(await svc.completeEmailLink()).toEqual({ outcome: 'none' });
+    expect(svc.client.auth.getSession).not.toHaveBeenCalled();
+    // Left for the header, which reads the address and then clears it.
+    expect(window.location.hash).toBe('#signup=kid%40example.com');
+    window.history.replaceState({}, '', '/');
+  });
+
   it('still reports an ordinary confirmation as confirmed', async () => {
     window.history.replaceState({}, '', '/#access_token=abc&type=signup');
     svc.client.auth.getSession = vi.fn().mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });

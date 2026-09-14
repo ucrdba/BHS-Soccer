@@ -25,14 +25,21 @@ const authTab = ref<'signin' | 'register'>('signin');
 const signupEmail = ref('');
 
 /**
- * An invited person arrives on ?signup=<address>: open registration with it
+ * An invited person arrives on #signup=<address>: open registration with it
  * filled in. The link connects nobody -- the invitation in the database does,
  * when they confirm the address.
+ *
+ * The address is removed from the URL once read. It is often a minor's, and
+ * left there it survives in the browser history and in any link copied from
+ * the address bar; being in the hash already keeps it out of server logs.
  */
 onMounted(() => {
   let email: string | null = null;
-  try { email = readSignupEmail(window.location.search); } catch { email = null; }
+  try { email = readSignupEmail(window.location.hash); } catch { email = null; }
   if (email === null) return;
+  try {
+    history.replaceState({}, document.title, window.location.pathname + window.location.search);
+  } catch { /* history blocked; the form still opens */ }
   signupEmail.value = email;
   authTab.value = 'register';
   authOpen.value = true;

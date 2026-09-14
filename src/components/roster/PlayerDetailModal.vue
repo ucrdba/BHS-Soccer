@@ -11,6 +11,7 @@
 import { computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import InviteControl from '../accounts/InviteControl.vue';
+import { demoConfig } from '../../demo';
 import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain/player-row';
 import { lineupGrade } from '../../domain/lineup';
 import { skillBars } from '../../domain/player-skills';
@@ -28,6 +29,9 @@ const props = withDefaults(defineProps<{
   canInvite?: boolean;
   teamId?: string | null;
 }>(), { canSeeRatings: false, canInvite: false, teamId: null });
+
+/** The demo's accounts are shared and public; nobody real is invited from it. */
+const demo = demoConfig();
 const emit = defineEmits<{ close: [] }>();
 
 const photo = computed(() => photoOrPlaceholder(props.player?.photo));
@@ -97,7 +101,7 @@ const skills = computed(() => skillBars(props.player?.ratings));
         </div>
       </section>
 
-      <section v-if="canInvite && teamId" class="account" data-bio-account>
+      <section v-if="canInvite && teamId && !demo.enabled" class="account" data-bio-account>
         <p class="kicker kicker--accent">Account</p>
         <InviteControl :team-id="teamId" role="player" :player-id="player.id" :subject="player.name" />
       </section>

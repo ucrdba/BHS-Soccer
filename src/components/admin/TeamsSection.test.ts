@@ -10,6 +10,13 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+
+vi.mock('../../demo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../demo')>();
+  return { ...actual, demoConfig: vi.fn(() => ({ enabled: false, password: '' })) };
+});
+
+import { demoConfig } from '../../demo';
 import TeamsSection from './TeamsSection.vue';
 
 const fetchAllTeams = vi.fn();
@@ -114,6 +121,17 @@ describe('the list', () => {
   it('offers a coach invitation on every team', async () => {
     const w = await mountTeams();
     expect(w.findAll('[data-team-invite]')).toHaveLength(w.findAll('[data-team-row]').length);
+  });
+
+  it('offers no coach invitation on the demo deployment', async () => {
+    vi.mocked(demoConfig).mockReturnValue({ enabled: true, password: 'demo-pass' });
+    try {
+      const w = await mountTeams();
+      expect(w.findAll('[data-team-row]').length).toBeGreaterThan(0);
+      expect(w.find('[data-team-invite]').exists()).toBe(false);
+    } finally {
+      vi.mocked(demoConfig).mockReturnValue({ enabled: false, password: '' });
+    }
   });
 
   it('does not mount the invite control before its disclosure is opened', async () => {

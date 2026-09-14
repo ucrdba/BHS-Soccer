@@ -20,6 +20,7 @@
 import { ref, computed, onMounted } from 'vue';
 import SectionShell from './SectionShell.vue';
 import InviteControl from '../accounts/InviteControl.vue';
+import { demoConfig } from '../../demo';
 import { supabaseService } from '../../data/supabase';
 
 const teams = ref<any[]>([]);
@@ -54,6 +55,9 @@ const picked = ref<Record<string, string>>({});
  * invitation does not lose the control's state.
  */
 const invitingCoach = ref<Record<string, boolean>>({});
+
+/** The demo's accounts are shared and public; nobody real is invited from it. */
+const demo = demoConfig();
 
 function onInviteToggle(teamId: string, e: Event): void {
   if ((e.target as HTMLDetailsElement).open) invitingCoach.value[teamId] = true;
@@ -273,7 +277,7 @@ async function onRemove(teamId: string, coach: any): Promise<void> {
             </span>
           </p>
 
-          <details class="invitecoach" data-team-invite @toggle="onInviteToggle(t.id, $event)">
+          <details v-if="!demo.enabled" class="invitecoach" data-team-invite @toggle="onInviteToggle(t.id, $event)">
             <summary class="kicker">Invite a coach</summary>
             <InviteControl v-if="invitingCoach[t.id]" :team-id="t.id" role="coach" :subject="t.name" />
           </details>

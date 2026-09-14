@@ -5,8 +5,15 @@
  * lists them there), shown as bars out of a hundred and only when set. A
  * missing value is left out, never drawn at zero.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+
+vi.mock('../../demo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../demo')>();
+  return { ...actual, demoConfig: vi.fn(() => ({ enabled: false, password: '' })) };
+});
+
+import { demoConfig } from '../../demo';
 import PlayerDetailModal from './PlayerDetailModal.vue';
 
 const PLAYER = {
@@ -77,6 +84,24 @@ describe('PlayerDetailModal', () => {
     // The rest of the bio is unaffected.
     expect(w.text()).toContain('Marcus Delgado');
     expect(w.findAll('[data-season-stat]').length).toBeGreaterThan(0);
+  });
+
+  describe('the account section', () => {
+    const mountInvite = () => mount(PlayerDetailModal, {
+      props: { open: true, player: PLAYER, canInvite: true, teamId: 't1' },
+      global: { stubs: { InviteControl: true } }
+    });
+
+    it('offers an invitation to a coach who may send one', () => {
+      expect(mountInvite().find('[data-bio-account]').exists()).toBe(true);
+    });
+
+    it('is absent on the demo deployment, where nobody should be invited', () => {
+      // The demo's accounts are shared and public; nobody real should be
+      // invited from it.
+      vi.mocked(demoConfig).mockReturnValueOnce({ enabled: true, password: 'demo-pass' });
+      expect(mountInvite().find('[data-bio-account]').exists()).toBe(false);
+    });
   });
 
   it('hides them when nobody says otherwise', () => {

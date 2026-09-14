@@ -70,7 +70,7 @@ describe('InviteControl', () => {
     const w = await mountPlayer();
     expect(w.find('[data-invite-open]').text()).toContain('kid@example.com');
     expect((w.find('[data-invite-link]').element as HTMLInputElement).value)
-      .toBe(`${window.location.origin}/?signup=kid%40example.com`);
+      .toBe(`${window.location.origin}/#signup=kid%40example.com`);
     expect(w.find('[data-invite-form]').exists()).toBe(false);
   });
 

@@ -256,6 +256,39 @@ describe('registering', () => {
     expect(wrapper.find('[data-tab-panel="register"]').exists()).toBe(true);
     expect((wrapper.find('[data-field="regEmail"]').element as HTMLInputElement).value).toBe('kid@example.com');
   });
+
+  it('assumes an invited address is a player joining a team', async () => {
+    // Most invitations are a coach's, for a roster entry; the form still lets them change it.
+    const { wrapper } = mountAuth({ open: false, initialTab: 'register', initialEmail: 'kid@example.com' });
+    await wrapper.setProps({ open: true });
+    await flush();
+    expect((wrapper.find('[data-field="regRole"]').element as HTMLSelectElement).value).toBe('player');
+  });
+
+  it('keeps the usual default when registration opens without an address', async () => {
+    const { wrapper } = mountAuth({ open: false, initialTab: 'register' });
+    await wrapper.setProps({ open: true });
+    await flush();
+    expect((wrapper.find('[data-field="regRole"]').element as HTMLSelectElement).value).toBe('coach');
+  });
+
+  it('says the team list could not be loaded, and tries again next time', async () => {
+    fetchJoinableTeams.mockClear();
+    fetchJoinableTeams.mockResolvedValueOnce(null).mockResolvedValueOnce(TEAMS);
+    const { wrapper } = await openRegister();
+    const alert = wrapper.find('[data-teams-error]');
+    expect(alert.exists()).toBe(true);
+    expect(alert.attributes('role')).toBe('alert');
+    expect(alert.text()).toBe('The list of teams could not be loaded. Close this and try again.');
+
+    // Nothing was cached: opening registration again reads the list again.
+    await wrapper.find('[data-tab="signin"]').trigger('click');
+    await wrapper.find('[data-tab="register"]').trigger('click');
+    await flush();
+    expect(fetchJoinableTeams).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-teams-error]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-field="regTeam"] optgroup')).toHaveLength(2);
+  });
 });
 
 describe('a forgotten password', () => {

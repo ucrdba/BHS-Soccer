@@ -152,6 +152,21 @@ describe('AppHeader', () => {
     expect(record.attributes('aria-label')).toBe('Season record');
   });
 
+  it('opens registration from a sign-up link, then clears the address from the URL', async () => {
+    // The address is often a minor's: it must not stay in the address bar or
+    // the browser history.
+    window.history.replaceState({}, '', '/roster?x=1#signup=kid%40example.com');
+    const w = mountWith();
+    await w.vm.$nextTick();
+    const modal = w.findComponent({ name: 'AuthModal' });
+    expect(modal.props('open')).toBe(true);
+    expect(modal.props('initialTab')).toBe('register');
+    expect(modal.props('initialEmail')).toBe('kid@example.com');
+    expect(window.location.hash).toBe('');
+    expect(window.location.pathname + window.location.search).toBe('/roster?x=1');
+    window.history.replaceState({}, '', '/');
+  });
+
   it('opens the account modal when a password reset link was opened', async () => {
     const w = mountWith({ auth: { recovering: true, isSignedIn: true, isGuest: true, role: 'guest', user: { name: 'Fan' } } });
     await w.vm.$nextTick();
