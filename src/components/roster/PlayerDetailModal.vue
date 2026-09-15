@@ -15,6 +15,7 @@ import { demoConfig } from '../../demo';
 import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain/player-row';
 import { lineupGrade } from '../../domain/lineup';
 import { skillBars } from '../../domain/player-skills';
+import { positionBioLabel } from '../../domain/position';
 
 const props = withDefaults(defineProps<{
   open: boolean;
@@ -48,7 +49,8 @@ const kicker = computed(() => {
 
 const line = computed(() => {
   const parts: string[] = [];
-  if (props.player?.position) parts.push(String(props.player.position));
+  const position = positionBioLabel(props.player?.position);
+  if (position) parts.push(position);
   if (props.player?.height) parts.push(String(props.player.height));
   return parts.join(' · ');
 });

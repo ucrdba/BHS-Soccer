@@ -12,6 +12,7 @@ import { ref, watch, computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import type { Player } from '../../domain/player-row';
 import type { PlayerForm } from '../../stores/roster';
+import { POSITIONS, positionOptionLabel } from '../../domain/position';
 
 const props = defineProps<{
   open: boolean;
@@ -22,26 +23,33 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: []; save: [PlayerForm] }>();
 
-/**
- * Position is still a free-text field here (Tasks 4/5 replace it with a
- * number picker); PlayerForm.position is now `number | null` for the write
- * path, so the in-progress text this field holds needs a wider local type
- * than what gets emitted.
- */
-type FormState = Omit<PlayerForm, 'position'> & { position?: string | number | null };
+const f = ref<PlayerForm>(blank());
 
-const f = ref<FormState>(blank());
-
-function blank(): FormState {
+function blank(): PlayerForm {
   return {
     firstName: '', lastName: '', classYear: '', height: '', photo: '',
-    number: '', recordingNumber: '', position: ''
+    number: '', recordingNumber: '', position: null
   };
 }
 
 function submit(): void {
-  emit('save', f.value as PlayerForm);
+  emit('save', f.value);
 }
+
+/**
+ * The `<select>`'s own DOM value is always a string, so the blank option
+ * cannot be bound with `:value="null"` — Vue's prop patcher removes an
+ * element's `value` attribute whenever the bound value is `null`, which
+ * leaves that `<option>` with no attribute to match against and makes the
+ * blank choice unreachable by setting the select's value directly (as a
+ * test, or a browser's autofill, might). Binding the blank option to a
+ * literal `""` keeps the attribute in place; this computed is what turns
+ * that `""` back into the `null` the form (and `PlayerForm.position`) uses.
+ */
+const positionModel = computed<number | ''>({
+  get: () => f.value.position ?? '',
+  set: (v) => { f.value.position = v === '' ? null : Number(v); }
+});
 
 // Re-seeded whenever the modal opens, so a cancelled edit does not leak into
 // the next one.
@@ -53,7 +61,7 @@ watch(() => [props.open, props.player], () => {
         firstName: p.firstName, lastName: p.lastName,
         classYear: p.classYear || '', height: p.height || '', photo: p.photo || '',
         number: p.number ?? '', recordingNumber: p.recordingNumber ?? '',
-        position: p.position || '',
+        position: p.position ?? null,
         seasonStats: p.seasonStats, ratings: p.ratings
       }
     : blank();
@@ -89,9 +97,13 @@ const title = computed(() => (props.player ? 'Edit player' : 'Add a player'));
       </label>
 
       <label class="field">
-        <span class="kicker">Position</span>
-        <input v-model="f.position" class="input" placeholder="e.g. Center Back"
-               data-field="position" />
+        <span class="kicker" title="The soccer position number: 1 goalkeeper, 2-6 defence, 7-11 attack">
+          Position
+        </span>
+        <select v-model="positionModel" class="input" data-field="position">
+          <option value="">—</option>
+          <option v-for="n in POSITIONS" :key="n" :value="n">{{ positionOptionLabel(n) }}</option>
+        </select>
       </label>
       <label class="field">
         <span class="kicker">Class year</span>

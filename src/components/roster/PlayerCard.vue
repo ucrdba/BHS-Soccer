@@ -10,6 +10,7 @@
 import { computed } from 'vue';
 import { photoOrPlaceholder, PLAYER_SILHOUETTE, type Player } from '../../domain/player-row';
 import { lineupGrade } from '../../domain/lineup';
+import { positionCardLabel } from '../../domain/position';
 
 const props = defineProps<{ player: Player; canEdit: boolean }>();
 const emit = defineEmits<{ open: [Player]; edit: [Player]; remove: [Player] }>();
@@ -33,7 +34,7 @@ const grade = computed(() => lineupGrade(props.player));
       <span class="card__text">
         <span class="card__name">{{ player.name }}</span>
         <span class="card__meta">
-          <template v-if="player.position">{{ player.position }}</template>
+          <template v-if="positionCardLabel(player.position)">{{ positionCardLabel(player.position) }}</template>
           <template v-else>Position not recorded</template>
           <span v-if="grade" class="card__grade">&#183; {{ grade }}</span>
         </span>

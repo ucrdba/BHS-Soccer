@@ -16,14 +16,10 @@ vi.mock('../../demo', async (importOriginal) => {
 import { demoConfig } from '../../demo';
 import PlayerDetailModal from './PlayerDetailModal.vue';
 
-// `position` is still exercised here as free text ("Striker"): Player.position
-// is now `number | null` (0036), but Tasks 4/5 are what rewrite this modal's
-// display and this fixture for the numbered scheme. `any` keeps this fixture
-// and its assertions unchanged in the meantime.
-const PLAYER: any = {
+const PLAYER = {
   id: 'p1', membershipId: 'm1', name: 'Marcus Delgado', firstName: 'Marcus', lastName: 'Delgado',
   classYear: 'Senior', height: '5′ 11″', photo: '', number: 9, recordingNumber: 7,
-  position: 'Striker', seasonStats: { goals: 11, assists: 6 },
+  position: 9, seasonStats: { goals: 11, assists: 6 },
   ratings: { technical: 80, tactical: 70, physical: 90, mental: 70 }
 };
 
@@ -36,7 +32,13 @@ describe('PlayerDetailModal', () => {
     // The capitals are CSS; the text itself reads as typed.
     expect(w.find('[data-bio-kicker]').text().replace(/\s+/g, ' ')).toBe('No. 9 · Senior');
     expect(w.text()).toContain('Marcus Delgado');
-    expect(w.text()).toContain('Striker');
+    expect(w.text()).toContain('Position 9 · Attack');
+    expect(w.text()).toContain('5′ 11″');
+  });
+
+  it('shows no position when the player has none', () => {
+    const w = mountWith({ ...PLAYER, position: null });
+    expect(w.text()).not.toContain('Position');
     expect(w.text()).toContain('5′ 11″');
   });
 
