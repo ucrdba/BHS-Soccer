@@ -2,6 +2,7 @@
 
 **Status:** awaiting sign-off
 **Date:** 2026-09-14
+**Depends on:** `2026-09-14-numbered-positions-design.md` — built first; this drill reads a player's role from that number.
 
 ## Problem
 
@@ -13,17 +14,16 @@ scores recorded afterwards, so one drill occurrence is one session.
 
 What a good result is depends on the player's position:
 
-- **Attacking players** (8–11 in the soccer numbering) should score more than
+- **Attacking players** (7–11 in the soccer numbering) should score more than
   they give up, and the more they score the better.
 - **Defensive players** (2–6) should not give up goals; the fewer the better.
 - **Goalkeepers** (1) are judged like defenders, against their own standards.
 
 None of the Matrix's five measures can score this. `win_loss` records only
 win/draw/loss; `count_high`, `time_low` and `time_bands` store one number per
-player; `head_to_head` records pairings, not scores. And a player's position
-cannot be read from the roster: `team_players.position` is free text ("FB",
-"MF", "Center Midfield", "Forward / CAM", "Goalkeeper") and is empty for 40 of
-the 57 roster entries in production today.
+player; `head_to_head` records pairings, not scores. A player's position is
+the number 1–11 defined by the numbered-positions spec — 1 goalkeeper, 2–6
+defence, 7–11 attack — with its meaning held only in `src/domain/position.ts`.
 
 ## Decisions
 
@@ -31,7 +31,7 @@ Settled with the owner before this was written.
 
 | Question | Decision |
 | --- | --- |
-| Where does a player's role come from? | **Chosen on the session sheet** each session, pre-filled from the roster where the position is unambiguous. |
+| Where does a player's role come from? | **The roster position number** (1 goalkeeper, 2–6 defend, 7–11 attack), pre-filled on the session sheet and **changeable for that session** — e.g. a midfielder who defends in today's 2v2. |
 | Which roles? | **Attack, Defend, Goalkeeper.** Each role has its own standards. |
 | How is a result recorded? | **One score per player for the whole drill,** from the player's side: goals scored – goals given up. In a 2v2 each player records their pair's score. |
 | How is it typed? | **One box, "3-1".** |
@@ -48,16 +48,11 @@ session.
 
 **The session sheet** gives each player's row:
 
-- **Role** — Attack, Defend or Goalkeeper; blank until chosen. Pre-filled only
-  where the roster position is unambiguous, matched case-insensitively after
-  trimming:
-  - Attack: `FW`, `ST`, `CF`, `W`, `LW`, `RW`, `Forward`, `Striker`, `Winger`,
-    and any value beginning with `Forward`.
-  - Defend: `FB`, `CB`, `LB`, `RB`, `D`, `DEF`, `Defender`, `Fullback`,
-    `Full back`, `Centre back`, `Center back`.
-  - Goalkeeper: `GK`, `G`, `Goalkeeper`, `Keeper`.
-  - Anything else (`MF`, `Center Midfield`, blank) — left blank for the coach.
-  The coach can change a pre-filled role; nothing is written back to the roster.
+- **Role** — Attack, Defend or Goalkeeper. Pre-filled from the player's roster
+  position number with `roleOfPosition` (1 → Goalkeeper, 2–6 → Defend, 7–11 →
+  Attack); blank when the player has no position. The coach can change it for
+  this session; nothing is written back to the roster. Reopening a saved session
+  shows the role stored with the result, not the roster's current one.
 - **Score** — one text box. `3-1`, `3:1` and `3 1` all mean scored 3, gave up
   1 (surrounding spaces allowed). Each side is a whole number from 0 to 99.
   Anything else — `3`, `3-`, `-1`, `a-b`, `3-1-2` — is refused, naming the player.
@@ -118,9 +113,10 @@ set, with nothing on screen to say why. Bonus bands are optional.
 **No-shows and players not entered.** An `unexcused` result, and a roster
 player given no row (`not_entered`), are charged 0 of the weight as for every
 session drill — **unless the squad has no base bands for any role of this
-drill**, in which case the drill is excluded for the whole squad. (A role cannot
-be known for a player who was not there, so the per-role rule cannot apply to
-them; the squad-level rule matches the intent that unset standards cost nobody.)
+drill**, in which case the drill is excluded for the whole squad. (A player who
+was not there has no role for the session, and their roster position may be
+blank, so the per-role rule cannot be applied to them reliably; the squad-level
+rule matches the intent that unset standards cost nobody.)
 
 ## Where standards are edited
 
@@ -157,7 +153,7 @@ the reason shown, when:
   have. The drill is left out of their pickers rather than shown as an empty
   chart.
 
-## Schema — `0036_goals_by_role.sql`
+## Schema — `0037_goals_by_role.sql`
 
 Must apply to an empty database (the demo rebuild) and leave every existing
 score unchanged.
@@ -223,7 +219,7 @@ for `role_goals` drills only.
 
 | Unit | Holds |
 | --- | --- |
-| `src/domain/goal-score.ts` | `parseGoalScore(text)` → `{ scored, conceded } \| null`; `formatGoalScore`; `roleFromPosition(position)` → `'attack' \| 'defend' \| 'keeper' \| null` using the lists above. |
+| `src/domain/goal-score.ts` | `parseGoalScore(text)` → `{ scored, conceded } \| null`; `formatGoalScore`. Roles come from `src/domain/position.ts` (`roleOfPosition`, `PositionRole`), whose values `'keeper' \| 'defend' \| 'attack'` are the same strings the `role` column stores. |
 | `src/domain/role-goal-score.ts` | `roleGoalFactor(score, role, bands)` → `{ base, bonus, total, hasStandards }` — the browser's copy of the SQL rule, for the live preview and the editor's example line. |
 | `src/domain/session-entry.ts` | the `role_goals` branch: blank/pre-filled entries, `attendanceAfterInput`, `toSessionResults` (role + goals), `presentWithoutResult`. |
 | `src/data/supabase.ts` | `saveMatrixSession` writes `role`, `goals_for`, `goals_against` and refuses a present `role_goals` row missing any; `fetchGoalBands(drillId, teamId)`; `saveGoalBands(drillId, teamId, role, bands)` over the RPC; `fetchPlayerBreakdown` / `fetchTeamExercisePoints` select the new view columns. |
@@ -262,7 +258,7 @@ preview and the stored points cannot disagree silently.
 
 - `parseGoalScore` accepts `3-1`, `3:1`, `3 1`, ` 3 - 1 ` and refuses `3`, `3-`,
   `-1`, `a-b`, `3-1-2`, `100-0`;
-- `roleFromPosition` for each listed spelling and for `MF`/blank;
+- the sheet pre-fills each role from the position number (1, 4, 9, blank) and keeps a role the coach changed; a reopened session shows the stored role;
 - `roleGoalFactor` agrees with the SQL over a shared table of cases;
 - the sheet: Enter moves through role and score fields in on-screen order;
   typing a score marks present; a present row missing role or score blocks save
@@ -275,5 +271,5 @@ preview and the stored points cannot disagree silently.
 - Recording who played whom, or per-game scores.
 - Ranking players against each other in this drill (standards only).
 - A Midfield role.
-- Writing a chosen role back to the roster, or a structured 1–11 position field.
+- Writing a session's chosen role back to the roster.
 - Progress chart and squad report for this measure.
