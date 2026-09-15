@@ -28,6 +28,7 @@ export const useSessionStore = defineStore('session', () => {
   const sessions = ref<any[]>([]);
   const results = ref<any[]>([]);
   const bands = ref<any[]>([]);
+  const goalBands = ref<any[]>([]);
   const drills = ref<any[]>([]);
   const editingId = ref<string | null>(null);
   const loading = ref(false);
@@ -91,15 +92,21 @@ export const useSessionStore = defineStore('session', () => {
   /**
    * The standards this squad is held to on this exercise.
    *
-   * Only `time_bands` has any. Fetching for another measure is a wasted round
-   * trip whose empty result would then read as "no standards set" for a drill
-   * that cannot have them.
+   * `time_bands` has time bands and `role_goals` has goal bands; nothing else
+   * has any. Fetching for another measure is a wasted round trip whose empty
+   * result would then read as "no standards set" for a drill that cannot have
+   * them.
    */
   async function loadBands(drillId: string, teamId: string | null): Promise<void> {
     bands.value = [];
+    goalBands.value = [];
     if (!drillId || !teamId) return;
 
     const drill = drillById(drillId);
+    if (drill?.measure === 'role_goals') {
+      goalBands.value = (await supabaseService.fetchGoalBands(drillId, teamId)) || [];
+      return;
+    }
     // Unknown drill: the library may not be loaded yet, and a banded exercise
     // with no standards on screen is worse than one extra read.
     if (drill && drill.measure !== 'time_bands') return;
@@ -174,7 +181,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return {
-    sessions, results, bands, drills, editingId, editing, loading, loadError,
+    sessions, results, bands, goalBands, drills, editingId, editing, loading, loadError,
     loadHistory, loadDrills, loadBands, openNew, openExisting, save, remove
   };
 });

@@ -1973,7 +1973,52 @@ class SupabaseService {
     return { ok: true, saved: parsed.length };
   }
 
-  private static readonly MEASURES = ['head_to_head', 'win_loss', 'count_high', 'time_low', 'time_bands'];
+  /**
+   * The Goals-by-role standards one squad is held to on one drill, every role.
+   *
+   * Grouped by role, then kind, then threshold, so the editor and the live
+   * preview read them in a stable order. Null is a failed read.
+   */
+  async fetchGoalBands(drillId: string, teamId: string): Promise<Record<string, any>[] | null> {
+    if (!this.isConfigured()) return null;
+    if (!drillId || !this.isUuid(drillId)) return null;
+    if (!teamId || !this.isUuid(teamId)) return null;
+
+    const { data, error } = await this.client!
+      .from('drill_goal_bands')
+      .select('id, drill_id, team_id, role, kind, threshold, factor')
+      .eq('drill_id', drillId)
+      .eq('team_id', teamId);
+    if (error) { report('fetchGoalBands', error.message); return null; }
+
+    return (data || []).slice().sort((a: any, b: any) =>
+      String(a.role).localeCompare(String(b.role))
+      || String(a.kind).localeCompare(String(b.kind))
+      || Number(a.threshold) - Number(b.threshold));
+  }
+
+  /**
+   * Replace one role's Goals-by-role standards for one squad.
+   *
+   * Only through save_goal_bands (0037): drill_goal_bands has no write policy,
+   * because the 100% rule spans rows. The function checks the caller and every
+   * band, and its refusals are sentences shown as they are.
+   */
+  async saveGoalBands(
+    drillId: string, teamId: string, role: string,
+    bands: { kind: string; threshold: number; factor: number }[]
+  ): Promise<AccountResult<unknown>> {
+    if (!drillId || !this.isUuid(drillId)) return { ok: false, error: 'No drill given.' };
+    if (!teamId || !this.isUuid(teamId)) return { ok: false, error: 'No team selected.' };
+    return this.accountRpc('save_goal_bands', {
+      p_drill_id: drillId,
+      p_team_id: teamId,
+      p_role: role,
+      p_bands: (bands || []).map(b => ({ kind: b.kind, threshold: b.threshold, factor: b.factor }))
+    });
+  }
+
+  private static readonly MEASURES = ['head_to_head', 'win_loss', 'count_high', 'time_low', 'time_bands', 'role_goals'];
 
   async fetchDrillsForWeighting(schoolId?: string): Promise<Record<string, any>[] | null> {
     if (!this.isConfigured()) return null;
@@ -2053,34 +2098,52 @@ class SupabaseService {
    * the player is scored as though excused. The guard below still refuses
    * the save, because a coach who marks someone "here" with no result meant
    * to record something, not to quietly excuse them.
+   *
+   * A Goals-by-role drill (0037) takes a different shape: a present player
+   * needs a role and both goal counts, and nothing in raw_value or outcome.
    */
   async saveMatrixSession(
     teamId: string,
     session: { id?: string; drillId: string; occurredOn: string; notes?: string },
-    results: { playerId: string; attendance: string; rawValue?: number | null; outcome?: string | null }[]
+    results: {
+      playerId: string; attendance: string; rawValue?: number | null; outcome?: string | null;
+      role?: string | null; goalsFor?: number | null; goalsAgainst?: number | null;
+    }[]
   ): Promise<{ ok: boolean; error?: string; id?: string }> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!teamId) return { ok: false, error: 'No team selected.' };
     if (!session?.drillId) return { ok: false, error: 'Pick the exercise this session was.' };
     if (!session?.occurredOn) return { ok: false, error: 'Pick the date this session happened.' };
 
-    for (const r of results || []) {
-      if (r.attendance !== 'present') continue;
-      const hasValue = r.rawValue !== null && r.rawValue !== undefined && Number.isFinite(Number(r.rawValue));
-      const hasOutcome = !!r.outcome;
-      if (!hasValue && !hasOutcome) {
-        return { ok: false, error: `${r.playerId} is marked present but has no result. Enter one, or mark them absent.` };
-      }
-    }
-
     // The drill decides how the session is scored, so a head_to_head drill has
     // no session shape at all. Checked here rather than trusting the picker:
-    // the same day's competition must not be countable twice.
+    // the same day's competition must not be countable twice. Read before the
+    // results are checked, because a Goals-by-role result is a different shape.
     const { data: dRows } = await this.client!
       .from('drills_bank').select('measure').eq('id', session.drillId).limit(1);
     const measure = dRows && dRows[0] ? dRows[0].measure : null;
     if (measure === 'head_to_head') {
       return { ok: false, error: 'That exercise is recorded as 1v1 pairings, not as a session. Use Record Result instead.' };
+    }
+    const roleGoals = measure === 'role_goals';
+    const isGoalCount = (n: any) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 99;
+
+    for (const r of results || []) {
+      if (r.attendance !== 'present') continue;
+      if (roleGoals) {
+        // 0037 scores a present row only with all three; one missing any is
+        // silently left out of the standings, which is not what "here" meant.
+        if (!['attack', 'defend', 'keeper'].includes(r.role as string)
+            || !isGoalCount(r.goalsFor) || !isGoalCount(r.goalsAgainst)) {
+          return { ok: false, error: `${r.playerId} is marked present but needs a role and a score like 3-1. Enter both, or mark them absent.` };
+        }
+        continue;
+      }
+      const hasValue = r.rawValue !== null && r.rawValue !== undefined && Number.isFinite(Number(r.rawValue));
+      const hasOutcome = !!r.outcome;
+      if (!hasValue && !hasOutcome) {
+        return { ok: false, error: `${r.playerId} is marked present but has no result. Enter one, or mark them absent.` };
+      }
     }
 
     const sessionRow: Record<string, any> = {
@@ -2097,14 +2160,20 @@ class SupabaseService {
     }
 
     const sessionId = sData[0].id;
-    const rows = (results || []).map(r => ({
-      session_id: sessionId,
-      player_id: r.playerId,
-      attendance: r.attendance,
-      raw_value: r.attendance === 'present' && r.rawValue !== null && r.rawValue !== undefined
-        ? Number(r.rawValue) : null,
-      outcome: r.attendance === 'present' ? (r.outcome || null) : null
-    }));
+    const rows = (results || []).map(r => {
+      const present = r.attendance === 'present';
+      return {
+        session_id: sessionId,
+        player_id: r.playerId,
+        attendance: r.attendance,
+        raw_value: present && !roleGoals && r.rawValue !== null && r.rawValue !== undefined
+          ? Number(r.rawValue) : null,
+        outcome: present && !roleGoals ? (r.outcome || null) : null,
+        role: present && roleGoals ? (r.role as string) : null,
+        goals_for: present && roleGoals ? Number(r.goalsFor) : null,
+        goals_against: present && roleGoals ? Number(r.goalsAgainst) : null
+      };
+    });
 
     if (rows.length) {
       const { data: rData, error: rErr } = await this.client!
@@ -2155,7 +2224,8 @@ class SupabaseService {
       // drill_id so a breakdown opened from one exercise's leaderboard can be
       // scoped to it. Names are not a safe key: two exercises may share one,
       // and a rename would silently empty the panel.
-      .select('drill_id, exercise, occurred_on, kind, detail, raw_value, attendance, weight, earned, available, opponent_id')
+      // role .. bonus_factor since 0037, which must be applied before this client is deployed.
+      .select('drill_id, exercise, occurred_on, kind, detail, raw_value, attendance, weight, earned, available, opponent_id, role, goals_for, goals_against, base_factor, bonus_factor')
       .eq('team_id', teamId)
       .eq('player_id', playerId)
       .order('occurred_on', { ascending: false });
@@ -2175,7 +2245,7 @@ class SupabaseService {
     if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
     const { data, error } = await this.client!
       .from('matrix_exercise_points')
-      .select('player_id, drill_id, exercise, kind, raw_value, weight, earned, available, w, dr, ls, occurred_on')
+      .select('player_id, drill_id, exercise, kind, raw_value, weight, earned, available, w, dr, ls, occurred_on, role, goals_for, goals_against, base_factor, bonus_factor')
       .eq('team_id', teamId);
     if (error) { report('fetchTeamExercisePoints', error.message); return null; }
     return data;
@@ -2437,7 +2507,7 @@ class SupabaseService {
     if (!this.isConfigured() || !sessionId) return null;
     const { data, error } = await this.client!
       .from('matrix_session_results')
-      .select('player_id, attendance, raw_value, outcome')
+      .select('player_id, attendance, raw_value, outcome, role, goals_for, goals_against')
       .eq('session_id', sessionId);
     if (error) { report('fetchMatrixSessionResults', error.message); return null; }
     return data;

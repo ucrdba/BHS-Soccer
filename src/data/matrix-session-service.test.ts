@@ -168,3 +168,52 @@ describe('deleteMatrixSession', () => {
     expect(captured).toHaveLength(0);
   });
 });
+
+describe('saveMatrixSession for a Goals-by-role drill', () => {
+  beforeEach(() => { tableRows = { drills_bank: [{ measure: 'role_goals' }] }; });
+
+  it('writes the role and both goal counts, and no raw value', async () => {
+    const res = await supabaseService.saveMatrixSession(
+      't1', { drillId: 'd1', occurredOn: '2026-09-14' },
+      [
+        { playerId: 'p1', attendance: 'present', role: 'attack', goalsFor: 3, goalsAgainst: 1 },
+        { playerId: 'p2', attendance: 'excused', role: 'defend', goalsFor: 2, goalsAgainst: 2 }
+      ]
+    );
+    expect(res.ok).toBe(true);
+    const results = captured.find(c => c.table === 'matrix_session_results')!;
+    expect(results.rows).toEqual([
+      { session_id: 'sess-1', player_id: 'p1', attendance: 'present', raw_value: null, outcome: null,
+        role: 'attack', goals_for: 3, goals_against: 1 },
+      { session_id: 'sess-1', player_id: 'p2', attendance: 'excused', raw_value: null, outcome: null,
+        role: null, goals_for: null, goals_against: null }
+    ]);
+  });
+
+  it.each([
+    ['no role', { role: null, goalsFor: 3, goalsAgainst: 1 }],
+    ['a role the database refuses', { role: 'midfield', goalsFor: 3, goalsAgainst: 1 }],
+    ['no score', { role: 'attack', goalsFor: null, goalsAgainst: null }],
+    ['a count over 99', { role: 'attack', goalsFor: 100, goalsAgainst: 1 }]
+  ])('refuses a present player with %s, naming them', async (_label, r) => {
+    const res = await supabaseService.saveMatrixSession(
+      't1', { drillId: 'd1', occurredOn: '2026-09-14' },
+      [{ playerId: 'p1', attendance: 'present', ...r }]
+    );
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('p1 is marked present but needs a role and a score like 3-1. Enter both, or mark them absent.');
+    expect(captured).toHaveLength(0);
+  });
+});
+
+describe('saveMatrixSession for other measures', () => {
+  it('writes the Goals-by-role columns as null', async () => {
+    tableRows = { drills_bank: [{ measure: 'count_high' }] };
+    await supabaseService.saveMatrixSession(
+      't1', { drillId: 'd1', occurredOn: '2026-09-14' },
+      [{ playerId: 'p1', attendance: 'present', rawValue: 40, role: 'attack', goalsFor: 1, goalsAgainst: 0 }]
+    );
+    const results = captured.find(c => c.table === 'matrix_session_results')!;
+    expect(results.rows![0]).toMatchObject({ raw_value: 40, role: null, goals_for: null, goals_against: null });
+  });
+});

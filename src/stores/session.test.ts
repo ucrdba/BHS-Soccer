@@ -15,6 +15,7 @@ const fetchMatrixSessions = vi.fn();
 const fetchMatrixSessionResults = vi.fn();
 const fetchDrillsForWeighting = vi.fn();
 const fetchTimeBands = vi.fn();
+const fetchGoalBands = vi.fn();
 const saveMatrixSession = vi.fn();
 const deleteMatrixSession = vi.fn();
 
@@ -25,6 +26,7 @@ vi.mock('../data/supabase', () => ({
     fetchMatrixSessionResults: (...a: any[]) => fetchMatrixSessionResults(...a),
     fetchDrillsForWeighting: (...a: any[]) => fetchDrillsForWeighting(...a),
     fetchTimeBands: (...a: any[]) => fetchTimeBands(...a),
+    fetchGoalBands: (...a: any[]) => fetchGoalBands(...a),
     saveMatrixSession: (...a: any[]) => saveMatrixSession(...a),
     deleteMatrixSession: (...a: any[]) => deleteMatrixSession(...a)
   }
@@ -34,10 +36,12 @@ const { useSessionStore } = await import('./session');
 
 const LAPS = 'd-laps';      // time_bands — has standards
 const SMALL = 'd-small';    // win_loss — has none
+const GOALS = 'd-goals';    // role_goals — has goal bands
 
 const DRILLS = [
   { id: LAPS, name: '3 Laps', measure: 'time_bands', points: 3 },
-  { id: SMALL, name: 'Small Sided', measure: 'win_loss', points: 2 }
+  { id: SMALL, name: 'Small Sided', measure: 'win_loss', points: 2 },
+  { id: GOALS, name: '1v1 Attack', measure: 'role_goals', points: 3 }
 ];
 
 const SESSIONS = [
@@ -76,7 +80,7 @@ describe('loading', () => {
     const s = useSessionStore();
     await s.loadDrills('school-1');
     expect(fetchDrillsForWeighting).toHaveBeenCalledWith('school-1');
-    expect(s.drills).toHaveLength(2);
+    expect(s.drills).toHaveLength(DRILLS.length);
   });
 
   it('does not call for drills at all without an organization', async () => {
@@ -312,5 +316,35 @@ describe('the shape the history is read in', () => {
 
     expect(deleteMatrixSession).toHaveBeenCalledWith('s1');
     expect(deleteMatrixSession).not.toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe('Goals-by-role standards', () => {
+  it('loads goal bands, not time bands, for a role_goals drill', async () => {
+    fetchGoalBands.mockResolvedValue([{ role: 'attack', kind: 'base', threshold: 0, factor: 1 }]);
+    const s = useSessionStore();
+    s.drills = DRILLS;
+    await s.loadBands(GOALS, 't1');
+    expect(fetchGoalBands).toHaveBeenCalledWith(GOALS, 't1');
+    expect(fetchTimeBands).not.toHaveBeenCalled();
+    expect(s.goalBands).toHaveLength(1);
+    expect(s.bands).toEqual([]);
+  });
+
+  it('clears the goal bands when switching to another exercise', async () => {
+    fetchGoalBands.mockResolvedValue([{ role: 'attack', kind: 'base', threshold: 0, factor: 1 }]);
+    const s = useSessionStore();
+    s.drills = DRILLS;
+    await s.loadBands(GOALS, 't1');
+    await s.loadBands(SMALL, 't1');
+    expect(s.goalBands).toEqual([]);
+  });
+
+  it('treats a failed read as no standards rather than throwing', async () => {
+    fetchGoalBands.mockResolvedValue(null);
+    const s = useSessionStore();
+    s.drills = DRILLS;
+    await s.loadBands(GOALS, 't1');
+    expect(s.goalBands).toEqual([]);
   });
 });
