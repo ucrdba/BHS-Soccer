@@ -48,7 +48,7 @@ const kicker = computed(() => {
 
 const line = computed(() => {
   const parts: string[] = [];
-  if (props.player?.position) parts.push(props.player.position);
+  if (props.player?.position) parts.push(String(props.player.position));
   if (props.player?.height) parts.push(String(props.player.height));
   return parts.join(' · ');
 });

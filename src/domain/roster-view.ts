@@ -1,31 +1,28 @@
 /**
  * Narrowing the roster to a position group.
  *
- * The position column is free text that arrived from spreadsheets other
- * people made: "CB", "Centre Back", "Center-back" and "Defender" all mean the
- * same thing to a reader and nothing to a string comparison. So a group is a
- * set of keywords matched as substrings, not an enum.
+ * A group is a role, and a role comes from the position number -- see
+ * domain/position.ts: 1 the goalkeeper, 2-6 defence, 7-11 attack. No text is
+ * matched. There is no midfield group because the numbering has no midfield
+ * role; a player with no position appears under All only.
  *
- * Extracted from filterRoster in public/js/views/roster.view.js, which did
- * this by setting style.display on each card. Sorting stays in
- * src/domain/roster.ts, where Phase 0 put it.
+ * Sorting stays in src/domain/roster.ts.
  */
 import type { Player } from './player-row';
+import { roleOfPosition, type PositionRole } from './position';
 
 export interface RosterFilter {
-  key: string;
+  key: 'ALL' | 'GK' | 'DEF' | 'FWD';
   label: string;
   /** null means "everyone" rather than "match nothing". */
-  keywords: string[] | null;
+  role: PositionRole | null;
 }
 
 export const ROSTER_FILTERS: RosterFilter[] = [
-  { key: 'ALL', label: 'All', keywords: null },
-  { key: 'GK', label: 'Keepers', keywords: ['goalkeeper', 'keeper', 'gk'] },
-  { key: 'DEF', label: 'Defence', keywords: ['back', 'defender', 'def'] },
-  { key: 'MID', label: 'Midfield', keywords: ['midfield', 'mid'] },
-  // CAM sits here rather than in midfield, matching how the legacy chips read.
-  { key: 'FWD', label: 'Attack', keywords: ['forward', 'winger', 'cam', 'striker'] }
+  { key: 'ALL', label: 'All', role: null },
+  { key: 'GK', label: 'Keepers', role: 'keeper' },
+  { key: 'DEF', label: 'Defence', role: 'defend' },
+  { key: 'FWD', label: 'Attack', role: 'attack' }
 ];
 
 export function filterRoster(players: Player[], filter: string): Player[] {
@@ -34,21 +31,16 @@ export function filterRoster(players: Player[], filter: string): Player[] {
 
   // An unknown filter shows everyone rather than nobody: an empty roster
   // reads as "there are no players", which would be a lie.
-  if (!found || !found.keywords) return rows.slice();
+  if (!found || !found.role) return rows.slice();
 
-  const keywords = found.keywords;
-  return rows.filter(p => {
-    const pos = String(p?.position || '').toLowerCase();
-    return keywords.some(kw => pos.includes(kw));
-  });
+  return rows.filter(p => roleOfPosition(p?.position) === found.role);
 }
 
 /**
  * The chips, with how many each would show.
  *
- * The count is the addition: a chip that leads to an empty list is worth
- * knowing about before it is pressed, and an empty group is shown as zero
- * rather than hidden, so the set of chips does not move around.
+ * An empty group is shown as zero rather than hidden, so the set of chips does
+ * not move around.
  */
 export function rosterFilters(players: Player[]): { key: string; label: string; count: number }[] {
   return ROSTER_FILTERS.map(f => ({

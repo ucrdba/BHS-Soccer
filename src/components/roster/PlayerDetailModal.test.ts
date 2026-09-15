@@ -16,7 +16,11 @@ vi.mock('../../demo', async (importOriginal) => {
 import { demoConfig } from '../../demo';
 import PlayerDetailModal from './PlayerDetailModal.vue';
 
-const PLAYER = {
+// `position` is still exercised here as free text ("Striker"): Player.position
+// is now `number | null` (0036), but Tasks 4/5 are what rewrite this modal's
+// display and this fixture for the numbered scheme. `any` keeps this fixture
+// and its assertions unchanged in the meantime.
+const PLAYER: any = {
   id: 'p1', membershipId: 'm1', name: 'Marcus Delgado', firstName: 'Marcus', lastName: 'Delgado',
   classYear: 'Senior', height: '5′ 11″', photo: '', number: 9, recordingNumber: 7,
   position: 'Striker', seasonStats: { goals: 11, assists: 6 },

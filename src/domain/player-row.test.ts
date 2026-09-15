@@ -19,7 +19,7 @@ const row = (over: any = {}) => ({
   school_id: 's1',
   number: 7,
   recording_number: 21,
-  position: 'Midfielder',
+  position: 8,
   season_stats: { games: 12, goals: 3 },
   ratings: { technical: 4 },
   is_deleted: false,
@@ -56,9 +56,16 @@ describe('toPlayer', () => {
   it('maps the per-team columns', () => {
     const p = toPlayer(row());
     expect(p.number).toBe(7);
-    expect(p.position).toBe('Midfielder');
+    expect(p.position).toBe(8);
     expect(p.seasonStats).toEqual({ games: 12, goals: 3 });
     expect(p.ratings).toEqual({ technical: 4 });
+  });
+
+  it('reads a position that is not 1-11 as no position', () => {
+    // Before 0036 is applied the column still holds text; after, only numbers.
+    expect(toPlayer({ id: 'm', position: 'FB', players: { id: 'p', name: 'A' } }).position).toBeNull();
+    expect(toPlayer({ id: 'm', position: null, players: { id: 'p', name: 'A' } }).position).toBeNull();
+    expect(toPlayer({ id: 'm', position: 11, players: { id: 'p', name: 'A' } }).position).toBe(11);
   });
 
   it('keeps the recording number distinct from the shirt number', () => {

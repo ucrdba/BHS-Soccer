@@ -26,13 +26,13 @@ vi.mock('../data/supabase', () => ({
 const { useRosterStore } = await import('./roster');
 
 const row = (id: string, name: string, over: any = {}) => ({
-  id: 'tp-' + id, number: 7, recording_number: 21, position: 'Midfielder',
+  id: 'tp-' + id, number: 7, recording_number: 21, position: 8,
   season_stats: {}, ratings: {},
   players: { id, name, first_name: name.split(' ')[0], last_name: name.split(' ')[1] || '' },
   ...over
 });
 
-const form = { firstName: 'Cesar', lastName: 'Alva', number: '7', position: 'Midfielder' };
+const form = { firstName: 'Cesar', lastName: 'Alva', number: '7', position: 8 };
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -79,8 +79,8 @@ describe('loading', () => {
 
   it('sorts and filters what it shows', async () => {
     fetchTeamRoster.mockResolvedValue([
-      row('p1', 'Cesar Alva', { number: 9, position: 'Striker' }),
-      row('p2', 'Tom Budde', { number: 2, position: 'Center Back' })
+      row('p1', 'Cesar Alva', { number: 9, position: 9 }),
+      row('p2', 'Tom Budde', { number: 2, position: 4 })
     ]);
     const s = useRosterStore();
     await s.load('t1');
@@ -136,6 +136,16 @@ describe('adding a player', () => {
     await s.addPlayer({ ...form, number: '', recordingNumber: undefined } as any, 't1', 's1');
     expect(upsertTeamMembership).toHaveBeenCalledWith('t1', 's1',
       expect.objectContaining({ number: null, recording_number: null }));
+  });
+
+  it('writes the position as a number, and a blank one as null', async () => {
+    // Not .at(-1): this project's tsconfig lib target predates it.
+    const last = (calls: any[][]) => calls[calls.length - 1];
+    const s = useRosterStore();
+    await s.addPlayer({ ...form, position: 8 }, 't1', 's1');
+    expect(last(upsertTeamMembership.mock.calls)[2]).toMatchObject({ position: 8 });
+    await s.addPlayer({ ...form, position: null }, 't1', 's1');
+    expect(last(upsertTeamMembership.mock.calls)[2]).toMatchObject({ position: null });
   });
 });
 

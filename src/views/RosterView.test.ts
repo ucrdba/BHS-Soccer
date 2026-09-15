@@ -14,7 +14,7 @@ import RosterView from './RosterView.vue';
 import { toPlayer } from '../domain/player-row';
 
 const row = (id: string, name: string, over: any = {}) => toPlayer({
-  id: 'tp-' + id, number: 7, recording_number: 21, position: 'Midfielder',
+  id: 'tp-' + id, number: 7, recording_number: 21, position: 8,
   season_stats: { goals: 3 }, ratings: {},
   players: {
     id, name,
@@ -25,8 +25,8 @@ const row = (id: string, name: string, over: any = {}) => toPlayer({
 });
 
 const SQUAD = [
-  row('p1', 'Cesar Alva', { number: 9, position: 'Striker' }),
-  row('p2', 'Tom Budde', { number: 2, position: 'Center Back' })
+  row('p1', 'Cesar Alva', { number: 9, position: 9 }),
+  row('p2', 'Tom Budde', { number: 2, position: 4 })
 ];
 
 function mountRoster(opts: {
@@ -74,7 +74,9 @@ describe('the squad', () => {
 
   it('offers a chip per position group, with counts', () => {
     const w = mountRoster();
-    expect(w.findAll('[data-filter-chip]').length).toBeGreaterThan(1);
+    expect(w.findAll('[data-filter-chip]').map(c => c.text().replace(/\s+/g, ' ').trim()))
+      .toEqual(expect.arrayContaining([expect.stringContaining('Defence'), expect.stringContaining('Attack')]));
+    expect(w.text()).not.toMatch(/Midfield/);
   });
 
   it('says the roster is empty only once it has loaded', () => {

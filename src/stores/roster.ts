@@ -31,7 +31,7 @@ export interface PlayerForm {
   photo?: string;
   number?: string | number | null;
   recordingNumber?: string | number | null;
-  position?: string;
+  position?: number | null;
   seasonStats?: Record<string, any>;
   ratings?: Record<string, any>;
 }
@@ -80,7 +80,7 @@ export const useRosterStore = defineStore('roster', () => {
       player_id: playerId,
       number: num(f.number),
       recording_number: num(f.recordingNumber),
-      position: f.position,
+      position: f.position ?? null,
       season_stats: f.seasonStats ?? {},
       ratings: f.ratings ?? {}
     };

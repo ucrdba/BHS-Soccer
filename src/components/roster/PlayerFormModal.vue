@@ -22,13 +22,25 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: []; save: [PlayerForm] }>();
 
-const f = ref<PlayerForm>(blank());
+/**
+ * Position is still a free-text field here (Tasks 4/5 replace it with a
+ * number picker); PlayerForm.position is now `number | null` for the write
+ * path, so the in-progress text this field holds needs a wider local type
+ * than what gets emitted.
+ */
+type FormState = Omit<PlayerForm, 'position'> & { position?: string | number | null };
 
-function blank(): PlayerForm {
+const f = ref<FormState>(blank());
+
+function blank(): FormState {
   return {
     firstName: '', lastName: '', classYear: '', height: '', photo: '',
     number: '', recordingNumber: '', position: ''
   };
+}
+
+function submit(): void {
+  emit('save', f.value as PlayerForm);
 }
 
 // Re-seeded whenever the modal opens, so a cancelled edit does not leak into
@@ -54,7 +66,7 @@ const title = computed(() => (props.player ? 'Edit player' : 'Add a player'));
   <BaseModal :open="open" :title="title" wide @close="emit('close')">
     <p v-if="error" class="err" role="alert" data-form-error>{{ error }}</p>
 
-    <form id="player-form" class="grid" @submit.prevent="emit('save', f)">
+    <form id="player-form" class="grid" @submit.prevent="submit">
       <label class="field">
         <span class="kicker">First name</span>
         <input v-model="f.firstName" class="input" required data-field="firstName" />

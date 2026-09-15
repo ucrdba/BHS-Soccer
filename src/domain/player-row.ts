@@ -10,6 +10,7 @@
  * Lifted out of syncFromSupabase during the Vue migration's Phase 2 so the
  * two apps cannot drift into reading the roster differently.
  */
+import { toPosition } from './position';
 
 export interface Player {
   /** The person. Stable across every team they appear on. */
@@ -32,7 +33,8 @@ export interface Player {
   number: number | null;
   /** The paper-sheet number, distinct from the shirt (0021). */
   recordingNumber: number | null;
-  position: string;
+  /** The soccer position number 1-11, or null (0036). Meaning: domain/position.ts. */
+  position: number | null;
   seasonStats: Record<string, any>;
   ratings: Record<string, any>;
 }
@@ -69,7 +71,7 @@ export function toPlayer(m: any): Player {
     photo: m?.players?.photo_url,
     number: m?.number ?? null,
     recordingNumber: m?.recording_number ?? null,
-    position: m?.position,
+    position: toPosition(m?.position),
     seasonStats: m?.season_stats || {},
     ratings: m?.ratings || {}
   };
