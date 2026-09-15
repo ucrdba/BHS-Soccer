@@ -352,6 +352,28 @@ describe('A BAD POSITION BLOCKS THE IMPORT', () => {
     await flush();
     expect(upsertTeamMembership).toHaveBeenCalledWith('t1', 's1', expect.objectContaining({ position: 7 }));
   });
+
+  it('leaves the stored position alone when the sheet has no Position column', async () => {
+    // A sparse sheet must not wipe a column it never mentioned -- the same
+    // convention that already protects Number and RecordingNumber.
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, { Players: [{ Team: 'Varsity', FirstName: 'Cy', LastName: 'Dunn' }] });
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+    const payload = upsertTeamMembership.mock.calls[0][2];
+    expect(payload.position).toBeUndefined();
+    expect('position' in payload === false || payload.position === undefined).toBe(true);
+  });
+
+  it('leaves the stored position alone when the Position cell is blank', async () => {
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, { Players: [{ Team: 'Varsity', FirstName: 'Cy', LastName: 'Dunn', Position: '' }] });
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+    expect(upsertTeamMembership.mock.calls[0][2].position).toBeUndefined();
+  });
 });
 
 describe('applying', () => {

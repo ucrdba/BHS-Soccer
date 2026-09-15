@@ -214,12 +214,16 @@ async function writeRow(key: string, row: any): Promise<boolean> {
     });
     if (!identity?.id) return false;
 
-    // readyToApply refuses a plan with a bad position, so this is 1-11 or null.
+    // readyToApply refuses a plan with a bad position, so a defined cell here
+    // is 1-11. An absent column or a blank cell arrives as row.Position ===
+    // undefined (cell()'s convention), and must stay undefined rather than
+    // become null: upsertTeamMembership skips an undefined field but writes a
+    // null one, and a sparse sheet must not wipe a position nobody mentioned.
     const positionCell = parsePositionCell(row.Position);
     const res = await supabaseService.upsertTeamMembership(teamId, schoolId, {
       player_id: identity.id,
       number: row.Number, recording_number: row.RecordingNumber,
-      position: positionCell.ok ? positionCell.position : null
+      position: row.Position === undefined ? undefined : (positionCell.ok ? positionCell.position : null)
     });
     return !!res?.ok;
   }
