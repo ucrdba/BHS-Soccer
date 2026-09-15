@@ -28,6 +28,7 @@ vi.mock('../../data/supabase', () => ({
 const TEAM = '11111111-2222-3333-4444-555555555555';
 const LAPS = 'd-laps';       // time_bands, with a standard
 const COOPERS = 'd-coopers'; // count_high, no standard
+const GOALS = 'd-goals';     // role_goals, left out of the report
 
 const PLAYERS = [
   { id: 'p1', name: 'Cesar Alva' },
@@ -37,7 +38,8 @@ const PLAYERS = [
 
 const DRILLS = [
   { id: LAPS, name: '3 Laps', measure: 'time_bands' },
-  { id: COOPERS, name: 'Coopers', measure: 'count_high' }
+  { id: COOPERS, name: 'Coopers', measure: 'count_high' },
+  { id: GOALS, name: '1v1 Attack', measure: 'role_goals' }
 ];
 
 /** p1 runs 4:10 (clears 4:30); p2 runs 4:50 (short). */
@@ -212,5 +214,16 @@ describe('when the read fails', () => {
     const w = await mountReport({ history: [] });
     expect(w.find('[data-squad-empty]').exists()).toBe(true);
     expect(w.find('[data-squad-error]').exists()).toBe(false);
+  });
+});
+
+describe('Goals by role', () => {
+  it('is left out of the report even when the squad has recorded it', async () => {
+    const w = await mountReport({
+      history: [...HISTORY, { drillId: GOALS, playerId: 'p1', attendance: 'present', rawValue: null, occurredOn: '2026-09-14' }]
+    });
+    const names = w.findAll('[data-squad-exercise]').map((s: any) => s.text());
+    expect(names.some((t: string) => t.includes('1v1 Attack'))).toBe(false);
+    expect(names.some((t: string) => t.includes('3 Laps'))).toBe(true);
   });
 });

@@ -133,3 +133,30 @@ describe('buildExercisePrintDocument', () => {
     expect(html).toContain('</html>');
   });
 });
+
+describe('a Goals-by-role exercise', () => {
+  const GOAL_ROWS = [
+    { playerId: 'p1', recordingNumber: 9, name: 'Ash Attacker', role: 'attack', goalsFor: 3, goalsAgainst: 1,
+      diff: 2, baseFactor: 0.5, bonusFactor: 0.1, earned: 1.8, available: 3 },
+    { playerId: 'p2', recordingNumber: 4, name: 'Dee Defender', role: 'defend', goalsFor: 0, goalsAgainst: 3,
+      diff: -3, baseFactor: 0, bonusFactor: 0, earned: 0, available: 3 },
+    { playerId: 'p3', recordingNumber: 1, name: 'Absent Al', role: null, goalsFor: null, goalsAgainst: null,
+      diff: null, baseFactor: null, bonusFactor: null, earned: 0, available: 3 }
+  ];
+  const opts = { exercise: '1v1 Attack', measure: 'role_goals', organization: 'Org', rows: GOAL_ROWS };
+
+  it('exports role, score, goal difference, both shares and the standard', () => {
+    expect(exerciseSheet(opts)).toEqual([
+      { '#': 9, Player: 'Ash Attacker', Role: 'Attack', Score: '3-1', 'Goal difference': '+2',
+        'Base %': '50%', 'Bonus %': '10%', Points: '1.80', Of: '3.00', Standard: 'met' },
+      { '#': 4, Player: 'Dee Defender', Role: 'Defence', Score: '0-3', 'Goal difference': '-3',
+        'Base %': '0%', 'Bonus %': '0%', Points: '0.00', Of: '3.00', Standard: 'below' },
+      { '#': 1, Player: 'Absent Al', Role: '', Score: '', 'Goal difference': '',
+        'Base %': '', 'Bonus %': '', Points: '0.00', Of: '3.00', Standard: '' }
+    ]);
+  });
+
+  it('explains the standard on the printed sheet', () => {
+    expect(buildExercisePrintDocument(opts)).toMatch(/per role, not a ranking/);
+  });
+});

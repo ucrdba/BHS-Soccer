@@ -13,6 +13,7 @@
  * Everything here is emphasis, never a filter: the leaderboard keeps every row
  * and every sort. That was the condition on introducing it.
  */
+import type { PositionRole } from './position';
 
 export type BandStanding = 'met' | 'below' | 'missed' | 'none';
 
@@ -96,4 +97,47 @@ export function bandStanding(row: StandingRow): BandStanding {
  */
 export function belowStandard<T extends StandingRow>(rows: T[]): T[] {
   return (rows || []).filter(r => bandStanding(r) !== 'met');
+}
+
+/**
+ * Goals by role: is this player's latest result below the standard for their role?
+ *
+ * Below means the BASE -- goal difference -- met no band. The bonus is extra
+ * credit, not the standard, so a 6-7 attacker who took the scoring bonus is
+ * still below. 'none' is a player with no scored result: a no-show, a row
+ * nobody entered, or a role this squad has no standards for (the database
+ * leaves those out), and none of them is counted against a role.
+ *
+ * Emphasis only, like bandStanding: nothing here removes a row or a sort.
+ */
+export type RoleGoalStanding = 'met' | 'below' | 'none';
+
+export function roleGoalStanding(row: any): RoleGoalStanding {
+  if (!row?.role || row.baseFactor === null || row.baseFactor === undefined) return 'none';
+  return Number(row.baseFactor) > 0 ? 'met' : 'below';
+}
+
+export interface RoleShortfall { role: PositionRole; below: number; of: number }
+
+const ROLE_ORDER: PositionRole[] = ['attack', 'defend', 'keeper'];
+
+/** "2 of 6 attackers": per role, in role order, only roles someone played. */
+export function roleGoalShortfall(rows: any[]): RoleShortfall[] {
+  return ROLE_ORDER
+    .map(role => {
+      const mine = (rows || []).filter(r => r?.role === role && roleGoalStanding(r) !== 'none');
+      return { role, below: mine.filter(r => roleGoalStanding(r) === 'below').length, of: mine.length };
+    })
+    .filter(s => s.of > 0);
+}
+
+const ROLE_NOUNS: Record<PositionRole, [string, string]> = {
+  attack: ['attacker', 'attackers'],
+  defend: ['defender', 'defenders'],
+  keeper: ['goalkeeper', 'goalkeepers']
+};
+
+export function roleShortfallLine(s: RoleShortfall): string {
+  const [one, many] = ROLE_NOUNS[s.role];
+  return `${s.below} of ${s.of} ${s.of === 1 ? one : many} below the standard`;
 }

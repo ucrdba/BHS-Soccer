@@ -34,7 +34,12 @@ const playerId = ref('');
 const drillId = ref('');
 
 const players = computed(() => matrix.players || []);
-const drills = computed(() => matrix.drillsBank || []);
+/**
+ * Every exercise except Goals by role: this chart plots one raw value per
+ * session, and a Goals-by-role result is a role and two counts. Left out
+ * rather than shown as an empty chart.
+ */
+const drills = computed(() => (matrix.drillsBank || []).filter((d: any) => d.measure !== 'role_goals'));
 
 const drill = computed(() => drills.value.find((d: any) => d.id === drillId.value) || null);
 const measure = computed(() => drill.value?.measure || 'count_high');

@@ -34,7 +34,8 @@ const COOPERS = 'd-coopers'; // count_high — more is better
 const PLAYERS = [{ id: 'p1', name: 'Cesar Alva' }, { id: 'p2', name: 'Tom Budde' }];
 const DRILLS = [
   { id: LAPS, name: '3 Laps', measure: 'time_low' },
-  { id: COOPERS, name: 'Coopers', measure: 'count_high' }
+  { id: COOPERS, name: 'Coopers', measure: 'count_high' },
+  { id: 'd-goals', name: '1v1 Attack', measure: 'role_goals' }
 ];
 
 /** Three sessions: p1 improves, and misses the middle one. */
@@ -215,5 +216,14 @@ describe('when the read fails', () => {
   it('says so rather than showing an empty chart', async () => {
     const w = await mountProgress(null);
     expect(w.find('[data-progress-error]').exists()).toBe(true);
+  });
+});
+
+describe('Goals by role', () => {
+  it('is not offered: the chart plots one value per session, which this measure does not have', async () => {
+    const w = await mountProgress();
+    const offered = w.find('[data-progress-drill]').findAll('option').map((o: any) => o.text());
+    expect(offered).not.toContain('1v1 Attack');
+    expect(offered).toContain('Coopers');
   });
 });

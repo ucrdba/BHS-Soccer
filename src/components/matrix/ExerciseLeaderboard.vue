@@ -20,7 +20,10 @@
  */
 import { computed, ref } from 'vue';
 import { useMatrixStore } from '../../stores/matrix';
-import { bandStanding } from '../../domain/matrix-threshold';
+import { bandStanding, roleGoalStanding, roleShortfallLine } from '../../domain/matrix-threshold';
+import { roleLabel } from '../../domain/position';
+import { formatGoalDifference } from '../../domain/goal-score';
+import { percentLabel } from '../../domain/role-goal-score';
 import { exerciseSheet, buildExercisePrintDocument } from '../../domain/exercise-export';
 import { useOrganizationStore } from '../../stores/organization';
 import { formatSecondsAsTime } from '../../domain/time';
@@ -31,6 +34,7 @@ const isWinLoss = computed(() =>
   matrix.measure === 'win_loss' || matrix.measure === 'head_to_head');
 const isTimed = computed(() =>
   matrix.measure === 'time_low' || matrix.measure === 'time_bands');
+const isRoleGoals = computed(() => matrix.measure === 'role_goals');
 
 const bestLabel = computed(() => (isTimed.value ? 'Best time' : 'Best'));
 const avgLabel = computed(() => (isTimed.value ? 'Average' : 'Avg'));
@@ -40,12 +44,25 @@ const columns = computed(() => [
   { key: 'name', label: 'Player', text: true },
   // The best figure is a ceiling, the average the norm; a player whose only
   // clear run was his fastest reads very differently from one who clears it
-  // routinely. A win-loss exercise has no figure to average.
+  // routinely. A win-loss exercise has no figure to average, and a
+  // Goals-by-role one shows its latest result instead.
   ...(isWinLoss.value
     ? [{ key: 'wins', label: 'W-D-L' }]
-    : [{ key: 'best', label: bestLabel.value }, { key: 'avg', label: avgLabel.value }]),
+    : isRoleGoals.value
+      ? [
+          { key: 'role', label: 'Role', text: true },
+          { key: 'score', label: 'Score' },
+          { key: 'diff', label: 'Goal diff' },
+          { key: 'base', label: 'Base' },
+          { key: 'bonus', label: 'Bonus' }
+        ]
+      : [{ key: 'best', label: bestLabel.value }, { key: 'avg', label: avgLabel.value }]),
   { key: 'earned', label: 'Points' }
 ]);
+
+function share(v: any): string {
+  return v === null || v === undefined ? '—' : percentLabel(v);
+}
 
 function arrow(key: string): string {
   if (matrix.exerciseSort.by !== key) return '';
@@ -201,6 +218,18 @@ function standing(row: any): string {
       </p>
     </div>
 
+    <!-- Goals by role: a standard per role, counted per role. Emphasis only. -->
+    <div
+      v-if="isRoleGoals && matrix.roleShortfall.length"
+      class="standard" data-role-standard-summary
+    >
+      <p class="kicker standard__kicker">Standards per role, not a ranking</p>
+      <p
+        v-for="s in matrix.roleShortfall" :key="s.role"
+        class="standard__line" :data-role-shortfall="s.role"
+      >{{ roleShortfallLine(s) }}</p>
+    </div>
+
     <p v-if="matrix.leaderboard.length === 0" class="empty" data-leaderboard-empty>
       No results recorded for
       {{ matrix.selectedDrill ? matrix.selectedDrill.name : 'this exercise' }} yet.
@@ -224,14 +253,14 @@ function standing(row: any): string {
               >{{ c.label }}{{ arrow(c.key) }}</button>
             </th>
             <th title="Points available from this exercise">Of</th>
-            <th v-if="matrix.isThreshold">Standard</th>
+            <th v-if="matrix.isThreshold || isRoleGoals">Standard</th>
           </tr>
         </thead>
 
         <tbody>
           <tr
             v-for="r in matrix.leaderboard" :key="r.playerId"
-            :data-standing="standing(r)"
+            :data-standing="isRoleGoals ? roleGoalStanding(r) : standing(r)"
             data-leaderboard-row
           >
             <td class="tnum muted">{{ r.recordingNumber != null ? r.recordingNumber : '—' }}</td>
@@ -244,6 +273,13 @@ function standing(row: any): string {
             </td>
             <template v-if="isWinLoss">
               <td class="tnum">{{ r.wins }} - {{ r.draws }} - {{ r.losses }}</td>
+            </template>
+            <template v-else-if="isRoleGoals">
+              <td class="is-text" data-goal-role>{{ r.role ? roleLabel(r.role) : '—' }}</td>
+              <td class="tnum" data-goal-score>{{ r.goalsFor != null && r.goalsAgainst != null ? `${r.goalsFor}-${r.goalsAgainst}` : '—' }}</td>
+              <td class="tnum">{{ r.diff != null ? formatGoalDifference(r.diff) : '—' }}</td>
+              <td class="tnum muted">{{ share(r.baseFactor) }}</td>
+              <td class="tnum muted">{{ share(r.bonusFactor) }}</td>
             </template>
             <template v-else>
               <td class="tnum">{{ best(r) }}</td>
@@ -265,6 +301,14 @@ function standing(row: any): string {
               <!-- Never run. Marked apart from a slow run because it asks
                    something different of a coach, but counted with it. -->
               <span v-else class="mark mark--short" data-no-runs>△ no runs</span>
+            </td>
+            <td v-if="isRoleGoals" class="tnum">
+              <span
+                v-if="roleGoalStanding(r) === 'below'"
+                class="mark mark--short" data-below-standard
+              >△ below</span>
+              <span v-else-if="roleGoalStanding(r) === 'met'" class="mark">met</span>
+              <span v-else class="mark mark--none">—</span>
             </td>
           </tr>
         </tbody>

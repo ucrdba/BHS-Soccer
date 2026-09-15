@@ -14,7 +14,10 @@
  */
 import { formatSecondsAsTime } from './time';
 import { escapeHtml } from './plan-print';
-import { bandStanding, isThresholdMeasure } from './matrix-threshold';
+import { bandStanding, isThresholdMeasure, roleGoalStanding } from './matrix-threshold';
+import { roleLabel, type PositionRole } from './position';
+import { formatGoalDifference } from './goal-score';
+import { percentLabel } from './role-goal-score';
 
 export interface ExerciseExportOptions {
   exercise: string;
@@ -68,6 +71,7 @@ export function exerciseSheet(options: ExerciseExportOptions): Record<string, an
 
   const winLoss = isWinLoss(options.measure);
   const threshold = isThresholdMeasure(options.measure);
+  const roleGoals = options.measure === 'role_goals';
 
   return rows.map(r => {
     const out: Record<string, any> = {
@@ -77,6 +81,13 @@ export function exerciseSheet(options: ExerciseExportOptions): Record<string, an
 
     if (winLoss) {
       out['W-D-L'] = `${r.wins || 0} - ${r.draws || 0} - ${r.losses || 0}`;
+    } else if (roleGoals) {
+      const has = (v: any) => v !== null && v !== undefined;
+      out.Role = r.role ? roleLabel(r.role as PositionRole) : '';
+      out.Score = has(r.goalsFor) && has(r.goalsAgainst) ? `${r.goalsFor}-${r.goalsAgainst}` : '';
+      out['Goal difference'] = has(r.diff) ? formatGoalDifference(r.diff) : '';
+      out['Base %'] = has(r.baseFactor) ? percentLabel(r.baseFactor) : '';
+      out['Bonus %'] = has(r.bonusFactor) ? percentLabel(r.bonusFactor) : '';
     } else {
       out['Best time'] = figure(r, r.best);
       out.Average = figure(r, r.avg);
@@ -90,6 +101,11 @@ export function exerciseSheet(options: ExerciseExportOptions): Record<string, an
     if (threshold) {
       out.Standard = verdict(r);
       out.Runs = runs(r);
+    }
+
+    if (roleGoals) {
+      const s = roleGoalStanding(r);
+      out.Standard = s === 'none' ? '' : s;
     }
 
     return out;
@@ -111,7 +127,7 @@ export function buildExercisePrintDocument(options: ExerciseExportOptions): stri
   if (sheet.length === 0) return null;
 
   const columns = Object.keys(sheet[0]);
-  const textual = new Set(['Player', 'Standard', 'Runs', 'W-D-L']);
+  const textual = new Set(['Player', 'Standard', 'Runs', 'W-D-L', 'Role', 'Score']);
 
   const head = columns
     .map(c => `<th${textual.has(c) ? '' : ' class="n"'}>${escapeHtml(c)}</th>`)
@@ -128,7 +144,11 @@ export function buildExercisePrintDocument(options: ExerciseExportOptions): stri
     ? `<p class="note">A match-readiness standard, not a ranking. A player meets it
        once his fastest run clears the bar; “runs” says how many of his runs did.
        “No runs” means the exercise has not been attempted.</p>`
-    : '';
+    : options.measure === 'role_goals'
+      ? `<p class="note">Scored against standards per role, not a ranking. Each row is the
+         player’s latest result; “below” means the goal difference met no band for their role.
+         Points total every session.</p>`
+      : '';
 
   const where = [options.organization, options.team].filter(Boolean).map(escapeHtml).join(' · ');
 

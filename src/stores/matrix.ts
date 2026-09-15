@@ -22,7 +22,7 @@ import {
   boardSortDescends, exerciseSortDescends, nextSortState,
   type SortState
 } from '../domain/matrix';
-import { isThresholdMeasure, belowStandard } from '../domain/matrix-threshold';
+import { isThresholdMeasure, belowStandard, roleGoalShortfall } from '../domain/matrix-threshold';
 
 export interface WriteResult { ok: boolean; error?: string }
 
@@ -70,6 +70,15 @@ export const useMatrixStore = defineStore('matrix', () => {
   const isThreshold = computed(() => isThresholdMeasure(measure.value));
   const shortOfStandard = computed(() =>
     isThreshold.value ? belowStandard(leaderboard.value) : []);
+
+  /**
+   * Goals by role: "2 of 6 attackers below the standard", per role.
+   *
+   * Emphasis only. Players in a role the squad has no standards for have no
+   * scored line, so they are not counted.
+   */
+  const roleShortfall = computed(() =>
+    measure.value === 'role_goals' ? roleGoalShortfall(leaderboard.value) : []);
   /**
    * Everyone the standard applies to, which is what "7 of 24" counts against.
    *
@@ -165,7 +174,7 @@ export const useMatrixStore = defineStore('matrix', () => {
     loading, loadError, loadedTeamId,
     boardSort, exerciseSort, exerciseFilter,
     boardRows, exercises, leaderboard, selectedDrill, measure,
-    isThreshold, shortOfStandard, measuredCount,
+    isThreshold, shortOfStandard, roleShortfall, measuredCount,
     load, setBoardSort, setExerciseSort, setExerciseFilter,
     boardDescends, exerciseDescends, removeResult
   };

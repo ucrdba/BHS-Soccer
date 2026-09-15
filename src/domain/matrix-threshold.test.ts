@@ -11,7 +11,9 @@
  * no attention.
  */
 import { describe, it, expect } from 'vitest';
-import { isThresholdMeasure, bandStanding, belowStandard } from './matrix-threshold';
+import {
+  isThresholdMeasure, bandStanding, belowStandard, roleGoalStanding, roleGoalShortfall, roleShortfallLine
+} from './matrix-threshold';
 
 // The id includes attempts: without it, a missed attempt and a non-attempt
 // both read as "p0-1" and the assertions below cannot tell them apart.
@@ -190,5 +192,31 @@ describe('bandStanding on the fastest run', () => {
     const cleared = row(1.5, 2, 2, 1);
     const never = row(1, 2, 2, 0);
     expect(belowStandard([cleared, never])).toEqual([never]);
+  });
+});
+
+describe('Goals-by-role standing', () => {
+  it('is below the standard when the base earned nothing, whatever the bonus', () => {
+    expect(roleGoalStanding({ role: 'attack', baseFactor: 0, bonusFactor: 0.2 })).toBe('below');
+    expect(roleGoalStanding({ role: 'attack', baseFactor: 0.25, bonusFactor: 0 })).toBe('met');
+    expect(roleGoalStanding({ role: null, baseFactor: null })).toBe('none');
+  });
+
+  it('counts per role, in role order, leaving out roles nobody played and players with no result', () => {
+    const rows = [
+      { role: 'attack', baseFactor: 0 }, { role: 'attack', baseFactor: 0.5 }, { role: 'attack', baseFactor: 0 },
+      { role: 'keeper', baseFactor: 0.9 },
+      { role: null, baseFactor: null }
+    ];
+    expect(roleGoalShortfall(rows as any)).toEqual([
+      { role: 'attack', below: 2, of: 3 },
+      { role: 'keeper', below: 0, of: 1 }
+    ]);
+  });
+
+  it('words each count', () => {
+    expect(roleShortfallLine({ role: 'attack', below: 2, of: 6 })).toBe('2 of 6 attackers below the standard');
+    expect(roleShortfallLine({ role: 'defend', below: 1, of: 1 })).toBe('1 of 1 defender below the standard');
+    expect(roleShortfallLine({ role: 'keeper', below: 0, of: 2 })).toBe('0 of 2 goalkeepers below the standard');
   });
 });

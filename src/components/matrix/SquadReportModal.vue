@@ -39,7 +39,8 @@ const players = computed(() => matrix.players || []);
 /** Only the exercises this squad has actually done. */
 const drills = computed(() => {
   const used = new Set(history.value.map(r => r.drillId));
-  return (matrix.drillsBank || []).filter((d: any) => used.has(d.id));
+  // Goals by role has no single reading per session to report; left out, as in the progress chart.
+  return (matrix.drillsBank || []).filter((d: any) => used.has(d.id) && d.measure !== 'role_goals');
 });
 
 /**

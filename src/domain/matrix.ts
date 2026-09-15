@@ -32,7 +32,9 @@ export function exerciseLeaderboard(
       wins: 0, draws: 0, losses: 0,
       earned: 0, available: 0, attempts: 0,
       metRuns: 0, shortRuns: 0,
-      best: null, sum: 0, timed
+      best: null, sum: 0, timed,
+      role: null, goalsFor: null, goalsAgainst: null, diff: null,
+      baseFactor: null, bonusFactor: null, latestOn: ''
     };
 
     a.wins += Number(r.w) || 0;
@@ -40,6 +42,20 @@ export function exerciseLeaderboard(
     a.losses += Number(r.ls) || 0;
     a.earned += Number(r.earned) || 0;
     a.available += Number(r.available) || 0;
+
+    // Goals by role: the figures shown are the player's LATEST result. A role
+    // can change between sessions, so adding scores across them would mix an
+    // attacker's goals with a defender's. Points above still total every one.
+    if (r.kind === 'role_goals' && String(r.occurred_on || '') >= a.latestOn) {
+      const num = (v: any) => (v === null || v === undefined ? null : Number(v));
+      a.latestOn = String(r.occurred_on || '');
+      a.role = r.role ?? null;
+      a.goalsFor = num(r.goals_for);
+      a.goalsAgainst = num(r.goals_against);
+      a.diff = a.goalsFor !== null && a.goalsAgainst !== null ? a.goalsFor - a.goalsAgainst : null;
+      a.baseFactor = num(r.base_factor);
+      a.bonusFactor = num(r.bonus_factor);
+    }
 
     // A row with no value is an absence or a session never filled in: it
     // counts against the points, but it is not an attempt and cannot be a
@@ -113,6 +129,28 @@ export function compareExerciseRows(
 
   if (by === 'wins') {
     if (y.wins !== x.wins) return flip * (y.wins - x.wins);
+    return flip * (y.earned - x.earned);
+  }
+
+  if (by === 'role') {
+    if (x.role === null || y.role === null) {
+      if (x.role === y.role) return 0;
+      return x.role === null ? 1 : -1;
+    }
+    return flip * String(x.role).localeCompare(String(y.role));
+  }
+
+  // Goals by role's figures: highest first, blanks last whichever way.
+  const GOAL_FIELDS: Record<string, string> = { score: 'goalsFor', diff: 'diff', base: 'baseFactor', bonus: 'bonusFactor' };
+  if (GOAL_FIELDS[by]) {
+    const f = GOAL_FIELDS[by];
+    if (x[f] === null || x[f] === undefined || y[f] === null || y[f] === undefined) {
+      const xn = x[f] === null || x[f] === undefined;
+      const yn = y[f] === null || y[f] === undefined;
+      if (xn === yn) return 0;
+      return xn ? 1 : -1;
+    }
+    if (y[f] !== x[f]) return flip * (y[f] - x[f]);
     return flip * (y.earned - x.earned);
   }
 
@@ -228,7 +266,7 @@ export function boardSortDescends(by: string): boolean {
  * show the order actually in force rather than just "sorted".
  */
 export function exerciseSortDescends(by: string, timed: boolean): boolean {
-  if (by === 'name' || by === 'number') return false;
+  if (by === 'name' || by === 'number' || by === 'role') return false;
   // Both figures read the same way round: a faster time is better, a higher
   // count is better.
   if (by === 'best' || by === 'avg') return !timed;

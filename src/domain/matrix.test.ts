@@ -20,6 +20,7 @@ import { bandStanding, belowStandard } from './matrix-threshold';
 const COOPERS = 'd-coopers';   // count_high
 const LAPS = 'd-laps';         // time_bands
 const SMALL = 'd-small';       // win_loss
+const GOALS = 'd-goals';       // role_goals
 
 const ctx = (points: any[]) => ({
   points,
@@ -31,7 +32,8 @@ const ctx = (points: any[]) => ({
   drillsBank: [
     { id: COOPERS, name: 'Coopers', measure: 'count_high' },
     { id: LAPS, name: '3 Laps', measure: 'time_bands' },
-    { id: SMALL, name: 'Small Sided', measure: 'win_loss' }
+    { id: SMALL, name: 'Small Sided', measure: 'win_loss' },
+    { id: GOALS, name: '1v1 Attack', measure: 'role_goals' }
   ] as any[]
 });
 
@@ -289,5 +291,57 @@ describe('nextSortState', () => {
   it('switches column and resets direction when a new one is clicked', () => {
     expect(nextSortState({ by: 'earned', reversed: true }, 'name'))
       .toEqual({ by: 'name', reversed: false });
+  });
+});
+
+describe('a Goals-by-role leaderboard', () => {
+  const g = (over: any) => row({
+    drill_id: GOALS, kind: 'role_goals', weight: 3, available: 3, ...over
+  });
+
+  it("shows each player's latest result and totals the points", () => {
+    const rows = exerciseLeaderboard(ctx([
+      g({ player_id: 'p1', occurred_on: '2026-09-01', role: 'defend', goals_for: 0, goals_against: 2,
+          raw_value: -2, base_factor: 0, bonus_factor: 0, earned: 0 }),
+      g({ player_id: 'p1', occurred_on: '2026-09-08', role: 'attack', goals_for: 3, goals_against: 1,
+          raw_value: 2, base_factor: '0.500', bonus_factor: '0.100', earned: 1.8 })
+    ]), GOALS);
+    expect(rows[0]).toMatchObject({
+      role: 'attack', goalsFor: 3, goalsAgainst: 1, diff: 2, baseFactor: 0.5, bonusFactor: 0.1,
+      earned: 1.8, available: 6
+    });
+  });
+
+  it('leaves the figures empty for a player with only a no-show', () => {
+    const rows = exerciseLeaderboard(ctx([
+      row({ drill_id: GOALS, kind: 'absent', player_id: 'p2', weight: 3, available: 3 })
+    ]), GOALS);
+    expect(rows[0]).toMatchObject({ role: null, goalsFor: null, diff: null, baseFactor: null });
+  });
+
+  it('sorts by goal difference, highest first, with blanks last either way', () => {
+    const points = [
+      g({ player_id: 'p1', role: 'attack', goals_for: 1, goals_against: 1, raw_value: 0, base_factor: 0.2, bonus_factor: 0 }),
+      g({ player_id: 'p2', role: 'attack', goals_for: 4, goals_against: 1, raw_value: 3, base_factor: 0.8, bonus_factor: 0 }),
+      row({ drill_id: GOALS, kind: 'not_entered', player_id: 'p3', weight: 3, available: 3 })
+    ];
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'diff', false).map(r => r.playerId)).toEqual(['p2', 'p1', 'p3']);
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'diff', true).map(r => r.playerId)).toEqual(['p1', 'p2', 'p3']);
+  });
+
+  it('sorts by role alphabetically and by base, bonus and score', () => {
+    const points = [
+      g({ player_id: 'p1', role: 'defend', goals_for: 0, goals_against: 0, raw_value: 0, base_factor: 0.6, bonus_factor: 0.4 }),
+      g({ player_id: 'p2', role: 'attack', goals_for: 5, goals_against: 1, raw_value: 4, base_factor: 0.8, bonus_factor: 0.2 })
+    ];
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'role', false).map(r => r.playerId)).toEqual(['p2', 'p1']);
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'base', false).map(r => r.playerId)).toEqual(['p2', 'p1']);
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'bonus', false).map(r => r.playerId)).toEqual(['p1', 'p2']);
+    expect(exerciseLeaderboard(ctx(points), GOALS, 'score', false).map(r => r.playerId)).toEqual(['p2', 'p1']);
+  });
+
+  it('reads role ascending and the figures descending on first click', () => {
+    expect(exerciseSortDescends('role', false)).toBe(false);
+    for (const by of ['score', 'diff', 'base', 'bonus']) expect(exerciseSortDescends(by, false)).toBe(true);
   });
 });

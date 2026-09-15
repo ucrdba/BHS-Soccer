@@ -10,6 +10,9 @@
  */
 import { formatSecondsAsTime } from './time';
 import { isTimedExercise } from './matrix-session';
+import { roleLabel, type PositionRole } from './position';
+import { formatGoalDifference } from './goal-score';
+import { percentLabel } from './role-goal-score';
 
 export interface BreakdownRow {
   kind: string;
@@ -46,6 +49,19 @@ export function breakdownDetail(
 
   if (row.kind === 'win_loss') {
     return row.detail === 'win' ? 'won' : row.detail === 'draw' ? 'drew' : 'lost';
+  }
+
+  if (row.kind === 'role_goals') {
+    // The exercise and "1.8 of 3.0" sit in the modal's own columns; this cell
+    // says what the player did and which shares it earned.
+    const parts = [row.role ? roleLabel(row.role as PositionRole) : 'no role'];
+    if (row.goals_for != null && row.goals_against != null) {
+      const gf = Number(row.goals_for);
+      const ga = Number(row.goals_against);
+      parts.push(`${gf}-${ga} (${formatGoalDifference(gf - ga)})`);
+    }
+    parts.push(`${percentLabel(Number(row.base_factor) || 0)} + ${percentLabel(Number(row.bonus_factor) || 0)}`);
+    return parts.join(' · ');
   }
 
   if (row.kind === 'absent') return 'no-show';

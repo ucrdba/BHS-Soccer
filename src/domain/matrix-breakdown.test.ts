@@ -154,3 +154,17 @@ describe('resultLabel', () => {
     expect(resultLabel('gone', byId)).toBe('(removed player)');
   });
 });
+
+describe('a Goals-by-role result', () => {
+  it('reads role, score, goal difference and the two shares', () => {
+    expect(detail({ kind: 'role_goals', role: 'attack', goals_for: 3, goals_against: 1,
+      base_factor: '0.500', bonus_factor: '0.100', raw_value: 2 }))
+      .toBe('Attack · 3-1 (+2) · 50% + 10%');
+  });
+
+  it('signs nothing for an even game and names a defender in roster words', () => {
+    expect(detail({ kind: 'role_goals', role: 'defend', goals_for: 1, goals_against: 1,
+      base_factor: 0.6, bonus_factor: 0, raw_value: 0 }))
+      .toBe('Defence · 1-1 (0) · 60% + 0%');
+  });
+});
