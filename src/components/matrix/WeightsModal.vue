@@ -17,9 +17,14 @@
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import BandsEditor, { type BandDraft } from './BandsEditor.vue';
+import GoalBandsEditor from './GoalBandsEditor.vue';
 import { supabaseService } from '../../data/supabase';
 import { useSessionStore } from '../../stores/session';
 import { formatSecondsAsTime } from '../../domain/time';
+import { roleLabel } from '../../domain/position';
+import {
+  GOAL_ROLES, emptyGoalDrafts, goalDraftsFromBands, draftsToGoalBands, type GoalBandDrafts
+} from '../../domain/goal-bands-draft';
 
 const props = defineProps<{ open: boolean; teamId: string | null; schoolId: string | null }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
@@ -31,7 +36,8 @@ const MEASURES: [string, string][] = [
   ['win_loss', 'Small-sided (W/D/L)'],
   ['count_high', 'Counted, high wins'],
   ['time_low', 'Timed, fastest wins'],
-  ['time_bands', 'Timed against a standard']
+  ['time_bands', 'Timed against a standard'],
+  ['role_goals', 'Goals by role']
 ];
 
 interface WeightDraft { id: string; name: string; category: string; points: string; measure: string }
@@ -47,6 +53,19 @@ const notice = ref<string | null>(null);
 const saving = ref(false);
 
 const banded = computed(() => drafts.value.filter(d => d.measure === 'time_bands'));
+
+/** Per drill, per role; kept when the measure is switched away and back, like bandDrafts. */
+const goalDrafts = ref<Record<string, GoalBandDrafts>>({});
+
+const goalDrilled = computed(() => drafts.value.filter(d => d.measure === 'role_goals'));
+
+function goalDraftsFor(id: string): GoalBandDrafts {
+  return goalDrafts.value[id] || emptyGoalDrafts();
+}
+
+function setGoalDrafts(id: string, rows: GoalBandDrafts): void {
+  goalDrafts.value = { ...goalDrafts.value, [id]: rows };
+}
 
 function toDrafts(drills: any[]): WeightDraft[] {
   return (drills || []).map(d => ({
@@ -77,6 +96,10 @@ async function load(): Promise<void> {
   for (const d of banded.value) {
     const rows = await supabaseService.fetchTimeBands(d.id, props.teamId);
     bandDrafts.value = { ...bandDrafts.value, [d.id]: toBandDrafts(rows || []) };
+  }
+  for (const d of goalDrilled.value) {
+    const rows = await supabaseService.fetchGoalBands(d.id, props.teamId);
+    goalDrafts.value = { ...goalDrafts.value, [d.id]: goalDraftsFromBands(rows || []) };
   }
 }
 
@@ -136,6 +159,31 @@ async function onSave(): Promise<void> {
       bandDrafts.value = { ...bandDrafts.value, [d.id]: toBandDrafts(fresh || []) };
     }
 
+    for (const d of goalDrilled.value) {
+      if (!props.teamId) {
+        error.value = 'Weights saved, but standards need a team. Choose one in the header.';
+        return;
+      }
+      const roles = goalDraftsFor(d.id);
+      for (const role of GOAL_ROLES) {
+        // Checked here first so a bad row is named beside nothing else having
+        // been sent; save_goal_bands makes the same refusals in the same words.
+        const parsed = draftsToGoalBands(roles[role]);
+        const label = `${roleLabel(role)} standards for ${d.name}`;
+        if (!parsed.ok) {
+          error.value = `Weights saved. ${label}: ${(parsed as { error: string }).error}`;
+          return;
+        }
+        const res = await supabaseService.saveGoalBands(d.id, props.teamId, role, parsed.bands);
+        if (!res?.ok) {
+          error.value = `Weights saved. ${label}: ${res?.error || 'could not be saved.'}`;
+          return;
+        }
+      }
+      const fresh = await supabaseService.fetchGoalBands(d.id, props.teamId);
+      goalDrafts.value = { ...goalDrafts.value, [d.id]: goalDraftsFromBands(fresh || []) };
+    }
+
     const n = res.updated ?? rows.length;
     notice.value = `Saved ${n} exercise${n === 1 ? '' : 's'}. Standings re-scored.`;
     emit('saved');
@@ -184,6 +232,12 @@ async function onSave(): Promise<void> {
         v-if="d.measure === 'time_bands'"
         :drill-id="d.id" :rows="bandsFor(d.id)"
         @update:rows="setBands(d.id, $event)"
+      />
+
+      <GoalBandsEditor
+        v-if="d.measure === 'role_goals'"
+        :drill-id="d.id" :rows="goalDraftsFor(d.id)"
+        @update:rows="setGoalDrafts(d.id, $event)"
       />
     </div>
 

@@ -18,13 +18,17 @@ const updateDrillWeights = vi.fn();
 const saveTimeBands = vi.fn();
 const fetchTimeBands = vi.fn();
 const fetchDrillsForWeighting = vi.fn();
+const fetchGoalBands = vi.fn();
+const saveGoalBands = vi.fn();
 
 vi.mock('../../data/supabase', () => ({
   supabaseService: {
     updateDrillWeights: (...a: any[]) => updateDrillWeights(...a),
     saveTimeBands: (...a: any[]) => saveTimeBands(...a),
     fetchTimeBands: (...a: any[]) => fetchTimeBands(...a),
-    fetchDrillsForWeighting: (...a: any[]) => fetchDrillsForWeighting(...a)
+    fetchDrillsForWeighting: (...a: any[]) => fetchDrillsForWeighting(...a),
+    fetchGoalBands: (...a: any[]) => fetchGoalBands(...a),
+    saveGoalBands: (...a: any[]) => saveGoalBands(...a)
   }
 }));
 
@@ -75,6 +79,8 @@ beforeEach(() => {
   saveTimeBands.mockResolvedValue({ ok: true, saved: 2 });
   fetchTimeBands.mockResolvedValue(BANDS);
   fetchDrillsForWeighting.mockResolvedValue(DRILLS);
+  fetchGoalBands.mockResolvedValue(GOAL_BANDS);
+  saveGoalBands.mockResolvedValue({ ok: true });
 });
 
 describe('the exercise list', () => {
@@ -96,10 +102,10 @@ describe('the exercise list', () => {
     expect(w.find('[data-weights-empty]').text()).toMatch(/planner/i);
   });
 
-  it('offers all five measures', async () => {
+  it('offers all six measures', async () => {
     const w = await mountWeights();
     const opts = w.find('[data-measure]').findAll('option').map((o: any) => o.attributes('value'));
-    expect(opts).toEqual(['head_to_head', 'win_loss', 'count_high', 'time_low', 'time_bands']);
+    expect(opts).toEqual(['head_to_head', 'win_loss', 'count_high', 'time_low', 'time_bands', 'role_goals']);
   });
 });
 
@@ -274,5 +280,65 @@ describe('saving', () => {
     await flush();
 
     expect(w.find('[data-weights-notice]').text()).toMatch(/re-scored/i);
+  });
+});
+
+const GOALS = 'd-goals';
+const GOAL_DRILLS = [...DRILLS, { id: GOALS, name: '1v1 Attack', category: 'Finishing', measure: 'role_goals', points: 3 }];
+const GOAL_BANDS = [
+  { role: 'attack', kind: 'base', threshold: 1, factor: 0.5 },
+  { role: 'attack', kind: 'bonus', threshold: 3, factor: 0.1 },
+  { role: 'defend', kind: 'base', threshold: 0, factor: 1 }
+];
+
+describe('Goals by role', () => {
+  it('shows the per-role editor for a Goals-by-role exercise only', async () => {
+    const w = await mountWeights(GOAL_DRILLS);
+    expect(w.find(`[data-goal-bands="${GOALS}"]`).exists()).toBe(true);
+    expect(w.find(`[data-goal-bands="${LAPS}"]`).exists()).toBe(false);
+    expect(fetchGoalBands).toHaveBeenCalledWith(GOALS, 't1');
+    expect(w.find(`[data-goal-bands="${GOALS}"] [data-goal-example]`).text()).toBe('+1 with 3 scored → 50% + 10% = 60%');
+  });
+
+  it("saves every role's bands for the ACTIVE SQUAD, as factors", async () => {
+    const w = await mountWeights(GOAL_DRILLS);
+    await w.find('[data-weights-save]').trigger('click');
+    await flush();
+
+    expect(saveGoalBands).toHaveBeenCalledTimes(3);
+    expect(saveGoalBands).toHaveBeenCalledWith(GOALS, 't1', 'attack', [
+      { kind: 'base', threshold: 1, factor: 0.5 },
+      { kind: 'bonus', threshold: 3, factor: 0.1 }
+    ]);
+    expect(saveGoalBands).toHaveBeenCalledWith(GOALS, 't1', 'defend', [{ kind: 'base', threshold: 0, factor: 1 }]);
+    expect(saveGoalBands).toHaveBeenCalledWith(GOALS, 't1', 'keeper', []);
+  });
+
+  it('names the exercise and the role when the database refuses', async () => {
+    const w = await mountWeights(GOAL_DRILLS);
+    saveGoalBands.mockResolvedValueOnce({ ok: false, error: 'Only a coach of this team can set its standards.' });
+    await w.find('[data-weights-save]').trigger('click');
+    await flush();
+
+    expect(w.find('[data-weights-error]').text())
+      .toBe('Weights saved. Attack standards for 1v1 Attack: Only a coach of this team can set its standards.');
+  });
+
+  it('refuses a pair over 100% without sending it', async () => {
+    const w = await mountWeights(GOAL_DRILLS);
+    await w.find(`[data-goal-bands="${GOALS}"] [data-goal-kind="bonus"] [data-goal-percent]`).setValue('60');
+    await w.find('[data-weights-save]').trigger('click');
+    await flush();
+
+    expect(saveGoalBands).not.toHaveBeenCalled();
+    expect(w.find('[data-weights-error]').text()).toMatch(/Attack standards for 1v1 Attack: .*more than 100%/);
+  });
+
+  it('does not write goal standards when the weights were refused', async () => {
+    const w = await mountWeights(GOAL_DRILLS);
+    updateDrillWeights.mockResolvedValue({ ok: false, error: 'no', updated: 0 });
+    await w.find('[data-weights-save]').trigger('click');
+    await flush();
+    expect(saveGoalBands).not.toHaveBeenCalled();
   });
 });
