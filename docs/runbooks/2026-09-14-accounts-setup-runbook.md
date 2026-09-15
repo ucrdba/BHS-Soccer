@@ -114,14 +114,19 @@ deploy.
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
 2. Paste the whole of `supabase/migrations/0035_account_invitations.sql` and run it.
    It carries its own `begin`, `set role postgres` and `commit`.
-3. Paste the whole of `supabase/migrations/0036_numbered_positions.sql` and run it.
+3. Run the positions query from 3f again now and keep this output — anything a
+   coach typed since you first ran it is cleared too.
+4. Paste the whole of `supabase/migrations/0036_numbered_positions.sql` and run it.
    **This must never be applied to a database that is still serving the older
    app.** The older app sends positions as text, and 0036 makes
    `team_players.position` a `smallint` — every roster save and every player
    import fails with `invalid input syntax for type smallint` on the old
    client until the new app is live, so keep this back to back with the push
-   below, the same as 0035.
-4. Verify:
+   below, the same as 0035. If it errors, its own transaction rolls it back and
+   nothing changed; do not push until it has applied cleanly (the new client
+   reads text positions as well as numbers, but the older client's writes are
+   what break once it is applied).
+5. Verify:
 
    ```sql
    select count(*) from public.invitations;                                   -- 0
@@ -139,14 +144,14 @@ deploy.
     where table_name = 'team_players' and column_name = 'position';            -- smallint
    ```
 
-5. Tell PostgREST about the new functions, or the app's calls to them answer
+6. Tell PostgREST about the new functions, or the app's calls to them answer
    "function not found" until it next reloads on its own:
 
    ```sql
    notify pgrst, 'reload schema';
    ```
 
-6. Immediately push `main` (the owner's call). Vercel deploys production; wait
+7. Immediately push `main` (the owner's call). Vercel deploys production; wait
    for the deployment to go live.
 
 ## 5. Prove the new flows on the live site
@@ -206,9 +211,12 @@ not just the ones waiting now.
 ## Rollback
 
 The client and the migration are independent enough to roll back separately,
-with one exception: rolling back the client alone, with 0035 still applied,
+with two exceptions: rolling back the client alone, with 0035 still applied,
 reopens the gap described in step 4 — confirming clears the sign-up password
-and the old client does not ask for a new one.
+and the old client does not ask for a new one; and rolling back the client
+alone, with **0036** still applied, breaks every roster save and player import
+(`invalid input syntax for type smallint`), because the older client sends
+positions as text.
 
 To undo the migration, run this block first — it restores the pre-0035
 functions in place (same names, so the existing triggers pick them up with no
@@ -346,16 +354,24 @@ read every profile's email again — undoing `0001_tighten_profiles_select.sql`
 
 ### Undoing 0036 (numbered positions)
 
+This must run **before** the client is rolled back: the newer client reads
+numbers, so the column can move back to text first without a moment where a
+live client sends text against a `smallint` column.
+
 This puts `team_players.position` back to text so the older client can write
 to it again. It cannot undo the conversion itself: the migration cleared every
 position it could not read as 1–11, and turning the column back into text does
 not bring those values back — whatever the roster showed right before 0036 ran
 is gone, and only the pre-check output from step 3f can tell a coach what to
-re-enter.
+re-enter. Positions the migration cleared stay cleared.
 
 ```sql
+begin;
+set role postgres;
 alter table public.team_players drop constraint if exists team_players_position_range;
 alter table public.team_players alter column position type text using position::text;
+comment on column public.team_players.position is null;
+commit;
 ```
 
 Then `notify pgrst, 'reload schema';` so PostgREST picks up the column's new type.

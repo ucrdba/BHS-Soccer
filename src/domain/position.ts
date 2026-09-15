@@ -9,11 +9,13 @@
  *   7-11   attack
  *
  * There is no midfield role. This module is the ONLY place those ranges are
- * written down -- the roster filter, the labels, the spreadsheet import and the
- * Goals by role drill all ask it -- so a change to the rule is one edit.
+ * written down -- the roster filter, the labels and the spreadsheet import all
+ * ask it, and the Goals by role drill will read it too -- so a change to the
+ * rule is one edit.
  *
- * The role strings are the ones the Goals by role drill stores, so the two can
- * never disagree about what "defend" means.
+ * The role strings are the ones the Goals by role drill will store, so the two
+ * can never disagree about what "defend" means. That drill is designed but not
+ * built.
  */
 
 export type PositionRole = 'keeper' | 'defend' | 'attack';

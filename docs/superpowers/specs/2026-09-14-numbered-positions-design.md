@@ -1,6 +1,6 @@
 # Numbered positions — design
 
-**Status:** awaiting sign-off
+**Status:** approved and implemented (2026-09-14)
 **Date:** 2026-09-14
 **Followed by:** `2026-09-14-goals-by-role-design.md`, which reads a player's role from this number.
 
