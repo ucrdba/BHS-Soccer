@@ -33,7 +33,8 @@ export interface Player {
   id: string;
   number: number;
   name: string;
-  position: string;
+  /** The position number 1-11, or null; see src/domain/position.ts. */
+  position: number | null;
   classYear: string;
   height: string;
   photo: string;

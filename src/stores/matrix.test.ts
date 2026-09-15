@@ -36,7 +36,7 @@ const LAPS = 'd-laps';       // time_bands — a standard
 const SMALL = 'd-small';     // win_loss — competitive
 
 const member = (id: string, name: string, number: number) => ({
-  id: 'tp-' + id, number, recording_number: number, position: 'Mid',
+  id: 'tp-' + id, number, recording_number: number, position: 8,
   season_stats: {}, ratings: {},
   players: { id, name, first_name: name, last_name: '', class_year: 'Senior' }
 });

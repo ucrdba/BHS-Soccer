@@ -334,7 +334,7 @@ describe('A BAD POSITION BLOCKS THE IMPORT', () => {
     const text = w.find('[data-bad-position]').text();
     expect(text).toContain('Cy Dunn');
     expect(text).toContain('FB');
-    expect(text).toContain('2');
+    expect(text).toContain('Row 2');
   });
 
   it('REFUSES to apply', async () => {

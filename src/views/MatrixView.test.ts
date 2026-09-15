@@ -83,11 +83,11 @@ const DRILLS = [
 
 /** The raw rows the store's load() maps, rather than the mapped result. */
 const ROSTER_ROWS = [
-  { id: 'tp-p1', number: 1, recording_number: 1, position: 'Mid', season_stats: {}, ratings: {},
+  { id: 'tp-p1', number: 1, recording_number: 1, position: 8, season_stats: {}, ratings: {},
     players: { id: 'p1', name: 'Alva', first_name: 'Alva', last_name: '', class_year: 'Senior' } },
-  { id: 'tp-p2', number: 2, recording_number: 2, position: 'Mid', season_stats: {}, ratings: {},
+  { id: 'tp-p2', number: 2, recording_number: 2, position: 8, season_stats: {}, ratings: {},
     players: { id: 'p2', name: 'Budde', first_name: 'Budde', last_name: '', class_year: 'Senior' } },
-  { id: 'tp-p3', number: 3, recording_number: 3, position: 'Mid', season_stats: {}, ratings: {},
+  { id: 'tp-p3', number: 3, recording_number: 3, position: 8, season_stats: {}, ratings: {},
     players: { id: 'p3', name: 'Renteria', first_name: 'Renteria', last_name: '', class_year: 'Senior' } }
 ];
 

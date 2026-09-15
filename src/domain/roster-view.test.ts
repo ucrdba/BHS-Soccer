@@ -38,6 +38,14 @@ describe('filterRoster', () => {
   it('shows everyone for an unknown filter rather than nobody', () => {
     expect(filterRoster(squad, 'MID')).toHaveLength(squad.length);
   });
+
+  it('treats a missing roster as empty rather than throwing', () => {
+    expect(filterRoster(null as any, 'GK')).toEqual([]);
+  });
+
+  it('shows everyone for an empty filter', () => {
+    expect(filterRoster(squad, '')).toHaveLength(squad.length);
+  });
 });
 
 describe('rosterFilters', () => {
@@ -51,6 +59,15 @@ describe('rosterFilters', () => {
       { key: 'GK', label: 'Keepers', count: 0 },
       { key: 'DEF', label: 'Defence', count: 0 },
       { key: 'FWD', label: 'Attack', count: 1 }
+    ]);
+  });
+
+  it('shows every chip with a count of zero for an empty roster', () => {
+    expect(rosterFilters([])).toEqual([
+      { key: 'ALL', label: 'All', count: 0 },
+      { key: 'GK', label: 'Keepers', count: 0 },
+      { key: 'DEF', label: 'Defence', count: 0 },
+      { key: 'FWD', label: 'Attack', count: 0 }
     ]);
   });
 });
