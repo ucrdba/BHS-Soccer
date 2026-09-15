@@ -142,7 +142,9 @@ export function helpSections(): HelpSection[] {
           <p>Search by name first. If the player already exists &mdash; because they are on another
           team in your program &mdash; reuse that record rather than making a second one. One person,
           one record: the jersey number, position and stats are stored per team, so the same player
-          can be a #9 for the school and a #4 for a club without the two interfering.</p>
+          can be a #9 for the school and a #4 for a club without the two interfering. A position is
+          the soccer position number &mdash; 1 is the goalkeeper, 2 to 6 are defence, 7 to 11 are
+          attack &mdash; and the Keepers, Defence and Attack filters use it.</p>
           ${N('One team per organization', `<p>A player can be on one team per organization, and on a
             club team as well. So a Beaumont player cannot be on both Varsity and JV &mdash; but they
             can be on Varsity <em>and</em> a Legends FC team, because those are different

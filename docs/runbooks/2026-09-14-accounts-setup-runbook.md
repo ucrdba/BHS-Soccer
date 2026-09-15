@@ -83,6 +83,21 @@ e. **Authentication → Providers → Email → Secure email change** is on. The
    address still changed after one click by the account holder, on the link
    sent to their old address.
 
+f. **Numbered positions (0036).** This release also turns roster positions into
+   numbers 1–11. Run this and keep the output — it lists every position the
+   migration will clear, so you can set them from the roster afterwards:
+
+   ```sql
+   select t.name as team, p.name as player, tp.position as will_be_cleared
+     from public.team_players tp
+     join public.teams t on t.id = tp.team_id
+     join public.players p on p.id = tp.player_id
+    where tp.position is not null
+      and lower(trim(tp.position)) not in ('goalkeeper', 'gk', 'keeper', 'goal keeper')
+      and tp.position !~ '^\s*([1-9]|1[01])\s*$'
+    order by t.name, p.name;
+   ```
+
 ## 4. Apply the migration and deploy the client back to back
 
 Pick a quiet time. Once 0035 is applied, confirming an email clears the password
@@ -99,7 +114,14 @@ deploy.
 1. Supabase → **the production project** (check the switcher) → SQL Editor.
 2. Paste the whole of `supabase/migrations/0035_account_invitations.sql` and run it.
    It carries its own `begin`, `set role postgres` and `commit`.
-3. Verify:
+3. Paste the whole of `supabase/migrations/0036_numbered_positions.sql` and run it.
+   **This must never be applied to a database that is still serving the older
+   app.** The older app sends positions as text, and 0036 makes
+   `team_players.position` a `smallint` — every roster save and every player
+   import fails with `invalid input syntax for type smallint` on the old
+   client until the new app is live, so keep this back to back with the push
+   below, the same as 0035.
+4. Verify:
 
    ```sql
    select count(*) from public.invitations;                                   -- 0
@@ -113,16 +135,18 @@ deploy.
                       'redeem_invitations','redeem_my_invitations',
                       'note_email_change')
     order by 1;                                                                -- 11 rows
+   select data_type from information_schema.columns
+    where table_name = 'team_players' and column_name = 'position';            -- smallint
    ```
 
-4. Tell PostgREST about the new functions, or the app's calls to them answer
+5. Tell PostgREST about the new functions, or the app's calls to them answer
    "function not found" until it next reloads on its own:
 
    ```sql
    notify pgrst, 'reload schema';
    ```
 
-5. Immediately push `main` (the owner's call). Vercel deploys production; wait
+6. Immediately push `main` (the owner's call). Vercel deploys production; wait
    for the deployment to go live.
 
 ## 5. Prove the new flows on the live site
@@ -160,6 +184,8 @@ With addresses you own, none of them a Supabase team member.
    token>` and body `{ "email": "<invited address>" }` — then open the change
    link(s) it emails. Sign in with the account: it is not connected to that
    team, and the coach still sees the invitation as open.
+5. **Positions are numbers.** Open a player's Edit form: Position is a picker
+   of 1–11; set the positions the pre-check listed.
 
 ### Troubleshooting: an account whose address changed
 
@@ -317,3 +343,19 @@ Do not re-run `supabase_migration_auth.sql` as part of this rollback, not even
 `for select using (is_deleted = false)`, which would let any anonymous caller
 read every profile's email again — undoing `0001_tighten_profiles_select.sql`
 — for the sake of a guard function the explicit block above already restores.
+
+### Undoing 0036 (numbered positions)
+
+This puts `team_players.position` back to text so the older client can write
+to it again. It cannot undo the conversion itself: the migration cleared every
+position it could not read as 1–11, and turning the column back into text does
+not bring those values back — whatever the roster showed right before 0036 ran
+is gone, and only the pre-check output from step 3f can tell a coach what to
+re-enter.
+
+```sql
+alter table public.team_players drop constraint if exists team_players_position_range;
+alter table public.team_players alter column position type text using position::text;
+```
+
+Then `notify pgrst, 'reload schema';` so PostgREST picks up the column's new type.

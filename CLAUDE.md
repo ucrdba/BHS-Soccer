@@ -125,6 +125,14 @@ Since `0035_account_invitations.sql`. A person reaches their team one of two way
 - **Test account permissions on an `authenticated` connection** — `src/data/testdb/accounts-db.ts` builds a committed database from the migrations and hands out visitor connections. Every permission bug in this area has passed the superuser harness.
 - `profiles_select` still lets any coach read every profile across organizations, and `profiles.school_id` names one organization even for someone on a school team and a club team. Both are known and left open by the spec.
 
+### A position is a number, 1 to 11
+
+Since `0036_numbered_positions.sql`. `team_players.position` is a `smallint`, null or 1–11: **1 goalkeeper, 2–6 defence, 7–11 attack.** There is no midfield role. It was free text ("FB", "MF", "Center Midfield") until then, and the conversion kept only what was certain — goalkeeper spellings became 1, everything ambiguous was cleared for the coach — because a guessed number puts a player in the wrong role without anyone noticing.
+
+The meaning lives **only** in `src/domain/position.ts` (`roleOfPosition`, the labels, `parsePositionCell`). The roster filter, the card and bio, the spreadsheet import and the Goals by role drill all ask it; nothing compares a position to 1, 6 or 7 or matches its text. The spreadsheet import refuses a Position that is not 1–11 or blank, listing the row, the way it refuses an unmapped team. A blank or missing Position cell leaves the player's stored position unchanged, the same as a blank Number cell — a position is cleared from the roster form, not by blanking a spreadsheet cell.
+
+The position number is **not the shirt number** (`team_players.number`) and not the recording number. The bio says "Position 9 · Attack" for that reason.
+
 ### Recording numbers are assigned by the coach, in a block
 
 `team_players.recording_number` is unique per team, and that shapes both ends of the feature.
@@ -269,7 +277,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0035_account_invitations.sql`.
+8. …through `supabase/migrations/0036_numbered_positions.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
