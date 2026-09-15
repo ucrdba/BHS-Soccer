@@ -506,16 +506,16 @@ declare
                           'Julian','Adrian','Gabriel','Elijah','Samuel','Nathan','Andres','Kai','Jonah','Leo'];
   v_last  text[] := array['Alvarez','Brooks','Castillo','Dawson','Espinoza','Fletcher','Guerrero','Hayes','Ibarra','Jensen',
                           'Kowalski','Lindqvist','Montoya','Nakamura','Okafor','Pereira','Quinlan','Ramos','Sutherland','Tran'];
-  v_pos   text[] := array['GK','GK','DEF','DEF','DEF','DEF','DEF','DEF','MID','MID',
-                          'MID','MID','MID','MID','MID','FWD','FWD','FWD','FWD','FWD'];
+  v_pos   int[]  := array[1, 1, 2, 3, 4, 5, 6, 5, 6, 8,
+                          8, 10, 6, 8, 10, 9, 11, 7, 9, 11];
   v_num   int[]  := array[1, 12, 2, 3, 4, 5, 6, 15, 7, 8, 10, 14, 16, 18, 20, 9, 11, 17, 19, 21];
 
   j_first text[] := array['Felix','Marco','Tyler','Rowan','Emilio','Jaden','Hugo','Omar','Theo',
                           'Rafael','Dylan','Miles','Tomas','Ezra','Victor','Cruz','Nico','Amir'];
   j_last  text[] := array['Uribe','Vance','Whitaker','Yamada','Zamora','Acosta','Bishop','Calloway','Delgado',
                           'Ellison','Farrow','Galvan','Holloway','Iverson','Jaramillo','Kessler','Lozano','Mercer'];
-  j_pos   text[] := array['GK','GK','DEF','DEF','DEF','DEF','DEF','DEF','MID',
-                          'MID','MID','MID','MID','MID','FWD','FWD','FWD','FWD'];
+  j_pos   int[]  := array[1, 1, 2, 3, 4, 5, 6, 3, 6,
+                          8, 10, 6, 8, 10, 9, 11, 7, 9];
   j_num   int[]  := array[1, 13, 2, 3, 4, 5, 6, 22, 7, 8, 10, 14, 16, 23, 9, 11, 17, 19];
 
   opp      text[] := array['Canyon Ridge','Palm Valley','Mesa Verde','Lakeside','Cedar Hills','Harbor View',

@@ -261,5 +261,27 @@ describe.skipIf(!available)('demo_seed.sql', () => {
           .rejects.toThrow(/template already exists/);
       });
     }, 60_000);
+
+    it('gives each demo squad a keeper, defenders and attackers by number', async () => {
+      await withDb(async (c) => {
+        await build(c);
+        await c.query(`select demo_seed_template('2026-09-11'::date)`);
+        const { rows } = await c.query(`
+          select t.name,
+                 count(*) filter (where tp.position = 1)::int              as keepers,
+                 count(*) filter (where tp.position between 2 and 6)::int  as defence,
+                 count(*) filter (where tp.position between 7 and 11)::int as attack,
+                 count(*) filter (where tp.position is null)::int          as unset
+            from public.team_players tp join public.teams t on t.id = tp.team_id
+           group by t.name order by t.name`);
+        expect(rows.length).toBeGreaterThan(0);
+        for (const r of rows) {
+          expect(r.keepers, r.name).toBeGreaterThan(0);
+          expect(r.defence, r.name).toBeGreaterThan(0);
+          expect(r.attack, r.name).toBeGreaterThan(0);
+          expect(r.unset, r.name).toBe(0);
+        }
+      });
+    }, 60_000);
   });
 });
