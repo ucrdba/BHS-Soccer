@@ -320,3 +320,54 @@ describe('clearOutcomes', () => {
     expect(e.p1.outcome).toBe('draw');
   });
 });
+
+describe('a Goals-by-role grid', () => {
+  const SQUAD = [
+    { id: 'k', name: 'Keeper Kay', position: 1 },
+    { id: 'd', name: 'Defender Dee', position: 4 },
+    { id: 'a', name: 'Attacker Ash', position: 9 },
+    { id: 'n', name: 'No Position', position: null }
+  ];
+
+  it('pre-fills each role from the roster position number', () => {
+    const e = blankEntries(SQUAD, 'role_goals');
+    expect([e.k.role, e.d.role, e.a.role, e.n.role]).toEqual(['keeper', 'defend', 'attack', '']);
+    expect(e.a.attendance).toBe('present');
+    expect(e.a.value).toBe('');
+  });
+
+  it('gives other measures no role at all', () => {
+    expect(blankEntries(SQUAD, 'count_high').a.role).toBeUndefined();
+  });
+
+  it('reopens with the role stored with the result, not the roster', () => {
+    const e = entriesFromResults(SQUAD, [
+      { player_id: 'a', attendance: 'present', role: 'defend', goals_for: 0, goals_against: 2 },
+      { player_id: 'd', attendance: 'excused', role: null, goals_for: null, goals_against: null }
+    ], 'role_goals');
+    expect(e.a).toMatchObject({ role: 'defend', value: '0-2', attendance: 'present' });
+    expect(e.d).toMatchObject({ role: 'defend', value: '', attendance: 'excused' });
+  });
+
+  it('shapes the payload with the role and both counts', () => {
+    const e = blankEntries(SQUAD, 'role_goals');
+    e.a = { ...e.a, value: ' 3 - 1 ' };
+    e.k = { ...e.k, attendance: 'unexcused', value: '0-1' };
+    const out = toSessionResults(SQUAD, e, 'role_goals');
+    expect(out.find(r => r.playerId === 'a')).toEqual({
+      playerId: 'a', attendance: 'present', rawValue: null, outcome: null, role: 'attack', goalsFor: 3, goalsAgainst: 1
+    });
+    expect(out.find(r => r.playerId === 'k')).toEqual({
+      playerId: 'k', attendance: 'unexcused', rawValue: null, outcome: null, role: null, goalsFor: null, goalsAgainst: null
+    });
+  });
+
+  it('names who is here without a role or a readable score', () => {
+    const e = blankEntries(SQUAD, 'role_goals');
+    e.k = { ...e.k, value: '0-1' };             // complete
+    e.d = { ...e.d, value: '3' };               // unreadable
+    e.a = { ...e.a, value: '' };                // no score
+    e.n = { ...e.n, value: '2-2' };             // no role
+    expect(presentWithoutResult(SQUAD, e, 'role_goals').map(p => p.id)).toEqual(['d', 'a', 'n']);
+  });
+});

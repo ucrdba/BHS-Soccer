@@ -23,6 +23,9 @@ import { supabaseService } from '../../data/supabase';
 import { useSessionStore } from '../../stores/session';
 import { compareSessionPlayers } from '../../domain/matrix-session';
 import { bandFeedback } from '../../domain/band-score';
+import { roleGoalFeedback } from '../../domain/role-goal-score';
+import { GOAL_ROLES } from '../../domain/goal-bands-draft';
+import { roleLabel } from '../../domain/position';
 import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
@@ -71,6 +74,7 @@ const drill = computed(() => session.drills.find((d: any) => d.id === props.dril
 const measure = computed(() => drill.value?.measure || 'count_high');
 const isBanded = computed(() => measure.value === 'time_bands');
 const isOutcome = computed(() => measure.value === 'win_loss');
+const isRoleGoals = computed(() => measure.value === 'role_goals');
 
 /** The squad-wide results, in the same order as each row's dropdown. */
 const FILL_OPTIONS = [
@@ -148,6 +152,21 @@ function onResetOutcomes(): void {
   const who = `${set} player${set === 1 ? '' : 's'}`;
   if (!window.confirm(`Clear the result for ${who}? Attendance is kept.`)) return;
   entries.value = clearOutcomes(entries.value);
+}
+
+/**
+ * Goals by role: the role for THIS session. Changing it touches nothing else
+ * -- not attendance, and not the roster.
+ */
+function onRole(playerId: string, role: string): void {
+  const row = entries.value[playerId];
+  if (!row) return;
+  entries.value[playerId] = { ...row, role };
+}
+
+function goalFeedback(playerId: string) {
+  const row = entries.value[playerId];
+  return roleGoalFeedback(row?.value || '', row?.role, session.goalBands as any, drill.value?.points);
 }
 
 function onAttendance(playerId: string, attendance: string): void {
@@ -250,8 +269,10 @@ async function onSave(): Promise<void> {
   if (short.length) {
     // Named, because the client's own guard reports a uuid — no use to
     // somebody looking at twenty-five rows.
-    error.value = `Marked here with no result: ${short.map(p => p.name).join(', ')}. `
-      + 'Enter one, or mark them absent.';
+    const who = short.map(p => p.name).join(', ');
+    error.value = isRoleGoals.value
+      ? `Needs a role and a score like 3-1: ${who}. Enter both, or mark them absent.`
+      : `Marked here with no result: ${who}. Enter one, or mark them absent.`;
     return;
   }
 
@@ -330,6 +351,11 @@ async function onSave(): Promise<void> {
       the standards are entered.
     </p>
 
+    <p v-if="isRoleGoals && session.goalBands.length === 0" class="hint" data-no-goal-bands>
+      No standards set for this squad yet. Scores are recorded, and count once
+      the standards are entered in Weights and standards.
+    </p>
+
     <div class="wrap">
       <table class="tbl">
         <thead>
@@ -340,7 +366,7 @@ async function onSave(): Promise<void> {
             <th class="is-text">
               <button type="button" class="th" data-grid-sort="name" @click="setSort('name')">Player</button>
             </th>
-            <th class="is-text">{{ isOutcome ? 'Result' : 'Value' }}</th>
+            <th class="is-text">{{ isOutcome ? 'Result' : isRoleGoals ? 'Role · score' : 'Value' }}</th>
             <th class="is-text">Attendance</th>
             <th></th>
           </tr>
@@ -362,6 +388,28 @@ async function onSave(): Promise<void> {
                 <option value="draw">Drew</option>
                 <option value="loss">Lost</option>
               </select>
+
+              <span v-else-if="isRoleGoals" class="goals">
+                <select
+                  class="inp" data-entry-field data-role-select
+                  aria-label="Role this session"
+                  :value="entries[p.id]?.role || ''"
+                  @change="onRole(p.id, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">— role —</option>
+                  <option v-for="r in GOAL_ROLES" :key="r" :value="r">{{ roleLabel(r) }}</option>
+                </select>
+                <input
+                  class="inp" data-entry-field data-goal-score
+                  type="text" placeholder="3-1" aria-label="Score, scored then given up"
+                  :value="entries[p.id]?.value || ''"
+                  @input="onValue(p.id, ($event.target as HTMLInputElement).value)"
+                />
+                <span
+                  class="earned" :class="`earned--${goalFeedback(p.id).tone}`"
+                  data-goal-earned
+                >{{ goalFeedback(p.id).text }}</span>
+              </span>
 
               <template v-else>
                 <input
@@ -529,6 +577,8 @@ async function onSave(): Promise<void> {
 
 .inp:focus-visible { border-color: var(--live); outline-offset: 0; }
 select.inp { width: auto; min-width: 96px; font-size: 14px; text-align: left; }
+
+.goals { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 
 .earned { margin-left: var(--space-2); font-size: 11px; }
 .earned--good { color: var(--live); }

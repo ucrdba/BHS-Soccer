@@ -32,6 +32,10 @@ const FORMATS: Record<string, EntryFormat> = {
   count_high: {
     figure: 'count',
     note: 'Repetitions — whole numbers.'
+  },
+  role_goals: {
+    figure: '3-1',
+    note: "Scored, then given up, from the player's side — 3-1. Roles are filled from the roster position; change one for today if needed."
   }
 };
 

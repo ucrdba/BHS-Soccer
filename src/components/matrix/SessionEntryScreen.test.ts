@@ -58,6 +58,26 @@ const BANDS = [
   { max_seconds: 280, factor: 0.5 }
 ];
 
+/** Attack only: +1 earns 50%, three scored earns a 10% bonus. No keeper standards. */
+const GOAL_BANDS = [
+  { role: 'attack', kind: 'base', threshold: 1, factor: 0.5 },
+  { role: 'attack', kind: 'bonus', threshold: 3, factor: 0.1 },
+  { role: 'defend', kind: 'base', threshold: 0, factor: 1 }
+];
+
+const SQUAD = [
+  { id: 'g1', name: 'Kay Keeper', recordingNumber: 1, position: 1 },
+  { id: 'g2', name: 'Dee Defender', recordingNumber: 2, position: 4 },
+  { id: 'g3', name: 'Ash Attacker', recordingNumber: 3, position: 9 },
+  { id: 'g4', name: 'Nat Noposition', recordingNumber: 4, position: null }
+];
+
+/** COOPERS, measured as Goals by role, weight 2. */
+const goalsGrid = (over: any = {}) =>
+  mountGrid({ drillId: COOPERS, measure: 'role_goals', players: SQUAD, ...over });
+
+const rowOf = (w: any, id: string) => w.find(`[data-grid-row="${id}"]`);
+
 const flush = () => new Promise(r => setTimeout(r, 0));
 
 /**
@@ -66,9 +86,9 @@ const flush = () => new Promise(r => setTimeout(r, 0));
  * a test choose a measure without inventing a fourth drill.
  */
 async function mountGrid(
-  opts: { drillId?: string; measure?: string; editing?: any } = {}
+  opts: { drillId?: string; measure?: string; editing?: any; players?: any[]; results?: any[]; goalBands?: any[] } = {}
 ) {
-  const { drillId = COOPERS, measure, editing } = opts;
+  const { drillId = COOPERS, measure, editing, players = PLAYERS, results = [], goalBands = GOAL_BANDS } = opts;
   vi.clearAllMocks();
   saveMatrixSession.mockResolvedValue({ ok: true, id: 's9' });
   fetchTimeBands.mockResolvedValue(BANDS);
@@ -80,14 +100,14 @@ async function mountGrid(
   fetchDrillsForWeighting.mockResolvedValue(drills);
 
   const w = mount(SessionEntryScreen, {
-    props: { teamId: 't1', schoolId: 's1', players: PLAYERS, drillId },
+    props: { teamId: 't1', schoolId: 's1', players, drillId },
     global: {
       plugins: [createTestingPinia({
         createSpy: vi.fn,
         stubActions: false,
         initialState: {
           session: {
-            drills, bands: BANDS,
+            drills, bands: BANDS, goalBands, results,
             sessions: editing ? [editing] : [],
             editingId: editing ? editing.id : null
           }
@@ -566,5 +586,97 @@ describe('the screen', () => {
   it('offers a way back to the ratings', async () => {
     const w = await mountGrid({ measure: 'count_high' });
     expect(w.find('[data-tool-back]').exists()).toBe(true);
+  });
+});
+
+describe('a Goals-by-role exercise', () => {
+  it('pre-fills each role from the position number', async () => {
+    const w = await goalsGrid();
+    const roles = SQUAD.map(p => (rowOf(w, p.id).find('[data-role-select]').element as HTMLSelectElement).value);
+    expect(roles).toEqual(['keeper', 'defend', 'attack', '']);
+    expect(rowOf(w, 'g2').find('[data-role-select]').text()).toContain('Defence');
+  });
+
+  it('keeps a role the coach changed while the score is typed', async () => {
+    const w = await goalsGrid();
+    await rowOf(w, 'g2').find('[data-role-select]').setValue('attack');
+    await rowOf(w, 'g2').find('[data-goal-score]').setValue('3-1');
+    expect((rowOf(w, 'g2').find('[data-role-select]').element as HTMLSelectElement).value).toBe('attack');
+  });
+
+  it('reopens a saved session with the role stored with the result', async () => {
+    const w = await goalsGrid({
+      editing: { id: 's1', drill_id: COOPERS, occurred_on: '2026-09-10' },
+      results: [{ player_id: 'g3', attendance: 'present', role: 'defend', goals_for: 0, goals_against: 2 }]
+    });
+    expect((rowOf(w, 'g3').find('[data-role-select]').element as HTMLSelectElement).value).toBe('defend');
+    expect((rowOf(w, 'g3').find('[data-goal-score]').element as HTMLInputElement).value).toBe('0-2');
+  });
+
+  it('moves role → score → next row on Enter, in on-screen order', async () => {
+    const w = await goalsGrid();
+    const f = fields(w);
+    expect(f[0].attributes('data-role-select')).toBeDefined();
+    expect(f[1].attributes('data-goal-score')).toBeDefined();
+    (f[0].element as HTMLElement).focus();
+    await f[0].trigger('keydown', { key: 'Enter' });
+    expect(document.activeElement).toBe(f[1].element);
+    await f[1].trigger('keydown', { key: 'Enter' });
+    expect(document.activeElement).toBe(rowOf(w, 'g2').find('[data-role-select]').element);
+  });
+
+  it('marks a player present when a score is typed', async () => {
+    const w = await goalsGrid();
+    await rowOf(w, 'g3').find('[data-attendance]').setValue('excused');
+    await rowOf(w, 'g3').find('[data-goal-score]').setValue('2-0');
+    expect((rowOf(w, 'g3').find('[data-attendance]').element as HTMLSelectElement).value).toBe('present');
+  });
+
+  it('shows what a score earns as it is typed', async () => {
+    const w = await goalsGrid();
+    await rowOf(w, 'g3').find('[data-goal-score]').setValue('3-1');
+    expect(rowOf(w, 'g3').find('[data-goal-earned]').text()).toBe('50% + 10% = 60% · 1.2 pts');
+  });
+
+  it('says when the squad has no standards for the role', async () => {
+    const w = await goalsGrid();
+    await rowOf(w, 'g1').find('[data-goal-score]').setValue('1-0');
+    expect(rowOf(w, 'g1').find('[data-goal-earned]').text()).toBe('no standards for Goalkeeper');
+  });
+
+  it('refuses to save a present row without a role or a readable score, naming who', async () => {
+    const w = await goalsGrid();
+    await rowOf(w, 'g1').find('[data-goal-score]').setValue('0-1');
+    await rowOf(w, 'g2').find('[data-goal-score]').setValue('3');
+    await rowOf(w, 'g3').find('[data-goal-score]').setValue('2-1');
+    await rowOf(w, 'g4').find('[data-goal-score]').setValue('1-1');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    const msg = w.find('[data-session-error]').text();
+    expect(msg).toContain('Dee Defender');
+    expect(msg).toContain('Nat Noposition');
+    expect(msg).not.toContain('Ash Attacker');
+    expect(msg).toMatch(/role and a score like 3-1/);
+    expect(saveMatrixSession).not.toHaveBeenCalled();
+  });
+
+  it('saves each role and both counts', async () => {
+    const w = await goalsGrid({ players: SQUAD.slice(0, 3) });
+    await rowOf(w, 'g1').find('[data-goal-score]').setValue('0-1');
+    await rowOf(w, 'g2').find('[data-goal-score]').setValue('1-1');
+    await rowOf(w, 'g3').find('[data-goal-score]').setValue('3:1');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    const rows = saveMatrixSession.mock.calls[0][2];
+    expect(rows.find((r: any) => r.playerId === 'g3')).toEqual({
+      playerId: 'g3', attendance: 'present', rawValue: null, outcome: null, role: 'attack', goalsFor: 3, goalsAgainst: 1
+    });
+  });
+
+  it('says so when the squad has no standards yet, and only then', async () => {
+    expect((await goalsGrid({ goalBands: [] })).find('[data-no-goal-bands]').exists()).toBe(true);
+    expect((await goalsGrid()).find('[data-no-goal-bands]').exists()).toBe(false);
   });
 });

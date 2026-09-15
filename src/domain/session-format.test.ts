@@ -81,3 +81,20 @@ describe('entryTally', () => {
     expect(entryTally(null as any, null as any, 'count_high')).toEqual({ timed: 0, absent: 0, remaining: 0 });
   });
 });
+
+describe('the Goals-by-role banner', () => {
+  it('shows the score shape and says whose side it is from', () => {
+    const f = entryFormat('role_goals');
+    expect(f?.figure).toBe('3-1');
+    expect(f?.note).toMatch(/player's side/);
+  });
+
+  it('counts a typed score as recorded', () => {
+    const t = entryTally(
+      [{ id: 'p1' }, { id: 'p2' }],
+      { p1: { playerId: 'p1', attendance: 'present', value: '3-1', outcome: '', role: 'attack' },
+        p2: { playerId: 'p2', attendance: 'present', value: '', outcome: '', role: 'defend' } },
+      'role_goals');
+    expect(t).toEqual({ timed: 1, absent: 0, remaining: 1 });
+  });
+});

@@ -15,15 +15,22 @@
  */
 import { parseTimeToSeconds, formatSecondsAsTime } from './time';
 import { defaultSessionAttendance } from './matrix-session';
+import { roleOfPosition } from './position';
+import { parseGoalScore, formatGoalScore } from './goal-score';
 
 export type Attendance = 'present' | 'excused' | 'unexcused';
 
 export interface EntryRow {
   playerId: string;
   attendance: Attendance;
-  /** As typed. Parsed on the way out, not on every keystroke. */
+  /** As typed. Parsed on the way out, not on every keystroke. For role_goals, the score: "3-1". */
   value: string;
   outcome: string;
+  /**
+   * Goals by role only: 'attack' | 'defend' | 'keeper', or '' for none chosen.
+   * Absent for every other measure, so their rows are unchanged.
+   */
+  role?: string;
 }
 
 export interface SessionResult {
@@ -31,6 +38,9 @@ export interface SessionResult {
   attendance: Attendance;
   rawValue: number | null;
   outcome: string | null;
+  role?: string | null;
+  goalsFor?: number | null;
+  goalsAgainst?: number | null;
 }
 
 /** Supabase rows say is_deleted; app state says isDeleted. */
@@ -72,12 +82,16 @@ function formatValue(seconds: any, measure: string): string {
 export function blankEntries(players: any[], measure: string): Record<string, EntryRow> {
   const out: Record<string, EntryRow> = {};
   live(players).forEach(p => {
-    out[p.id] = {
+    const row: EntryRow = {
       playerId: p.id,
       attendance: defaultSessionAttendance(measure),
       value: '',
       outcome: ''
     };
+    // Pre-filled from the roster position number and changeable for this
+    // session only; nothing is written back to the roster.
+    if (measure === 'role_goals') row.role = roleOfPosition(p.position) || '';
+    out[p.id] = row;
   });
   return out;
 }
@@ -98,12 +112,25 @@ export function entriesFromResults(
   (results || []).forEach(r => {
     const row = out[r?.player_id];
     if (!row) return;
-    out[r.player_id] = {
-      ...row,
-      attendance: (r.attendance as Attendance) || row.attendance,
-      value: formatValue(r.raw_value, measure),
-      outcome: r.outcome || ''
-    };
+    out[r.player_id] = measure === 'role_goals'
+      ? {
+          ...row,
+          attendance: (r.attendance as Attendance) || row.attendance,
+          // The role stored with the result, not the roster's current one: a
+          // player who defended in that session defended, whatever the roster
+          // says now. An absence stored no role, so the roster's stands.
+          role: r.role || row.role,
+          value: r.goals_for != null && r.goals_against != null
+            ? formatGoalScore({ scored: Number(r.goals_for), conceded: Number(r.goals_against) })
+            : '',
+          outcome: ''
+        }
+      : {
+          ...row,
+          attendance: (r.attendance as Attendance) || row.attendance,
+          value: formatValue(r.raw_value, measure),
+          outcome: r.outcome || ''
+        };
   });
 
   return out;
@@ -130,6 +157,19 @@ export function toSessionResults(
   return live(players).map(p => {
     const row = entries?.[p.id];
     const attendance: Attendance = row?.attendance || 'present';
+
+    if (measure === 'role_goals') {
+      if (attendance !== 'present') {
+        return { playerId: p.id, attendance, rawValue: null, outcome: null, role: null, goalsFor: null, goalsAgainst: null };
+      }
+      const score = parseGoalScore(row?.value || '');
+      return {
+        playerId: p.id, attendance, rawValue: null, outcome: null,
+        role: row?.role || null,
+        goalsFor: score ? score.scored : null,
+        goalsAgainst: score ? score.conceded : null
+      };
+    }
 
     // Not there: whatever is still in the boxes is not a result.
     if (attendance !== 'present') {
@@ -165,6 +205,8 @@ export function presentWithoutResult(
   return live(players).filter(p => {
     const r = byId.get(p.id);
     if (!r || r.attendance !== 'present') return false;
+    // A Goals-by-role row needs both: the database scores neither half alone.
+    if (measure === 'role_goals') return !r.role || r.goalsFor == null || r.goalsAgainst == null;
     return r.rawValue === null && !r.outcome;
   });
 }
