@@ -27,6 +27,7 @@ import {
   tableDefs, sheetFor, templateFor, type ExportData
 } from '../../domain/workbook';
 import { planImport, readyToApply, resolveTeam, type ImportPlan } from '../../domain/import-plan';
+import { parsePositionCell } from '../../domain/position';
 
 const props = defineProps<{
   open: boolean;
@@ -213,10 +214,12 @@ async function writeRow(key: string, row: any): Promise<boolean> {
     });
     if (!identity?.id) return false;
 
+    // readyToApply refuses a plan with a bad position, so this is 1-11 or null.
+    const positionCell = parsePositionCell(row.Position);
     const res = await supabaseService.upsertTeamMembership(teamId, schoolId, {
       player_id: identity.id,
       number: row.Number, recording_number: row.RecordingNumber,
-      position: row.Position
+      position: positionCell.ok ? positionCell.position : null
     });
     return !!res?.ok;
   }
@@ -379,6 +382,18 @@ async function onApply(): Promise<void> {
               <option value="">— pick a squad —</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
+          </div>
+        </template>
+
+        <template v-if="plan.badPositions.length">
+          <h4 class="sub kicker">Positions this file gives that are not 1–11</h4>
+          <p class="hint hint--warn" data-preview-bad-positions>
+            A position is the number 1–11 (1 goalkeeper, 2–6 defence, 7–11 attack),
+            or blank. Nothing is imported until these are fixed in the file.
+          </p>
+          <div v-for="b in plan.badPositions" :key="`${b.sheetName}-${b.row}`" class="row hrow" data-bad-position>
+            <span class="row__name">Row {{ b.row }} · {{ b.name || 'No name' }}</span>
+            <span class="tag">{{ b.value }}</span>
           </div>
         </template>
 

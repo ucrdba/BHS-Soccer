@@ -107,7 +107,7 @@ describe('the rows', () => {
       teamName: 'Varsity',
       players: [{
         number: 9, recordingNumber: 3, firstName: 'Cesar', lastName: 'Alva',
-        position: 'Striker', classYear: 'Senior',
+        position: 9, classYear: 'Senior',
         seasonStats: { goals: 4 }, ratings: { technical: 8 }
       }]
     });
@@ -116,6 +116,15 @@ describe('the rows', () => {
       Team: 'Varsity', Number: 9, RecordingNumber: 3,
       FirstName: 'Cesar', LastName: 'Alva', Class: 'Senior', Goals: 4, Tech: 8
     });
+  });
+
+  it('exports the position number, and a blank for none', () => {
+    const def = tableDefs().find(d => d.key === 'players')!;
+    const rows = def.toRows({ teamName: 'Varsity', players: [
+      { firstName: 'A', lastName: 'B', position: 9 },
+      { firstName: 'C', lastName: 'D', position: null }
+    ] } as any);
+    expect(rows.map((r: any) => r.Position)).toEqual([9, '']);
   });
 
   it('reads the snake_case a database row arrives in', () => {

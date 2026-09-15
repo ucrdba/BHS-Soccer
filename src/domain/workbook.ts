@@ -113,7 +113,7 @@ export function tableDefs(): TableDef[] {
       toRows: (d) => (d.players || []).map(p => ({
         Team: t(d.teamName), Number: p.number ?? '', RecordingNumber: p.recordingNumber ?? '',
         FirstName: t(p.firstName || p.first_name), LastName: t(p.lastName || p.last_name),
-        Position: t(p.position), Class: t(p.classYear || p.class_year), Height: t(p.height),
+        Position: p.position ?? '', Class: t(p.classYear || p.class_year), Height: t(p.height),
         Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '',
         Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '',
         Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '',

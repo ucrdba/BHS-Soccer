@@ -96,7 +96,7 @@ describe('planning an import', () => {
     // itself the assertion: this module cannot write.
     const plan = planImport(sheets, known);
     expect(plan).toHaveProperty('sheets');
-    expect(Object.keys(plan)).toEqual(['sheets', 'totals', 'warnings', 'unknownTeams']);
+    expect(Object.keys(plan)).toEqual(['sheets', 'totals', 'warnings', 'unknownTeams', 'badPositions']);
   });
 
   it('copes with an empty workbook', () => {
@@ -169,6 +169,33 @@ describe('whether a plan may be applied', () => {
   it('is allowed for a workbook that names no unknown team', () => {
     const clean = planImport({ Players: [{ Team: 'Varsity' }] }, known);
     expect(readyToApply(clean, {})).toBe(true);
+  });
+});
+
+describe('positions', () => {
+  const known = { teams: [{ id: 't1', name: 'Varsity' }] };
+
+  it('lists a Position that is not 1-11 or blank, naming the row and player', () => {
+    const plan = planImport({ Players: [
+      { Team: 'Varsity', FirstName: 'Ann', LastName: 'Bell', Position: '4' },
+      { Team: 'Varsity', FirstName: 'Cy', LastName: 'Dunn', Position: 'FB' },
+      { Team: 'Varsity', FirstName: 'Ed', LastName: 'Fox', Position: '' },
+      { Team: 'Varsity', FirstName: 'Gil', LastName: 'Hart', Position: 12 }
+    ] }, known);
+    expect(plan.badPositions).toEqual([
+      { sheetName: 'Players', row: 3, name: 'Cy Dunn', value: 'FB' },
+      { sheetName: 'Players', row: 5, name: 'Gil Hart', value: '12' }
+    ]);
+  });
+
+  it('will not apply while a position is refused', () => {
+    const plan = planImport({ Players: [{ Team: 'Varsity', FirstName: 'Cy', Position: 'MF' }] }, known);
+    expect(readyToApply(plan, {})).toBe(false);
+  });
+
+  it('applies when every position is 1-11 or blank', () => {
+    const plan = planImport({ Players: [{ Team: 'Varsity', FirstName: 'Cy', Position: '9' }] }, known);
+    expect(readyToApply(plan, {})).toBe(true);
   });
 });
 

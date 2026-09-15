@@ -324,6 +324,36 @@ describe('AN UNMAPPED TEAM BLOCKS THE IMPORT', () => {
   });
 });
 
+describe('A BAD POSITION BLOCKS THE IMPORT', () => {
+  const sheet = { Players: [{ Team: 'Varsity', FirstName: 'Cy', LastName: 'Dunn', Position: 'FB' }] };
+
+  it('lists it in the preview, with the row and the player', async () => {
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, sheet);
+    const text = w.find('[data-bad-position]').text();
+    expect(text).toContain('Cy Dunn');
+    expect(text).toContain('FB');
+    expect(text).toContain('2');
+  });
+
+  it('REFUSES to apply', async () => {
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, sheet);
+    expect((w.find('[data-import-apply]').element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('writes a good position as a number', async () => {
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, { Players: [{ Team: 'Varsity', FirstName: 'Cy', LastName: 'Dunn', Position: '7' }] });
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+    expect(upsertTeamMembership).toHaveBeenCalledWith('t1', 's1', expect.objectContaining({ position: 7 }));
+  });
+});
+
 describe('applying', () => {
   it('writes a player as an identity and a membership', async () => {
     // Two steps: a person exists once, and belongs to a squad separately.

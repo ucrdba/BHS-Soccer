@@ -18,6 +18,16 @@
  * Extracted from public/js/admin.js during Phase 6.
  */
 import { tableBySheetName, type TableDef } from './workbook';
+import { parsePositionCell } from './position';
+
+/** A Position cell that is not 1-11 or blank. Refused rather than guessed. */
+export interface BadPosition {
+  sheetName: string;
+  /** The spreadsheet row: the header is row 1. */
+  row: number;
+  name: string;
+  value: string;
+}
 
 export interface PlannedSheet {
   key: string;
@@ -28,6 +38,7 @@ export interface PlannedSheet {
   unknownTeams: string[];
   /** False for a sheet the importer has no branch for — the Matrix logs. */
   importable: boolean;
+  badPositions: BadPosition[];
 }
 
 export interface ImportPlan {
@@ -37,6 +48,7 @@ export interface ImportPlan {
   warnings: string[];
   /** Every unmapped team name across the workbook, deduplicated. */
   unknownTeams: string[];
+  badPositions: BadPosition[];
 }
 
 export interface KnownData {
@@ -72,6 +84,7 @@ export function planImport(
   const planned: PlannedSheet[] = [];
   const warnings: string[] = [];
   const unknown = new Set<string>();
+  const badAll: BadPosition[] = [];
 
   Object.keys(sheets || {}).forEach(sheetName => {
     const def: TableDef | null = tableBySheetName(sheetName);
@@ -113,13 +126,32 @@ export function planImport(
         + 'alone. Matrix results are recorded through Player Ratings.');
     }
 
+    // A position the importer would have to guess at is refused rather than
+    // guessed: "FB" could be 2 or 3, and a wrong guess puts a player in the
+    // wrong role without anyone noticing.
+    const badHere: BadPosition[] = [];
+    if (def.key === 'players' && def.importable) {
+      rows.forEach((r, i) => {
+        if (!parsePositionCell(r.Position).ok) {
+          badHere.push({
+            sheetName: def.sheetName,
+            row: i + 2,
+            name: [r.FirstName, r.LastName].filter(Boolean).join(' '),
+            value: String(r.Position)
+          });
+        }
+      });
+      badAll.push(...badHere);
+    }
+
     planned.push({
       key: def.key,
       sheetName: def.sheetName,
       fileName: def.fileName,
       rows,
       unknownTeams: unknownHere,
-      importable: def.importable
+      importable: def.importable,
+      badPositions: badHere
     });
   });
 
@@ -132,13 +164,18 @@ export function planImport(
       sheets: planned.length
     },
     warnings,
-    unknownTeams: Array.from(unknown).sort()
+    unknownTeams: Array.from(unknown).sort(),
+    badPositions: badAll
   };
 }
 
-/** Whether a plan may be applied: every named team has somewhere to go. */
+/**
+ * Whether a plan may be applied: every named team has somewhere to go, and no
+ * position is one the importer would have to guess at.
+ */
 export function readyToApply(
   plan: ImportPlan, mapping: Record<string, string>
 ): boolean {
-  return (plan?.unknownTeams || []).every(name => !!mapping?.[name]);
+  return (plan?.unknownTeams || []).every(name => !!mapping?.[name])
+    && (plan?.badPositions || []).length === 0;
 }
