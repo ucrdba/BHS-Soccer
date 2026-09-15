@@ -345,6 +345,7 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           <h4>A reasonable starting point</h4>
           ${T(['Exercise', 'Weight', 'Measure'], [
             ['1v1 gauntlet', '3.0', '1v1'],
+            ['1v1 attackers against defenders', '3.0', 'Goals by role'],
             ['Small-sided game', '2.5', 'Small-sided'],
             ['Finishing under pressure', '2.0', 'Counted, high wins'],
             ['12-minute Cooper test', '1.5', 'Counted, high wins'],
@@ -360,6 +361,19 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             beneath the drill for the team currently selected. A 4:30 that stretches a varsity side
             is out of reach for an under-14, so each squad carries its own times. Set none and that
             exercise is simply not counted for them.</p>`)}
+          <h4>Goals by role</h4>
+          <p>For a 1v1 &mdash; or a 2v2 with attackers against defenders &mdash; choose
+          <b>Goals by role</b>. Each player records one score for the whole drill from their own
+          side: <b>3-1</b> is three scored, one given up. They are judged against the standards for
+          their role: <b>Attack</b> on goal difference, with a bonus for goals scored;
+          <b>Defence</b> and <b>Goalkeeper</b> on goal difference, with a bonus for goals given up.
+          The role comes from the roster position number (1 goalkeeper, 2&ndash;6 defence,
+          7&ndash;11 attack) and can be changed on the session sheet for that day.</p>
+          ${N('The best band plus the best bonus is at most 100%', `<p>Both are a share of the
+            exercise&rsquo;s weight, so a goal-difference band worth 80% leaves room for a bonus
+            worth 20%. Save refuses a pair that adds up to more. Standards are per squad and per
+            role; a role with no goal-difference band is not counted for that squad, and neither is
+            a no-show while the squad has none at all.</p>`)}
           ${N('Changing a weight re-scores history', `<p>Raise the Cooper&rsquo;s from 1.0 to 1.5 and
             every Cooper&rsquo;s you have ever recorded is re-scored immediately, and the table
             re-ranks. Set it back and it reverts. Nothing is frozen &mdash; which is the point, but it
@@ -390,7 +404,7 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             <li>Pick the exercise. Only drills with a non-1v1 measurement type appear here.</li>
             <li>Check the date.</li>
             <li>Type each player&rsquo;s number down the column &mdash; metres, level or shots
-                made. For a small-sided game, pick won, drew or lost instead. For a
+                made. For a small-sided game, pick won, drew or lost instead. For <b>Goals by role</b>, check each player&rsquo;s role and type their score as <code>3-1</code>. For a
                 <b>timed</b> exercise type <code>mm:ss</code>, so <code>4:28</code> rather than
                 268.</li>
             <li>Mark anyone absent as <b>Excused</b> or <b>No-show</b>. Their number box is ignored either way.</li>

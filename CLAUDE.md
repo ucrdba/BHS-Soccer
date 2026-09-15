@@ -97,7 +97,7 @@ The column arrived late: `0034_team_match_minutes.sql` created it, after this fi
 
 ### `time_bands` is a standard, not a ranking
 
-Four of the five Matrix measures — `head_to_head`, `win_loss`, `count_high` and `time_low` — rank players against each other. **`time_bands` does not: it is a match-readiness standard.** The board reports how many fell below it and marks them, rather than treating a bunched result as a problem — a squad that all clears the standard is the good outcome, and tuning the bands to spread them out defeats the point. The emphasis is strictly **additive**: it must never narrow the table or disable a sort. See `src/domain/matrix-threshold.ts`.
+Four of the six Matrix measures — `head_to_head`, `win_loss`, `count_high` and `time_low` — rank players against each other. **`time_bands` does not: it is a match-readiness standard.** The board reports how many fell below it and marks them, rather than treating a bunched result as a problem — a squad that all clears the standard is the good outcome, and tuning the bands to spread them out defeats the point. The emphasis is strictly **additive**: it must never narrow the table or disable a sort. See `src/domain/matrix-threshold.ts`. `role_goals` is a standard too, per role — see *Goals by role* below.
 
 The measure also decides which parser applies, and both directions bite. **`time_bands` is entered as mm:ss** — reading `"4:30"` with `parseFloat` gives 4, which fits under every standard and awards full marks for a time nobody ran. **`time_low` is entered as decimal seconds** — a sprint of 4.85, which `parseTimeToSeconds` refuses outright, so reading it as mm:ss would drop every sprint on the sheet. `domain/session-entry.ts` holds the distinction.
 
@@ -129,9 +129,21 @@ Since `0035_account_invitations.sql`. A person reaches their team one of two way
 
 Since `0036_numbered_positions.sql`. `team_players.position` is a `smallint`, null or 1–11: **1 goalkeeper, 2–6 defence, 7–11 attack.** There is no midfield role. It was free text ("FB", "MF", "Center Midfield") until then, and the conversion kept only what was certain — goalkeeper spellings became 1, everything ambiguous was cleared for the coach — because a guessed number puts a player in the wrong role without anyone noticing.
 
-The meaning lives **only** in `src/domain/position.ts` (`roleOfPosition`, the labels, `parsePositionCell`). The roster filter, the card and bio and the spreadsheet import all ask it, and the Goals by role drill will read it too — that drill is designed but not built; nothing compares a position to 1, 6 or 7 or matches its text. The spreadsheet import refuses a Position that is not 1–11 or blank, listing the row, the way it refuses an unmapped team. A blank or missing Position cell leaves the player's stored position unchanged, the same as a blank Number cell — a position is cleared from the roster form, not by blanking a spreadsheet cell.
+The meaning lives **only** in `src/domain/position.ts` (`roleOfPosition`, the labels, `parsePositionCell`). The roster filter, the card and bio and the spreadsheet import all ask it, and the Goals by role session sheet reads it to pre-fill each player's role; nothing compares a position to 1, 6 or 7 or matches its text. The spreadsheet import refuses a Position that is not 1–11 or blank, listing the row, the way it refuses an unmapped team. A blank or missing Position cell leaves the player's stored position unchanged, the same as a blank Number cell — a position is cleared from the roster form, not by blanking a spreadsheet cell.
 
 The position number is **not the shirt number** (`team_players.number`) and not the recording number. The bio says "Position 9 · Attack" for that reason.
+
+### Goals by role is scored per role, against standards
+
+Since `0037_goals_by_role.sql`. The sixth Matrix measure, `role_goals`, is for a 1v1 or attackers-against-defenders drill: each player records **one score for the whole drill from their own side** (`3-1`), with their **role for that session** — pre-filled from the position number by `roleOfPosition`, changeable on the sheet, never written back to the roster. Like `time_bands` it is a standard, not a ranking.
+
+- **The rule** — per squad, per drill, per role, `drill_goal_bands` holds `base` bands (goal difference at least T) and `bonus` bands (attack: goals scored at least T; defend and keeper: goals given up at most T). A player earns the **highest** factor among the base bands met plus the highest among the bonus bands met, capped at 1, times the weight. "Highest met", not "tightest threshold", so a list typed out of order scores the way it reads.
+- **A role with no base bands for the squad is left out**, as a squad with no time bands is. A no-show or an unentered player is charged 0 — unless the squad has no base bands for any role of that drill, when they are left out too.
+- **Standards are written only through `save_goal_bands`.** `drill_goal_bands` has no write policy, because the 100% rule (a role's best base plus best bonus ≤ 100%) spans rows. The function fails closed with `coalesce(public.is_team_coach(...), false)` and refuses in sentences the app shows as they are; `goal-bands-draft.ts` makes the same refusals first so the editor can show them beside the boxes.
+- **The browser holds a copy of the rule on purpose** — `domain/role-goal-score.ts`, for the live points on the sheet and the editor's worked example. `domain/role-goal-cases.ts` is one table of cases that both `role-goal-score.test.ts` and `src/data/testdb/goals-by-role.test.ts` run, so the preview and the stored points cannot disagree without a test failing. Change the rule in both, and add the case to the table.
+- **A present Goals-by-role result needs a role and both counts**; the database cannot know a result's measure, so `saveMatrixSession` and the sheet refuse it instead. A present row missing any of them is silently not scored.
+- **The leaderboard shows each player's latest result** (a role can change between sessions); points total every session. Below the standard means the base earned nothing — the bonus is extra credit.
+- **The progress chart and squad report leave `role_goals` out**: they plot one raw value per session, which this measure does not have.
 
 ### Recording numbers are assigned by the coach, in a block
 
@@ -277,7 +289,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0036_numbered_positions.sql`.
+8. …through `supabase/migrations/0037_goals_by_role.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 

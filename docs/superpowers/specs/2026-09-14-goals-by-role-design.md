@@ -1,6 +1,6 @@
 # Goals by role — a Matrix drill scored on each player's score, by position — design
 
-**Status:** awaiting sign-off
+**Status:** approved and implemented (2026-09-14)
 **Date:** 2026-09-14
 **Depends on:** `2026-09-14-numbered-positions-design.md` — built first; this drill reads a player's role from that number.
 

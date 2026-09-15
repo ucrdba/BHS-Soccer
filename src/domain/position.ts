@@ -10,12 +10,12 @@
  *
  * There is no midfield role. This module is the ONLY place those ranges are
  * written down -- the roster filter, the labels and the spreadsheet import all
- * ask it, and the Goals by role drill will read it too -- so a change to the
+ * ask it, and the Goals by role session sheet reads it to pre-fill each player's role -- so a change to the
  * rule is one edit.
  *
- * The role strings are the ones the Goals by role drill will store, so the two
- * can never disagree about what "defend" means. That drill is designed but not
- * built.
+ * The role strings are the ones the Goals by role drill stores
+ * (matrix_session_results.role, drill_goal_bands.role, since 0037), so the two
+ * can never disagree about what "defend" means.
  */
 
 export type PositionRole = 'keeper' | 'defend' | 'attack';

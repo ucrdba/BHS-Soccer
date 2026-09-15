@@ -126,7 +126,14 @@ deploy.
    nothing changed; do not push until it has applied cleanly (the new client
    reads text positions as well as numbers, but the older client's writes are
    what break once it is applied).
-5. Verify:
+5. Paste the whole of `supabase/migrations/0037_goals_by_role.sql` and run it.
+   It adds the Goals by role measure, its standards table and function, and
+   rebuilds the two scoring views. Unlike 0036 it is safe on the older app —
+   additive, and every column the older app reads is unchanged — but the new
+   app **needs** it: it reads the new view columns, and without them the
+   Ratings board loads empty. If it errors, its own transaction rolls it back;
+   do not push until it has applied cleanly.
+6. Verify:
 
    ```sql
    select count(*) from public.invitations;                                   -- 0
@@ -142,16 +149,20 @@ deploy.
     order by 1;                                                                -- 11 rows
    select data_type from information_schema.columns
     where table_name = 'team_players' and column_name = 'position';            -- smallint
+   select to_regprocedure('public.save_goal_bands(uuid,uuid,text,jsonb)') is not null; -- true
+   select count(*) from information_schema.columns
+    where table_name = 'matrix_exercise_points'
+      and column_name in ('role','goals_for','goals_against','base_factor','bonus_factor'); -- 5
    ```
 
-6. Tell PostgREST about the new functions, or the app's calls to them answer
+7. Tell PostgREST about the new functions, or the app's calls to them answer
    "function not found" until it next reloads on its own:
 
    ```sql
    notify pgrst, 'reload schema';
    ```
 
-7. Immediately push `main` (the owner's call). Vercel deploys production; wait
+8. Immediately push `main` (the owner's call). Vercel deploys production; wait
    for the deployment to go live.
 
 ## 5. Prove the new flows on the live site
@@ -216,7 +227,7 @@ reopens the gap described in step 4 — confirming clears the sign-up password
 and the old client does not ask for a new one; and rolling back the client
 alone, with **0036** still applied, breaks every roster save and player import
 (`invalid input syntax for type smallint`), because the older client sends
-positions as text.
+positions as text. A third, the other way round: **0037** must stay applied while the new client is live (it reads 0037's view columns), so undo 0037 only **after** the client has been rolled back.
 
 To undo the migration, run this block first — it restores the pre-0035
 functions in place (same names, so the existing triggers pick them up with no
@@ -375,3 +386,37 @@ commit;
 ```
 
 Then `notify pgrst, 'reload schema';` so PostgREST picks up the column's new type.
+
+### Undoing 0037 (Goals by role)
+
+Run this only **after** the client has been rolled back: the newer client
+selects columns this removes from `matrix_exercise_points`.
+
+1. Supabase → the production project → SQL Editor. Run:
+
+   ```sql
+   begin;
+   set role postgres;
+   drop function if exists public.save_goal_bands(uuid, uuid, text, jsonb);
+   drop view if exists public.matrix_standings;
+   drop view if exists public.matrix_exercise_points;
+   ```
+
+2. In the same editor tab, **before committing**, paste the section of
+   `supabase/migrations/0022_time_band_scoring.sql` from
+   `create view public.matrix_exercise_points` through
+   `grant select on public.matrix_standings to anon, authenticated;` and run it.
+3. Then run:
+
+   ```sql
+   drop table if exists public.drill_goal_bands;
+   commit;
+   notify pgrst, 'reload schema';
+   ```
+
+The measure constraint and the three result columns (`role`, `goals_for`,
+`goals_against`) are left in place: they are harmless to the older app, and
+dropping them would destroy recorded Goals-by-role results. Under 0022's view
+those sessions score nothing for players who were there, and still charge a
+no-show or an unentered player 0 of the weight. Change such drills to another
+measure, or delete those sessions, if that matters.
