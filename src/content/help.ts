@@ -638,7 +638,7 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             ['<code>LastName</code>', 'Herrera', ''],
             ['<code>RecordingNumber</code>', '12', 'The paper-sheet number'],
             ['<code>Number</code>', '9', 'Jersey number, optional'],
-            ['<code>Position</code>', 'MF', 'Free text; be consistent'],
+            ['<code>Position</code>', '9', 'The position number, 1 to 11 (1 goalkeeper, 2 to 6 defence, 7 to 11 attack), or blank; anything else is refused in the preview'],
             ['<code>Team</code>', 'JV', 'Blank means the team selected in the header']
           ])}
           ${N('A single Name column still works', `<p>Both <code>Mateo Herrera</code> and
@@ -646,9 +646,12 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             first. A two-word surname survives the comma form (<code>Bustillos Correa, Luis</code>)
             where it cannot be guessed from spaces alone.</p>`)}
           ${W('Re-importing updates, it does not duplicate', `<p>Players are matched by full name, so
-            importing a corrected sheet updates the people already there. But a blank cell CLEARS the
-            stored value &mdash; export the roster first and edit that file, rather than starting a
-            fresh sheet with only the columns you care about.</p>`)}`
+            importing a corrected sheet updates the people already there. A blank
+            <code>Number</code>, <code>RecordingNumber</code> or <code>Position</code> cell leaves
+            what is already stored alone &mdash; but <code>Class</code>, <code>Height</code> and
+            <code>Photo</code> are not: a blank cell there overwrites what is stored (Class resets to
+            <code>Senior</code>; Height and Photo are cleared). Export the roster first and edit that
+            file, rather than starting a fresh sheet with only the columns you care about.</p>`)}`
       },
       {
         id: 'ex-drills', part: 'Worked examples', title: 'Add a drill and decide how it scores', roles: [COACH],
