@@ -27,6 +27,7 @@ import SectionShell from './SectionShell.vue';
 import ImportExportModal from './ImportExportModal.vue';
 import { supabaseService } from '../../data/supabase';
 import type { ExportData } from '../../domain/workbook';
+import { toRoster } from '../../domain/player-row';
 
 const props = defineProps<{
   isAdmin: boolean;
@@ -71,7 +72,9 @@ async function onOpen(): Promise<void> {
 
     data.value = {
       school: school || null,
-      players: list(players),
+      // A roster row is a membership with the person nested under `players`;
+      // the Players sheet reads a `Player`. Read raw, every name exported blank.
+      players: toRoster(list(players)),
       schedule: list(schedule),
       drillsBank: list(drillsBank),
       coaches: list(coaches),

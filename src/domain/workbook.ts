@@ -46,6 +46,7 @@ export interface TableDef {
 export interface ExportData {
   school?: any;
   profiles?: any[];
+  /** `Player`s — run `fetchTeamRoster`'s rows through `toRoster` first. */
   players?: any[];
   schedule?: any[];
   drillsBank?: any[];
@@ -110,15 +111,18 @@ export function tableDefs(): TableDef[] {
         'Class', 'Height', 'Goals', 'Assists', 'Saves', 'CleanSheets',
         'Tech', 'Tactical', 'Physical', 'Mental', 'Photo', 'IsDeleted'],
       importable: true,
+      // Reads a `Player` (domain/player-row.ts) and nothing else. The snake_case
+      // fallbacks this once had guessed at a flat row no read returns, and hid
+      // that the real roster row nests the person and was exporting blank.
       toRows: (d) => (d.players || []).map(p => ({
         Team: t(d.teamName), Number: p.number ?? '', RecordingNumber: p.recordingNumber ?? '',
-        FirstName: t(p.firstName || p.first_name), LastName: t(p.lastName || p.last_name),
-        Position: p.position ?? '', Class: t(p.classYear || p.class_year), Height: t(p.height),
+        FirstName: t(p.firstName), LastName: t(p.lastName),
+        Position: p.position ?? '', Class: t(p.classYear), Height: t(p.height),
         Goals: p.seasonStats?.goals ?? '', Assists: p.seasonStats?.assists ?? '',
         Saves: p.seasonStats?.saves ?? '', CleanSheets: p.seasonStats?.cleanSheets ?? '',
         Tech: p.ratings?.technical ?? '', Tactical: p.ratings?.tactical ?? '',
         Physical: p.ratings?.physical ?? '', Mental: p.ratings?.mental ?? '',
-        Photo: t(p.photo || p.photo_url), IsDeleted: flag(p.is_deleted || p.isDeleted)
+        Photo: t(p.photo), IsDeleted: flag(p.is_deleted || p.isDeleted)
       }))
     },
     {

@@ -136,7 +136,8 @@ export function planImport(
           badHere.push({
             sheetName: def.sheetName,
             row: i + 2,
-            name: [r.FirstName, r.LastName].filter(Boolean).join(' '),
+            // The same two shapes writeRow reads: parts, or one Name column.
+            name: [r.FirstName, r.LastName].filter(Boolean).join(' ').trim() || String(r.Name ?? '').trim(),
             value: String(r.Position)
           });
         }

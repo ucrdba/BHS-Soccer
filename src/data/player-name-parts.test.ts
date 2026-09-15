@@ -135,6 +135,15 @@ describe('saving a player', () => {
     expect(row.name).toBe('Owen Blackwell');
   });
 
+  it('splits a "Last, First" name the import hands over whole', async () => {
+    // The Players sheet may carry one Name column, and the import passes it
+    // here without parts. The comma keeps a two-word surname together.
+    await supabaseService.upsertPlayerIdentity({ name: 'Bustillos Correa, Luis' });
+    const row = sent.find(r => r.table === 'players')!;
+    expect(row.first_name).toBe('Luis');
+    expect(row.last_name).toBe('Bustillos Correa');
+  });
+
   it('prefers the explicit parts over a full name given alongside them', async () => {
     await supabaseService.upsertPlayerIdentity({
       name: 'Stale Value', firstName: 'Finn', lastName: 'Gallagher'

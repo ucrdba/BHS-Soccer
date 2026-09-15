@@ -391,6 +391,40 @@ describe('applying', () => {
     }));
   });
 
+  it('READS A SINGLE Name COLUMN, which the handbook says still works', async () => {
+    // Built only from FirstName and LastName, a sheet with just Name had every
+    // row refused. The name is handed over whole and without parts, which is
+    // what makes `upsertPlayerIdentity` split it — comma form included — with
+    // `splitPlayerName` (proved in src/data/player-name-parts.test.ts).
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, { Players: [
+      { Team: 'Varsity', Name: 'Mateo Herrera' },
+      { Team: 'Varsity', Name: 'Bustillos Correa, Luis' }
+    ] });
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+
+    const sent = upsertPlayerIdentity.mock.calls.map(c => c[0]);
+    expect(sent.map(p => p.name)).toEqual(['Mateo Herrera', 'Bustillos Correa, Luis']);
+    sent.forEach(p => {
+      expect(p.first_name).toBeUndefined();
+      expect(p.last_name).toBeUndefined();
+    });
+    expect(w.find('[data-import-result]').text()).toContain('0 refused');
+  });
+
+  it('still refuses a player row with no name in any column', async () => {
+    stubXLSX();
+    const w = mountIE();
+    await choose(w, { Players: [{ Team: 'Varsity', Number: '9' }] });
+    await w.find('[data-import-apply]').trigger('click');
+    await flush();
+
+    expect(upsertPlayerIdentity).not.toHaveBeenCalled();
+    expect(w.find('[data-import-result]').text()).toContain('1 refused');
+  });
+
   it('does NOT write a sheet that cannot be imported', async () => {
     stubXLSX();
     const w = mountIE();

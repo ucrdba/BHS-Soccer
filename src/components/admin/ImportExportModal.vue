@@ -205,7 +205,11 @@ async function writeRow(key: string, row: any): Promise<boolean> {
 
   if (key === 'players') {
     if (!teamId || !schoolId) return false;
-    const name = [row.FirstName, row.LastName].filter(Boolean).join(' ').trim();
+    // A single Name column is the other shape the handbook documents. Handed
+    // over without parts, `upsertPlayerIdentity` splits it with
+    // `splitPlayerName`, which reads "Last, First" as well as "First Last".
+    const name = [row.FirstName, row.LastName].filter(Boolean).join(' ').trim()
+      || String(row.Name || '').trim();
     if (!name) return false;
 
     const identity = await supabaseService.upsertPlayerIdentity({

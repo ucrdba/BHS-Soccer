@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import ImportExportSection from './ImportExportSection.vue';
+import { sheetFor, tableByKey } from '../../domain/workbook';
 
 const fetchSchool = vi.fn();
 const fetchTeamRoster = vi.fn();
@@ -55,10 +56,26 @@ function mountIt(props: any = {}) {
   });
 }
 
+/**
+ * What `fetchTeamRoster` really returns: a team_players MEMBERSHIP with the
+ * person nested under `players`. A flat `{ first_name }` mock hid that the
+ * export read the person's fields off the top of this row and wrote them all
+ * blank.
+ */
+const ROSTER_ROW = {
+  id: 'm1', team_id: 't1', school_id: 's1',
+  number: 9, recording_number: 3, position: 7,
+  season_stats: { goals: 4 }, ratings: { technical: 8 }, is_deleted: false,
+  players: {
+    id: 'p1', name: 'Cesar Alva', first_name: 'Cesar', last_name: 'Alva',
+    class_year: 'Senior', height: '5\'10"', photo_url: 'img/cesar.jpg'
+  }
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   fetchSchool.mockResolvedValue({ code: 'lfc', name: 'Legends FC', mascot: 'Lions' });
-  fetchTeamRoster.mockResolvedValue([{ first_name: 'Cesar', last_name: 'Alva' }]);
+  fetchTeamRoster.mockResolvedValue([ROSTER_ROW]);
   fetchSchedule.mockResolvedValue([{ opponent: 'Yucaipa' }]);
   fetchDrillsBank.mockResolvedValue([{ name: 'Rondo' }]);
   fetchCoaches.mockResolvedValue([{ name: 'Coach Bob' }]);
@@ -128,6 +145,23 @@ describe('what the modal is handed', () => {
     expect(data.players).toHaveLength(1);
     expect(data.quiz).toHaveLength(1);
     expect(data.teamName).toBe('Varsity');
+  });
+
+  it('EXPORTS THE PERSON, not just the membership, from a real roster row', async () => {
+    // The roster row nests the person under `players`. Read off the top of
+    // the row, FirstName, LastName, Class, Height and Photo all exported
+    // blank — and every row of that backup was refused on re-import.
+    const w = mountIt();
+    await w.find('[data-ie-open]').trigger('click');
+    await flush();
+
+    const data = w.findComponent('[data-modal-stub]' as any).props('data') as any;
+    const [row] = sheetFor(tableByKey('players')!, data);
+    expect(row).toMatchObject({
+      Team: 'Varsity', FirstName: 'Cesar', LastName: 'Alva', Class: 'Senior',
+      Height: '5\'10"', Photo: 'img/cesar.jpg',
+      Number: 9, RecordingNumber: 3, Position: 7, Goals: 4, Tech: 8
+    });
   });
 
   it('gives it an empty collection rather than nothing when a read fails', async () => {

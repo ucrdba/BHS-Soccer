@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   tableDefs, sheetFor, templateFor, tableByKey, tableBySheetName
 } from './workbook';
+import { toRoster } from './player-row';
 
 const rowsOf = (key: string, data: any) => sheetFor(tableByKey(key)!, data);
 
@@ -127,11 +128,22 @@ describe('the rows', () => {
     expect(rows.map((r: any) => r.Position)).toEqual([9, '']);
   });
 
-  it('reads the snake_case a database row arrives in', () => {
-    const [row] = rowsOf('players', {
-      players: [{ first_name: 'Tom', last_name: 'Budde', class_year: 'Junior' }]
+  it('reads a Player, so a roster row goes through toRoster first', () => {
+    // `fetchTeamRoster` nests the person under `players`. This sheet once
+    // guessed at a flat snake_case row no read ever returns, and so exported
+    // the real one with every name blank.
+    const players = toRoster([{
+      id: 'm1', number: 9, recording_number: 3, position: 7,
+      players: {
+        id: 'p1', first_name: 'Tom', last_name: 'Budde', class_year: 'Junior',
+        height: '5\'9"', photo_url: 'img/tom.jpg'
+      }
+    }]);
+    const [row] = rowsOf('players', { players });
+    expect(row).toMatchObject({
+      FirstName: 'Tom', LastName: 'Budde', Class: 'Junior', Height: '5\'9"',
+      Photo: 'img/tom.jpg', Number: 9, RecordingNumber: 3, Position: 7
     });
-    expect(row).toMatchObject({ FirstName: 'Tom', LastName: 'Budde', Class: 'Junior' });
   });
 
   it('writes Home or Away rather than a boolean', () => {

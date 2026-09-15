@@ -188,6 +188,17 @@ describe('positions', () => {
     ]);
   });
 
+  it('names the player from a single Name column when the sheet has no parts', () => {
+    // The import accepts one Name column; a refusal that listed the row with a
+    // blank name would leave the coach only a row number to find it by.
+    const plan = planImport({ Players: [
+      { Team: 'Varsity', Name: 'Budde, Tom', Position: 'MF' }
+    ] }, known);
+    expect(plan.badPositions).toEqual([
+      { sheetName: 'Players', row: 2, name: 'Budde, Tom', value: 'MF' }
+    ]);
+  });
+
   it('will not apply while a position is refused', () => {
     const plan = planImport({ Players: [{ Team: 'Varsity', FirstName: 'Cy', Position: 'MF' }] }, known);
     expect(readyToApply(plan, {})).toBe(false);
