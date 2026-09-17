@@ -15,7 +15,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
-  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes, clearOutcomes
+  toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes, clearOutcomes,
+  applyOutcomeLists
 } from './session-entry';
 
 const PLAYERS = [
@@ -369,5 +370,81 @@ describe('a Goals-by-role grid', () => {
     e.a = { ...e.a, value: '' };                // no score
     e.n = { ...e.n, value: '2-2' };             // no role
     expect(presentWithoutResult(SQUAD, e, 'role_goals').map(p => p.id)).toEqual(['d', 'a', 'n']);
+  });
+});
+
+describe('applyOutcomeLists', () => {
+  // Recording numbers 1, 2 and 3 -- the numbers on the paper sheet.
+  const grid = () => blankEntries(PLAYERS, 'win_loss');
+  const lists = (over: any = {}) => ({ win: '', draw: '', loss: '', ...over });
+
+  it('sets each listed player by recording number and marks them here', () => {
+    const e = grid();
+    e.p1 = { ...e.p1, attendance: 'excused' };
+    const res = applyOutcomeLists(PLAYERS, e, lists({ win: '1', draw: '2', loss: '3' }));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.entries.p1).toMatchObject({ outcome: 'win', attendance: 'present' });
+    expect(res.entries.p2.outcome).toBe('draw');
+    expect(res.entries.p3.outcome).toBe('loss');
+    expect(res.applied).toBe(3);
+  });
+
+  it('reads commas, spaces or both', () => {
+    const res = applyOutcomeLists(PLAYERS, grid(), lists({ win: ' 1,2  3 ,' }));
+    expect(res.ok && Object.values(res.entries).map(r => r.outcome)).toEqual(['win', 'win', 'win']);
+  });
+
+  it('REPLACES a result already in a listed row: naming the number is the choice', () => {
+    const e = grid();
+    e.p1 = { ...e.p1, outcome: 'loss' };
+    const res = applyOutcomeLists(PLAYERS, e, lists({ win: '1' }));
+    expect(res.ok && res.entries.p1.outcome).toBe('win');
+  });
+
+  it('leaves everyone not listed exactly as they were', () => {
+    const e = grid();
+    e.p2 = { ...e.p2, outcome: 'draw' };
+    e.p3 = { ...e.p3, attendance: 'unexcused' };
+    const res = applyOutcomeLists(PLAYERS, e, lists({ win: '1' }));
+    expect(res.ok && res.entries.p2).toEqual(e.p2);
+    expect(res.ok && res.entries.p3).toEqual(e.p3);
+  });
+
+  it('does nothing, and says nothing is wrong, when every list is empty', () => {
+    const e = grid();
+    const res = applyOutcomeLists(PLAYERS, e, lists({ win: '  ' }));
+    expect(res).toEqual({ ok: true, entries: e, applied: 0 });
+  });
+
+  it('refuses a number in two lists, naming both', () => {
+    expect(applyOutcomeLists(PLAYERS, grid(), lists({ win: '1, 2', loss: '3 2' })))
+      .toEqual({ ok: false, error: '2 is in both Won and Lost.' });
+  });
+
+  it('allows a number repeated inside one list', () => {
+    expect(applyOutcomeLists(PLAYERS, grid(), lists({ draw: '2, 2' })).ok).toBe(true);
+  });
+
+  it('refuses a number nobody on the sheet has', () => {
+    expect(applyOutcomeLists(PLAYERS, grid(), lists({ loss: '3, 40' })))
+      .toEqual({ ok: false, error: 'No player with recording number 40.' });
+  });
+
+  it('refuses something that is not a number', () => {
+    expect(applyOutcomeLists(PLAYERS, grid(), lists({ win: '1, 17a' })))
+      .toEqual({ ok: false, error: '"17a" is not a recording number.' });
+  });
+
+  it('changes nothing when it refuses', () => {
+    const e = grid();
+    applyOutcomeLists(PLAYERS, e, lists({ win: '1', loss: '40' }));
+    expect(e.p1.outcome).toBe('');
+  });
+
+  it('does not reach a player who has left the squad', () => {
+    const squad = [...PLAYERS, { id: 'gone', name: 'Former', recordingNumber: 9, is_deleted: true }];
+    expect(applyOutcomeLists(squad, blankEntries(squad, 'win_loss'), lists({ win: '9' })))
+      .toEqual({ ok: false, error: 'No player with recording number 9.' });
   });
 });

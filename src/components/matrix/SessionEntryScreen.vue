@@ -30,7 +30,7 @@ import { entryFormat, entryTally } from '../../domain/session-format';
 import {
   blankEntries, entriesFromResults, attendanceAfterInput,
   toSessionResults, presentWithoutResult, startingSessionDate, fillBlankOutcomes, clearOutcomes,
-  type EntryRow
+  applyOutcomeLists, type EntryRow, type OutcomeLists
 } from '../../domain/session-entry';
 
 const props = defineProps<{
@@ -167,6 +167,31 @@ function onRole(playerId: string, role: string): void {
 function goalFeedback(playerId: string) {
   const row = entries.value[playerId];
   return roleGoalFeedback(row?.value || '', row?.role, session.goalBands as any, drill.value?.points);
+}
+
+/** The Won / Drew / Lost boxes, typed as the paper sheet reads. */
+const OUTCOME_LISTS: { key: keyof OutcomeLists; label: string; placeholder: string }[] = [
+  { key: 'win', label: 'Won', placeholder: 'Recording numbers that won, e.g. 17, 21, 11, 19' },
+  { key: 'draw', label: 'Drew', placeholder: 'Recording numbers that drew, e.g. 1, 6, 7, 9' },
+  { key: 'loss', label: 'Lost', placeholder: 'Recording numbers that lost, e.g. 21, 22, 23' }
+];
+const outcomeLists = ref<OutcomeLists>({ win: '', draw: '', loss: '' });
+const listsError = ref('');
+const listsNotice = ref('');
+
+/**
+ * Apply the lists to the grid, all or nothing -- see `applyOutcomeLists`.
+ *
+ * Only on a press (or Enter), never as the numbers are typed: "17, 2" on the
+ * way to "17, 21" would otherwise set player 2 for a moment and leave them set.
+ */
+function onApplyLists(): void {
+  listsError.value = '';
+  listsNotice.value = '';
+  const res = applyOutcomeLists(props.players, entries.value, outcomeLists.value);
+  if (!res.ok) { listsError.value = (res as { error: string }).error; return; }
+  entries.value = res.entries;
+  if (res.applied) listsNotice.value = `Set ${res.applied} result${res.applied === 1 ? '' : 's'}.`;
 }
 
 function onAttendance(playerId: string, attendance: string): void {
@@ -346,6 +371,25 @@ async function onSave(): Promise<void> {
       <span class="fill__note">Players you have already set keep their result.</span>
     </div>
 
+    <div v-if="isOutcome" class="lists" data-outcome-lists>
+      <label v-for="l in OUTCOME_LISTS" :key="l.key" class="lists__row">
+        <span class="fill__label lists__label">{{ l.label }}</span>
+        <input
+          v-model="outcomeLists[l.key]" type="text" class="fld__input lists__input"
+          inputmode="numeric" :placeholder="l.placeholder" :aria-label="l.placeholder"
+          :data-outcome-list="l.key"
+          @keydown.enter.prevent="onApplyLists"
+        />
+      </label>
+      <p class="fill__note" data-outcome-lists-hint>
+        Optional. Separate numbers with commas or spaces, then press Apply lists. Anyone not
+        listed keeps what is in the grid, and you can still set results row by row.
+      </p>
+      <button type="button" class="btn" data-outcome-lists-apply @click="onApplyLists">Apply lists</button>
+      <p v-if="listsError" class="hint hint--bad" role="alert" data-outcome-lists-error>{{ listsError }}</p>
+      <p v-else-if="listsNotice" class="hint" role="status" data-outcome-lists-notice>{{ listsNotice }}</p>
+    </div>
+
     <p v-if="isBanded && session.bands.length === 0" class="hint" data-no-bands>
       No standards set for this squad yet. Times are recorded, and score once
       the standards are entered.
@@ -503,6 +547,12 @@ async function onSave(): Promise<void> {
 }
 
 .fill__note { font-size: 11.5px; color: var(--ink-soft); }
+
+.lists { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.lists__row { display: flex; align-items: center; gap: var(--space-2); }
+.lists__label { width: 3.5rem; flex: none; }
+.lists__input { flex: 1; min-width: 0; }
+.lists .btn { align-self: flex-start; }
 
 .fld { display: flex; flex-direction: column; gap: 4px; }
 .fld--wide { flex: 1; min-width: 14rem; }

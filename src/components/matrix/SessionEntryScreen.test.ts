@@ -371,6 +371,78 @@ describe('filling a small-sided sheet in one press', () => {
   });
 });
 
+describe('entering a small-sided sheet as lists of numbers', () => {
+  // PLAYERS carry recording numbers 3 (Cesar), 1 (Tom) and 2 (Alain), and the
+  // grid shows them in that recording order: Tom, Alain, Cesar.
+  const outcomes = (w: any) =>
+    fields(w).map((f: any) => (f.element as HTMLSelectElement).value);
+  const small = () => mountGrid({ drillId: SMALL, measure: 'win_loss' });
+
+  it('offers Won, Drew and Lost boxes that explain themselves, on a W/D/L exercise only', async () => {
+    const w = await small();
+    const boxes = w.findAll('[data-outcome-list]');
+    expect(boxes.map((b: any) => b.attributes('data-outcome-list'))).toEqual(['win', 'draw', 'loss']);
+    expect(boxes[0].attributes('placeholder')).toBe('Recording numbers that won, e.g. 17, 21, 11, 19');
+    expect(boxes[1].attributes('placeholder')).toBe('Recording numbers that drew, e.g. 1, 6, 7, 9');
+    expect(boxes[2].attributes('placeholder')).toBe('Recording numbers that lost, e.g. 21, 22, 23');
+    expect(w.find('[data-outcome-lists-hint]').text()).toMatch(/Optional/);
+
+    expect((await mountGrid({ drillId: COOPERS })).find('[data-outcome-list]').exists()).toBe(false);
+  });
+
+  it('sets each listed player on Apply, by recording number', async () => {
+    const w = await small();
+    await w.find('[data-outcome-list="win"]').setValue('3');
+    await w.find('[data-outcome-list="loss"]').setValue('1, 2');
+    expect(outcomes(w)).toEqual(['', '', '']);          // nothing until Apply
+
+    await w.find('[data-outcome-lists-apply]').trigger('click');
+    expect(outcomes(w)).toEqual(['loss', 'loss', 'win']);
+  });
+
+  it('applies on Enter in a box, and marks a listed player here', async () => {
+    const w = await small();
+    await w.findAll('[data-attendance]')[0].setValue('excused');   // Tom, number 1
+    const box = w.find('[data-outcome-list="draw"]');
+    await box.setValue('1');
+    await box.trigger('keydown', { key: 'Enter' });
+    expect(outcomes(w)[0]).toBe('draw');
+    expect((w.findAll('[data-attendance]')[0].element as HTMLSelectElement).value).toBe('present');
+  });
+
+  it('refuses the whole list, saying why, and changes nothing', async () => {
+    const w = await small();
+    await fields(w)[0].setValue('draw');
+    await w.find('[data-outcome-list="win"]').setValue('1, 2');
+    await w.find('[data-outcome-list="loss"]').setValue('2');
+    await w.find('[data-outcome-lists-apply]').trigger('click');
+
+    expect(w.find('[data-outcome-lists-error]').text()).toBe('2 is in both Won and Lost.');
+    expect(outcomes(w)).toEqual(['draw', '', '']);
+  });
+
+  it('says how many it set', async () => {
+    const w = await small();
+    await w.find('[data-outcome-list="win"]').setValue('1 2 3');
+    await w.find('[data-outcome-lists-apply]').trigger('click');
+    expect(w.find('[data-outcome-lists-notice]').text()).toBe('Set 3 results.');
+    expect(w.find('[data-outcome-lists-error]').exists()).toBe(false);
+  });
+
+  it('leaves the sheet ready to save', async () => {
+    const w = await small();
+    await w.find('[data-outcome-list="win"]').setValue('1');
+    await w.find('[data-outcome-list="draw"]').setValue('2,3');
+    await w.find('[data-outcome-lists-apply]').trigger('click');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    const rows = saveMatrixSession.mock.calls[0][2];
+    expect(Object.fromEntries(rows.map((r: any) => [r.playerId, r.outcome])))
+      .toEqual({ p2: 'win', p3: 'draw', p1: 'draw' });
+  });
+});
+
 describe('resetting the Result column', () => {
   const outcomes = (w: any) =>
     fields(w).map((f: any) => (f.element as HTMLSelectElement).value);

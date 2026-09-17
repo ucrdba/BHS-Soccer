@@ -283,3 +283,66 @@ export function clearOutcomes(entries: Record<string, EntryRow>): Record<string,
   });
   return out;
 }
+
+export interface OutcomeLists {
+  win: string;
+  draw: string;
+  loss: string;
+}
+
+const LIST_NAMES: Record<keyof OutcomeLists, string> = { win: 'Won', draw: 'Drew', loss: 'Lost' };
+
+/**
+ * Set a small-sided sheet from three lists of recording numbers.
+ *
+ * The paper sheet already says "won: 17, 21, 11, 19", so typing that once
+ * beats finding each row. RECORDING numbers, the ones on those sheets and in
+ * the grid's # column -- not shirt numbers.
+ *
+ * Unlike `fillBlankOutcomes`, a listed player's result is REPLACED: naming the
+ * number is the coach's choice for that player, and it marks them here, as
+ * picking the result in the row does. Anyone not listed is left exactly as
+ * they were, so the lists and the row dropdowns can be mixed freely.
+ *
+ * All or nothing. Anything unreadable, a number in two lists, or a number
+ * nobody on the sheet has is refused before a single row changes -- half a
+ * sheet applied is harder to notice than a sentence saying why nothing was.
+ */
+export function applyOutcomeLists(
+  players: any[], entries: Record<string, EntryRow>, lists: OutcomeLists
+): { ok: true; entries: Record<string, EntryRow>; applied: number } | { ok: false; error: string } {
+  const byNumber = new Map<number, any>();
+  live(players).forEach(p => {
+    if (p.recordingNumber === null || p.recordingNumber === undefined || p.recordingNumber === '') return;
+    const n = Number(p.recordingNumber);
+    if (Number.isFinite(n)) byNumber.set(n, p);
+  });
+
+  const wanted = new Map<number, keyof OutcomeLists>();
+  for (const outcome of ['win', 'draw', 'loss'] as const) {
+    const tokens = String(lists?.[outcome] ?? '').split(/[\s,]+/).filter(Boolean);
+    for (const token of tokens) {
+      if (!/^\d+$/.test(token)) return { ok: false, error: `"${token}" is not a recording number.` };
+      const n = Number(token);
+      const earlier = wanted.get(n);
+      if (earlier && earlier !== outcome) {
+        return { ok: false, error: `${n} is in both ${LIST_NAMES[earlier]} and ${LIST_NAMES[outcome]}.` };
+      }
+      wanted.set(n, outcome);
+    }
+  }
+
+  for (const n of wanted.keys()) {
+    if (!byNumber.has(n)) return { ok: false, error: `No player with recording number ${n}.` };
+  }
+
+  if (wanted.size === 0) return { ok: true, entries, applied: 0 };
+
+  const out: Record<string, EntryRow> = { ...entries };
+  wanted.forEach((outcome, n) => {
+    const p = byNumber.get(n);
+    const row = out[p.id] || { playerId: p.id, attendance: 'present', value: '', outcome: '' };
+    out[p.id] = { ...row, outcome, attendance: 'present' };
+  });
+  return { ok: true, entries: out, applied: wanted.size };
+}
