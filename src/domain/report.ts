@@ -22,3 +22,38 @@ export function reportStandardSeconds(
   if (!bands.length) return null;
   return Math.min(...bands.map(b => Number(b.max_seconds)));
 }
+
+export interface OutcomeRecord {
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  /** "1 - 1 - 1", or a dash for a player who played none. */
+  label: string;
+}
+
+/**
+ * One player's record in a W/D/L exercise.
+ *
+ * A small-sided game or a Flying Fours stores won/drew/lost and NO number, so
+ * the squad report's "best reading" counts nothing for them: every player read
+ * 0 attempts and a dash, and the exercise took a heading in the report while
+ * saying nothing about the sessions behind it. Their reading is the record.
+ *
+ * Only rows where the player was there and a result was chosen: an outcome
+ * implies attendance, and a present row with no outcome is a game nobody
+ * recorded rather than a game drawn.
+ */
+export function outcomeRecord(history: any[], drillId: string, playerId: string): OutcomeRecord {
+  const mine = (history || []).filter(r =>
+    r?.drillId === drillId && r?.playerId === playerId
+    && r?.attendance === 'present' && !!r?.outcome);
+
+  const count = (kind: string) => mine.filter(r => r.outcome === kind).length;
+  const wins = count('win');
+  const draws = count('draw');
+  const losses = count('loss');
+  const games = wins + draws + losses;
+
+  return { games, wins, draws, losses, label: games === 0 ? '—' : `${wins} - ${draws} - ${losses}` };
+}

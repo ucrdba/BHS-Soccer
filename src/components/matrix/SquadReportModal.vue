@@ -15,12 +15,17 @@
  *
  * An exercise with no bands set for this squad is **not counted at all**
  * rather than scored as universally failed.
+ *
+ * **A W/D/L exercise is read as a record.** A small-sided game or a Flying
+ * Fours stores won/drew/lost and no number, so counting readings gave every
+ * player 0 attempts and a dash -- the exercise took a heading and said nothing
+ * about the sessions behind it. Those sections count games and show the record.
  */
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { useMatrixStore } from '../../stores/matrix';
-import { reportStandardSeconds } from '../../domain/report';
+import { reportStandardSeconds, outcomeRecord } from '../../domain/report';
 import { formatSecondsAsTime } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
 
@@ -51,8 +56,14 @@ const rows = computed(() => drills.value.map((d: any) => {
   const standard = reportStandardSeconds(bandsByDrill.value, d.id);
   const timed = d.measure === 'time_low' || d.measure === 'time_bands';
   const lower = timed;
+  const outcomes = d.measure === 'win_loss';
 
   const entries = players.value.map((p: any) => {
+    if (outcomes) {
+      const record = outcomeRecord(history.value, d.id, p.id);
+      return { player: p, attempts: record.games, best: null, record: record.label, short: false };
+    }
+
     const readings = history.value
       .filter(r => r.playerId === p.id && r.drillId === d.id
         && r.attendance === 'present'
@@ -67,6 +78,7 @@ const rows = computed(() => drills.value.map((d: any) => {
       player: p,
       attempts: readings.length,
       best,
+      record: null,
       // Null standard means the exercise is not scored for this squad at all,
       // which is not the same as everybody failing it.
       short: standard !== null && best !== null && best > standard
@@ -76,6 +88,7 @@ const rows = computed(() => drills.value.map((d: any) => {
   return {
     drill: d,
     timed,
+    outcomes,
     standard,
     threshold: isThresholdMeasure(d.measure),
     entries,
@@ -151,8 +164,8 @@ watch(() => [props.open, props.teamId] as const, async () => {
           <thead>
             <tr>
               <th class="is-text">Player</th>
-              <th>Attempts</th>
-              <th>Best</th>
+              <th>{{ row.outcomes ? 'Games' : 'Attempts' }}</th>
+              <th>{{ row.outcomes ? 'W-D-L' : 'Best' }}</th>
             </tr>
           </thead>
           <tbody>
@@ -162,7 +175,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
             >
               <td class="is-text" data-squad-player>{{ e.player.name }}</td>
               <td class="tabular" data-squad-attempts>{{ e.attempts }}</td>
-              <td class="tabular" data-squad-best>{{ shown(row, e.best) }}</td>
+              <td class="tabular" data-squad-best>{{ row.outcomes ? e.record : shown(row, e.best) }}</td>
             </tr>
           </tbody>
         </table>

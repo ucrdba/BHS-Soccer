@@ -14,7 +14,7 @@
  * Ported from the agreement tests that loaded the legacy view.
  */
 import { describe, it, expect } from 'vitest';
-import { reportStandardSeconds } from './report';
+import { reportStandardSeconds, outcomeRecord } from './report';
 
 const bands = {
   d1: [
@@ -62,3 +62,44 @@ describe('AN EXERCISE WITH NO STANDARD IS NOT COUNTED', () => {
     expect(reportStandardSeconds({}, 'd1')).toBeNull();
   });
 });
+
+describe('a W/D/L exercise has a record, not a best figure', () => {
+  // Flying Fours and small-sided games store won/drew/lost and NO number, so
+  // counting raw values reported every player as 0 attempts with a dash --
+  // the exercise took a heading in the report and said nothing.
+  const HISTORY = [
+    { drillId: 'flying', playerId: 'p1', attendance: 'present', rawValue: null, outcome: 'win' },
+    { drillId: 'flying', playerId: 'p1', attendance: 'present', rawValue: null, outcome: 'loss' },
+    { drillId: 'flying', playerId: 'p1', attendance: 'present', rawValue: null, outcome: 'draw' },
+    { drillId: 'flying', playerId: 'p2', attendance: 'present', rawValue: null, outcome: 'win' },
+    { drillId: 'laps',   playerId: 'p1', attendance: 'present', rawValue: 250, outcome: null }
+  ];
+
+  it('counts the games a player played and reads them as a record', () => {
+    expect(outcomeRecord(HISTORY, 'flying', 'p1'))
+      .toEqual({ games: 3, wins: 1, draws: 1, losses: 1, label: '1 - 1 - 1' });
+  });
+
+  it('is nothing at all for a player who played none', () => {
+    expect(outcomeRecord(HISTORY, 'flying', 'p3'))
+      .toEqual({ games: 0, wins: 0, draws: 0, losses: 0, label: '—' });
+  });
+
+  it('counts only this exercise', () => {
+    expect(outcomeRecord(HISTORY, 'laps', 'p1').games).toBe(0);
+  });
+
+  it('leaves out a player who was not there, and a row with no outcome', () => {
+    const rows = [
+      { drillId: 'flying', playerId: 'p1', attendance: 'excused', rawValue: null, outcome: 'win' },
+      { drillId: 'flying', playerId: 'p1', attendance: 'unexcused', rawValue: null, outcome: 'loss' },
+      { drillId: 'flying', playerId: 'p1', attendance: 'present', rawValue: null, outcome: null }
+    ];
+    expect(outcomeRecord(rows, 'flying', 'p1').games).toBe(0);
+  });
+
+  it('is unbothered by no history at all', () => {
+    expect(outcomeRecord(undefined as any, 'flying', 'p1').label).toBe('—');
+  });
+});
+

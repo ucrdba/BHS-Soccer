@@ -29,6 +29,7 @@ const TEAM = '11111111-2222-3333-4444-555555555555';
 const LAPS = 'd-laps';       // time_bands, with a standard
 const COOPERS = 'd-coopers'; // count_high, no standard
 const GOALS = 'd-goals';     // role_goals, left out of the report
+const FLYING = 'd-flying';   // win_loss, reported as a record
 
 const PLAYERS = [
   { id: 'p1', name: 'Cesar Alva' },
@@ -39,7 +40,8 @@ const PLAYERS = [
 const DRILLS = [
   { id: LAPS, name: '3 Laps', measure: 'time_bands' },
   { id: COOPERS, name: 'Coopers', measure: 'count_high' },
-  { id: GOALS, name: '1v1 Attack', measure: 'role_goals' }
+  { id: GOALS, name: '1v1 Attack', measure: 'role_goals' },
+  { id: FLYING, name: 'Flying Fours', measure: 'win_loss' }
 ];
 
 /** p1 runs 4:10 (clears 4:30); p2 runs 4:50 (short). */
@@ -227,3 +229,44 @@ describe('Goals by role', () => {
     expect(names.some((t: string) => t.includes('3 Laps'))).toBe(true);
   });
 });
+
+describe('a W/D/L exercise', () => {
+  // It used to take a heading and say nothing: the report counted raw values,
+  // and a Flying Fours result carries an outcome instead.
+  const WDL = [
+    ...HISTORY,
+    { drillId: FLYING, playerId: 'p1', attendance: 'present', rawValue: null, outcome: 'win', occurredOn: '2026-09-02' },
+    { drillId: FLYING, playerId: 'p1', attendance: 'present', rawValue: null, outcome: 'draw', occurredOn: '2026-09-09' },
+    { drillId: FLYING, playerId: 'p2', attendance: 'present', rawValue: null, outcome: 'loss', occurredOn: '2026-09-02' }
+  ];
+
+  const flying = (w: any) =>
+    w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('Flying Fours'))!;
+
+  it('reports each player’s record, and counts the games they played', async () => {
+    const sec = flying(await mountReport({ history: WDL }));
+    const rows = sec.findAll('[data-squad-row]').map((r: any) => [
+      r.find('[data-squad-player]').text(),
+      r.find('[data-squad-attempts]').text(),
+      r.find('[data-squad-best]').text()
+    ]);
+    expect(rows).toEqual([
+      ['Cesar Alva', '2', '1 - 1 - 0'],
+      ['Tom Budde', '1', '0 - 0 - 1'],
+      ['Alain Renteria', '0', '—']      // played none: still listed
+    ]);
+  });
+
+  it('heads the columns as games and record, not attempts and best', async () => {
+    const sec = flying(await mountReport({ history: WDL }));
+    expect(sec.findAll('th').map((t: any) => t.text())).toEqual(['Player', 'Games', 'W-D-L']);
+  });
+
+  it('leaves a measured exercise reading as it did', async () => {
+    const w = await mountReport({ history: WDL });
+    const laps = w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('3 Laps'))!;
+    expect(laps.findAll('th').map((t: any) => t.text())).toEqual(['Player', 'Attempts', 'Best']);
+    expect(laps.findAll('[data-squad-best]').map((b: any) => b.text())).toEqual(['4:10', '4:50', '—']);
+  });
+});
+
