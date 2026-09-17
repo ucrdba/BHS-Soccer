@@ -74,14 +74,26 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  /**
+   * Which load is the newest. App reloads when the account changes, and that
+   * can start while the page-open load is still waiting: without this, the
+   * older, signed-out answer arriving last would put back the list the
+   * sign-in replaced.
+   */
+  let loadGeneration = 0;
+
   async function load(): Promise<void> {
+    const generation = ++loadGeneration;
     loading.value = true;
     loadError.value = null;
     try {
-      schools.value = (await supabaseService.fetchSchools()) || [];
+      const fetchedSchools = (await supabaseService.fetchSchools()) || [];
       // fetchTeamsForViewer, not fetchTeams: it returns only the teams this
       // profile may see, which is what the switcher should offer.
-      teams.value = (await supabaseService.fetchTeamsForViewer()) || [];
+      const fetchedTeams = (await supabaseService.fetchTeamsForViewer()) || [];
+      if (generation !== loadGeneration) return;
+      schools.value = fetchedSchools;
+      teams.value = fetchedTeams;
 
       let stored: string | null = null;
       try { stored = localStorage.getItem(ACTIVE_TEAM_KEY); } catch { /* blocked */ }
@@ -90,10 +102,11 @@ export const useOrganizationStore = defineStore('organization', () => {
       // viewer still has access, so a coach removed from a team stops seeing it.
       activeTeamId.value = resolveActiveTeam(teams.value as any, stored, null);
     } catch (err: any) {
+      if (generation !== loadGeneration) return;
       loadError.value = err?.message || 'Could not load the organization.';
       console.error('Organization load failed:', err);
     } finally {
-      loading.value = false;
+      if (generation === loadGeneration) loading.value = false;
     }
   }
 

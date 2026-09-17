@@ -2,8 +2,12 @@
 /**
  * The application shell.
  *
- * The organization loads once, here, rather than in each view: its branding
- * paints the whole page and every screen scopes to the active team.
+ * The organization loads here, rather than in each view: its branding paints
+ * the whole page and every screen scopes to the active team. It loads again
+ * whenever a different person signs in or out, because the team switcher offers
+ * the teams THIS person coaches or plays on -- read once at page open, a coach
+ * who signed in without reloading kept the signed-out list, which is the public
+ * default team alone.
  *
  * A route marked `chrome: 'tool'` renders bare. The touchline and session
  * screens draw their own top and bottom bars, and a header over a match
@@ -18,7 +22,7 @@
  * every route, bare ones included, because a visitor on the live-match screen
  * must know the players are made up just as much as one on the home page.
  */
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AppHeader from './components/layout/AppHeader.vue';
 import AppNav from './components/layout/AppNav.vue';
@@ -26,12 +30,23 @@ import AppFooter from './components/layout/AppFooter.vue';
 import NoticeBox from './components/ui/NoticeBox.vue';
 import DemoNotice from './components/layout/DemoNotice.vue';
 import { useOrganizationStore } from './stores/organization';
+import { useAuthStore } from './stores/auth';
 
 const org = useOrganizationStore();
 const route = useRoute();
 const toolChrome = computed(() => route.meta.chrome === 'tool');
 
+const authStore = useAuthStore();
+
 onMounted(() => org.load());
+
+// Keyed on the account, not the profile object: AuthManager re-reads the
+// profile for the same person (after connecting an invitation, say), and that
+// is no reason to reload. No one signed in and the guest are the same viewer.
+watch(
+  () => authStore.user?.id || 'user_guest',
+  (now, before) => { if (now !== before) org.load(); }
+);
 </script>
 
 <template>

@@ -12,6 +12,7 @@ import { createTestingPinia } from '@pinia/testing';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import App from './App.vue';
 import { useOrganizationStore } from './stores/organization';
+import { useAuthStore } from './stores/auth';
 
 const Page = { template: '<p data-page>page</p>' };
 const Tool = { template: '<p data-page>tool</p>' };
@@ -64,5 +65,36 @@ describe('App', () => {
     await mountAt('/');
     const org = useOrganizationStore();
     expect(org.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads the teams when someone signs in or out, so the switcher is theirs', async () => {
+    // The list is whose-teams-are-these, and it was read once as the page
+    // opened. Signing in without a reload left a coach -- or an admin -- with
+    // the signed-out list: the public default team and nothing else.
+    await mountAt('/');
+    const org = useOrganizationStore();
+    const auth = useAuthStore();
+
+    auth.user = { id: 'u1', role: 'admin' };
+    await flushPromises();
+    expect(org.load).toHaveBeenCalledTimes(2);
+
+    auth.user = { id: 'user_guest', role: 'guest' };
+    await flushPromises();
+    expect(org.load).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not reload for a fresh read of the same account', async () => {
+    // AuthManager re-reads the profile (after connecting an invitation, say),
+    // which is a new object for the same person.
+    await mountAt('/');
+    const org = useOrganizationStore();
+    const auth = useAuthStore();
+
+    auth.user = { id: 'u1', role: 'coach' };
+    await flushPromises();
+    auth.user = { id: 'u1', role: 'coach', name: 'Reloaded' };
+    await flushPromises();
+    expect(org.load).toHaveBeenCalledTimes(2);
   });
 });

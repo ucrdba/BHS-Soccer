@@ -121,4 +121,23 @@ describe('the organization store', () => {
 
     expect(document.title).toBe('Legends FC');
   });
+
+  it('keeps the newest load when two overlap, so a slow signed-out read cannot undo a sign-in', async () => {
+    // App reloads the teams when the account changes, which can start while
+    // the page-open load is still waiting on the network.
+    let finishSignedOut: (v: any) => void = () => {};
+    fetchTeamsForViewer
+      .mockImplementationOnce(() => new Promise(r => { finishSignedOut = r; }))
+      .mockImplementationOnce(() => Promise.resolve([VARSITY, U16]));
+    const store = useOrganizationStore();
+
+    const first = store.load();
+    const second = store.load();
+    await second;
+    finishSignedOut([VARSITY]);
+    await first;
+
+    expect(store.teams.map((t: any) => t.id)).toEqual(['t1', 't2']);
+  });
 });
+
