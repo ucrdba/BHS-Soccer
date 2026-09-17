@@ -10,10 +10,67 @@
  * sinks whichever way a column points. They are not last on merit; there is
  * nothing to compare.
  */
+import { ref } from 'vue';
 import { useMatrixStore } from '../../stores/matrix';
+import { useOrganizationStore } from '../../stores/organization';
+import { boardSheet, buildBoardPrintDocument } from '../../domain/board-export';
 
 const matrix = useMatrixStore();
+const org = useOrganizationStore();
 const emit = defineEmits<{ openPlayer: [string] }>();
+
+const exportError = ref<string | null>(null);
+
+/** What both exports describe: this board, as the coach has it sorted. */
+function exportOptions() {
+  return {
+    organization: org.branding.name || '',
+    team: org.activeTeam?.name || '',
+    // Straight off the store, so the order is whatever column the coach
+    // sorted by. Re-sorting here would throw away their answer.
+    rows: matrix.boardRows
+  };
+}
+
+/**
+ * Printed through the browser's own dialog, where Save as PDF is one of the
+ * destinations -- the same route the exercise leaderboard and the practice
+ * plan take.
+ */
+function onPrint(): void {
+  exportError.value = null;
+  const html = buildBoardPrintDocument(exportOptions());
+  if (!html) { exportError.value = 'There is nothing to print yet.'; return; }
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    // A blocked pop-up is silent otherwise, and the coach just sees nothing
+    // happen when they press print.
+    exportError.value = 'Your browser blocked the print window. Allow pop-ups for this site and try again.';
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function onExcel(): void {
+  exportError.value = null;
+  const XLSX = (window as any).XLSX;
+  if (typeof XLSX === 'undefined') {
+    // The CDN may not have answered yet. Said, not thrown.
+    exportError.value = 'The spreadsheet library has not loaded yet. Wait a moment and try again.';
+    return;
+  }
+
+  const rows = boardSheet(exportOptions());
+  if (rows.length === 0) { exportError.value = 'There is nothing to export yet.'; return; }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Player ratings');
+  XLSX.writeFile(wb, 'Player_ratings.xlsx');
+}
 
 const COLUMNS = [
   { key: 'rank', label: 'Rank', sortable: true },
@@ -33,7 +90,22 @@ function arrow(key: string): string {
 </script>
 
 <template>
-  <div class="wrap">
+  <div>
+    <!-- Beside the board, because they export THIS table as it is sorted. -->
+    <div v-if="matrix.boardRows.length" class="acts">
+      <button type="button" class="btn btn--small" data-board-print @click="onPrint">
+        Print / PDF
+      </button>
+      <button type="button" class="btn btn--small" data-board-excel @click="onExcel">
+        Excel
+      </button>
+    </div>
+
+    <p v-if="exportError" class="note note--bad" role="alert" data-board-export-error>
+      {{ exportError }}
+    </p>
+
+    <div class="wrap">
     <table class="board" data-matrix-board>
       <thead>
         <tr>
@@ -89,9 +161,28 @@ function arrow(key: string): string {
       left out of this table for having taken part in little.
     </p>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.acts { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); }
+
+.btn {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn--small { font-size: 11.5px; }
+.note { margin: 0 0 var(--space-2); font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
+.note--bad { color: var(--color-warning); }
+
 .wrap { overflow-x: auto; }
 .board { width: 100%; border-collapse: collapse; font-size: 13px; }
 

@@ -446,7 +446,12 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             ['<b>SHARE</b>', 'PTS &divide; AVAIL. This is what the ranking uses.']
           ])}
           <p>A dash in SHARE means nothing has been scored for that player yet &mdash; not zero
-          percent. Two players on the same share are separated by who has competed more.</p>`
+          percent. Two players on the same share are separated by who has competed more.</p>
+          <h4>Printing or exporting it</h4>
+          <p><b>Print / PDF</b> and <b>Excel</b> sit above the table, on the overall board and on a
+          single exercise alike. Both take the table exactly as you have it sorted, so sort it the
+          way you want it read first. Print opens your browser&rsquo;s print dialog, where
+          &ldquo;Save as PDF&rdquo; is one of the destinations.</p>`
       },
       {
         id: 'roundrobin', part: 'Practice', title: '1v1 round robin', roles: [COACH],

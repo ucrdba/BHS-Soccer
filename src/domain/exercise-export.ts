@@ -13,7 +13,7 @@
  * dependency for a worse result.
  */
 import { formatSecondsAsTime } from './time';
-import { escapeHtml } from './plan-print';
+import { printTableDocument } from './print-table';
 import { bandStanding, isThresholdMeasure, roleGoalStanding } from './matrix-threshold';
 import { roleLabel, type PositionRole } from './position';
 import { formatGoalDifference } from './goal-score';
@@ -112,34 +112,14 @@ export function exerciseSheet(options: ExerciseExportOptions): Record<string, an
   });
 }
 
-function cell(v: any, numeric: boolean): string {
-  return `<td${numeric ? ' class="n"' : ''}>${escapeHtml(v)}</td>`;
-}
-
 /**
  * The printable document, or null when there is nothing to print.
  *
  * Self-contained on purpose: off screen there is no summary box to explain
- * what the standard column means, so the sheet says it.
+ * what the standard column means, so the sheet says it. The page itself is
+ * `print-table.ts`, shared with the board export.
  */
 export function buildExercisePrintDocument(options: ExerciseExportOptions): string | null {
-  const sheet = exerciseSheet(options);
-  if (sheet.length === 0) return null;
-
-  const columns = Object.keys(sheet[0]);
-  const textual = new Set(['Player', 'Standard', 'Runs', 'W-D-L', 'Role', 'Score']);
-
-  const head = columns
-    .map(c => `<th${textual.has(c) ? '' : ' class="n"'}>${escapeHtml(c)}</th>`)
-    .join('');
-  const body = sheet
-    .map(r => `<tr>${columns.map(c => cell(r[c], !textual.has(c))).join('')}</tr>`)
-    .join('');
-
-  const when = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
-
   const standardNote = isThresholdMeasure(options.measure)
     ? `<p class="note">A match-readiness standard, not a ranking. A player meets it
        once his fastest run clears the bar; “runs” says how many of his runs did.
@@ -150,39 +130,11 @@ export function buildExercisePrintDocument(options: ExerciseExportOptions): stri
          Points total every session.</p>`
       : '';
 
-  const where = [options.organization, options.team].filter(Boolean).map(escapeHtml).join(' · ');
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>${escapeHtml(options.exercise)}</title>
-<style>
-  @page { margin: 16mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color: #201f1d; margin: 0; }
-  h1 { font-size: 22pt; margin: 0 0 2mm; font-weight: 500; }
-  .where { margin: 0; color: #605d5d; font-size: 10pt; }
-  .when { margin: 1mm 0 6mm; color: #605d5d; font-size: 9pt; }
-  .note { margin: 0 0 6mm; font-size: 9pt; color: #605d5d; line-height: 1.5; max-width: 60em; }
-  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-  th, td { padding: 2mm 3mm; border-bottom: 0.4pt solid #b8b5b5; text-align: left; }
-  th { font-size: 8pt; letter-spacing: 0.08em; text-transform: uppercase; color: #605d5d; }
-  .n { text-align: right; font-variant-numeric: tabular-nums; }
-  /* A long squad breaks across pages; the head repeats so the second page is
-     readable on its own. */
-  thead { display: table-header-group; }
-  tr { break-inside: avoid; }
-</style>
-</head>
-<body>
-<h1>${escapeHtml(options.exercise)}</h1>
-<p class="where">${where}</p>
-<p class="when">${escapeHtml(when)}</p>
-${standardNote}
-<table>
-<thead><tr>${head}</tr></thead>
-<tbody>${body}</tbody>
-</table>
-</body>
-</html>`;
+  return printTableDocument({
+    title: options.exercise,
+    where: [options.organization, options.team],
+    textual: new Set(['Player', 'Standard', 'Runs', 'W-D-L', 'Role', 'Score']),
+    rows: exerciseSheet(options),
+    note: standardNote
+  });
 }
