@@ -85,8 +85,10 @@ const STYLE = `
 /** The page around one or more tables. */
 function page(
   title: string, where: string[], note: string | undefined, body: string,
-  extraStyle = '', showTitle = true
+  extraStyle = '', showTitle = true, topLine?: string
 ): string {
+  // The day it was printed, which is what dates a report. A blank form says
+  // "Date: ____" instead: the sheet is filled in on the day, not printed on it.
   const when = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
@@ -103,7 +105,7 @@ function page(
 <body>
 ${showTitle ? `<h1>${escapeHtml(title)}</h1>` : ''}
 <p class="where">${who}</p>
-<p class="when">${escapeHtml(when)}</p>
+${topLine || `<p class="when">${escapeHtml(when)}</p>`}
 ${note || ''}
 ${body}
 </body>
@@ -139,6 +141,8 @@ export function printSectionsDocument(options: {
    * names its exercise and the page is wanted for rows.
    */
   showTitle?: boolean;
+  /** Replaces the printed-on date under the names -- a blank to fill in, say. */
+  topLine?: string;
 }): string | null {
   const sections = (options.sections || []).filter(s => (s.rows || []).length > 0);
   if (sections.length === 0) return null;
@@ -151,5 +155,5 @@ ${table(s.rows, s.textual || new Set<string>())}
 </section>`).join('\n');
 
   return page(options.title, options.where, options.note, body, options.style || '',
-              options.showTitle !== false);
+              options.showTitle !== false, options.topLine);
 }

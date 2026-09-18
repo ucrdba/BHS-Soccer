@@ -132,6 +132,15 @@ describe('the document', () => {
     expect(html).toContain('Beaumont High School');
   });
 
+  it('offers a blank to write the date on, rather than stamping the day it was printed', () => {
+    const html = buildPracticeFormsDocument(opts({ dates: ['2026-09-17'] }))!;
+    expect(html).toContain('Date:');
+    // Each sheet still carries the day it is FOR, which is what keeps a week
+    // of forms apart; only the printed-on date is gone.
+    expect(html).toContain('Thursday, September 17, 2026');
+    expect(html).not.toMatch(/class="when"/);
+  });
+
   it('spends no space on a title: the sheet says which exercise it is', () => {
     const html = buildPracticeFormsDocument(opts({}))!;
     expect(html).not.toMatch(/<h1>/);

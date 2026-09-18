@@ -181,6 +181,9 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
     // space is better spent on rows. The document is still titled, which is
     // what the print dialog and a saved PDF use.
     showTitle: false,
+    // Filled in on the day, not stamped with the day it was printed. Each
+    // sheet still carries the day it is FOR, under its own heading.
+    topLine: '<p class="fill">Date: <span class="fill__rule"></span></p>',
     pageBreaks: true,
     sections,
     style: `
@@ -188,6 +191,8 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
   .lines__row { display: flex; align-items: flex-end; gap: 3mm; margin: 0 0 3mm; }
   .lines__label { width: 14mm; flex: none; font-size: 9pt; letter-spacing: 0.08em; color: #605d5d; }
   .rule { flex: 1; border-bottom: 0.6pt solid #201f1d; height: 7mm; }
-  .lines__hint { margin: 0 0 4mm; font-size: 8.5pt; color: #605d5d; }`
+  .lines__hint { margin: 0 0 4mm; font-size: 8.5pt; color: #605d5d; }
+  .fill { display: flex; align-items: flex-end; gap: 2mm; margin: 1mm 0 6mm; font-size: 10pt; }
+  .fill__rule { width: 70mm; border-bottom: 0.6pt solid #201f1d; height: 5mm; }`
   });
 }
