@@ -314,10 +314,10 @@ describe('filling a small-sided sheet in one press', () => {
   const outcomes = (w: any) =>
     fields(w).map((f: any) => (f.element as HTMLSelectElement).value);
 
-  it('offers Won, Drew and Lost on a W/D/L exercise', async () => {
+  it('offers Won, Tie and Lost on a W/D/L exercise', async () => {
     const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
     expect(w.findAll('[data-fill-outcome]').map((b: any) => b.text()))
-      .toEqual(['Won', 'Drew', 'Lost']);
+      .toEqual(['Won', 'Tie', 'Lost']);
   });
 
   it('offers nothing of the sort on a counted exercise', async () => {
@@ -361,7 +361,7 @@ describe('filling a small-sided sheet in one press', () => {
   it('leaves the sheet ready to save', async () => {
     // The whole point: one press instead of twenty-five dropdowns.
     const w = await mountGrid({ drillId: SMALL, measure: 'win_loss' });
-    await w.findAll('[data-fill-outcome]')[1].trigger('click');   // Drew
+    await w.findAll('[data-fill-outcome]')[1].trigger('click');   // Tie
     await w.find('[data-session-save]').trigger('click');
     await flush();
 
@@ -378,12 +378,12 @@ describe('entering a small-sided sheet as lists of numbers', () => {
     fields(w).map((f: any) => (f.element as HTMLSelectElement).value);
   const small = () => mountGrid({ drillId: SMALL, measure: 'win_loss' });
 
-  it('offers Won, Drew and Lost boxes that explain themselves, on a W/D/L exercise only', async () => {
+  it('offers Won, Tie and Lost boxes that explain themselves, on a W/D/L exercise only', async () => {
     const w = await small();
     const boxes = w.findAll('[data-outcome-list]');
     expect(boxes.map((b: any) => b.attributes('data-outcome-list'))).toEqual(['win', 'draw', 'loss']);
     expect(boxes[0].attributes('placeholder')).toBe('Recording numbers that won, e.g. 17, 21, 11, 19');
-    expect(boxes[1].attributes('placeholder')).toBe('Recording numbers that drew, e.g. 1, 6, 7, 9');
+    expect(boxes[1].attributes('placeholder')).toBe('Recording numbers that tied, e.g. 1, 6, 7, 9');
     expect(boxes[2].attributes('placeholder')).toBe('Recording numbers that lost, e.g. 21, 22, 23');
     expect(w.find('[data-outcome-lists-hint]').text()).toMatch(/Optional/);
 

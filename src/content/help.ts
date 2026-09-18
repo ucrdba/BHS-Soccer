@@ -404,7 +404,7 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
             <li>Pick the exercise. Only drills with a non-1v1 measurement type appear here.</li>
             <li>Check the date.</li>
             <li>Type each player&rsquo;s number down the column &mdash; metres, level or shots
-                made. For a small-sided game, pick won, drew or lost instead &mdash; or type the recording numbers into the <b>Won</b>, <b>Drew</b> and <b>Lost</b> boxes above the list, such as <code>17, 21, 11, 19</code>, and press <b>Apply lists</b>. For <b>Goals by role</b>, check each player&rsquo;s role and type their score as <code>3-1</code>. For a
+                made. For a small-sided game, pick won, tie or lost instead &mdash; or type the recording numbers into the <b>Won</b>, <b>Tie</b> and <b>Lost</b> boxes above the list, such as <code>17, 21, 11, 19</code>, and press <b>Apply lists</b>. For <b>Goals by role</b>, check each player&rsquo;s role and type their score as <code>3-1</code>. For a
                 <b>timed</b> exercise type <code>mm:ss</code>, so <code>4:28</code> rather than
                 268.</li>
             <li>Mark anyone absent as <b>Excused</b> or <b>No-show</b>. Their number box is ignored either way.</li>

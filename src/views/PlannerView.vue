@@ -25,6 +25,7 @@ import { useOrganizationStore } from '../stores/organization';
 import { useRosterStore } from '../stores/roster';
 import { useAuthStore } from '../stores/auth';
 import { buildPrintDocument } from '../domain/plan-print';
+import PrintFormsModal from '../components/planner/PrintFormsModal.vue';
 import { diagramsForPlan } from '../diagram/raster';
 
 const planner = usePlannerStore();
@@ -96,6 +97,13 @@ async function onUseFromLibrary(drill: any): Promise<void> {
 }
 
 const items = computed(() => planner.items);
+
+/**
+ * Blank recording sheets for this plan's drills. A plan row carries the
+ * drill's NAME, so the modal matches those against the library.
+ */
+const formsOpen = ref(false);
+const planDrillNames = computed(() => planner.items.map((i: any) => i.name));
 
 watch(
   () => [org.activeTeamId, schoolId.value],
@@ -210,6 +218,9 @@ async function onDrop(index: number): Promise<void> {
         </button>
         <button type="button" class="act" data-print-plan @click="onPrint">
           Print
+        </button>
+        <button type="button" class="act" data-print-forms @click="formsOpen = true">
+          Print forms
         </button>
         <button type="button" class="act" data-open-round-robin @click="roundRobinOpen = true">
           1v1 round robin
@@ -333,6 +344,12 @@ async function onDrop(index: number): Promise<void> {
       v-if="isCoach"
       :open="roundRobinOpen" :team-id="org.activeTeamId" :players="roster.players"
       @close="roundRobinOpen = false" />
+
+    <PrintFormsModal
+      v-if="isCoach"
+      :open="formsOpen" :team-id="org.activeTeamId" :school-id="schoolId"
+      :preselect-names="planDrillNames"
+      @close="formsOpen = false" />
 
     <DiagramModal
       v-if="isCoach"

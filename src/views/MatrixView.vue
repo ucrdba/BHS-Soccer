@@ -20,6 +20,7 @@ import SessionHistory from '../components/matrix/SessionHistory.vue';
 import WeightsModal from '../components/matrix/WeightsModal.vue';
 import RecordResultModal from '../components/matrix/RecordResultModal.vue';
 import SquadReportModal from '../components/matrix/SquadReportModal.vue';
+import PrintFormsModal from '../components/planner/PrintFormsModal.vue';
 import ProgressModal from '../components/matrix/ProgressModal.vue';
 import { useMatrixStore } from '../stores/matrix';
 import { useSessionStore } from '../stores/session';
@@ -66,6 +67,7 @@ const notice = ref<string | null>(null);
 const weightsOpen = ref(false);
 const resultOpen = ref(false);
 const squadOpen = ref(false);
+const formsOpen = ref(false);
 const progressOpen = ref(false);
 /**
  * Every live exercise, which is one list rather than two.
@@ -232,6 +234,7 @@ watch(
       <p v-else class="act act--dead" data-record-session>Add an exercise in the planner first</p>
       <button type="button" class="act" data-open-weights @click="weightsOpen = true">Weights &amp; standards</button>
       <button type="button" class="act" data-open-squad @click="squadOpen = true">Squad report</button>
+        <button type="button" class="act" data-open-forms @click="formsOpen = true">Print forms</button>
       <button type="button" class="act" data-open-progress @click="progressOpen = true">Progress</button>
     </div>
 
@@ -291,6 +294,11 @@ watch(
     <SquadReportModal
       v-if="isCoach"
       :open="squadOpen" :team-id="org.activeTeamId" @close="squadOpen = false" />
+
+    <PrintFormsModal
+      v-if="isCoach"
+      :open="formsOpen" :team-id="org.activeTeamId" :school-id="schoolId"
+      @close="formsOpen = false" />
 
     <ProgressModal
       v-if="isCoach"

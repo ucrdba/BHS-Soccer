@@ -79,7 +79,7 @@ const isRoleGoals = computed(() => measure.value === 'role_goals');
 /** The squad-wide results, in the same order as each row's dropdown. */
 const FILL_OPTIONS = [
   { value: 'win', label: 'Won' },
-  { value: 'draw', label: 'Drew' },
+  { value: 'draw', label: 'Tie' },
   { value: 'loss', label: 'Lost' }
 ];
 
@@ -169,10 +169,10 @@ function goalFeedback(playerId: string) {
   return roleGoalFeedback(row?.value || '', row?.role, session.goalBands as any, drill.value?.points);
 }
 
-/** The Won / Drew / Lost boxes, typed as the paper sheet reads. */
+/** The Won / Tie / Lost boxes, typed as the paper sheet reads. */
 const OUTCOME_LISTS: { key: keyof OutcomeLists; label: string; placeholder: string }[] = [
   { key: 'win', label: 'Won', placeholder: 'Recording numbers that won, e.g. 17, 21, 11, 19' },
-  { key: 'draw', label: 'Drew', placeholder: 'Recording numbers that drew, e.g. 1, 6, 7, 9' },
+  { key: 'draw', label: 'Tie', placeholder: 'Recording numbers that tied, e.g. 1, 6, 7, 9' },
   { key: 'loss', label: 'Lost', placeholder: 'Recording numbers that lost, e.g. 21, 22, 23' }
 ];
 const outcomeLists = ref<OutcomeLists>({ win: '', draw: '', loss: '' });
@@ -429,7 +429,7 @@ async function onSave(): Promise<void> {
               >
                 <option value="">— result —</option>
                 <option value="win">Won</option>
-                <option value="draw">Drew</option>
+                <option value="draw">Tie</option>
                 <option value="loss">Lost</option>
               </select>
 

@@ -33,6 +33,11 @@ export interface PrintSection {
   heading: string;
   /** An optional line under the heading: the standard, and who is short of it. */
   note?: string;
+  /**
+   * Optional HTML between the note and the table -- ruled lines for a
+   * hand-written result, say. The caller controls it, as with `note`.
+   */
+  preamble?: string;
   textual: Set<string>;
   rows: Record<string, any>[];
 }
@@ -66,6 +71,8 @@ const STYLE = `
   .note { margin: 0 0 6mm; font-size: 9pt; color: #605d5d; line-height: 1.5; max-width: 60em; }
   .secnote { margin: 0 0 2mm; font-size: 9pt; color: #605d5d; }
   .sec { margin-bottom: 8mm; }
+  /* One sheet per section, for forms a coach carries page by page. */
+  .sec--page { break-before: page; page-break-before: always; }
   table { width: 100%; border-collapse: collapse; font-size: 10pt; }
   th, td { padding: 2mm 3mm; border-bottom: 0.4pt solid #b8b5b5; text-align: left; }
   th { font-size: 8pt; letter-spacing: 0.08em; text-transform: uppercase; color: #605d5d; }
@@ -76,7 +83,9 @@ const STYLE = `
   tr { break-inside: avoid; }`;
 
 /** The page around one or more tables. */
-function page(title: string, where: string[], note: string | undefined, body: string): string {
+function page(
+  title: string, where: string[], note: string | undefined, body: string, extraStyle = ''
+): string {
   const when = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
@@ -87,7 +96,7 @@ function page(title: string, where: string[], note: string | undefined, body: st
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(title)}</title>
-<style>${STYLE}
+<style>${STYLE}${extraStyle}
 </style>
 </head>
 <body>
@@ -116,16 +125,24 @@ export function printTableDocument(options: PrintTableOptions): string | null {
  * empty table.
  */
 export function printSectionsDocument(options: {
-  title: string; where: string[]; note?: string; sections: PrintSection[];
+  title: string;
+  where: string[];
+  note?: string;
+  sections: PrintSection[];
+  /** Start each section after the first on a fresh page. */
+  pageBreaks?: boolean;
+  /** Extra CSS a caller's preamble needs. */
+  style?: string;
 }): string | null {
   const sections = (options.sections || []).filter(s => (s.rows || []).length > 0);
   if (sections.length === 0) return null;
 
-  const body = sections.map(s => `<section class="sec">
+  const body = sections.map((s, i) => `<section class="sec${options.pageBreaks && i > 0 ? ' sec--page' : ''}">
 <h2>${escapeHtml(s.heading)}</h2>
 ${s.note ? `<p class="secnote">${escapeHtml(s.note)}</p>` : ''}
+${s.preamble || ''}
 ${table(s.rows, s.textual || new Set<string>())}
 </section>`).join('\n');
 
-  return page(options.title, options.where, options.note, body);
+  return page(options.title, options.where, options.note, body, options.style || '');
 }

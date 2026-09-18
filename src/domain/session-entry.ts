@@ -290,7 +290,9 @@ export interface OutcomeLists {
   loss: string;
 }
 
-const LIST_NAMES: Record<keyof OutcomeLists, string> = { win: 'Won', draw: 'Drew', loss: 'Lost' };
+// What the boxes are called on screen and on the printed form. The stored
+// value stays 'draw'; only the word a coach reads is 'Tie'.
+const LIST_NAMES: Record<keyof OutcomeLists, string> = { win: 'Won', draw: 'Tie', loss: 'Lost' };
 
 /**
  * Set a small-sided sheet from three lists of recording numbers.
