@@ -22,7 +22,13 @@ import { useMatrixStore } from '../../stores/matrix';
 import { progressSeries, progressTrend, progressLowerIsBetter } from '../../domain/progress';
 import { formatTimeFor } from '../../domain/time';
 
-const props = defineProps<{ open: boolean; teamId: string | null }>();
+const props = defineProps<{
+  open: boolean;
+  teamId: string | null;
+  /** Open on this player and exercise -- from a graph in the squad report. */
+  initialPlayerId?: string | null;
+  initialDrillId?: string | null;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const matrix = useMatrixStore();
@@ -77,6 +83,8 @@ const polyline = computed(() => {
 watch(() => [props.open, props.teamId] as const, async () => {
   if (!props.open) return;
   loadError.value = null;
+  if (props.initialPlayerId) playerId.value = props.initialPlayerId;
+  if (props.initialDrillId) drillId.value = props.initialDrillId;
 
   if (!props.teamId) { loadError.value = 'Choose a team first.'; return; }
 

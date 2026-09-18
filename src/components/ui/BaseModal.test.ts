@@ -6,9 +6,13 @@
  * used one-handed on a touchline. Thirty-six of these exist in the legacy app,
  * each with its own close handling; this is the one that replaces them.
  */
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mount, enableAutoUnmount } from '@vue/test-utils';
 import BaseModal from './BaseModal.vue';
+
+// The page lock counts open dialogs, so one left mounted by a test would hold
+// the page locked for the next.
+enableAutoUnmount(afterEach);
 
 const mountModal = (props: Record<string, any> = {}, slots: Record<string, any> = {}) =>
   mount(BaseModal, {
@@ -95,5 +99,30 @@ describe('BaseModal', () => {
     await w.find('[data-modal]').trigger('keydown', { key: 'Tab' });
     // Wrapped rather than escaping to the page behind.
     expect(w.find('[data-modal-panel]').element.contains(document.activeElement)).toBe(true);
+  });
+});
+
+describe('one dialog over another', () => {
+  // The squad report opens the progress chart on top of itself. Closing the
+  // chart must not unlock the page while the report is still up behind it.
+  it('keeps the page locked until the last one closes', async () => {
+    const under = mountModal({ title: 'Squad report' });
+    const over = mountModal({ title: 'Progress' });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await over.setProps({ open: false });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await under.setProps({ open: false });
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('counts one unmounted while open as closed', async () => {
+    const under = mountModal({ title: 'Squad report' });
+    const over = mountModal({ title: 'Progress' });
+    over.unmount();
+    expect(document.body.style.overflow).toBe('hidden');
+    await under.setProps({ open: false });
+    expect(document.body.style.overflow).not.toBe('hidden');
   });
 });

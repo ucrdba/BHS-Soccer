@@ -1,3 +1,13 @@
+<script lang="ts">
+/**
+ * How many dialogs are open right now, across every instance. One can open
+ * over another -- the squad report opens the progress chart on top of itself
+ * -- and closing the top one must not unlock the page while the one beneath
+ * is still up.
+ */
+let openDialogs = 0;
+</script>
+
 <script setup lang="ts">
 /**
  * The dialog every screen reuses.
@@ -33,9 +43,14 @@ function focusable(): HTMLElement[] {
     .filter(el => el.offsetParent !== null || el === document.activeElement);
 }
 
+/** Whether this dialog holds one of the locks, so it releases exactly one. */
+let holding = false;
+
 function lockScroll(on: boolean): void {
-  if (typeof document === 'undefined') return;
-  document.body.style.overflow = on ? 'hidden' : '';
+  if (typeof document === 'undefined' || on === holding) return;
+  holding = on;
+  openDialogs += on ? 1 : -1;
+  document.body.style.overflow = openDialogs > 0 ? 'hidden' : '';
 }
 
 watch(() => props.open, async (open) => {

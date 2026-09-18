@@ -55,11 +55,11 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
 };
 
-async function mountProgress(history: any = HISTORY) {
+async function mountProgress(history: any = HISTORY, extra: Record<string, any> = {}) {
   fetchTeamSessionHistory.mockResolvedValue(history);
 
   const w = mount(ProgressModal, {
-    props: { open: true, teamId: TEAM },
+    props: { open: true, teamId: TEAM, ...extra },
     global: {
       plugins: [createTestingPinia({
         createSpy: vi.fn, stubActions: true,
@@ -250,5 +250,33 @@ describe('a sprint', () => {
     await w.find('[data-progress-drill]').setValue(SPRINT);
     await w.vm.$nextTick();
     expect(w.find('[data-progress-trend]').text()).toContain('5.40s to 5.05s');
+  });
+});
+
+describe('opened on a given player and exercise', () => {
+  // From a graph in the squad report: the chart opens on that row, not on
+  // whoever happens to be first in the pickers.
+  const picked = (w: any) => [
+    (w.find('[data-progress-player]').element as HTMLSelectElement).value,
+    (w.find('[data-progress-drill]').element as HTMLSelectElement).value
+  ];
+
+  it('selects them', async () => {
+    const w = await mountProgress(HISTORY, { initialPlayerId: 'p2', initialDrillId: COOPERS });
+    expect(picked(w)).toEqual(['p2', COOPERS]);
+  });
+
+  it('selects the new pair when opened again from another graph', async () => {
+    const w = await mountProgress(HISTORY, { initialPlayerId: 'p2', initialDrillId: COOPERS });
+    await w.setProps({ open: false });
+    // Neither half is a picker's default, so this cannot pass by falling back.
+    await w.setProps({ open: true, initialPlayerId: 'p2', initialDrillId: SPRINT });
+    await flush();
+    expect(picked(w)).toEqual(['p2', SPRINT]);
+  });
+
+  it('keeps its own defaults when opened without one', async () => {
+    const w = await mountProgress();
+    expect(picked(w)).toEqual(['p1', LAPS]);
   });
 });

@@ -44,7 +44,11 @@ import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
 import { matrixBoardRows, boardSortDescends } from '../../domain/matrix';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{
+  close: [];
+  /** A graph was chosen: the progress chart for that player on that exercise. */
+  openProgress: [{ playerId: string; drillId: string }];
+}>();
 
 const matrix = useMatrixStore();
 const org = useOrganizationStore();
@@ -372,21 +376,28 @@ watch(() => [props.open, props.teamId] as const, async () => {
               <td class="tabular" data-squad-best>{{ row.outcomes ? e.record : shown(row, e.best) }}</td>
               <td v-if="row.timed" class="tabular" data-squad-avg>{{ shown(row, e.avg) }}</td>
               <td v-if="row.timed" class="is-text spark-cell" data-squad-progress>
-                <svg
-                  v-if="spark(row, e)" class="spark" role="img"
-                  :viewBox="`0 0 ${spark(row, e)!.width} ${spark(row, e)!.height}`"
-                  :width="spark(row, e)!.width" :height="spark(row, e)!.height"
-                  :aria-label="sparkText(row, e)" data-squad-spark
+                <button
+                  v-if="spark(row, e)" type="button" class="spark-btn"
+                  :aria-label="`Progress for ${e.player.name} on ${row.drill.name}: ${sparkText(row, e)}`"
+                  data-squad-spark-open
+                  @click="emit('openProgress', { playerId: e.player.id, drillId: row.drill.id })"
                 >
-                  <title>{{ sparkText(row, e) }}</title>
-                  <line
-                    v-if="spark(row, e)!.standardY !== null" class="spark__std"
-                    x1="0" :y1="spark(row, e)!.standardY!" :x2="spark(row, e)!.width" :y2="spark(row, e)!.standardY!"
-                    data-squad-spark-standard
-                  />
-                  <polyline v-if="spark(row, e)!.line" class="spark__line" :points="spark(row, e)!.line" />
-                  <circle class="spark__dot" :cx="spark(row, e)!.last.x" :cy="spark(row, e)!.last.y" r="1.8" />
-                </svg>
+                  <svg
+                    class="spark" role="img"
+                    :viewBox="`0 0 ${spark(row, e)!.width} ${spark(row, e)!.height}`"
+                    :width="spark(row, e)!.width" :height="spark(row, e)!.height"
+                    :aria-label="sparkText(row, e)" data-squad-spark
+                  >
+                    <title>{{ sparkText(row, e) }}</title>
+                    <line
+                      v-if="spark(row, e)!.standardY !== null" class="spark__std"
+                      x1="0" :y1="spark(row, e)!.standardY!" :x2="spark(row, e)!.width" :y2="spark(row, e)!.standardY!"
+                      data-squad-spark-standard
+                    />
+                    <polyline v-if="spark(row, e)!.line" class="spark__line" :points="spark(row, e)!.line" />
+                    <circle class="spark__dot" :cx="spark(row, e)!.last.x" :cy="spark(row, e)!.last.y" r="1.8" />
+                  </svg>
+                </button>
                 <template v-else>—</template>
               </td>
             </tr>
@@ -482,6 +493,19 @@ watch(() => [props.open, props.teamId] as const, async () => {
   stroke-linejoin: round; stroke-linecap: round;
 }
 .spark__dot { fill: var(--mark); }
+
+/* The graph opens the progress chart; it should look like the graph, and say
+   it can be pressed only on hover and focus. */
+.spark-btn {
+  display: block;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.spark-btn:hover { border-color: var(--rule); }
+.spark-btn:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
 
 /* A row that fell short of the standard -- below-standard, not decorative. */
 .tbl tr.is-short td { color: var(--color-warning); }

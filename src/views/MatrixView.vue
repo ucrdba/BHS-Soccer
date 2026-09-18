@@ -69,6 +69,20 @@ const resultOpen = ref(false);
 const squadOpen = ref(false);
 const formsOpen = ref(false);
 const progressOpen = ref(false);
+/** Set when the chart is opened from a squad report graph, so it opens on that row. */
+const progressFor = ref<{ playerId: string | null; drillId: string | null }>({ playerId: null, drillId: null });
+
+/** The chart on its own button: whatever it had chosen. */
+function openProgress(): void {
+  progressFor.value = { playerId: null, drillId: null };
+  progressOpen.value = true;
+}
+
+/** The chart from a graph, over the squad report, which stays open beneath it. */
+function openProgressFor(pick: { playerId: string; drillId: string }): void {
+  progressFor.value = pick;
+  progressOpen.value = true;
+}
 /**
  * Every live exercise, which is one list rather than two.
  *
@@ -235,7 +249,7 @@ watch(
       <button type="button" class="act" data-open-weights @click="weightsOpen = true">Weights &amp; standards</button>
       <button type="button" class="act" data-open-squad @click="squadOpen = true">Squad report</button>
         <button type="button" class="act" data-open-forms @click="formsOpen = true">Print forms</button>
-      <button type="button" class="act" data-open-progress @click="progressOpen = true">Progress</button>
+      <button type="button" class="act" data-open-progress @click="openProgress">Progress</button>
     </div>
 
     <p v-if="!settled" class="empty">Loading the ratings…</p>
@@ -293,7 +307,8 @@ watch(
 
     <SquadReportModal
       v-if="isCoach"
-      :open="squadOpen" :team-id="org.activeTeamId" @close="squadOpen = false" />
+      :open="squadOpen" :team-id="org.activeTeamId" @close="squadOpen = false"
+      @open-progress="openProgressFor" />
 
     <PrintFormsModal
       v-if="isCoach"
@@ -302,7 +317,9 @@ watch(
 
     <ProgressModal
       v-if="isCoach"
-      :open="progressOpen" :team-id="org.activeTeamId" @close="progressOpen = false" />
+      :open="progressOpen" :team-id="org.activeTeamId"
+      :initial-player-id="progressFor.playerId" :initial-drill-id="progressFor.drillId"
+      @close="progressOpen = false" />
   </section>
 </template>
 

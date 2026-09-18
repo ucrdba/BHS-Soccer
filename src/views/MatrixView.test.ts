@@ -11,6 +11,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import MatrixView from './MatrixView.vue';
+import ProgressModal from '../components/matrix/ProgressModal.vue';
 import ExerciseLeaderboard from '../components/matrix/ExerciseLeaderboard.vue';
 import { useMatrixStore } from '../stores/matrix';
 
@@ -745,5 +746,35 @@ describe('the panels', () => {
 
     await w.findAll('[data-panel-tab]')[1].trigger('click');
     expect(w.find('[data-panel]').attributes('data-panel')).toBe('exercise');
+  });
+});
+
+describe('the squad report and the progress chart together', () => {
+  // A stand-in report whose graph asks for Budde's progress on one exercise.
+  const report = {
+    name: 'SquadReportModal', props: ['open', 'teamId'], emits: ['openProgress', 'close'],
+    template: `<button data-stub-graph @click="$emit('openProgress', { playerId: 'p2', drillId: 'd-coopers' })" />`
+  };
+
+  it('opens the chart on that player and exercise, over the report', async () => {
+    const w = await mountMatrix({ coach: true, stubs: { SquadReportModal: report } });
+    await w.find('[data-open-squad]').trigger('click');
+    await w.find('[data-stub-graph]').trigger('click');
+    await flush();
+
+    const chart = w.findComponent(ProgressModal);
+    expect(chart.props()).toMatchObject({ open: true, initialPlayerId: 'p2', initialDrillId: 'd-coopers' });
+    expect(w.findComponent({ name: 'SquadReportModal' }).props('open')).toBe(true);
+  });
+
+  it('opens the chart from its own button with no player chosen for it', async () => {
+    const w = await mountMatrix({ coach: true, stubs: { SquadReportModal: report } });
+    await w.find('[data-open-squad]').trigger('click');
+    await w.find('[data-stub-graph]').trigger('click');
+    await w.findComponent(ProgressModal).vm.$emit('close');
+    await w.find('[data-open-progress]').trigger('click');
+    await flush();
+
+    expect(w.findComponent(ProgressModal).props()).toMatchObject({ open: true, initialPlayerId: null, initialDrillId: null });
   });
 });

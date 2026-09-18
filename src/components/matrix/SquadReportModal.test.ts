@@ -592,3 +592,26 @@ describe('the overall ratings', () => {
     expect(overall(w).exists()).toBe(false);
   });
 });
+
+describe('a graph opens the progress chart', () => {
+  const rowFor = (w: any, name: string) =>
+    sectionFor(w, '3 Laps').findAll('[data-squad-row]').find((r: any) => r.text().includes(name))!;
+
+  it('asks for that player on that exercise', async () => {
+    const w = await mountReport();
+    await rowFor(w, 'Tom Budde').find('[data-squad-spark-open]').trigger('click');
+    expect(w.emitted('openProgress')).toEqual([[{ playerId: 'p2', drillId: LAPS }]]);
+  });
+
+  it('is a button that says where it goes', async () => {
+    const w = await mountReport();
+    const btn = rowFor(w, 'Cesar Alva').find('[data-squad-spark-open]');
+    expect(btn.element.tagName).toBe('BUTTON');
+    expect(btn.attributes('aria-label')).toBe('Progress for Cesar Alva on 3 Laps: Slipping — 4:10 to 4:20 across 2 readings');
+  });
+
+  it('offers nothing to open for a player with no readings', async () => {
+    const w = await mountReport();
+    expect(rowFor(w, 'Alain Renteria').find('[data-squad-spark-open]').exists()).toBe(false);
+  });
+});
