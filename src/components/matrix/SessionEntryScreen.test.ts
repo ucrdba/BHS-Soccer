@@ -774,3 +774,32 @@ describe('the attendance column', () => {
   });
 });
 
+
+describe('remembering the sort', () => {
+  it('opens the next sheet in the order last chosen', async () => {
+    const first = await mountGrid();
+    await first.find('[data-grid-sort="name"]').trigger('click');
+    first.unmount();
+
+    const again = await mountGrid();
+    expect(names(again)[0]).toContain('Alain');
+    expect(again.find('[data-grid-sort-toggle]').text()).toContain('name');
+  });
+
+  it('still moves on Enter in the remembered order shown', async () => {
+    // The paper-beats-screen rule holds through a remembered sort: Enter
+    // follows the rows as displayed, not the roster.
+    const first = await mountGrid();
+    await first.find('[data-grid-sort="name"]').trigger('click');
+    first.unmount();
+
+    const w = await mountGrid();
+    // Remembered, so the grid opens by name without another click.
+    expect(names(w)[0]).toContain('Alain');
+    const f = fields(w);
+    (f[0].element as HTMLInputElement).focus();
+    await f[0].trigger('keydown', { key: 'Enter' });
+    expect(document.activeElement)
+      .toBe(w.findAll('[data-grid-row]')[1].find('[data-entry-field]').element);
+  });
+});

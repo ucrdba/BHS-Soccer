@@ -307,6 +307,19 @@ describe('the running figures', () => {
     expect(names()).toEqual(forward.slice().reverse());
   });
 
+  it('reopen in the order last chosen', async () => {
+    const first = await mountBoard();
+    const names = (w: any) => w.findAll('[data-pm-cell="name"]').map((c: any) => c.text());
+    // Name reversed: unlike name forward, it cannot match the opening order.
+    await first.find('[data-pm-sort="name"]').trigger('click');
+    await first.find('[data-pm-sort="name"]').trigger('click');
+    const byName = names(first);
+    first.unmount();
+
+    const again = await mountBoard();
+    expect(names(again)).toEqual(byName);
+  });
+
   it('correct themselves after an undo', async () => {
     // Every figure is replayed from the log rather than counted, which is
     // what makes an undo fix everything downstream of it.

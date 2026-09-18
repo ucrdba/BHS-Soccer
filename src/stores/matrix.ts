@@ -20,8 +20,10 @@ import { joinStandings } from '../domain/matrix-standings';
 import {
   matrixBoardRows, exerciseLeaderboard, exercisesWithResults,
   boardSortDescends, exerciseSortDescends, nextSortState,
+  BOARD_SORT_KEYS, exerciseSortKind, exerciseSortKeys,
   type SortState
 } from '../domain/matrix';
+import { readSort, writeSort } from '../data/sort-memory';
 import { isThresholdMeasure, belowStandard, roleGoalShortfall } from '../domain/matrix-threshold';
 
 export interface WriteResult { ok: boolean; error?: string }
@@ -35,7 +37,8 @@ export const useMatrixStore = defineStore('matrix', () => {
   const loadError = ref<string | null>(null);
   const loadedTeamId = ref<string | null>(null);
 
-  const boardSort = ref<SortState>({ by: 'rank', reversed: false });
+  // Both sorts open as the coach last left them on this device.
+  const boardSort = ref<SortState>(readSort('board', BOARD_SORT_KEYS, { by: 'rank', reversed: false }));
   const exerciseSort = ref<SortState>({ by: 'earned', reversed: false });
   const exerciseFilter = ref('');
 
@@ -126,17 +129,23 @@ export const useMatrixStore = defineStore('matrix', () => {
   // The decision moves to the domain module; the assignment stays here.
   function setBoardSort(by: string): void {
     boardSort.value = nextSortState(boardSort.value, by);
+    writeSort('board', boardSort.value);
   }
+
+  /** Remembered per kind of leaderboard, since their columns differ. */
+  const exerciseSortName = () => `exercise.${exerciseSortKind(measure.value)}`;
 
   function setExerciseSort(by: string): void {
     exerciseSort.value = nextSortState(exerciseSort.value, by);
+    writeSort(exerciseSortName(), exerciseSort.value);
   }
 
   function setExerciseFilter(id: string): void {
     exerciseFilter.value = id || '';
-    // A new exercise starts from its own natural order rather than inheriting
-    // the last one's, which may have been a column this measure does not have.
-    exerciseSort.value = { by: 'earned', reversed: false };
+    // A new exercise opens on the sort last used for its kind, never on the
+    // last exercise's, which may be a column this measure does not have.
+    exerciseSort.value = readSort(exerciseSortName(), exerciseSortKeys(measure.value),
+      { by: 'earned', reversed: false });
   }
 
   /** Which way a column reads on its first click, for the header arrow. */

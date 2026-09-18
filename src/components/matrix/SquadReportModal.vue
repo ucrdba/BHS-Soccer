@@ -41,7 +41,8 @@ import { formatTimeFor } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
 import { progressSeries } from '../../domain/progress';
 import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
-import { matrixBoardRows, boardSortDescends } from '../../domain/matrix';
+import { matrixBoardRows, boardSortDescends, BOARD_SORT_KEYS } from '../../domain/matrix';
+import { readSort, writeSort } from '../../data/sort-memory';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{
@@ -126,20 +127,24 @@ const rows = computed(() => drills.value.map((d: any) => {
 
 /**
  * How each exercise is sorted, kept per drill: reading the Cooper's by best
- * figure must not reorder the small-sided section above it.
+ * figure must not reorder the small-sided section above it. Each is also
+ * remembered on the device, so the report reopens as the coach left it.
  */
 const sorts = ref<Record<string, { by: string; reversed: boolean }>>({});
 
+const SECTION_SORT_KEYS = ['name', 'attempts', 'best', 'avg', 'record'];
+const sectionSortName = (drillId: string) => `squad.exercise.${drillId}`;
+
 function sortOf(drillId: string) {
-  return sorts.value[drillId] || { by: '', reversed: false };
+  return sorts.value[drillId]
+    || readSort(sectionSortName(drillId), SECTION_SORT_KEYS, { by: '', reversed: false });
 }
 
 function setSort(drillId: string, by: string): void {
   const now = sortOf(drillId);
-  sorts.value = {
-    ...sorts.value,
-    [drillId]: now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false }
-  };
+  const next = now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false };
+  sorts.value = { ...sorts.value, [drillId]: next };
+  writeSort(sectionSortName(drillId), next);
 }
 
 function arrow(drillId: string, by: string): string {
@@ -170,7 +175,7 @@ const OVERALL_COLUMNS = [
   { key: 'share', label: 'Share' }
 ];
 
-const overallSort = ref({ by: 'rank', reversed: false });
+const overallSort = ref(readSort('squad.overall', BOARD_SORT_KEYS, { by: 'rank', reversed: false }));
 
 const overallRows = computed(() =>
   matrixBoardRows(players.value, overallSort.value.by, overallSort.value.reversed));
@@ -178,6 +183,7 @@ const overallRows = computed(() =>
 function setOverallSort(by: string): void {
   const now = overallSort.value;
   overallSort.value = now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false };
+  writeSort('squad.overall', overallSort.value);
 }
 
 function overallArrow(by: string): string {

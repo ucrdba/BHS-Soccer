@@ -307,3 +307,30 @@ export function nextSortState(current: SortState, by: string): SortState {
   if (current.by === by) return { by, reversed: !current.reversed };
   return { by, reversed: false };
 }
+
+/**
+ * The columns each table sorts on, so a remembered sort can be checked
+ * against what the table offers now (`data/sort-memory.ts`). MatrixBoard and
+ * ExerciseLeaderboard render these keys; their tests pin the same lists.
+ */
+export const BOARD_SORT_KEYS = [
+  'rank', 'name', 'recordingNumber', 'exercises', 'wdl', 'earned', 'available', 'share'
+] as const;
+
+/**
+ * Leaderboards that share their columns share a remembered sort: every timed
+ * or counted exercise shows best and average, every W/D/L one a record.
+ */
+export function exerciseSortKind(measure: string): 'win_loss' | 'role_goals' | 'measured' {
+  if (measure === 'win_loss' || measure === 'head_to_head') return 'win_loss';
+  if (measure === 'role_goals') return 'role_goals';
+  return 'measured';
+}
+
+export function exerciseSortKeys(measure: string): string[] {
+  const kind = exerciseSortKind(measure);
+  const middle = kind === 'win_loss' ? ['wins']
+    : kind === 'role_goals' ? ['role', 'score', 'diff', 'base', 'bonus']
+    : ['best', 'avg'];
+  return ['number', 'name', ...middle, 'earned'];
+}

@@ -212,3 +212,15 @@ describe('removing a player', () => {
     expect((await s.removePlayer('p1', 't1')).error).toBe('not permitted');
   });
 });
+
+describe('remembering the sort', () => {
+  it('opens on the sort last chosen', () => {
+    useRosterStore().setSort('name');
+    setActivePinia(createPinia());
+    expect(useRosterStore().sortBy).toBe('name');
+  });
+
+  it('opens on number when nothing has been chosen', () => {
+    expect(useRosterStore().sortBy).toBe('number');
+  });
+});

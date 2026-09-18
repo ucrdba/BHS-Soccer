@@ -186,6 +186,15 @@ describe('sorting', () => {
     expect(players(w)[0]).toBe('Alain Renteria');
   });
 
+  it('reopens in the order last chosen', async () => {
+    const first = await mountSeason();
+    await first.find('[data-season-sort="mins"]').trigger('click');
+    first.unmount();
+
+    const again = await mountSeason();
+    expect(players(again)[0]).toBe('Alain Renteria');
+  });
+
   it('keeps a player with no rate LAST, not top', async () => {
     // No rate is not the best rate. A player who has never been on would
     // otherwise sort to the head of a descending column.

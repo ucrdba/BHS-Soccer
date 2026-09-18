@@ -11,7 +11,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   exerciseLeaderboard, exercisesWithResults, matrixBoardRows,
-  boardSortDescends, exerciseSortDescends, nextSortState
+  boardSortDescends, exerciseSortDescends, nextSortState,
+  BOARD_SORT_KEYS, exerciseSortKind, exerciseSortKeys
 } from './matrix';
 // Read across the seam on purpose: the bug lived between what the leaderboard
 // totals and what the standard reads, so one of these tests spans both.
@@ -390,5 +391,26 @@ describe('sorting the board on every column', () => {
     expect(boardSortDescends('exercises')).toBe(true);
     expect(boardSortDescends('wdl')).toBe(true);
     expect(boardSortDescends('available')).toBe(true);
+  });
+});
+
+describe('the columns each table sorts on', () => {
+  it('lists the board\'s eight', () => {
+    expect(BOARD_SORT_KEYS).toEqual(['rank', 'name', 'recordingNumber', 'exercises', 'wdl', 'earned', 'available', 'share']);
+  });
+
+  it('groups a leaderboard by the columns its measure shows', () => {
+    expect(exerciseSortKind('time_low')).toBe('measured');
+    expect(exerciseSortKind('time_bands')).toBe('measured');
+    expect(exerciseSortKind('count_high')).toBe('measured');
+    expect(exerciseSortKind('win_loss')).toBe('win_loss');
+    expect(exerciseSortKind('head_to_head')).toBe('win_loss');
+    expect(exerciseSortKind('role_goals')).toBe('role_goals');
+  });
+
+  it('lists a leaderboard\'s columns for each kind', () => {
+    expect(exerciseSortKeys('time_bands')).toEqual(['number', 'name', 'best', 'avg', 'earned']);
+    expect(exerciseSortKeys('win_loss')).toEqual(['number', 'name', 'wins', 'earned']);
+    expect(exerciseSortKeys('role_goals')).toEqual(['number', 'name', 'role', 'score', 'diff', 'base', 'bonus', 'earned']);
   });
 });

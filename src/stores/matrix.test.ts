@@ -256,3 +256,50 @@ describe('correcting a result', () => {
     expect((await s.removeResult('log1', 't1', 's1')).error).toBe('not permitted');
   });
 });
+
+describe('remembering the sorts', () => {
+  // A new store stands in for coming back to the screen later: the sort is
+  // read from the device, not held in memory.
+  const again = async () => {
+    setActivePinia(createPinia());
+    const s = useMatrixStore();
+    await s.load('t1', 's1');
+    return s;
+  };
+
+  it('opens the board on the sort last chosen', async () => {
+    const s = useMatrixStore();
+    await s.load('t1', 's1');
+    s.setBoardSort('name');
+    s.setBoardSort('name');
+
+    expect((await again()).boardSort).toEqual({ by: 'name', reversed: true });
+  });
+
+  it('remembers a leaderboard sort for that kind of exercise', async () => {
+    const s = useMatrixStore();
+    await s.load('t1', 's1');
+    s.setExerciseFilter(LAPS);
+    s.setExerciseSort('best');
+
+    const later = await again();
+    later.setExerciseFilter(LAPS);
+    expect(later.exerciseSort).toEqual({ by: 'best', reversed: false });
+  });
+
+  it('keeps a timed sort off a W/D/L exercise, and gives it back on return', async () => {
+    const s = useMatrixStore();
+    await s.load('t1', 's1');
+    s.setExerciseFilter(LAPS);
+    s.setExerciseSort('best');
+
+    s.setExerciseFilter(SMALL);
+    expect(s.exerciseSort).toEqual({ by: 'earned', reversed: false });
+    s.setExerciseSort('wins');
+
+    s.setExerciseFilter(LAPS);
+    expect(s.exerciseSort).toEqual({ by: 'best', reversed: false });
+    s.setExerciseFilter(SMALL);
+    expect(s.exerciseSort).toEqual({ by: 'wins', reversed: false });
+  });
+});

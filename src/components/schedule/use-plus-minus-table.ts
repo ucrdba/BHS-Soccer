@@ -14,6 +14,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue';
 import { pmColumns, pmSortedRows, type PmColumn } from '../../domain/plus-minus-court';
 import { toMinutes } from '../../data/season-stats';
+import { readSort, writeSort } from '../../data/sort-memory';
 
 export interface SheetRow {
   player: any;
@@ -29,9 +30,10 @@ export function usePlusMinusTable(
 ) {
   const columns: PmColumn[] = pmColumns();
   // Minutes first: on a live board it is what a coach checks against the
-  // rotation they are planning.
-  const sortKey = ref('mins');
-  const reversed = ref(false);
+  // rotation they are planning. After that, as the coach last left it.
+  const saved = readSort('plus-minus', columns.map(c => c.key), { by: 'mins', reversed: false });
+  const sortKey = ref(saved.by);
+  const reversed = ref(saved.reversed);
 
   const rows = computed<SheetRow[]>(() =>
     pmSortedRows(stats.value, squad.value, sortKey.value, reversed.value)
@@ -49,9 +51,13 @@ export function usePlusMinusTable(
       })));
 
   function sortBy(key: string): void {
-    if (sortKey.value === key) { reversed.value = !reversed.value; return; }
-    sortKey.value = key;
-    reversed.value = false;
+    if (sortKey.value === key) {
+      reversed.value = !reversed.value;
+    } else {
+      sortKey.value = key;
+      reversed.value = false;
+    }
+    writeSort('plus-minus', { by: sortKey.value, reversed: reversed.value });
   }
 
   return { columns, sortKey, reversed, rows, sortBy };

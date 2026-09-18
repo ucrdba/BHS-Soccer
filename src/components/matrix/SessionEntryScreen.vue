@@ -18,6 +18,7 @@
  * players silently left out.
  */
 import { ref, computed, watch } from 'vue';
+import { readSort, writeSort } from '../../data/sort-memory';
 import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { useSessionStore } from '../../stores/session';
@@ -67,7 +68,9 @@ watch(
   { immediate: true }
 );
 
-const sort = ref({ by: 'recordingNumber', reversed: false });
+// Opens as the coach last sorted a sheet on this device. Enter follows the
+// rows as shown, so it follows a remembered sort too.
+const sort = ref(readSort('session-grid', ['recordingNumber', 'name'], { by: 'recordingNumber', reversed: false }));
 const rowsEl = ref<HTMLElement | null>(null);
 
 const drill = computed(() => session.drills.find((d: any) => d.id === props.drillId) || null);
@@ -95,6 +98,7 @@ function setSort(by: string): void {
   sort.value = sort.value.by === by
     ? { by, reversed: !sort.value.reversed }
     : { by, reversed: false };
+  writeSort('session-grid', sort.value);
 }
 
 /** Rebuild the grid whenever the exercise or the stored results change. */

@@ -17,6 +17,7 @@
  *   a club side too, and their Matrix history belongs to them.
  */
 import { defineStore } from 'pinia';
+import { readSort, writeSort } from '../data/sort-memory';
 import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 import { toRoster, type Player } from '../domain/player-row';
@@ -50,7 +51,9 @@ export const useRosterStore = defineStore('roster', () => {
   /** Null until a load has happened, so "no players" is not claimed early. */
   const loadedTeamId = ref<string | null>(null);
 
-  const sortBy = ref<'number' | 'name'>('number');
+  // Number or name, as the coach last left it on this device.
+  const sortBy = ref<'number' | 'name'>(
+    readSort('roster', ['number', 'name'], { by: 'number', reversed: false }).by as 'number' | 'name');
   const filter = ref('ALL');
 
   const visible = computed(() =>
@@ -180,7 +183,10 @@ export const useRosterStore = defineStore('roster', () => {
     return { ok: true };
   }
 
-  function setSort(by: 'number' | 'name'): void { sortBy.value = by; }
+  function setSort(by: 'number' | 'name'): void {
+    sortBy.value = by;
+    writeSort('roster', { by, reversed: false });
+  }
   function setFilter(key: string): void { filter.value = key; }
 
   return {

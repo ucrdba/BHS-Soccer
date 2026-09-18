@@ -20,6 +20,7 @@
  * memory of the match.
  */
 import { ref, computed, watch } from 'vue';
+import { readSort, writeSort } from '../../data/sort-memory';
 import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { seasonColumns, seasonFullMatchMinutes } from '../../domain/season';
@@ -35,10 +36,12 @@ const props = defineProps<{
 const rows = ref<any[]>([]);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
-const sortKey = ref('mins');
-const reversed = ref(false);
-
 const columns = seasonColumns();
+
+// Minutes, most first, until the coach sorts it otherwise on this device.
+const saved = readSort('season-report', columns.map(c => c.key), { by: 'mins', reversed: false });
+const sortKey = ref(saved.by);
+const reversed = ref(saved.reversed);
 
 /** This squad's own full-match length, never a constant. */
 const fullMatch = computed(() =>
@@ -98,9 +101,13 @@ const sorted = computed(() => {
 });
 
 function sortBy(key: string): void {
-  if (sortKey.value === key) { reversed.value = !reversed.value; return; }
-  sortKey.value = key;
-  reversed.value = false;
+  if (sortKey.value === key) {
+    reversed.value = !reversed.value;
+  } else {
+    sortKey.value = key;
+    reversed.value = false;
+  }
+  writeSort('season-report', { by: sortKey.value, reversed: reversed.value });
 }
 
 const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFixed(2));

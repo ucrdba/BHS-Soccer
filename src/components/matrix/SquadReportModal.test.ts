@@ -615,3 +615,39 @@ describe('a graph opens the progress chart', () => {
     expect(rowFor(w, 'Alain Renteria').find('[data-squad-spark-open]').exists()).toBe(false);
   });
 });
+
+describe('remembering the sorts', () => {
+  const RATED = [
+    { id: 'p1', name: 'Cesar Alva', recordingNumber: 21,
+      matrixStats: { earned: 50, available: 120, share: 41.7, rank: 2, exercises: 6, wins: 3, draws: 1, losses: 2 } },
+    { id: 'p2', name: 'Tom Budde', recordingNumber: 7,
+      matrixStats: { earned: 100, available: 100, share: 100, rank: 1, exercises: 4, wins: 2, draws: 0, losses: 2 } },
+    { id: 'p3', name: 'Alain Renteria', recordingNumber: 3,
+      matrixStats: { earned: 0, available: 0, share: null, rank: 999, exercises: 0, wins: 0, draws: 0, losses: 0 } }
+  ];
+  const names = (sec: any, sel: string) => sec.findAll(sel).map((p: any) => p.text());
+
+  it('reopens the overall ratings in the order last chosen', async () => {
+    const first = await mountReport({ players: RATED });
+    await first.find('[data-overall-sort="name"]').trigger('click');
+    await first.find('[data-overall-sort="name"]').trigger('click');
+    first.unmount();
+
+    const again = await mountReport({ players: RATED });
+    expect(names(again.find('[data-squad-overall]'), '[data-overall-player]'))
+      .toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+    expect(again.find('[data-overall-sort="name"]').text()).toContain('▼');
+  });
+
+  it('reopens each exercise in its own order, leaving the others alone', async () => {
+    const first = await mountReport();
+    await sectionFor(first, '3 Laps').find('[data-squad-sort="name"]').trigger('click');
+    first.unmount();
+
+    const again = await mountReport();
+    expect(names(sectionFor(again, '3 Laps'), '[data-squad-player]'))
+      .toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+    expect(names(sectionFor(again, 'Coopers'), '[data-squad-player]'))
+      .toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+  });
+});

@@ -9,6 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
     restoreMocks: true,
+    // Clears the remembered sorts between tests; see the file.
+    setupFiles: ['src/test-setup.ts'],
     css: true,
   },
 });
