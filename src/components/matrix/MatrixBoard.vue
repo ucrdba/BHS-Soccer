@@ -72,14 +72,16 @@ function onExcel(): void {
   XLSX.writeFile(wb, 'Player_ratings.xlsx');
 }
 
+// Every column sorts; compareBoardRows in domain/matrix.ts holds how each one
+// reads, shared with the squad report's overall ratings.
 const COLUMNS = [
   { key: 'rank', label: 'Rank', sortable: true },
   { key: 'name', label: 'Player', sortable: true, text: true },
-  { key: 'recordingNumber', label: 'No', sortable: false, title: 'Recording number, not the shirt number' },
-  { key: 'exercises', label: 'Ex', sortable: false, title: 'Exercises taken part in' },
-  { key: 'wdl', label: 'W-D-L', sortable: false },
+  { key: 'recordingNumber', label: 'No', sortable: true, title: 'Recording number, not the shirt number' },
+  { key: 'exercises', label: 'Ex', sortable: true, title: 'Exercises taken part in' },
+  { key: 'wdl', label: 'W-D-L', sortable: true },
   { key: 'earned', label: 'Pts', sortable: true },
-  { key: 'available', label: 'Of', sortable: false, title: 'Points available' },
+  { key: 'available', label: 'Of', sortable: true, title: 'Points available' },
   { key: 'share', label: 'Share', sortable: true }
 ];
 

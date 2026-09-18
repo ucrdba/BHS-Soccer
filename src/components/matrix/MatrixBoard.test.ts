@@ -94,3 +94,25 @@ describe('taking the board off the screen', () => {
     expect(w.find('[data-board-export-error]').text()).toMatch(/pop-?up/i);
   });
 });
+
+describe('sorting the board', () => {
+  it('offers a sort on every column', () => {
+    const w = mountBoard();
+    const heads = w.findAll('[data-matrix-board] th');
+    expect(heads).toHaveLength(8);
+    expect(heads.every(h => h.find('[data-board-sort]').exists())).toBe(true);
+    expect(heads.map(h => h.find('[data-board-sort]').attributes('data-board-sort')))
+      .toEqual(['rank', 'name', 'recordingNumber', 'exercises', 'wdl', 'earned', 'available', 'share']);
+  });
+
+  it('sorts on a column that used to be fixed, and exports in that order', async () => {
+    // Budde carries No 1 and Heitritter No 11, the reverse of their ranks.
+    const w = mountBoard();
+    await w.find('[data-board-sort="recordingNumber"]').trigger('click');
+    expect(w.findAll('[data-board-player]').map(p => p.text())).toEqual(['Tom Budde', 'Oliver Heitritter']);
+    expect(w.find('[data-board-sort="recordingNumber"]').text()).toContain('▲');
+
+    await w.find('[data-board-excel]').trigger('click');
+    expect(written!.rows.map((r: any) => r.Player)).toEqual(['Tom Budde', 'Oliver Heitritter']);
+  });
+});
