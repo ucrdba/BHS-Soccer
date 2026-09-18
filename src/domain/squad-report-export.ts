@@ -10,6 +10,8 @@
  */
 import { formatSecondsAsTime } from './time';
 import { printSectionsDocument, type PrintSection } from './print-table';
+import { progressLowerIsBetter } from './progress';
+import { sparkline, sparkLabel, sparklineSvg } from './sparkline';
 
 export interface SquadReportExportOptions {
   organization: string;
@@ -21,7 +23,10 @@ export interface SquadReportExportOptions {
 const TITLE = 'Squad report';
 
 /** Columns that read as words rather than figures. */
-const TEXTUAL = new Set(['Player', 'Best', 'Standard', 'Short', 'W-D-L']);
+const TEXTUAL = new Set(['Player', 'Best', 'Avg', 'Progress', 'Standard', 'Short', 'W-D-L']);
+
+/** The graphs are drawn here, not typed by anyone. */
+const MARKUP = new Set(['Progress']);
 
 /**
  * Excel refuses : \ / ? * [ ] in a sheet name and caps it at 31 characters, so
@@ -34,8 +39,25 @@ function sheetName(name: string): string {
 const figure = (row: any, value: any): string =>
   value === null || value === undefined ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
 
-/** One sheet's rows for one exercise, with the columns that measure needs. */
-function sheetRows(row: any): Record<string, any>[] {
+/**
+ * One player's graph, or a dash when they have no reading -- they stay in the
+ * table either way. Print only: a spreadsheet cell cannot hold one.
+ */
+function progressCell(row: any, e: any): string {
+  const series: number[] = e.progress || [];
+  const lower = progressLowerIsBetter(row.drill?.measure) || !!row.timed;
+  const drawn = sparkline(series, row.range ?? null, { lowerIsBetter: lower, standard: row.standard });
+  if (!drawn) return '—';
+  return sparklineSvg(drawn, sparkLabel(series, lower, v => figure(row, v)));
+}
+
+/**
+ * One exercise's rows, with the columns that measure needs. `printed` is the
+ * PDF: it gains the progress graphs and drops the Standard column, which says
+ * the same figure on every row and is already in the line under the heading.
+ * The spreadsheet keeps it, where a column is what a filter or formula reads.
+ */
+function sheetRows(row: any, printed = false): Record<string, any>[] {
   return (row.entries || []).map((e: any) => {
     if (row.outcomes) {
       return { Player: e.player?.name, Games: e.attempts, 'W-D-L': e.record ?? '—' };
@@ -45,10 +67,12 @@ function sheetRows(row: any): Record<string, any>[] {
       Attempts: e.attempts,
       Best: figure(row, e.best)
     };
+    if (row.timed) out.Avg = figure(row, e.avg);
+    if (printed && row.timed) out.Progress = progressCell(row, e);
     // Only where the squad has a standard. A column of blanks would read as a
     // standard that failed to load rather than one that was never set.
     if (row.standard !== null && row.standard !== undefined) {
-      out.Standard = figure(row, row.standard);
+      if (!printed) out.Standard = figure(row, row.standard);
       out.Short = e.short ? '△ short' : '';
     }
     return out;
@@ -83,7 +107,8 @@ export function buildSquadReportPrintDocument(options: SquadReportExportOptions)
     heading: row.drill?.name || 'Exercise',
     note: sectionNote(row),
     textual: TEXTUAL,
-    rows: sheetRows(row)
+    markup: MARKUP,
+    rows: sheetRows(row, true)
   }));
 
   return printSectionsDocument({
@@ -92,6 +117,11 @@ export function buildSquadReportPrintDocument(options: SquadReportExportOptions)
     note: `<p class="note">Every player against every exercise the squad has done, including
        players who have attempted nothing — who has not done an exercise is part of what this
        answers. A standard is a match-readiness mark, not a ranking.</p>`,
+    // Tables as wide as their contents, not the page: at full width the
+    // Player column took the slack and pushed the figures away from the names.
+    style: `
+  table { width: auto; min-width: 55%; }
+  th, td { padding: 2mm 5mm; }`,
     sections
   });
 }

@@ -101,3 +101,27 @@ describe('leaving the rows alone', () => {
     expect(names(sortSquadEntries(TIMED, '', false, { timed: true }))).toEqual(names(TIMED));
   });
 });
+
+describe('sorting by average', () => {
+  // Alva has the faster best but the slower average: the sort must read the
+  // average, not fall back on the best.
+  const AVG = [
+    { player: P('p1', 'Cesar Alva'), attempts: 2, best: 240, avg: 270, record: null, short: false },
+    { player: P('p2', 'Tom Budde'), attempts: 1, best: 260, avg: 260, record: null, short: false },
+    { player: P('p3', 'Alain Renteria'), attempts: 0, best: null, avg: null, record: null, short: false }
+  ];
+
+  it('puts the fastest average first on a timed exercise', () => {
+    expect(names(sortSquadEntries(AVG, 'avg', false, { timed: true })))
+      .toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+  });
+
+  it('keeps a player with nothing at the bottom when reversed', () => {
+    expect(names(sortSquadEntries(AVG, 'avg', true, { timed: true })))
+      .toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+  });
+
+  it('reads downward on a first click, as the best does', () => {
+    expect(squadSortDescends('avg')).toBe(true);
+  });
+});

@@ -265,7 +265,7 @@ describe('a W/D/L exercise', () => {
   it('leaves a measured exercise reading as it did', async () => {
     const w = await mountReport({ history: WDL });
     const laps = w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('3 Laps'))!;
-    expect(laps.findAll('th').map((t: any) => t.text())).toEqual(['Player', 'Attempts', 'Best']);
+    expect(laps.findAll('th').map((t: any) => t.text())).toEqual(['Player', 'Attempts', 'Best', 'Avg', 'Progress']);
     expect(laps.findAll('[data-squad-best]').map((b: any) => b.text())).toEqual(['4:10', '4:50', '—']);
   });
 });
@@ -368,3 +368,103 @@ describe('taking the squad report off the screen', () => {
   });
 });
 
+
+describe('the progress graphs', () => {
+  const rowFor = (section: any, name: string) =>
+    section.findAll('[data-squad-row]').find((r: any) => r.text().includes(name))!;
+
+  it('head a Progress column in a timed exercise', async () => {
+    const w = await mountReport();
+    const heads = sectionFor(w, '3 Laps').findAll('th').map((t: any) => t.text());
+    expect(heads).toContain('Progress');
+  });
+
+  it('are not drawn for a counted or a W/D/L exercise', async () => {
+    const w = await mountReport({
+      history: [...HISTORY,
+        { drillId: FLYING, playerId: 'p1', attendance: 'present', outcome: 'win', occurredOn: '2026-09-02' }]
+    });
+    expect(sectionFor(w, 'Coopers').find('[data-squad-progress]').exists()).toBe(false);
+    expect(sectionFor(w, 'Flying Fours').find('[data-squad-progress]').exists()).toBe(false);
+  });
+
+  it('draw a line through a player\'s readings, oldest first, and say what it shows', async () => {
+    const w = await mountReport();
+    const svg = rowFor(sectionFor(w, '3 Laps'), 'Cesar Alva').find('[data-squad-spark]');
+    expect(svg.find('polyline').exists()).toBe(true);
+    // 4:10 on the 1st, then 4:20: slower, so slipping.
+    expect(svg.attributes('aria-label')).toBe('Slipping — 4:10 to 4:20 across 2 readings');
+  });
+
+  it('draw one reading as a dot, with no verdict', async () => {
+    const w = await mountReport();
+    const svg = rowFor(sectionFor(w, '3 Laps'), 'Tom Budde').find('[data-squad-spark]');
+    expect(svg.find('polyline').exists()).toBe(false);
+    expect(svg.find('circle').exists()).toBe(true);
+    expect(svg.attributes('aria-label')).toBe('One reading: 4:50');
+  });
+
+  it('keep a player with no readings in the table, with a dash', async () => {
+    const w = await mountReport();
+    const row = rowFor(sectionFor(w, '3 Laps'), 'Alain Renteria');
+    expect(row.find('[data-squad-spark]').exists()).toBe(false);
+    expect(row.find('[data-squad-progress]').text()).toBe('—');
+  });
+
+  it('share one scale across the exercise, faster drawn higher', async () => {
+    const w = await mountReport();
+    const laps = sectionFor(w, '3 Laps');
+    // Budde's 4:50 is the squad's slowest reading, so it sits at the bottom;
+    // Alva's latest, 4:20, sits above it.
+    const cy = (name: string) => Number(rowFor(laps, name).find('[data-squad-spark] circle').attributes('cy'));
+    expect(cy('Tom Budde')).toBe(18);
+    expect(cy('Cesar Alva')).toBeLessThan(cy('Tom Budde'));
+  });
+
+  it('lay the standard across each graph', async () => {
+    const w = await mountReport();
+    const svg = rowFor(sectionFor(w, '3 Laps'), 'Cesar Alva').find('[data-squad-spark]');
+    expect(svg.find('[data-squad-spark-standard]').exists()).toBe(true);
+  });
+
+  it('draw no standard where the squad has none set', async () => {
+    const w = await mountReport({ bands: [] });
+    const svg = rowFor(sectionFor(w, '3 Laps'), 'Cesar Alva').find('[data-squad-spark]');
+    expect(svg.find('[data-squad-spark-standard]').exists()).toBe(false);
+  });
+});
+
+describe('the average', () => {
+  const laps = (w: any) => sectionFor(w, '3 Laps');
+  const players = (sec: any) => sec.findAll('[data-squad-player]').map((p: any) => p.text());
+
+  it('is shown beside the best in a timed exercise, a dash for nobody', async () => {
+    const w = await mountReport();
+    // Alva ran 4:10 and 4:20; Budde once, 4:50.
+    expect(laps(w).findAll('[data-squad-avg]').map((a: any) => a.text())).toEqual(['4:15', '4:50', '—']);
+  });
+
+  it('is not shown for a counted or a W/D/L exercise', async () => {
+    const w = await mountReport({
+      history: [...HISTORY,
+        { drillId: FLYING, playerId: 'p1', attendance: 'present', outcome: 'win', occurredOn: '2026-09-02' }]
+    });
+    expect(sectionFor(w, 'Coopers').find('[data-squad-avg]').exists()).toBe(false);
+    expect(sectionFor(w, 'Flying Fours').find('[data-squad-avg]').exists()).toBe(false);
+  });
+
+  it('sorts fastest first on its own figure, not the best', async () => {
+    // Alva's best (4:00) beats Budde's, but his average (4:30) does not.
+    const w = await mountReport({ history: [
+      { drillId: LAPS, playerId: 'p1', attendance: 'present', rawValue: 240, occurredOn: '2026-09-01' },
+      { drillId: LAPS, playerId: 'p1', attendance: 'present', rawValue: 300, occurredOn: '2026-09-08' },
+      { drillId: LAPS, playerId: 'p2', attendance: 'present', rawValue: 260, occurredOn: '2026-09-01' }
+    ] });
+    const sec = laps(w);
+    await sec.find('[data-squad-sort="avg"]').trigger('click');
+    expect(players(sec)).toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+
+    await sec.find('[data-squad-sort="avg"]').trigger('click');
+    expect(players(sec)).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+  });
+});

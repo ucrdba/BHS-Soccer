@@ -39,21 +39,29 @@ export interface PrintSection {
    */
   preamble?: string;
   textual: Set<string>;
+  /**
+   * Columns whose values are markup the caller built -- the squad report's
+   * progress graphs. Everything else is escaped; nothing typed by a coach
+   * belongs in one of these.
+   */
+  markup?: Set<string>;
   rows: Record<string, any>[];
 }
 
-function cell(v: any, numeric: boolean): string {
-  return `<td${numeric ? ' class="n"' : ''}>${escapeHtml(v)}</td>`;
+function cell(v: any, numeric: boolean, raw = false): string {
+  return `<td${numeric ? ' class="n"' : ''}>${raw ? String(v ?? '') : escapeHtml(v)}</td>`;
 }
 
 /** One table, head and body, for rows whose keys are the columns. */
-function table(rows: Record<string, any>[], textual: Set<string>): string {
+function table(
+  rows: Record<string, any>[], textual: Set<string>, markup: Set<string> = new Set()
+): string {
   const columns = Object.keys(rows[0]);
   const head = columns
     .map(c => `<th${textual.has(c) ? '' : ' class="n"'}>${escapeHtml(c)}</th>`)
     .join('');
   const body = rows
-    .map(r => `<tr>${columns.map(c => cell(r[c], !textual.has(c))).join('')}</tr>`)
+    .map(r => `<tr>${columns.map(c => cell(r[c], !textual.has(c), markup.has(c))).join('')}</tr>`)
     .join('');
   return `<table>
 <thead><tr>${head}</tr></thead>
@@ -151,7 +159,7 @@ export function printSectionsDocument(options: {
 <h2>${escapeHtml(s.heading)}</h2>
 ${s.note ? `<p class="secnote">${escapeHtml(s.note)}</p>` : ''}
 ${s.preamble || ''}
-${table(s.rows, s.textual || new Set<string>())}
+${table(s.rows, s.textual || new Set<string>(), s.markup)}
 </section>`).join('\n');
 
   return page(options.title, options.where, options.note, body, options.style || '',

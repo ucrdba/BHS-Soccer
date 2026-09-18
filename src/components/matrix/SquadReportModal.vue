@@ -20,6 +20,10 @@
  * Fours stores won/drew/lost and no number, so counting readings gave every
  * player 0 attempts and a dash -- the exercise took a heading and said nothing
  * about the sessions behind it. Those sections count games and show the record.
+ *
+ * **A timed exercise draws each player's progress** beside their best, on one
+ * scale for the whole exercise so the graphs read down the table and the
+ * standard sits at one height. See `domain/sparkline.ts`.
  */
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
@@ -31,6 +35,8 @@ import { squadReportSheets, buildSquadReportPrintDocument } from '../../domain/s
 import { useOrganizationStore } from '../../stores/organization';
 import { formatSecondsAsTime } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
+import { progressSeries } from '../../domain/progress';
+import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -66,26 +72,29 @@ const rows = computed(() => drills.value.map((d: any) => {
     if (outcomes) {
       const record = outcomeRecord(history.value, d.id, p.id);
       return {
-        player: p, attempts: record.games, best: null, record: record.label,
+        player: p, attempts: record.games, best: null, avg: null, record: record.label,
         wins: record.wins, draws: record.draws, losses: record.losses, short: false
       };
     }
 
-    const readings = history.value
-      .filter(r => r.playerId === p.id && r.drillId === d.id
-        && r.attendance === 'present'
-        && r.rawValue !== null && r.rawValue !== undefined && Number.isFinite(Number(r.rawValue)))
-      .map(r => Number(r.rawValue));
+    // Oldest first; the same readings the Progress window draws.
+    const readings = progressSeries(history.value, p.id, d.id).map(pt => pt.value);
 
     const best = readings.length
       ? (lower ? Math.min(...readings) : Math.max(...readings))
+      : null;
+    // Timed exercises only: an average of a count is not a figure anyone reads here.
+    const avg = timed && readings.length
+      ? readings.reduce((sum, v) => sum + v, 0) / readings.length
       : null;
 
     return {
       player: p,
       attempts: readings.length,
       best,
+      avg,
       record: null,
+      progress: timed ? readings : [],
       // Null standard means the exercise is not scored for this squad at all,
       // which is not the same as everybody failing it.
       short: standard !== null && best !== null && best > standard
@@ -97,6 +106,8 @@ const rows = computed(() => drills.value.map((d: any) => {
     timed,
     outcomes,
     standard,
+    // One range for every graph in the exercise, standard included.
+    range: timed ? sparkRange(entries.map((e: any) => e.progress || []), standard) : null,
     threshold: isThresholdMeasure(d.measure),
     entries,
     shortCount: entries.filter((e: any) => e.short).length,
@@ -182,7 +193,14 @@ function onExcel(): void {
 }
 
 const shown = (row: any, value: number | null) =>
-  value === null ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
+  value === null || value === undefined ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
+
+/** A player's graph for a timed exercise, or null when they have no reading. */
+const spark = (row: any, e: any) =>
+  sparkline(e.progress || [], row.range, { lowerIsBetter: true, standard: row.standard });
+
+const sparkText = (row: any, e: any) =>
+  sparkLabel(e.progress || [], true, v => shown(row, v));
 
 watch(() => [props.open, props.teamId] as const, async () => {
   if (!props.open) return;
@@ -266,6 +284,13 @@ watch(() => [props.open, props.teamId] as const, async () => {
                   @click="setSort(row.drill.id, row.outcomes ? 'record' : 'best')"
                 >{{ row.outcomes ? 'W-D-L' : 'Best' }}{{ arrow(row.drill.id, row.outcomes ? 'record' : 'best') }}</button>
               </th>
+              <th v-if="row.timed">
+                <button
+                  type="button" class="th-btn" data-squad-sort="avg"
+                  @click="setSort(row.drill.id, 'avg')"
+                >Avg{{ arrow(row.drill.id, 'avg') }}</button>
+              </th>
+              <th v-if="row.timed" class="is-text">Progress</th>
             </tr>
           </thead>
           <tbody>
@@ -276,6 +301,25 @@ watch(() => [props.open, props.teamId] as const, async () => {
               <td class="is-text" data-squad-player>{{ e.player.name }}</td>
               <td class="tabular" data-squad-attempts>{{ e.attempts }}</td>
               <td class="tabular" data-squad-best>{{ row.outcomes ? e.record : shown(row, e.best) }}</td>
+              <td v-if="row.timed" class="tabular" data-squad-avg>{{ shown(row, e.avg) }}</td>
+              <td v-if="row.timed" class="is-text spark-cell" data-squad-progress>
+                <svg
+                  v-if="spark(row, e)" class="spark" role="img"
+                  :viewBox="`0 0 ${spark(row, e)!.width} ${spark(row, e)!.height}`"
+                  :width="spark(row, e)!.width" :height="spark(row, e)!.height"
+                  :aria-label="sparkText(row, e)" data-squad-spark
+                >
+                  <title>{{ sparkText(row, e) }}</title>
+                  <line
+                    v-if="spark(row, e)!.standardY !== null" class="spark__std"
+                    x1="0" :y1="spark(row, e)!.standardY!" :x2="spark(row, e)!.width" :y2="spark(row, e)!.standardY!"
+                    data-squad-spark-standard
+                  />
+                  <polyline v-if="spark(row, e)!.line" class="spark__line" :points="spark(row, e)!.line" />
+                  <circle class="spark__dot" :cx="spark(row, e)!.last.x" :cy="spark(row, e)!.last.y" r="1.8" />
+                </svg>
+                <template v-else>—</template>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -332,7 +376,9 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .ex__short { margin: 0 0 0.4rem; color: var(--ink-muted); font-size: 0.78rem; }
 
 .wrap { overflow-x: auto; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+/* Sized to its contents rather than the modal: at full width the Player
+   column took all the slack and pushed the figures away from the names. */
+.tbl { width: auto; min-width: min(100%, 26rem); border-collapse: collapse; font-size: 0.83rem; }
 
 .th-btn {
   padding: 0; border: 0; background: none; color: inherit;
@@ -342,7 +388,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
 .th-btn:hover { color: var(--ink); }
 
 .tbl th, .tbl td {
-  padding: 0.28rem 0.5rem;
+  padding: 0.28rem 0.75rem;
   border-bottom: 1px solid var(--rule);
   text-align: right;
 }
@@ -356,6 +402,17 @@ watch(() => [props.open, props.teamId] as const, async () => {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* The progress graph. Its own colours, not the row's: a short row's warning
+   colour would otherwise run through the line and read as a verdict on it. */
+.spark-cell { width: 1%; padding-top: 0.15rem; padding-bottom: 0.15rem; white-space: nowrap; }
+.spark { display: block; overflow: visible; }
+.spark__std { stroke: var(--rule-strong); stroke-width: 0.8; stroke-dasharray: 2 2; }
+.spark__line {
+  fill: none; stroke: var(--ink-muted); stroke-width: 1.2;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.spark__dot { fill: var(--mark); }
 
 /* A row that fell short of the standard -- below-standard, not decorative. */
 .tbl tr.is-short td { color: var(--color-warning); }

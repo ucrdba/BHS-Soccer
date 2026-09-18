@@ -57,9 +57,11 @@ export function sortSquadEntries(
       return String(x.player?.name || '').localeCompare(String(y.player?.name || ''));
     }
 
-    // 'best'. A dash has already sunk above, so both sides have a figure.
-    const a = Number(x.best);
-    const b = Number(y.best);
+    // 'best' or 'avg', read the same way. A dash has already sunk above, so
+    // both sides have a figure.
+    const field = by === 'avg' ? 'avg' : 'best';
+    const a = Number(x[field]);
+    const b = Number(y[field]);
     if (a !== b) return flip * (options.timed ? a - b : b - a);
     return String(x.player?.name || '').localeCompare(String(y.player?.name || ''));
   });
