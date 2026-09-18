@@ -116,3 +116,24 @@ describe('sorting the board', () => {
     expect(written!.rows.map((r: any) => r.Player)).toEqual(['Tom Budde', 'Oliver Heitritter']);
   });
 });
+
+describe('resetting the sort', () => {
+  it('appears once the board is sorted another way, and puts rank order back', async () => {
+    const w = mountBoard();
+    expect(w.find('[data-board-sort-reset]').exists()).toBe(false);
+
+    await w.find('[data-board-sort="recordingNumber"]').trigger('click');
+    expect(w.findAll('[data-board-player]').map(p => p.text())).toEqual(['Tom Budde', 'Oliver Heitritter']);
+    await w.find('[data-board-sort-reset]').trigger('click');
+
+    expect(w.findAll('[data-board-player]').map(p => p.text())).toEqual(['Oliver Heitritter', 'Tom Budde']);
+    expect(w.find('[data-board-sort-reset]').exists()).toBe(false);
+    expect(localStorage.getItem('bhs.sort.v1.board')).toBeNull();
+  });
+
+  it('appears for rank reversed too, which is not the starting order', async () => {
+    const w = mountBoard();
+    await w.find('[data-board-sort="rank"]').trigger('click');
+    expect(w.find('[data-board-sort-reset]').exists()).toBe(true);
+  });
+});

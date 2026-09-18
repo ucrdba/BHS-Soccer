@@ -19,6 +19,7 @@
  * on introducing the emphasis at all.
  */
 import { computed, ref } from 'vue';
+import SortReset from '../ui/SortReset.vue';
 import { useMatrixStore } from '../../stores/matrix';
 import { bandStanding, roleGoalStanding, roleShortfallLine } from '../../domain/matrix-threshold';
 import { roleLabel } from '../../domain/position';
@@ -184,6 +185,7 @@ function standing(row: any): string {
       <!-- Beside the exercise's own name, because they export THIS table --
            as it is sorted, not the board behind it. -->
       <div v-if="matrix.leaderboard.length" class="lb__acts">
+        <SortReset v-if="matrix.exerciseSortChanged" data-exercise-sort-reset @click="matrix.resetExerciseSort()" />
         <button type="button" class="btn btn--small" data-export-print @click="onPrint">
           Print / PDF
         </button>

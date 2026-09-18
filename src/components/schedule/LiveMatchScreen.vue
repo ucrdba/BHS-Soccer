@@ -16,6 +16,7 @@
  * has to be readable at a touchline and it has to be testable.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import SortReset from '../ui/SortReset.vue';
 import ToolScreen from '../layout/ToolScreen.vue';
 import { usePlusMinusStore } from '../../stores/plus-minus';
 import { usePlusMinusTable } from './use-plus-minus-table';
@@ -141,7 +142,7 @@ async function onTapPlayer(playerId: string, e: MouseEvent | TouchEvent, rightCl
 }
 
 const shortName = lineupShortName;
-const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, squad);
+const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = usePlusMinusTable(stats, squad);
 </script>
 
 <template>
@@ -240,7 +241,10 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
       <p v-if="bench.length === 0" class="hint">Everyone is on the pitch.</p>
     </div>
 
-    <p class="kicker sec">The sheet</p>
+    <div class="sheet-head">
+      <p class="kicker sec">The sheet</p>
+      <SortReset v-if="sortChanged" data-pm-sort-reset @click="resetSort" />
+    </div>
 
     <div class="wrap">
       <table class="tbl">
@@ -361,6 +365,9 @@ const { columns, sortKey, reversed, rows, sortBy } = usePlusMinusTable(stats, sq
 .minor:hover { color: var(--ink); }
 
 .sec { margin-top: var(--space-4); color: var(--ink-muted); }
+
+/* The sheet's heading, with Reset sort at its end when the sheet is re-sorted. */
+.sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .sec .tnum { color: var(--ink-muted); }
 
 .rows { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }

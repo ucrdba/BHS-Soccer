@@ -23,7 +23,7 @@ import {
   BOARD_SORT_KEYS, exerciseSortKind, exerciseSortKeys,
   type SortState
 } from '../domain/matrix';
-import { readSort, writeSort } from '../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../data/sort-memory';
 import { isThresholdMeasure, belowStandard, roleGoalShortfall } from '../domain/matrix-threshold';
 
 export interface WriteResult { ok: boolean; error?: string }
@@ -132,12 +132,30 @@ export const useMatrixStore = defineStore('matrix', () => {
     writeSort('board', boardSort.value);
   }
 
+  /** Whether the board is in anything but its starting order, rank first. */
+  const boardSortChanged = computed(() =>
+    boardSort.value.by !== 'rank' || boardSort.value.reversed);
+
+  function resetBoardSort(): void {
+    boardSort.value = { by: 'rank', reversed: false };
+    clearSort('board');
+  }
+
   /** Remembered per kind of leaderboard, since their columns differ. */
   const exerciseSortName = () => `exercise.${exerciseSortKind(measure.value)}`;
 
   function setExerciseSort(by: string): void {
     exerciseSort.value = nextSortState(exerciseSort.value, by);
     writeSort(exerciseSortName(), exerciseSort.value);
+  }
+
+  const exerciseSortChanged = computed(() =>
+    exerciseSort.value.by !== 'earned' || exerciseSort.value.reversed);
+
+  /** Back to points, for this kind of leaderboard only. */
+  function resetExerciseSort(): void {
+    exerciseSort.value = { by: 'earned', reversed: false };
+    clearSort(exerciseSortName());
   }
 
   function setExerciseFilter(id: string): void {
@@ -185,6 +203,7 @@ export const useMatrixStore = defineStore('matrix', () => {
     boardRows, exercises, leaderboard, selectedDrill, measure,
     isThreshold, shortOfStandard, roleShortfall, measuredCount,
     load, setBoardSort, setExerciseSort, setExerciseFilter,
+    boardSortChanged, resetBoardSort, exerciseSortChanged, resetExerciseSort,
     boardDescends, exerciseDescends, removeResult
   };
 });

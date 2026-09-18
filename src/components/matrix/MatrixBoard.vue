@@ -11,6 +11,7 @@
  * nothing to compare.
  */
 import { ref } from 'vue';
+import SortReset from '../ui/SortReset.vue';
 import { useMatrixStore } from '../../stores/matrix';
 import { useOrganizationStore } from '../../stores/organization';
 import { boardSheet, buildBoardPrintDocument } from '../../domain/board-export';
@@ -95,6 +96,7 @@ function arrow(key: string): string {
   <div>
     <!-- Beside the board, because they export THIS table as it is sorted. -->
     <div v-if="matrix.boardRows.length" class="acts">
+      <SortReset v-if="matrix.boardSortChanged" data-board-sort-reset @click="matrix.resetBoardSort()" />
       <button type="button" class="btn btn--small" data-board-print @click="onPrint">
         Print / PDF
       </button>

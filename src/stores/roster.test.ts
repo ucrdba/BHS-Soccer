@@ -224,3 +224,17 @@ describe('remembering the sort', () => {
     expect(useRosterStore().sortBy).toBe('number');
   });
 });
+
+describe('resetting the sort', () => {
+  it('goes back to number and forgets the saved sort', () => {
+    useRosterStore().setSort('name');
+    const s = useRosterStore();
+    expect(s.sortChanged).toBe(true);
+    s.resetSort();
+    expect(s.sortBy).toBe('number');
+    expect(s.sortChanged).toBe(false);
+    setActivePinia(createPinia());
+    expect(useRosterStore().sortBy).toBe('number');
+    expect(localStorage.getItem('bhs.sort.v1.roster')).toBeNull();
+  });
+});

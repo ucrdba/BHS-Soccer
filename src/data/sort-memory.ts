@@ -42,3 +42,12 @@ export function writeSort(screen: string, state: SortState): void {
     // Quota or refused storage. The sort still applies; it just is not kept.
   }
 }
+
+/** Forget a screen's sort, so it opens on its own starting order again. */
+export function clearSort(screen: string): void {
+  try {
+    localStorage.removeItem(PREFIX + screen);
+  } catch {
+    // Refused storage held nothing to forget.
+  }
+}

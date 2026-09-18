@@ -186,6 +186,16 @@ describe('sorting', () => {
     expect(players(w)[0]).toBe('Alain Renteria');
   });
 
+  it('resets to minutes, most first, and forgets the saved sort', async () => {
+    const w = await mountSeason();
+    expect(w.find('[data-season-sort-reset]').exists()).toBe(false);
+    await w.find('[data-season-sort="mins"]').trigger('click');
+    await w.find('[data-season-sort-reset]').trigger('click');
+    expect(players(w)[0]).toBe('Cesar Alva');
+    expect(w.find('[data-season-sort-reset]').exists()).toBe(false);
+    expect(localStorage.getItem('bhs.sort.v1.season-report')).toBeNull();
+  });
+
   it('reopens in the order last chosen', async () => {
     const first = await mountSeason();
     await first.find('[data-season-sort="mins"]').trigger('click');

@@ -803,3 +803,19 @@ describe('remembering the sort', () => {
       .toBe(w.findAll('[data-grid-row]')[1].find('[data-entry-field]').element);
   });
 });
+
+describe('resetting the sort', () => {
+  it('goes back to recording number, for this sheet and the next', async () => {
+    const w = await mountGrid();
+    const byNumber = names(w);
+    expect(w.find('[data-grid-sort-reset]').exists()).toBe(false);
+
+    await w.find('[data-grid-sort="name"]').trigger('click');
+    await w.find('[data-grid-sort-reset]').trigger('click');
+    expect(names(w)).toEqual(byNumber);
+    expect(w.find('[data-grid-sort-reset]').exists()).toBe(false);
+    w.unmount();
+
+    expect(names(await mountGrid())).toEqual(byNumber);
+  });
+});

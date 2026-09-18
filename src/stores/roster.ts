@@ -17,7 +17,7 @@
  *   a club side too, and their Matrix history belongs to them.
  */
 import { defineStore } from 'pinia';
-import { readSort, writeSort } from '../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../data/sort-memory';
 import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
 import { toRoster, type Player } from '../domain/player-row';
@@ -187,10 +187,18 @@ export const useRosterStore = defineStore('roster', () => {
     sortBy.value = by;
     writeSort('roster', { by, reversed: false });
   }
+
+  /** Whether the roster is sorted any way but its starting one, by number. */
+  const sortChanged = computed(() => sortBy.value !== 'number');
+
+  function resetSort(): void {
+    sortBy.value = 'number';
+    clearSort('roster');
+  }
   function setFilter(key: string): void { filter.value = key; }
 
   return {
-    players, loading, loadError, loadedTeamId, sortBy, filter,
+    players, loading, loadError, loadedTeamId, sortBy, filter, sortChanged, resetSort,
     visible, filters,
     load, addPlayer, addExistingPlayer, updatePlayer, removePlayer, setSort, setFilter
   };

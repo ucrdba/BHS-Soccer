@@ -651,3 +651,41 @@ describe('remembering the sorts', () => {
       .toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
   });
 });
+
+describe('resetting a sort', () => {
+  const RATED = [
+    { id: 'p1', name: 'Cesar Alva', recordingNumber: 21,
+      matrixStats: { earned: 50, available: 120, share: 41.7, rank: 2, exercises: 6, wins: 3, draws: 1, losses: 2 } },
+    { id: 'p2', name: 'Tom Budde', recordingNumber: 7,
+      matrixStats: { earned: 100, available: 100, share: 100, rank: 1, exercises: 4, wins: 2, draws: 0, losses: 2 } }
+  ];
+  const names = (sec: any, sel: string) => sec.findAll(sel).map((p: any) => p.text());
+
+  it('puts the overall ratings back in rank order', async () => {
+    const w = await mountReport({ players: RATED });
+    const overall = () => w.find('[data-squad-overall]');
+    expect(overall().find('[data-overall-sort-reset]').exists()).toBe(false);
+
+    await overall().find('[data-overall-sort="name"]').trigger('click');
+    await overall().find('[data-overall-sort-reset]').trigger('click');
+
+    expect(names(overall(), '[data-overall-player]')).toEqual(['Tom Budde', 'Cesar Alva']);
+    expect(overall().find('[data-overall-sort-reset]').exists()).toBe(false);
+    expect(localStorage.getItem('bhs.sort.v1.squad.overall')).toBeNull();
+  });
+
+  it('puts one exercise back as listed, leaving the others sorted', async () => {
+    const w = await mountReport();
+    const laps = () => sectionFor(w, '3 Laps');
+    const coopers = () => sectionFor(w, 'Coopers');
+    await laps().find('[data-squad-sort="name"]').trigger('click');
+    await coopers().find('[data-squad-sort="name"]').trigger('click');
+    expect(laps().find('[data-squad-sort-reset]').exists()).toBe(true);
+
+    await laps().find('[data-squad-sort-reset]').trigger('click');
+    expect(names(laps(), '[data-squad-player]')).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+    expect(laps().find('[data-squad-sort-reset]').exists()).toBe(false);
+    expect(names(coopers(), '[data-squad-player]')).toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+    expect(localStorage.getItem(`bhs.sort.v1.squad.exercise.${LAPS}`)).toBeNull();
+  });
+});

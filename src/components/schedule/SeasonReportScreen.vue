@@ -20,7 +20,8 @@
  * memory of the match.
  */
 import { ref, computed, watch } from 'vue';
-import { readSort, writeSort } from '../../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../../data/sort-memory';
+import SortReset from '../ui/SortReset.vue';
 import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { seasonColumns, seasonFullMatchMinutes } from '../../domain/season';
@@ -110,6 +111,14 @@ function sortBy(key: string): void {
   writeSort('season-report', { by: sortKey.value, reversed: reversed.value });
 }
 
+const sortChanged = computed(() => sortKey.value !== 'mins' || reversed.value);
+
+function resetSort(): void {
+  sortKey.value = 'mins';
+  reversed.value = false;
+  clearSort('season-report');
+}
+
 const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFixed(2));
 </script>
 
@@ -134,6 +143,9 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
     </p>
 
     <div v-else class="wrap">
+      <p v-if="sortChanged" class="resetrow">
+        <SortReset data-season-sort-reset @click="resetSort" />
+      </p>
       <table class="tbl">
         <thead>
           <tr>
@@ -167,6 +179,9 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
 </template>
 
 <style scoped>
+/* Reset sort, above the table's right edge, only while it is re-sorted. */
+.resetrow { margin: 0 0 var(--space-2); text-align: right; }
+
 .lede {
   max-width: 44rem;
   font-size: 12.5px;

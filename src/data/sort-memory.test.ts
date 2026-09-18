@@ -8,7 +8,7 @@
  * back to the screen's own starting sort, silently.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readSort, writeSort } from './sort-memory';
+import { readSort, writeSort, clearSort } from './sort-memory';
 
 const COLUMNS = ['rank', 'name', 'earned'];
 const DEFAULT = { by: 'rank', reversed: false };
@@ -67,5 +67,21 @@ describe('storage the browser refuses', () => {
   it('saves nothing rather than throwing', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
     expect(() => writeSort('board', { by: 'name', reversed: false })).not.toThrow();
+  });
+});
+
+describe('forgetting a sort', () => {
+  it('returns that screen to its default, leaving the others', () => {
+    writeSort('board', { by: 'earned', reversed: true });
+    writeSort('roster', { by: 'name', reversed: false });
+    clearSort('board');
+    expect(readSort('board', COLUMNS, DEFAULT)).toEqual(DEFAULT);
+    expect(readSort('roster', ['number', 'name'], { by: 'number', reversed: false }))
+      .toEqual({ by: 'name', reversed: false });
+  });
+
+  it('does nothing rather than throwing when storage is refused', () => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('SecurityError'); });
+    expect(() => clearSort('board')).not.toThrow();
   });
 });

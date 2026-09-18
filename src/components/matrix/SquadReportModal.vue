@@ -42,7 +42,8 @@ import { isThresholdMeasure } from '../../domain/matrix-threshold';
 import { progressSeries } from '../../domain/progress';
 import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
 import { matrixBoardRows, boardSortDescends, BOARD_SORT_KEYS } from '../../domain/matrix';
-import { readSort, writeSort } from '../../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../../data/sort-memory';
+import SortReset from '../ui/SortReset.vue';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{
@@ -147,6 +148,14 @@ function setSort(drillId: string, by: string): void {
   writeSort(sectionSortName(drillId), next);
 }
 
+/** An exercise is sorted once a column has been chosen; as listed is its start. */
+const sectionSorted = (drillId: string) => sortOf(drillId).by !== '';
+
+function resetSection(drillId: string): void {
+  sorts.value = { ...sorts.value, [drillId]: { by: '', reversed: false } };
+  clearSort(sectionSortName(drillId));
+}
+
 function arrow(drillId: string, by: string): string {
   const now = sortOf(drillId);
   if (now.by !== by) return '';
@@ -184,6 +193,13 @@ function setOverallSort(by: string): void {
   const now = overallSort.value;
   overallSort.value = now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false };
   writeSort('squad.overall', overallSort.value);
+}
+
+const overallSorted = computed(() => overallSort.value.by !== 'rank' || overallSort.value.reversed);
+
+function resetOverallSort(): void {
+  overallSort.value = { by: 'rank', reversed: false };
+  clearSort('squad.overall');
 }
 
 function overallArrow(by: string): string {
@@ -291,7 +307,10 @@ watch(() => [props.open, props.teamId] as const, async () => {
     </p>
 
     <section v-if="!loading && !loadError && rows.length" class="ex" data-squad-overall>
-      <h3 class="ex__h">Overall ratings</h3>
+      <h3 class="ex__h">
+        Overall ratings
+        <SortReset v-if="overallSorted" class="ex__reset" data-overall-sort-reset @click="resetOverallSort" />
+      </h3>
       <p class="ex__short">
         Every exercise recorded, weighted — as on the Player Ratings board. A dash
         means a player has taken part in nothing yet.
@@ -334,6 +353,10 @@ watch(() => [props.open, props.teamId] as const, async () => {
         <span v-else-if="row.threshold" class="ex__none" data-squad-no-standard>
           no standard set for this squad — not scored
         </span>
+        <SortReset
+          v-if="sectionSorted(row.drill.id)" class="ex__reset"
+          data-squad-sort-reset @click="resetSection(row.drill.id)"
+        />
       </h3>
 
       <p v-if="row.standard !== null" class="ex__short" data-squad-short>
@@ -455,6 +478,9 @@ watch(() => [props.open, props.teamId] as const, async () => {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Headings are uppercase; the button beside one is not. */
+.ex__reset { margin-left: auto; letter-spacing: 0; text-transform: none; }
 
 .ex__std { color: var(--rule-strong); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }
 .ex__none { color: var(--ink-muted); font-size: 0.7rem; letter-spacing: 0; text-transform: none; }

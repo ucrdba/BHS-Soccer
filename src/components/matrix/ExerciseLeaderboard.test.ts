@@ -81,3 +81,17 @@ describe('a Goals-by-role leaderboard', () => {
     expect(w.findAll('[data-leaderboard-row]')[0].text()).toContain('Ash Attacker');
   });
 });
+
+describe('resetting the sort', () => {
+  it('appears once sorted another way, and goes back to points', async () => {
+    const w = mountBoard();
+    expect(w.find('[data-exercise-sort-reset]').exists()).toBe(false);
+    await w.find('[data-exercise-sort="name"]').trigger('click');
+    await w.find('[data-exercise-sort-reset]').trigger('click');
+
+    const { useMatrixStore } = await import('../../stores/matrix');
+    expect(useMatrixStore().exerciseSort).toEqual({ by: 'earned', reversed: false });
+    expect(w.find('[data-exercise-sort-reset]').exists()).toBe(false);
+    expect(localStorage.getItem('bhs.sort.v1.exercise.role_goals')).toBeNull();
+  });
+});

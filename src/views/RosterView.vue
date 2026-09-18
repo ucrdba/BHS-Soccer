@@ -11,6 +11,7 @@
  * and the legacy app still has all four.
  */
 import { ref, computed, watch } from 'vue';
+import SortReset from '../components/ui/SortReset.vue';
 import PlayerCard from '../components/roster/PlayerCard.vue';
 import PlayerDetailModal from '../components/roster/PlayerDetailModal.vue';
 import PlayerFormModal from '../components/roster/PlayerFormModal.vue';
@@ -146,6 +147,7 @@ async function onRemove(p: Player): Promise<void> {
         <span class="sort__sep" aria-hidden="true">·</span>
         <button type="button" class="sort__opt" :class="{ 'is-on': roster.sortBy === 'name' }"
                 data-sort-name @click="roster.setSort('name')">name</button>
+        <SortReset v-if="roster.sortChanged" class="sort__reset" data-sort-reset @click="roster.resetSort()" />
       </div>
     </div>
 
@@ -232,6 +234,7 @@ async function onRemove(p: Player): Promise<void> {
 .chip.is-on .chip__n { color: inherit; }
 
 .sort { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; color: var(--ink-muted); }
+.sort__reset { margin-left: var(--space-2); }
 .sort__opt { padding: 0; border: 0; background: none; color: var(--ink-muted); font: inherit; cursor: pointer; }
 .sort__opt.is-on { color: var(--live); border-bottom: 1px solid var(--live); }
 .sort__sep { color: var(--ink-soft); }

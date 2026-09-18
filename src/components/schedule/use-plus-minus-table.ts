@@ -14,7 +14,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue';
 import { pmColumns, pmSortedRows, type PmColumn } from '../../domain/plus-minus-court';
 import { toMinutes } from '../../data/season-stats';
-import { readSort, writeSort } from '../../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../../data/sort-memory';
 
 export interface SheetRow {
   player: any;
@@ -60,5 +60,14 @@ export function usePlusMinusTable(
     writeSort('plus-minus', { by: sortKey.value, reversed: reversed.value });
   }
 
-  return { columns, sortKey, reversed, rows, sortBy };
+  const sortChanged = computed(() => sortKey.value !== 'mins' || reversed.value);
+
+  /** Back to minutes, most first, and forget the remembered sort. */
+  function resetSort(): void {
+    sortKey.value = 'mins';
+    reversed.value = false;
+    clearSort('plus-minus');
+  }
+
+  return { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort };
 }

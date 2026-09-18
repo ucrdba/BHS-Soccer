@@ -18,7 +18,8 @@
  * players silently left out.
  */
 import { ref, computed, watch } from 'vue';
-import { readSort, writeSort } from '../../data/sort-memory';
+import { readSort, writeSort, clearSort } from '../../data/sort-memory';
+import SortReset from '../ui/SortReset.vue';
 import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { useSessionStore } from '../../stores/session';
@@ -99,6 +100,13 @@ function setSort(by: string): void {
     ? { by, reversed: !sort.value.reversed }
     : { by, reversed: false };
   writeSort('session-grid', sort.value);
+}
+
+const sortChanged = computed(() => sort.value.by !== 'recordingNumber' || sort.value.reversed);
+
+function resetSort(): void {
+  sort.value = { by: 'recordingNumber', reversed: false };
+  clearSort('session-grid');
 }
 
 /** Rebuild the grid whenever the exercise or the stored results change. */
@@ -335,6 +343,7 @@ async function onSave(): Promise<void> {
         type="button" class="sortbtn" data-grid-sort-toggle
         @click="setSort(sort.by === 'name' ? 'recordingNumber' : 'name')"
       >Sort: {{ sort.by === 'name' ? 'name' : 'recording no.' }} ▾</button>
+      <SortReset v-if="sortChanged" data-grid-sort-reset @click="resetSort" />
     </template>
 
     <p v-if="format" class="format" data-entry-format>

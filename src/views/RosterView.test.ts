@@ -31,11 +31,11 @@ const SQUAD = [
 
 function mountRoster(opts: {
   players?: any[]; coach?: boolean; loading?: boolean;
-  loadedTeamId?: string | null; loadError?: string | null;
+  loadedTeamId?: string | null; loadError?: string | null; sortBy?: 'number' | 'name';
 } = {}) {
   const {
     players = SQUAD, coach = false, loading = false,
-    loadedTeamId = 't1', loadError = null
+    loadedTeamId = 't1', loadError = null, sortBy = 'number'
   } = opts;
 
   return mount(RosterView, {
@@ -44,7 +44,7 @@ function mountRoster(opts: {
         createSpy: vi.fn,
         stubActions: true,
         initialState: {
-          roster: { players, loading, loadError, loadedTeamId, sortBy: 'number', filter: 'ALL' },
+          roster: { players, loading, loadError, loadedTeamId, sortBy, filter: 'ALL' },
           organization: {
             schools: [{ id: 's1', name: 'Legends FC', mascot: 'Lions' }],
             teams: [{ id: 't1', name: 'U16', school_id: 's1' }],
@@ -178,5 +178,20 @@ describe('recording numbers', () => {
 
     expect(w.find('[data-rn-propose]').exists()).toBe(true);
     expect(w.find('[data-rn-pending]').text()).toContain('0');
+  });
+});
+
+describe('resetting the sort', () => {
+  it('offers no reset while the roster is in number order', () => {
+    expect(mountRoster().find('[data-sort-reset]').exists()).toBe(false);
+  });
+
+  it('offers one once it is sorted by name, and resets through the store', async () => {
+    const w = mountRoster({ sortBy: 'name' });
+    const reset = w.find('[data-sort-reset]');
+    expect(reset.text()).toBe('Reset sort');
+    await reset.trigger('click');
+    const { useRosterStore } = await import('../stores/roster');
+    expect(useRosterStore().resetSort).toHaveBeenCalled();
   });
 });

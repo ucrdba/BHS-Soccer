@@ -307,6 +307,20 @@ describe('the running figures', () => {
     expect(names()).toEqual(forward.slice().reverse());
   });
 
+  it('reset to minutes, and forget the saved sort', async () => {
+    const w = await mountBoard();
+    const names = () => w.findAll('[data-pm-cell="name"]').map((c: any) => c.text());
+    const opening = names();
+    expect(w.find('[data-pm-sort-reset]').exists()).toBe(false);
+
+    await w.find('[data-pm-sort="name"]').trigger('click');
+    await w.find('[data-pm-sort="name"]').trigger('click');
+    await w.find('[data-pm-sort-reset]').trigger('click');
+    expect(names()).toEqual(opening);
+    expect(w.find('[data-pm-sort-reset]').exists()).toBe(false);
+    expect(localStorage.getItem('bhs.sort.v1.plus-minus')).toBeNull();
+  });
+
   it('reopen in the order last chosen', async () => {
     const first = await mountBoard();
     const names = (w: any) => w.findAll('[data-pm-cell="name"]').map((c: any) => c.text());
