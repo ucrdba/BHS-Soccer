@@ -449,8 +449,11 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           percent. Two players on the same share are separated by who has competed more.</p>
           <h4>Printing or exporting it</h4>
           <p><b>Print / PDF</b> and <b>Excel</b> sit above the table, on the overall board and on a
-          single exercise alike. Both take the table exactly as you have it sorted, so sort it the
-          way you want it read first. Print opens your browser&rsquo;s print dialog, where
+          single exercise alike, and at the foot of the <b>Squad report</b> &mdash; where the
+          spreadsheet gets one tab per exercise. Both take the table exactly as you have it sorted,
+          so sort it the way you want it read first. Each exercise in the squad report sorts on its
+          own: click <b>Player</b>, <b>Attempts</b> or <b>Best</b> &mdash; <b>Games</b> and
+          <b>W-D-L</b> on a small-sided exercise. Print opens your browser&rsquo;s print dialog, where
           &ldquo;Save as PDF&rdquo; is one of the destinations.</p>`
       },
       {

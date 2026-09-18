@@ -270,3 +270,101 @@ describe('a W/D/L exercise', () => {
   });
 });
 
+describe('sorting one exercise at a time', () => {
+  const laps = (w: any) =>
+    w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('3 Laps'))!;
+  const coopers = (w: any) =>
+    w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('Coopers'))!;
+  const players = (sec: any) => sec.findAll('[data-squad-player]').map((p: any) => p.text());
+
+  it('sorts a timed exercise fastest first, and reverses on a second click', async () => {
+    const w = await mountReport();
+    const sec = laps(w);
+    await sec.find('[data-squad-sort="best"]').trigger('click');
+    expect(players(sec)).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+
+    await sec.find('[data-squad-sort="best"]').trigger('click');
+    // Reversed among those who ran; the player with nothing stays at the foot.
+    expect(players(sec)).toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+  });
+
+  it('sorts by name without dropping anyone', async () => {
+    const w = await mountReport();
+    const sec = laps(w);
+    await sec.find('[data-squad-sort="name"]').trigger('click');
+    expect(players(sec)).toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+  });
+
+  it('leaves the other exercises in their own order', async () => {
+    const w = await mountReport();
+    await laps(w).find('[data-squad-sort="name"]').trigger('click');
+    expect(players(coopers(w))).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+  });
+});
+
+describe('taking the squad report off the screen', () => {
+  let written: { name: string; rows: any[] }[];
+  let printed: string;
+
+  beforeEach(() => {
+    written = [];
+    printed = '';
+    (window as any).XLSX = {
+      utils: {
+        book_new: () => ({}),
+        json_to_sheet: (rows: any[]) => ({ rows }),
+        book_append_sheet: (_wb: any, sheet: any, name: string) => { written.push({ name, rows: sheet.rows }); }
+      },
+      writeFile: () => {}
+    };
+    vi.spyOn(window, 'open').mockImplementation(() => ({
+      document: { write: (html: string) => { printed = html; }, close: () => {} },
+      focus: () => {}, print: () => {}
+    }) as any);
+  });
+
+  it('writes one sheet per exercise, in the order shown', async () => {
+    const w = await mountReport();
+    await w.find('[data-squad-excel]').trigger('click');
+    expect(written.map(s => s.name)).toEqual(['3 Laps', 'Coopers']);
+    expect(written[0].rows[0]).toMatchObject({ Player: 'Cesar Alva', Attempts: 2, Best: '4:10' });
+  });
+
+  it('exports what the coach sorted, not the original order', async () => {
+    const w = await mountReport();
+    const sec = w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('3 Laps'))!;
+    await sec.find('[data-squad-sort="name"]').trigger('click');
+    await w.find('[data-squad-excel]').trigger('click');
+    expect(written[0].rows.map((r: any) => r.Player))
+      .toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+  });
+
+  it('prints every exercise in one document', async () => {
+    const w = await mountReport();
+    await w.find('[data-squad-print]').trigger('click');
+    expect(printed).toContain('Squad report');
+    expect(printed).toContain('3 Laps');
+    expect(printed).toContain('Coopers');
+  });
+
+  it('says so when the spreadsheet library has not loaded', async () => {
+    delete (window as any).XLSX;
+    const w = await mountReport();
+    await w.find('[data-squad-excel]').trigger('click');
+    expect(w.find('[data-squad-export-error]').text()).toMatch(/spreadsheet library/i);
+  });
+
+  it('says so when the print window is blocked', async () => {
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    const w = await mountReport();
+    await w.find('[data-squad-print]').trigger('click');
+    expect(w.find('[data-squad-export-error]').text()).toMatch(/pop-?up/i);
+  });
+
+  it('offers neither button when nothing has been recorded', async () => {
+    const w = await mountReport({ history: [] });
+    expect(w.find('[data-squad-excel]').exists()).toBe(false);
+    expect(w.find('[data-squad-print]').exists()).toBe(false);
+  });
+});
+

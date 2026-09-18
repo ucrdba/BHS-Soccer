@@ -26,6 +26,9 @@ import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { useMatrixStore } from '../../stores/matrix';
 import { reportStandardSeconds, outcomeRecord } from '../../domain/report';
+import { sortSquadEntries, squadSortDescends } from '../../domain/squad-report';
+import { squadReportSheets, buildSquadReportPrintDocument } from '../../domain/squad-report-export';
+import { useOrganizationStore } from '../../stores/organization';
 import { formatSecondsAsTime } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
 
@@ -33,6 +36,7 @@ const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
 
 const matrix = useMatrixStore();
+const org = useOrganizationStore();
 
 const history = ref<any[]>([]);
 const bandsByDrill = ref<Record<string, any[]>>({});
@@ -61,7 +65,10 @@ const rows = computed(() => drills.value.map((d: any) => {
   const entries = players.value.map((p: any) => {
     if (outcomes) {
       const record = outcomeRecord(history.value, d.id, p.id);
-      return { player: p, attempts: record.games, best: null, record: record.label, short: false };
+      return {
+        player: p, attempts: record.games, best: null, record: record.label,
+        wins: record.wins, draws: record.draws, losses: record.losses, short: false
+      };
     }
 
     const readings = history.value
@@ -96,6 +103,83 @@ const rows = computed(() => drills.value.map((d: any) => {
     untried: entries.filter((e: any) => e.attempts === 0).length
   };
 }));
+
+/**
+ * How each exercise is sorted, kept per drill: reading the Cooper's by best
+ * figure must not reorder the small-sided section above it.
+ */
+const sorts = ref<Record<string, { by: string; reversed: boolean }>>({});
+
+function sortOf(drillId: string) {
+  return sorts.value[drillId] || { by: '', reversed: false };
+}
+
+function setSort(drillId: string, by: string): void {
+  const now = sortOf(drillId);
+  sorts.value = {
+    ...sorts.value,
+    [drillId]: now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false }
+  };
+}
+
+function arrow(drillId: string, by: string): string {
+  const now = sortOf(drillId);
+  if (now.by !== by) return '';
+  // squadSortDescends says which way a FIRST click reads; reversing flips it.
+  return squadSortDescends(by) !== now.reversed ? ' ▼' : ' ▲';
+}
+
+/** The sections as they appear on screen, which is what the exports take. */
+const sortedRows = computed(() => rows.value.map((row: any) => {
+  const { by, reversed } = sortOf(row.drill.id);
+  return {
+    ...row,
+    entries: sortSquadEntries(row.entries, by, reversed, { timed: row.timed, outcomes: row.outcomes })
+  };
+}));
+
+const exportError = ref<string | null>(null);
+
+function exportOptions() {
+  return {
+    organization: org.branding.name || '',
+    team: org.activeTeam?.name || '',
+    rows: sortedRows.value
+  };
+}
+
+function onPrint(): void {
+  exportError.value = null;
+  const html = buildSquadReportPrintDocument(exportOptions());
+  if (!html) { exportError.value = 'There is nothing to print yet.'; return; }
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    exportError.value = 'Your browser blocked the print window. Allow pop-ups for this site and try again.';
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function onExcel(): void {
+  exportError.value = null;
+  const XLSX = (window as any).XLSX;
+  if (typeof XLSX === 'undefined') {
+    exportError.value = 'The spreadsheet library has not loaded yet. Wait a moment and try again.';
+    return;
+  }
+
+  const sheets = squadReportSheets(exportOptions());
+  if (sheets.length === 0) { exportError.value = 'There is nothing to export yet.'; return; }
+
+  // One sheet per exercise: the columns differ by measure.
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(s => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s.rows), s.name));
+  XLSX.writeFile(wb, 'Squad_report.xlsx');
+}
 
 const shown = (row: any, value: number | null) =>
   value === null ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
@@ -144,7 +228,7 @@ watch(() => [props.open, props.teamId] as const, async () => {
       No sessions recorded yet. Record one from Player Ratings and it appears here.
     </p>
 
-    <section v-for="row in rows" :key="row.drill.id" class="ex" data-squad-exercise>
+    <section v-for="row in sortedRows" :key="row.drill.id" class="ex" data-squad-exercise>
       <h3 class="ex__h">
         {{ row.drill.name }}
         <span v-if="row.standard !== null" class="ex__std" data-squad-standard>
@@ -163,9 +247,25 @@ watch(() => [props.open, props.teamId] as const, async () => {
         <table class="tbl">
           <thead>
             <tr>
-              <th class="is-text">Player</th>
-              <th>{{ row.outcomes ? 'Games' : 'Attempts' }}</th>
-              <th>{{ row.outcomes ? 'W-D-L' : 'Best' }}</th>
+              <th class="is-text">
+                <button
+                  type="button" class="th-btn" data-squad-sort="name"
+                  @click="setSort(row.drill.id, 'name')"
+                >Player{{ arrow(row.drill.id, 'name') }}</button>
+              </th>
+              <th>
+                <button
+                  type="button" class="th-btn" data-squad-sort="attempts"
+                  @click="setSort(row.drill.id, 'attempts')"
+                >{{ row.outcomes ? 'Games' : 'Attempts' }}{{ arrow(row.drill.id, 'attempts') }}</button>
+              </th>
+              <th>
+                <button
+                  type="button" class="th-btn"
+                  :data-squad-sort="row.outcomes ? 'record' : 'best'"
+                  @click="setSort(row.drill.id, row.outcomes ? 'record' : 'best')"
+                >{{ row.outcomes ? 'W-D-L' : 'Best' }}{{ arrow(row.drill.id, row.outcomes ? 'record' : 'best') }}</button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -182,7 +282,19 @@ watch(() => [props.open, props.teamId] as const, async () => {
       </div>
     </section>
 
+    <p v-if="exportError" class="state state--bad" role="alert" data-squad-export-error>
+      {{ exportError }}
+    </p>
+
     <template #footer>
+      <button
+        v-if="rows.length" type="button" class="btn"
+        data-squad-print @click="onPrint"
+      >Print / PDF</button>
+      <button
+        v-if="rows.length" type="button" class="btn"
+        data-squad-excel @click="onExcel"
+      >Excel</button>
       <button type="button" class="btn" @click="emit('close')">Close</button>
     </template>
   </BaseModal>
@@ -221,6 +333,13 @@ watch(() => [props.open, props.teamId] as const, async () => {
 
 .wrap { overflow-x: auto; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+
+.th-btn {
+  padding: 0; border: 0; background: none; color: inherit;
+  font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+
+.th-btn:hover { color: var(--ink); }
 
 .tbl th, .tbl td {
   padding: 0.28rem 0.5rem;
