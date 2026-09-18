@@ -143,7 +143,7 @@ The position number is **not the shirt number** (`team_players.number`) and not 
 
 ### Goals by role is scored per role, against standards
 
-Since `0038_attendance_dnp.sql`. The sixth Matrix measure, `role_goals`, is for a 1v1 or attackers-against-defenders drill: each player records **one score for the whole drill from their own side** (`3-1`), with their **role for that session** — pre-filled from the position number by `roleOfPosition`, changeable on the sheet, never written back to the roster. Like `time_bands` it is a standard, not a ranking.
+Since `0037_goals_by_role.sql`. The sixth Matrix measure, `role_goals`, is for a 1v1 or attackers-against-defenders drill: each player records **one score for the whole drill from their own side** (`3-1`), with their **role for that session** — pre-filled from the position number by `roleOfPosition`, changeable on the sheet, never written back to the roster. Like `time_bands` it is a standard, not a ranking.
 
 - **The rule** — per squad, per drill, per role, `drill_goal_bands` holds `base` bands (goal difference at least T) and `bonus` bands (attack: goals scored at least T; defend and keeper: goals given up at most T). A player earns the **highest** factor among the base bands met plus the highest among the bonus bands met, capped at 1, times the weight. "Highest met", not "tightest threshold", so a list typed out of order scores the way it reads.
 - **A role with no base bands for the squad is left out**, as a squad with no time bands is. A no-show or an unentered player is charged 0 — unless the squad has no base bands for any role of that drill, when they are left out too.
