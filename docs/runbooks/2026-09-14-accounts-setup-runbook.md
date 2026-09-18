@@ -21,7 +21,20 @@ anyone else until this is done.
 5. Supabase → Authentication → **URL Configuration**: Site URL = the production
    site. Redirect URLs include the production site, the demo site and
    `http://localhost:3000`.
-6. Leave **Authentication → Providers → Email → Confirm email ON.** An
+6. Supabase → Authentication → **Rate Limits**: raise "Rate limit for sending
+   emails" to about 100 an hour. Custom SMTP starts with a low cap, and a
+   squad registering the evening a coach shares the link will hit it.
+7. Supabase → Authentication → **Emails → Templates**: in **Confirm signup**,
+   **Reset password**, **Change email address** and **Magic link**, every link
+   must be `href="{{ .ConfirmationURL }}"` — no space inside the quotes, and
+   never `{{ .Token }}` or `{{ .TokenHash }}`. The app has no screen for typing
+   a code: it runs the implicit flow and reads the session off the link.
+   Production's Confirm signup template once put the token in the `href`,
+   with a leading space, and every confirmation link arrived as
+   `http://%20<digits>`, which mail clients refuse — so sign-up failed even
+   after mail was delivered. Keep the wording free of any one organization's
+   name; club players get these emails too.
+8. Leave **Authentication → Providers → Email → Confirm email ON.** An
    invitation is only safe because of it: with it off, accounts arrive already
    confirmed, invitations are redeemed at sign-up, and anyone who knows an
    invited address can take that place.
@@ -34,6 +47,13 @@ minute.
 
 If it does not arrive, stop: check the provider's activity log and Supabase →
 Logs → Auth before going further.
+
+Use an address that has **never** registered — a `+alias` of your own works.
+Signing up again with an address that already has a confirmed account answers
+`/signup | request completed` and sends nothing, deliberately, so the response
+cannot reveal which addresses are registered. That looks exactly like a broken
+mailer. Resend's API-keys page tells them apart: a key that shows no activity
+after a sign-up was never used for it.
 
 ## 3. Before applying
 
