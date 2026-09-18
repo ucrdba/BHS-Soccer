@@ -18,13 +18,13 @@ Vue 3 with `<script setup>`, Vue Router and Pinia, built by Vite. Backend is Sup
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/
 npm run typecheck  # vue-tsc --noEmit over src/, components included
-npm test           # vitest — 3,677 tests, config in vitest.config.mts
+npm test           # vitest — 3,703 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 ```
 
 Verification is three gates, and each covers a different slice:
 
-- `npm test` — Vitest (3,677 tests across 205 files), including Vue component and database tests.
+- `npm test` — Vitest (3,703 tests across 205 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit`, which checks a single-file component's script block **and its template**.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. Typecheck and tests can both pass while an import is unresolvable at bundle time.
 
