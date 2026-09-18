@@ -71,13 +71,20 @@ function formatStandard(seconds: number | null | undefined): string {
   return seconds === null || seconds === undefined ? '' : formatSecondsAsTime(seconds);
 }
 
-/** The ruled lines a small-sided result is actually written on. */
+/**
+ * The open space a small-sided result is written in.
+ *
+ * Free form, with one hairline separating the three -- a coach writes "1, 5,
+ * 3, 7" across the block however it falls, and ruled writing lines would only
+ * say where the numbers may not go.
+ */
 function outcomeLines(): string {
-  const line = '<div class="rule"></div>';
+  const block = (label: string, tall: boolean) =>
+    `<div class="box${tall ? ' box--tall' : ''}"><span class="box__label">${label}</span></div>`;
   return `<div class="lines">
-<p class="lines__row"><span class="lines__label">WON</span>${line}${line}</p>
-<p class="lines__row"><span class="lines__label">TIE</span>${line}</p>
-<p class="lines__row"><span class="lines__label">LOST</span>${line}${line}</p>
+${block('WON', true)}
+${block('TIE', false)}
+${block('LOST', true)}
 <p class="lines__hint">Write recording numbers, e.g. 1, 5, 3, 7, 12, 18, 14</p>
 </div>`;
 }
@@ -187,11 +194,11 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
     pageBreaks: true,
     sections,
     style: `
-  .lines { margin: 0 0 4mm; }
-  .lines__row { display: flex; align-items: flex-end; gap: 3mm; margin: 0 0 3mm; }
-  .lines__label { width: 14mm; flex: none; font-size: 9pt; letter-spacing: 0.08em; color: #605d5d; }
-  .rule { flex: 1; border-bottom: 0.6pt solid #201f1d; height: 7mm; }
-  .lines__hint { margin: 0 0 4mm; font-size: 8.5pt; color: #605d5d; }
+  .lines { margin: 0 0 4mm; border-top: 0.4pt solid #b8b5b5; }
+  .box { padding: 1.5mm 0 0; min-height: 14mm; border-bottom: 0.4pt solid #b8b5b5; }
+  .box--tall { min-height: 22mm; }
+  .box__label { font-size: 9pt; letter-spacing: 0.08em; color: #605d5d; }
+  .lines__hint { margin: 1.5mm 0 4mm; font-size: 8.5pt; color: #605d5d; }
   .fill { display: flex; align-items: flex-end; gap: 2mm; margin: 1mm 0 6mm; font-size: 10pt; }
   .fill__rule { width: 70mm; border-bottom: 0.6pt solid #201f1d; height: 5mm; }`
   });

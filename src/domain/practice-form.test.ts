@@ -67,6 +67,9 @@ describe('the sheet for each measure', () => {
     expect(sheet.preamble).toContain('TIE');
     expect(sheet.preamble).toContain('LOST');
     expect(sheet.preamble).toMatch(/recording numbers/i);
+    // Open space, not ruled writing lines: the numbers are written free form,
+    // and a rule only tells a coach where they may not write.
+    expect(sheet.preamble).not.toContain('class="rule"');
   });
 
   it('gives Goals by role a role to circle, the usual one, and a score box', () => {
