@@ -18,13 +18,13 @@ Vue 3 with `<script setup>`, Vue Router and Pinia, built by Vite. Backend is Sup
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/
 npm run typecheck  # vue-tsc --noEmit over src/, components included
-npm test           # vitest — 3,563 tests, config in vitest.config.mts
+npm test           # vitest — 3,575 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 ```
 
 Verification is three gates, and each covers a different slice:
 
-- `npm test` — Vitest (3,563 tests across 202 files), including Vue component and database tests.
+- `npm test` — Vitest (3,575 tests across 203 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit`, which checks a single-file component's script block **and its template**.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. Typecheck and tests can both pass while an import is unresolvable at bundle time.
 
@@ -143,7 +143,7 @@ The position number is **not the shirt number** (`team_players.number`) and not 
 
 ### Goals by role is scored per role, against standards
 
-Since `0037_goals_by_role.sql`. The sixth Matrix measure, `role_goals`, is for a 1v1 or attackers-against-defenders drill: each player records **one score for the whole drill from their own side** (`3-1`), with their **role for that session** — pre-filled from the position number by `roleOfPosition`, changeable on the sheet, never written back to the roster. Like `time_bands` it is a standard, not a ranking.
+Since `0038_attendance_dnp.sql`. The sixth Matrix measure, `role_goals`, is for a 1v1 or attackers-against-defenders drill: each player records **one score for the whole drill from their own side** (`3-1`), with their **role for that session** — pre-filled from the position number by `roleOfPosition`, changeable on the sheet, never written back to the roster. Like `time_bands` it is a standard, not a ranking.
 
 - **The rule** — per squad, per drill, per role, `drill_goal_bands` holds `base` bands (goal difference at least T) and `bonus` bands (attack: goals scored at least T; defend and keeper: goals given up at most T). A player earns the **highest** factor among the base bands met plus the highest among the bonus bands met, capped at 1, times the weight. "Highest met", not "tightest threshold", so a list typed out of order scores the way it reads.
 - **A role with no base bands for the squad is left out**, as a squad with no time bands is. A no-show or an unentered player is charged 0 — unless the squad has no base bands for any role of that drill, when they are left out too.
@@ -297,7 +297,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0037_goals_by_role.sql`.
+8. …through `supabase/migrations/0038_attendance_dnp.sql`.
 
 Prefer adding a new dated migration over editing an already-applied script.
 
