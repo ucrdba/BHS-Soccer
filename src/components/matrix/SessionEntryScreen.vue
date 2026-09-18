@@ -480,6 +480,7 @@ async function onSave(): Promise<void> {
                 <option value="present">Here</option>
                 <option value="excused">Excused</option>
                 <option value="unexcused">No-show</option>
+                <option value="dnp">DNP (did not play)</option>
               </select>
             </td>
 

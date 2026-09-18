@@ -162,7 +162,12 @@ deploy.
    notify pgrst, 'reload schema';
    ```
 
-8. Immediately push `main` (the owner's call). Vercel deploys production; wait
+8. Paste the whole of `supabase/migrations/0038_attendance_dnp.sql` and run it.
+   It widens the attendance check to allow `dnp` and rebuilds the two scoring
+   views. Safe on the older app — it never sends `dnp` — but the new client
+   **needs** it, or every DNP save is refused by the constraint. If it errors,
+   its own transaction rolls it back; do not push until it has applied cleanly.
+9. Immediately push `main` (the owner's call). Vercel deploys production; wait
    for the deployment to go live.
 
 ## 5. Prove the new flows on the live site
@@ -420,3 +425,32 @@ dropping them would destroy recorded Goals-by-role results. Under 0022's view
 those sessions score nothing for players who were there, and still charge a
 no-show or an unentered player 0 of the weight. Change such drills to another
 measure, or delete those sessions, if that matters.
+
+### Undoing 0038 (DNP)
+
+Run this only **after** the client has been rolled back, and only once no
+result carries `dnp` — the constraint below refuses to go back while one does.
+
+```sql
+begin;
+set role postgres;
+-- Anything still marked DNP has to be settled first: these are the rows.
+select s.occurred_on, d.name, r.player_id
+  from public.matrix_session_results r
+  join public.matrix_sessions s on s.id = r.session_id
+  join public.drills_bank    d on d.id = s.drill_id
+ where r.attendance = 'dnp';
+-- Either fix them by hand, or take the blunt route and call them no-shows,
+-- which scores identically:
+--   update public.matrix_session_results set attendance = 'unexcused' where attendance = 'dnp';
+alter table public.matrix_session_results drop constraint if exists matrix_session_results_attendance_check;
+alter table public.matrix_session_results add constraint matrix_session_results_attendance_check
+  check (attendance in ('present', 'excused', 'unexcused'));
+commit;
+```
+
+The views may be left as 0038 built them: with no `dnp` rows, the absent branch
+reports `unexcused` exactly as 0037's did. To restore 0037's text as well, run
+the section of `supabase/migrations/0037_goals_by_role.sql` from
+`drop view if exists public.matrix_standings;` to the `grant` that follows
+`matrix_standings`, then `notify pgrst, 'reload schema';`.

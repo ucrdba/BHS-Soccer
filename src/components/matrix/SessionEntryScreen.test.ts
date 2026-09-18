@@ -752,3 +752,25 @@ describe('a Goals-by-role exercise', () => {
     expect((await goalsGrid()).find('[data-no-goal-bands]').exists()).toBe(false);
   });
 });
+
+describe('the attendance column', () => {
+  it('offers DNP beside Here, Excused and No-show', async () => {
+    const w = await mountGrid();
+    const options = w.find('[data-attendance]').findAll('option');
+    expect(options.map((o: any) => o.attributes('value'))).toEqual(['present', 'excused', 'unexcused', 'dnp']);
+    expect(options.map((o: any) => o.text())).toEqual(['Here', 'Excused', 'No-show', 'DNP (did not play)']);
+  });
+
+  it('saves a DNP row with no result and does not refuse the sheet', async () => {
+    const w = await mountGrid();
+    await w.findAll('[data-attendance]')[0].setValue('dnp');
+    await fields(w)[1].setValue('40');
+    await fields(w)[2].setValue('42');
+    await w.find('[data-session-save]').trigger('click');
+    await flush();
+
+    const rows = saveMatrixSession.mock.calls[0][2];
+    expect(rows.find((r: any) => r.attendance === 'dnp')).toMatchObject({ rawValue: null });
+  });
+});
+

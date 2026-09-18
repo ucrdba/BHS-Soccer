@@ -448,3 +448,26 @@ describe('applyOutcomeLists', () => {
       .toEqual({ ok: false, error: 'No player with recording number 9.' });
   });
 });
+
+describe('DNP on the grid', () => {
+  it('is not a result: whatever is in the box is dropped, as for any absence', () => {
+    const e = blankEntries(PLAYERS, 'count_high');
+    e.p1 = { ...e.p1, value: '40', attendance: 'dnp' };
+    const out = toSessionResults(PLAYERS, e, 'count_high');
+    expect(out.find(r => r.playerId === 'p1'))
+      .toEqual({ playerId: 'p1', attendance: 'dnp', rawValue: null, outcome: null });
+  });
+
+  it('does not count as present with nothing recorded', () => {
+    const e = blankEntries(PLAYERS, 'count_high');
+    e.p2 = { ...e.p2, attendance: 'dnp' };
+    expect(presentWithoutResult(PLAYERS, e, 'count_high').map(p => p.id)).not.toContain('p2');
+  });
+
+  it('is left alone by the squad-wide fill', () => {
+    const e = blankEntries(PLAYERS, 'win_loss');
+    e.p3 = { ...e.p3, attendance: 'dnp' };
+    expect(fillBlankOutcomes(e, 'win').p3.outcome).toBe('');
+  });
+});
+

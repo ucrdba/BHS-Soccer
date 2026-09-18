@@ -125,6 +125,14 @@ Since `0035_account_invitations.sql`. A person reaches their team one of two way
 - **Test account permissions on an `authenticated` connection** — `src/data/testdb/accounts-db.ts` builds a committed database from the migrations and hands out visitor connections. Every permission bug in this area has passed the superuser harness.
 - `profiles_select` still lets any coach read every profile across organizations, and `profiles.school_id` names one organization even for someone on a school team and a club team. Both are known and left open by the spec.
 
+### Attendance has four values, and two of them cost the same
+
+Since `0038_attendance_dnp.sql`. `matrix_session_results.attendance` is `present`, `excused`, `unexcused` or `dnp`.
+
+- **`excused` costs nothing**: the row is left out of earned and available entirely, so an undone exercise cannot drag a share down.
+- **`unexcused` and `dnp` both earn 0 of the full weight.** A no-show was not at practice; a DNP was there and did not do the exercise. They are scored identically and **reported apart** — `matrix_exercise_points`' `absent` branch carries the stored value rather than hard-coding `'unexcused'`, which is what lets `matrix-breakdown.ts` say "did not play" instead of accusing someone of missing practice.
+- The measure's default is unchanged: `defaultSessionAttendance` still opens a timed or banded sheet on `unexcused` and everything else on `present`, because typing a value marks a player present anyway.
+
 ### A position is a number, 1 to 11
 
 Since `0036_numbered_positions.sql`. `team_players.position` is a `smallint`, null or 1–11: **1 goalkeeper, 2–6 defence, 7–11 attack.** There is no midfield role. It was free text ("FB", "MF", "Center Midfield") until then, and the conversion kept only what was certain — goalkeeper spellings became 1, everything ambiguous was cleared for the coach — because a guessed number puts a player in the wrong role without anyone noticing.

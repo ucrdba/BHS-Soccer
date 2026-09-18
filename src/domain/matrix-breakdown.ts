@@ -28,6 +28,7 @@ export interface BreakdownRow {
 /**
  * What the player actually did, in words.
  *
+ * `absent` covers a no-show and a DNP, which read differently below.
  * `absent` and `not_entered` are deliberately different. A no-show is a
  * decision somebody recorded; a row nobody filled in is an omission, and
  * naming it tells the coach to go back rather than leaving them to assume the
@@ -64,7 +65,8 @@ export function breakdownDetail(
     return parts.join(' · ');
   }
 
-  if (row.kind === 'absent') return 'no-show';
+  // Both cost 0 of the weight; only one of them missed practice.
+  if (row.kind === 'absent') return row.attendance === 'dnp' ? 'did not play' : 'no-show';
   if (row.kind === 'not_entered') return 'not entered';
 
   if (row.raw_value === null || row.raw_value === undefined) return 'took part';

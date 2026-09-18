@@ -329,7 +329,8 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
           ${T(['Marked', 'Effect on their score'], [
             ['<b>Here</b>', 'Scored on their result'],
             ['<b>Excused</b>', 'Nothing at all &mdash; as if the session never happened for them'],
-            ['<b>No-show</b>', 'Zero earned against the full weight &mdash; it pulls the share down']
+            ['<b>No-show</b>', 'Zero earned against the full weight &mdash; it pulls the share down'],
+            ['<b>DNP (did not play)</b>', 'There, but did not do the exercise. Costs the same as a no-show &mdash; zero against the full weight &mdash; and is recorded apart from one, so a player&rsquo;s breakdown says which it was']
           ])}`
       },
       {
@@ -407,7 +408,7 @@ Dylan   1.875 of 7.000 =  26.8%   3rd</pre>
                 made. For a small-sided game, pick won, tie or lost instead &mdash; or type the recording numbers into the <b>Won</b>, <b>Tie</b> and <b>Lost</b> boxes above the list, such as <code>17, 21, 11, 19</code>, and press <b>Apply lists</b>. For <b>Goals by role</b>, check each player&rsquo;s role and type their score as <code>3-1</code>. For a
                 <b>timed</b> exercise type <code>mm:ss</code>, so <code>4:28</code> rather than
                 268.</li>
-            <li>Mark anyone absent as <b>Excused</b> or <b>No-show</b>. Their number box is ignored either way.</li>
+            <li>Mark anyone absent as <b>Excused</b>, <b>No-show</b> or <b>DNP (did not play)</b>. Their number box is ignored whichever you pick.</li>
             <li>Save. The placings and the points are worked out for you.</li>
           </ol>
           ${N('A player marked &ldquo;Here&rdquo; must have a result', `<p>Leave someone&rsquo;s box

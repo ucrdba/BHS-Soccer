@@ -168,3 +168,14 @@ describe('a Goals-by-role result', () => {
       .toBe('Defence · 1-1 (0) · 60% + 0%');
   });
 });
+
+describe('a player who was there but did not do the exercise', () => {
+  it('reads as did not play, not as a no-show', () => {
+    // Both cost the same -- 0 of the weight -- but the words are not
+    // interchangeable: one of them turned up.
+    expect(detail({ kind: 'absent', attendance: 'dnp' })).toBe('did not play');
+    expect(detail({ kind: 'absent', attendance: 'unexcused' })).toBe('no-show');
+    expect(detail({ kind: 'absent' })).toBe('no-show');
+  });
+});
+

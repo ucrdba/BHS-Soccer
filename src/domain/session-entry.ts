@@ -18,7 +18,12 @@ import { defaultSessionAttendance } from './matrix-session';
 import { roleOfPosition } from './position';
 import { parseGoalScore, formatGoalScore } from './goal-score';
 
-export type Attendance = 'present' | 'excused' | 'unexcused';
+/**
+ * `dnp` is "did not play": there, but did not do the exercise. It costs what
+ * a no-show costs -- 0 of the weight, since they did not do it -- and is kept
+ * apart from one so a breakdown does not accuse them of missing practice.
+ */
+export type Attendance = 'present' | 'excused' | 'unexcused' | 'dnp';
 
 export interface EntryRow {
   playerId: string;
