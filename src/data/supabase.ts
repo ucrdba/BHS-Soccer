@@ -340,6 +340,16 @@ class SupabaseService {
     if (!this.isConfigured()) return null;
     try {
       const { data: userData, error: userError } = await this.client!.auth.getUser();
+      if ((userError as any)?.code === 'user_not_found'
+          || /sub claim in JWT does not exist/i.test(userError?.message || '')) {
+        // The account was deleted while this browser was signed in to it.
+        // auth-js drops a saved session itself only for session_not_found, so
+        // without this the dead session is restored on every visit and each
+        // one shows a failure the visitor cannot clear. Local scope: the
+        // server has nothing left to sign out of.
+        await this.client!.auth.signOut({ scope: 'local' });
+        return null;
+      }
       if (userError || !userData?.user) {
         // This branch used to return null silently, which made a failed profile
         // load indistinguishable from an RLS denial — the caller only reports

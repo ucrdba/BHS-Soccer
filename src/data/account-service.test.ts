@@ -180,3 +180,49 @@ describe('completeEmailLink', () => {
     expect(await svc.completeEmailLink()).toEqual({ outcome: 'confirmed' });
   });
 });
+
+describe('a saved sign-in for a deleted account', () => {
+  // auth-js clears a saved session itself only when the *session* is gone
+  // (session_not_found). When an admin deletes the account, getUser answers
+  // user_not_found and the dead session stays in storage -- so every visit
+  // afterwards showed "Your account profile could not be loaded" and the
+  // visitor, who did nothing, could not get rid of it.
+  const deleted = { message: 'User from sub claim in JWT does not exist', status: 403, code: 'user_not_found' };
+
+  beforeEach(async () => {
+    const { resetNotices } = await import('../domain/notices');
+    resetNotices();
+    auth.getUser = vi.fn().mockResolvedValue({ data: { user: null }, error: deleted });
+    auth.signOut = vi.fn().mockResolvedValue({ error: null });
+  });
+
+  it('is signed out on this device only, and reads as no profile', async () => {
+    expect(await svc.fetchOwnProfile()).toBeNull();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('is not reported as a failure', async () => {
+    const { currentNotices } = await import('../domain/notices');
+    await svc.fetchOwnProfile();
+    expect(currentNotices()).toEqual([]);
+  });
+
+  it('any other getUser failure is still reported, and keeps the session', async () => {
+    const { currentNotices } = await import('../domain/notices');
+    auth.getUser = vi.fn().mockResolvedValue({ data: { user: null }, error: { message: 'network down', status: 0 } });
+    expect(await svc.fetchOwnProfile()).toBeNull();
+    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(currentNotices()).toHaveLength(1);
+  });
+});
+
+describe('a deleted account answered without an error code', () => {
+  it('is recognised by the server message alone', async () => {
+    auth.getUser = vi.fn().mockResolvedValue({
+      data: { user: null }, error: { message: 'User from sub claim in JWT does not exist', status: 403 }
+    });
+    auth.signOut = vi.fn().mockResolvedValue({ error: null });
+    expect(await svc.fetchOwnProfile()).toBeNull();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+});
