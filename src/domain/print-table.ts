@@ -84,7 +84,8 @@ const STYLE = `
 
 /** The page around one or more tables. */
 function page(
-  title: string, where: string[], note: string | undefined, body: string, extraStyle = ''
+  title: string, where: string[], note: string | undefined, body: string,
+  extraStyle = '', showTitle = true
 ): string {
   const when = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -100,7 +101,7 @@ function page(
 </style>
 </head>
 <body>
-<h1>${escapeHtml(title)}</h1>
+${showTitle ? `<h1>${escapeHtml(title)}</h1>` : ''}
 <p class="where">${who}</p>
 <p class="when">${escapeHtml(when)}</p>
 ${note || ''}
@@ -133,6 +134,11 @@ export function printSectionsDocument(options: {
   pageBreaks?: boolean;
   /** Extra CSS a caller's preamble needs. */
   style?: string;
+  /**
+   * Print the title above the tables. Off for forms, where each sheet already
+   * names its exercise and the page is wanted for rows.
+   */
+  showTitle?: boolean;
 }): string | null {
   const sections = (options.sections || []).filter(s => (s.rows || []).length > 0);
   if (sections.length === 0) return null;
@@ -144,5 +150,6 @@ ${s.preamble || ''}
 ${table(s.rows, s.textual || new Set<string>())}
 </section>`).join('\n');
 
-  return page(options.title, options.where, options.note, body, options.style || '');
+  return page(options.title, options.where, options.note, body, options.style || '',
+              options.showTitle !== false);
 }

@@ -177,6 +177,10 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
   return printSectionsDocument({
     title: TITLE,
     where: [options.organization, options.team],
+    // No heading over the sheets: each one names its own exercise, and the
+    // space is better spent on rows. The document is still titled, which is
+    // what the print dialog and a saved PDF use.
+    showTitle: false,
     pageBreaks: true,
     sections,
     style: `

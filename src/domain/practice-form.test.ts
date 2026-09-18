@@ -132,6 +132,13 @@ describe('the document', () => {
     expect(html).toContain('Beaumont High School');
   });
 
+  it('spends no space on a title: the sheet says which exercise it is', () => {
+    const html = buildPracticeFormsDocument(opts({}))!;
+    expect(html).not.toMatch(/<h1>/);
+    // The document is still titled, for the print dialog and the saved PDF.
+    expect(html).toContain('<title>Practice forms</title>');
+  });
+
   it('refuses rather than printing a headed blank page', () => {
     expect(buildPracticeFormsDocument(opts({ players: [] }))).toBeNull();
     expect(buildPracticeFormsDocument(opts({ drills: [] }))).toBeNull();
