@@ -224,13 +224,36 @@ export function matrixBoardRows(
 export function compareBoardRows(x: any, y: any, by: string, reversed: boolean): number {
   const flip = reversed ? -1 : 1;
   const unranked = (r: any) => r.exercises === 0;
+  const byName = () => String(x.name || '').localeCompare(String(y.name || ''));
 
-  if (by !== 'name') {
+  // A name and a recording number are lookups: everyone sorts among everyone.
+  if (by !== 'name' && by !== 'recordingNumber') {
     if (unranked(x) !== unranked(y)) return unranked(x) ? 1 : -1;
   }
 
   if (by === 'name') {
-    return flip * String(x.name || '').localeCompare(String(y.name || ''));
+    return flip * byName();
+  }
+
+  if (by === 'recordingNumber') {
+    // A player with no number sinks either way: there is nothing to place.
+    const blank = (r: any) => r.recordingNumber === null || r.recordingNumber === undefined || r.recordingNumber === '';
+    if (blank(x) !== blank(y)) return blank(x) ? 1 : -1;
+    if (blank(x)) return byName();
+    const d = Number(x.recordingNumber) - Number(y.recordingNumber);
+    return d ? flip * d : byName();
+  }
+
+  if (by === 'exercises' || by === 'available') {
+    const d = Number(y[by] || 0) - Number(x[by] || 0);
+    return d ? flip * d : byName();
+  }
+
+  if (by === 'wdl') {
+    const wins = (y.wins || 0) - (x.wins || 0);
+    if (wins) return flip * wins;
+    const draws = (y.draws || 0) - (x.draws || 0);
+    return draws ? flip * draws : byName();
   }
 
   if (by === 'earned') {
@@ -255,7 +278,7 @@ export function compareBoardRows(x: any, y: any, by: string, reversed: boolean):
 
 /** Which way a board column reads on its first click. */
 export function boardSortDescends(by: string): boolean {
-  return by === 'earned' || by === 'share';
+  return by === 'earned' || by === 'share' || by === 'exercises' || by === 'wdl' || by === 'available';
 }
 
 /**

@@ -57,8 +57,8 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
 };
 
-async function mountReport(opts: { history?: any; bands?: any[] } = {}) {
-  const { history = HISTORY, bands = [{ max_seconds: 270, factor: 1 }] } = opts;
+async function mountReport(opts: { history?: any; bands?: any[]; players?: any[] } = {}) {
+  const { history = HISTORY, bands = [{ max_seconds: 270, factor: 1 }], players = PLAYERS } = opts;
   fetchTeamSessionHistory.mockResolvedValue(history);
   fetchTimeBands.mockResolvedValue(bands);
 
@@ -67,7 +67,7 @@ async function mountReport(opts: { history?: any; bands?: any[] } = {}) {
     global: {
       plugins: [createTestingPinia({
         createSpy: vi.fn, stubActions: true,
-        initialState: { matrix: { players: PLAYERS, drillsBank: DRILLS } }
+        initialState: { matrix: { players, drillsBank: DRILLS } }
       })]
     },
     attachTo: document.body
@@ -200,8 +200,11 @@ describe('what it does not say', () => {
 
   it('does not rank anybody against the squad on a threshold', async () => {
     // The useful reading is who is short of the standard, not who is fastest.
+    // The exercise sections only: the overall ratings above them are the
+    // Matrix's weighted points ranking, which is a ranking by design.
     const w = await mountReport();
-    expect(w.text()).not.toMatch(/rank|1st|fastest in the squad/i);
+    const exercises = w.findAll('[data-squad-exercise]').map((s: any) => s.text()).join(' ');
+    expect(exercises).not.toMatch(/rank|1st|fastest in the squad/i);
   });
 });
 
@@ -326,8 +329,9 @@ describe('taking the squad report off the screen', () => {
   it('writes one sheet per exercise, in the order shown', async () => {
     const w = await mountReport();
     await w.find('[data-squad-excel]').trigger('click');
-    expect(written.map(s => s.name)).toEqual(['3 Laps', 'Coopers']);
-    expect(written[0].rows[0]).toMatchObject({ Player: 'Cesar Alva', Attempts: 2, Best: '4:10' });
+    // The overall ratings first, as on screen.
+    expect(written.map(s => s.name)).toEqual(['Overall ratings', '3 Laps', 'Coopers']);
+    expect(written[1].rows[0]).toMatchObject({ Player: 'Cesar Alva', Attempts: 2, Best: '4:10' });
   });
 
   it('exports what the coach sorted, not the original order', async () => {
@@ -335,8 +339,21 @@ describe('taking the squad report off the screen', () => {
     const sec = w.findAll('[data-squad-exercise]').find((s: any) => s.text().includes('3 Laps'))!;
     await sec.find('[data-squad-sort="name"]').trigger('click');
     await w.find('[data-squad-excel]').trigger('click');
-    expect(written[0].rows.map((r: any) => r.Player))
+    // written[0] is the overall ratings; 3 Laps is the next sheet.
+    expect(written[1].name).toBe('3 Laps');
+    expect(written[1].rows.map((r: any) => r.Player))
       .toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+  });
+
+  it('exports the overall ratings as the coach sorted them', async () => {
+    const w = await mountReport({ players: [
+      { id: 'p1', name: 'Cesar Alva', recordingNumber: 21, matrixStats: { earned: 50, available: 120, share: 41.7, rank: 2, exercises: 6, wins: 3, draws: 1, losses: 2 } },
+      { id: 'p2', name: 'Tom Budde', recordingNumber: 7, matrixStats: { earned: 100, available: 100, share: 100, rank: 1, exercises: 4, wins: 2, draws: 0, losses: 2 } }
+    ] });
+    await w.find('[data-overall-sort="wdl"]').trigger('click');
+    await w.find('[data-squad-excel]').trigger('click');
+    expect(written[0].name).toBe('Overall ratings');
+    expect(written[0].rows.map((r: any) => r.Player)).toEqual(['Cesar Alva', 'Tom Budde']);
   });
 
   it('prints every exercise in one document', async () => {
@@ -495,5 +512,83 @@ describe('a sprint', () => {
     expect(row.find('[data-squad-avg]').text()).toBe('5.25s');
     expect(row.find('[data-squad-spark]').attributes('aria-label'))
       .toBe('Improving — 5.40s to 5.10s across 2 readings');
+  });
+});
+
+describe('the overall ratings', () => {
+  // Budde outranks Alva on points; Alva has done more and won more. Renteria
+  // has done nothing and is still listed.
+  const RATED = [
+    { id: 'p1', name: 'Cesar Alva', recordingNumber: 21,
+      matrixStats: { earned: 50, available: 120, share: 41.7, rank: 2, exercises: 6, wins: 3, draws: 1, losses: 2 } },
+    { id: 'p2', name: 'Tom Budde', recordingNumber: 7,
+      matrixStats: { earned: 100, available: 100, share: 100, rank: 1, exercises: 4, wins: 2, draws: 0, losses: 2 } },
+    { id: 'p3', name: 'Alain Renteria', recordingNumber: 3,
+      matrixStats: { earned: 0, available: 0, share: null, rank: 999, exercises: 0, wins: 0, draws: 0, losses: 0 } }
+  ];
+  const overall = (w: any) => w.find('[data-squad-overall]');
+  const players = (w: any) => overall(w).findAll('[data-overall-player]').map((p: any) => p.text());
+  const sortBy = (w: any, key: string) => overall(w).find(`[data-overall-sort="${key}"]`).trigger('click');
+
+  it('comes before every exercise', async () => {
+    const w = await mountReport({ players: RATED });
+    const first = w.find('[data-squad-overall], [data-squad-exercise]');
+    expect(first.attributes()).toHaveProperty('data-squad-overall');
+    expect(overall(w).text()).toContain('Overall ratings');
+  });
+
+  it('has the Player Ratings columns', async () => {
+    const w = await mountReport({ players: RATED });
+    // Without the arrow that marks the column it is sorted by.
+    expect(overall(w).findAll('th').map((t: any) => t.text().replace(/[▲▼]/g, '').trim()))
+      .toEqual(['Rank', 'Player', 'No', 'Ex', 'W-D-L', 'Pts', 'Of', 'Share']);
+  });
+
+  it('lists everyone in rank order, with a dash for a player who has done nothing', async () => {
+    const w = await mountReport({ players: RATED });
+    expect(players(w)).toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+    const rows = overall(w).findAll('[data-overall-row]');
+    expect(rows[0].text()).toContain('100.00');
+    expect(rows[0].text()).toContain('2 - 0 - 2');
+    expect(rows[0].text()).toContain('100.0%');
+    expect(rows[2].find('[data-overall-rank]').text()).toBe('—');
+  });
+
+  it('sorts on every column', async () => {
+    const w = await mountReport({ players: RATED });
+    const heads = overall(w).findAll('th');
+    expect(heads.every((h: any) => h.find('[data-overall-sort]').exists())).toBe(true);
+
+    await sortBy(w, 'wdl');
+    expect(players(w)).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+    await sortBy(w, 'wdl');
+    expect(players(w)).toEqual(['Tom Budde', 'Cesar Alva', 'Alain Renteria']);
+
+    await sortBy(w, 'name');
+    expect(players(w)).toEqual(['Alain Renteria', 'Cesar Alva', 'Tom Budde']);
+
+    await sortBy(w, 'recordingNumber');
+    expect(players(w)).toEqual(['Alain Renteria', 'Tom Budde', 'Cesar Alva']);
+
+    await sortBy(w, 'exercises');
+    expect(players(w)).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
+  });
+
+  it('marks the column it is sorted by', async () => {
+    const w = await mountReport({ players: RATED });
+    await sortBy(w, 'earned');
+    expect(overall(w).find('[data-overall-sort="earned"]').text()).toContain('▼');
+  });
+
+  it('sorts on its own, leaving the exercises as they were', async () => {
+    const w = await mountReport({ players: RATED });
+    const before = sectionFor(w, '3 Laps').findAll('[data-squad-player]').map((p: any) => p.text());
+    await sortBy(w, 'name');
+    expect(sectionFor(w, '3 Laps').findAll('[data-squad-player]').map((p: any) => p.text())).toEqual(before);
+  });
+
+  it('is not shown when no sessions have been recorded', async () => {
+    const w = await mountReport({ players: RATED, history: [] });
+    expect(overall(w).exists()).toBe(false);
   });
 });

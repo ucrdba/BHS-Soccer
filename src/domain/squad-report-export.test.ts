@@ -198,3 +198,36 @@ describe('a sprint in the squad report, taken off the screen', () => {
     expect(buildSquadReportPrintDocument(opts)!).toContain('Improving — 5.40s to 5.05s across 2 readings');
   });
 });
+
+describe('the overall ratings, taken off the screen', () => {
+  // Board rows as the screen has them sorted.
+  const OVERALL = [
+    { playerId: 'p2', name: 'Tom Budde', recordingNumber: 7, rank: 1, exercises: 4,
+      wins: 2, draws: 0, losses: 2, earned: 100, available: 100, share: 100 },
+    { playerId: 'p3', name: 'Alain Renteria', recordingNumber: null, rank: 999, exercises: 0,
+      wins: 0, draws: 0, losses: 0, earned: 0, available: 0, share: null }
+  ];
+  const opts = { ...OPTS, overall: OVERALL };
+
+  it('is the first sheet, in the order shown, with the board columns', () => {
+    const sheets = squadReportSheets(opts);
+    expect(sheets[0].name).toBe('Overall ratings');
+    expect(sheets[0].rows).toEqual([
+      { Rank: 1, Player: 'Tom Budde', No: 7, Ex: 4, 'W-D-L': '2 - 0 - 2', Pts: '100.00', Of: '100.00', Share: '100.0%' },
+      // As the board's own export writes them: blanks, not dashes, for no number or share.
+      { Rank: '—', Player: 'Alain Renteria', No: '', Ex: 0, 'W-D-L': '0 - 0 - 0', Pts: '0.00', Of: '0.00', Share: '' }
+    ]);
+    expect(sheets.slice(1).map(s => s.name)).toEqual(['3-430', 'Flying Fours']);
+  });
+
+  it('is printed first, above the exercises', () => {
+    const html = buildSquadReportPrintDocument(opts)!;
+    expect(html.indexOf('<h2>Overall ratings</h2>')).toBeGreaterThan(-1);
+    expect(html.indexOf('<h2>Overall ratings</h2>')).toBeLessThan(html.indexOf('<h2>3-430</h2>'));
+  });
+
+  it('is left out when there is nothing to rate', () => {
+    expect(squadReportSheets({ ...OPTS, overall: [] }).map(s => s.name)).toEqual(['3-430', 'Flying Fours']);
+    expect(squadReportSheets(OPTS).map(s => s.name)).toEqual(['3-430', 'Flying Fours']);
+  });
+});

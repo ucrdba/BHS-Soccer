@@ -12,12 +12,25 @@ import { formatTimeFor } from './time';
 import { printSectionsDocument, type PrintSection } from './print-table';
 import { progressLowerIsBetter } from './progress';
 import { sparkline, sparkLabel, sparklineSvg } from './sparkline';
+import { boardSheet } from './board-export';
 
 export interface SquadReportExportOptions {
   organization: string;
   team?: string;
   /** The report's sections, as the screen has them. */
   rows: any[];
+  /**
+   * The overall ratings -- Player Ratings board rows -- as the screen has them
+   * sorted. First in both exports, as on screen.
+   */
+  overall?: any[];
+}
+
+const OVERALL = 'Overall ratings';
+
+/** The board's own columns, written by the board's own export. */
+function overallRows(options: SquadReportExportOptions): Record<string, any>[] {
+  return boardSheet({ organization: options.organization, team: options.team, rows: options.overall || [] });
 }
 
 const TITLE = 'Squad report';
@@ -90,10 +103,12 @@ function sectionNote(row: any): string | undefined {
 export function squadReportSheets(
   options: SquadReportExportOptions
 ): { name: string; rows: Record<string, any>[] }[] {
-  return (options?.rows || []).map(row => ({
+  const overall = overallRows(options);
+  const exercises = (options?.rows || []).map(row => ({
     name: sheetName(row.drill?.name),
     rows: sheetRows(row)
   }));
+  return overall.length ? [{ name: OVERALL, rows: overall }, ...exercises] : exercises;
 }
 
 /**
@@ -103,13 +118,20 @@ export function squadReportSheets(
  * coach hands over one sheet rather than one per exercise.
  */
 export function buildSquadReportPrintDocument(options: SquadReportExportOptions): string | null {
-  const sections: PrintSection[] = (options?.rows || []).map(row => ({
+  const overall: PrintSection = {
+    heading: OVERALL,
+    note: 'Every exercise recorded, weighted. Pts is what each player earned and Of what was '
+      + 'available to them. A dash means they have taken part in nothing yet.',
+    textual: new Set(['Player', 'W-D-L', 'Rank', 'Share']),
+    rows: overallRows(options)
+  };
+  const sections: PrintSection[] = [overall, ...(options?.rows || []).map(row => ({
     heading: row.drill?.name || 'Exercise',
     note: sectionNote(row),
     textual: TEXTUAL,
     markup: MARKUP,
     rows: sheetRows(row, true)
-  }));
+  }))];
 
   return printSectionsDocument({
     title: TITLE,

@@ -345,3 +345,50 @@ describe('a Goals-by-role leaderboard', () => {
     for (const by of ['score', 'diff', 'base', 'bonus']) expect(exerciseSortDescends(by, false)).toBe(true);
   });
 });
+
+describe('sorting the board on every column', () => {
+  // The squad report's Overall ratings section sorts on all of them. Alva and
+  // Budde disagree on each figure, so a sort that fell through to rank shows.
+  const players = [
+    { id: 'p1', name: 'Cesar Alva', recordingNumber: 21,
+      matrixStats: { earned: 50, available: 120, share: 42, rank: 2, exercises: 6, wins: 3, draws: 1, losses: 2 } },
+    { id: 'p2', name: 'Tom Budde', recordingNumber: 7,
+      matrixStats: { earned: 100, available: 100, share: 100, rank: 1, exercises: 4, wins: 2, draws: 0, losses: 2 } },
+    { id: 'p3', name: 'Alain Renteria', recordingNumber: null,
+      matrixStats: { earned: 0, available: 0, share: null, rank: 999, exercises: 0 } },
+    { id: 'p4', name: 'Marco Diaz', recordingNumber: 3,
+      matrixStats: { earned: 0, available: 0, share: null, rank: 999, exercises: 0 } }
+  ];
+  const ids = (by: string, reversed = false) => matrixBoardRows(players, by, reversed).map(r => r.playerId);
+
+  it('sorts the recording number lowest first, everyone in number order, a blank last', () => {
+    // A lookup column: a player who has done nothing still has a number.
+    expect(ids('recordingNumber')).toEqual(['p4', 'p2', 'p1', 'p3']);
+    expect(ids('recordingNumber', true)).toEqual(['p1', 'p2', 'p4', 'p3']);
+  });
+
+  it('sorts exercises most first, with nothing done at the bottom', () => {
+    expect(ids('exercises')).toEqual(['p1', 'p2', 'p3', 'p4']);
+    expect(ids('exercises', true)).toEqual(['p2', 'p1', 'p3', 'p4']);
+  });
+
+  it('sorts the record on wins, then draws', () => {
+    // Alva has more wins than Budde though Budde outranks him.
+    expect(ids('wdl')).toEqual(['p1', 'p2', 'p3', 'p4']);
+    expect(ids('wdl', true)).toEqual(['p2', 'p1', 'p3', 'p4']);
+    const level = players.map(p => p.id === 'p2'
+      ? { ...p, matrixStats: { ...p.matrixStats, wins: 3, draws: 2 } } : p);
+    expect(matrixBoardRows(level, 'wdl').map(r => r.playerId).slice(0, 2)).toEqual(['p2', 'p1']);
+  });
+
+  it('sorts points available most first', () => {
+    expect(ids('available')).toEqual(['p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('reads the number upward and the counts downward on a first click', () => {
+    expect(boardSortDescends('recordingNumber')).toBe(false);
+    expect(boardSortDescends('exercises')).toBe(true);
+    expect(boardSortDescends('wdl')).toBe(true);
+    expect(boardSortDescends('available')).toBe(true);
+  });
+});

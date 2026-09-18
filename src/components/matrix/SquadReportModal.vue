@@ -24,6 +24,10 @@
  * **A timed exercise draws each player's progress** beside their best, on one
  * scale for the whole exercise so the graphs read down the table and the
  * standard sits at one height. See `domain/sparkline.ts`.
+ *
+ * **The overall ratings come first**: the Player Ratings board, built by the
+ * board's own `matrixBoardRows`, so the two cannot rank anyone differently.
+ * Every column sorts, and the section sorts on its own.
  */
 import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
@@ -37,6 +41,7 @@ import { formatTimeFor } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
 import { progressSeries } from '../../domain/progress';
 import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
+import { matrixBoardRows, boardSortDescends } from '../../domain/matrix';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -149,13 +154,42 @@ const sortedRows = computed(() => rows.value.map((row: any) => {
   };
 }));
 
+/** The overall ratings, the board's rows, sorted on their own. */
+const OVERALL_COLUMNS = [
+  { key: 'rank', label: 'Rank' },
+  { key: 'name', label: 'Player', text: true },
+  { key: 'recordingNumber', label: 'No', title: 'Recording number, not the shirt number' },
+  { key: 'exercises', label: 'Ex', title: 'Exercises taken part in' },
+  { key: 'wdl', label: 'W-D-L' },
+  { key: 'earned', label: 'Pts' },
+  { key: 'available', label: 'Of', title: 'Points available' },
+  { key: 'share', label: 'Share' }
+];
+
+const overallSort = ref({ by: 'rank', reversed: false });
+
+const overallRows = computed(() =>
+  matrixBoardRows(players.value, overallSort.value.by, overallSort.value.reversed));
+
+function setOverallSort(by: string): void {
+  const now = overallSort.value;
+  overallSort.value = now.by === by ? { by, reversed: !now.reversed } : { by, reversed: false };
+}
+
+function overallArrow(by: string): string {
+  const now = overallSort.value;
+  if (now.by !== by) return '';
+  return boardSortDescends(by) !== now.reversed ? ' ▼' : ' ▲';
+}
+
 const exportError = ref<string | null>(null);
 
 function exportOptions() {
   return {
     organization: org.branding.name || '',
     team: org.activeTeam?.name || '',
-    rows: sortedRows.value
+    rows: sortedRows.value,
+    overall: overallRows.value
   };
 }
 
@@ -245,6 +279,41 @@ watch(() => [props.open, props.teamId] as const, async () => {
     <p v-else-if="rows.length === 0" class="state" data-squad-empty>
       No sessions recorded yet. Record one from Player Ratings and it appears here.
     </p>
+
+    <section v-if="!loading && !loadError && rows.length" class="ex" data-squad-overall>
+      <h3 class="ex__h">Overall ratings</h3>
+      <p class="ex__short">
+        Every exercise recorded, weighted — as on the Player Ratings board. A dash
+        means a player has taken part in nothing yet.
+      </p>
+
+      <div class="wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th v-for="c in OVERALL_COLUMNS" :key="c.key" :class="{ 'is-text': c.text }" :title="c.title">
+                <button
+                  type="button" class="th-btn" :data-overall-sort="c.key"
+                  @click="setOverallSort(c.key)"
+                >{{ c.label }}{{ overallArrow(c.key) }}</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in overallRows" :key="m.playerId" data-overall-row>
+              <td class="tabular" data-overall-rank>{{ m.exercises === 0 ? '—' : m.rank }}</td>
+              <td class="is-text" data-overall-player>{{ m.name }}</td>
+              <td class="tabular">{{ m.recordingNumber != null ? m.recordingNumber : '—' }}</td>
+              <td class="tabular">{{ m.exercises }}</td>
+              <td class="tabular">{{ m.wins }} - {{ m.draws }} - {{ m.losses }}</td>
+              <td class="tabular">{{ m.earned.toFixed(2) }}</td>
+              <td class="tabular">{{ m.available.toFixed(2) }}</td>
+              <td class="tabular">{{ m.share === null ? '—' : `${m.share.toFixed(1)}%` }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <section v-for="row in sortedRows" :key="row.drill.id" class="ex" data-squad-exercise>
       <h3 class="ex__h">
