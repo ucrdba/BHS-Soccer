@@ -8,7 +8,7 @@
  * As everywhere else here, the rows arrive in the order the coach sorted them
  * and are never re-sorted.
  */
-import { formatSecondsAsTime } from './time';
+import { formatTimeFor } from './time';
 import { printSectionsDocument, type PrintSection } from './print-table';
 import { progressLowerIsBetter } from './progress';
 import { sparkline, sparkLabel, sparklineSvg } from './sparkline';
@@ -37,7 +37,7 @@ function sheetName(name: string): string {
 }
 
 const figure = (row: any, value: any): string =>
-  value === null || value === undefined ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
+  value === null || value === undefined ? '—' : (row.timed ? formatTimeFor(value, row.drill?.measure) : String(value));
 
 /**
  * One player's graph, or a dash when they have no reading -- they stay in the

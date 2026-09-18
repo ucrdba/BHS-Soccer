@@ -179,3 +179,22 @@ describe('the printed page', () => {
     expect(buildSquadReportPrintDocument(OPTS)!).toMatch(/table \{ width: auto;/);
   });
 });
+
+describe('a sprint in the squad report, taken off the screen', () => {
+  const sprint = {
+    drill: { id: 'd9', name: '40m Sprint', measure: 'time_low' },
+    timed: true, outcomes: false, threshold: false, standard: null, shortCount: 0,
+    range: { min: 5.05, max: 5.4 },
+    entries: [{ player: { id: 'p1', name: 'Cesar Alva' }, attempts: 2, best: 5.05, avg: 5.2,
+      record: null, short: false, progress: [5.4, 5.05] }]
+  };
+  const opts = { ...OPTS, rows: [sprint] };
+
+  it('writes best and average in decimal seconds', () => {
+    expect(squadReportSheets(opts)[0].rows[0]).toMatchObject({ Best: '5.05s', Avg: '5.20s' });
+  });
+
+  it('prints the words of the graph in decimal seconds too', () => {
+    expect(buildSquadReportPrintDocument(opts)!).toContain('Improving — 5.40s to 5.05s across 2 readings');
+  });
+});

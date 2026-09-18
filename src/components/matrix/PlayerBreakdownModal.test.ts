@@ -24,7 +24,7 @@ const PLAYERS = [
 ];
 
 const DRILLS = [
-  { id: 'd-laps', name: '3 Laps', measure: 'time_low' },
+  { id: 'd-laps', name: '3 Laps', measure: 'time_bands' },
   { id: 'd-coopers', name: 'Coopers', measure: 'count_high' }
 ];
 

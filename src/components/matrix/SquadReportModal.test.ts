@@ -468,3 +468,32 @@ describe('the average', () => {
     expect(players(sec)).toEqual(['Cesar Alva', 'Tom Budde', 'Alain Renteria']);
   });
 });
+
+describe('a sprint', () => {
+  it('reads in decimal seconds: best, average and the words of the graph', async () => {
+    const SPRINT = 'd-sprint';
+    fetchTeamSessionHistory.mockResolvedValue([
+      { drillId: SPRINT, playerId: 'p1', attendance: 'present', rawValue: 5.4, occurredOn: '2026-09-01' },
+      { drillId: SPRINT, playerId: 'p1', attendance: 'present', rawValue: 5.1, occurredOn: '2026-09-08' }
+    ]);
+    fetchTimeBands.mockResolvedValue([]);
+    const w = mount(SquadReportModal, {
+      props: { open: true, teamId: TEAM },
+      global: {
+        plugins: [createTestingPinia({
+          createSpy: vi.fn, stubActions: true,
+          initialState: { matrix: { players: PLAYERS, drillsBank: [{ id: SPRINT, name: '40m Sprint', measure: 'time_low' }] } }
+        })]
+      },
+      attachTo: document.body
+    });
+    await flush();
+    await w.vm.$nextTick();
+
+    const row = w.findAll('[data-squad-row]').find((r: any) => r.text().includes('Cesar Alva'))!;
+    expect(row.find('[data-squad-best]').text()).toBe('5.10s');
+    expect(row.find('[data-squad-avg]').text()).toBe('5.25s');
+    expect(row.find('[data-squad-spark]').attributes('aria-label'))
+      .toBe('Improving — 5.40s to 5.10s across 2 readings');
+  });
+});

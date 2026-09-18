@@ -12,7 +12,7 @@
  * No PDF library, for the reason that module already gives — it would be a
  * dependency for a worse result.
  */
-import { formatSecondsAsTime } from './time';
+import { formatTimeFor } from './time';
 import { printTableDocument } from './print-table';
 import { bandStanding, isThresholdMeasure, roleGoalStanding } from './matrix-threshold';
 import { roleLabel, type PositionRole } from './position';
@@ -30,10 +30,14 @@ export interface ExerciseExportOptions {
 
 const isWinLoss = (m: string) => m === 'win_loss' || m === 'head_to_head';
 
-/** A figure phrased for the exercise it was measured in, or a dash. */
-function figure(row: any, value: any): string {
+/**
+ * A figure phrased for the exercise it was measured in, or a dash. A banded
+ * run rounds to the second; a sprint keeps its hundredths.
+ */
+function figure(row: any, value: any, measure: string): string {
   if (value === null || value === undefined) return '—';
-  return row.timed ? formatSecondsAsTime(Math.round(value)) : String(value);
+  if (!row.timed) return String(value);
+  return formatTimeFor(measure === 'time_low' ? value : Math.round(value), measure);
 }
 
 /** The verdict, in the words the screen uses. */
@@ -89,8 +93,8 @@ export function exerciseSheet(options: ExerciseExportOptions): Record<string, an
       out['Base %'] = has(r.baseFactor) ? percentLabel(r.baseFactor) : '';
       out['Bonus %'] = has(r.bonusFactor) ? percentLabel(r.bonusFactor) : '';
     } else {
-      out['Best time'] = figure(r, r.best);
-      out.Average = figure(r, r.avg);
+      out['Best time'] = figure(r, r.best, options.measure);
+      out.Average = figure(r, r.avg, options.measure);
     }
 
     out.Points = Number(r.earned ?? 0).toFixed(2);

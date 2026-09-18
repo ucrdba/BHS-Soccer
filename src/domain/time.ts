@@ -42,3 +42,19 @@ export function formatSecondsAsTime(seconds: any): string {
   if (!Number.isFinite(n) || n < 0) return '';
   return `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')}`;
 }
+
+/**
+ * A recorded time, in the unit its measure is entered in.
+ *
+ * `time_low` -- a sprint -- is decimal seconds (`4.85`), so it is shown to the
+ * hundredth with an `s`, which also keeps it from being mistaken for a m:ss
+ * figure beside it. Everything else timed is `time_bands`, whole seconds read
+ * as m:ss. Every screen and export that shows a time goes through this:
+ * formatting a sprint with formatSecondsAsTime showed 5.05s as "0:05".
+ */
+export function formatTimeFor(seconds: any, measure: string | undefined | null): string {
+  if (seconds === null || seconds === undefined || seconds === '') return '';
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n < 0) return '';
+  return measure === 'time_low' ? `${n.toFixed(2)}s` : formatSecondsAsTime(n);
+}

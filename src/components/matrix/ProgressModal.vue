@@ -20,7 +20,7 @@ import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { useMatrixStore } from '../../stores/matrix';
 import { progressSeries, progressTrend, progressLowerIsBetter } from '../../domain/progress';
-import { formatSecondsAsTime } from '../../domain/time';
+import { formatTimeFor } from '../../domain/time';
 
 const props = defineProps<{ open: boolean; teamId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -53,7 +53,7 @@ const series = computed(() =>
 
 const trend = computed(() => progressTrend(series.value, lowerIsBetter.value));
 
-const shown = (v: number) => (timed.value ? formatSecondsAsTime(v) : String(v));
+const shown = (v: number) => (timed.value ? formatTimeFor(v, measure.value) : String(v));
 
 /** The polyline, in a 100x40 viewBox. Flat when every reading is the same. */
 const polyline = computed(() => {

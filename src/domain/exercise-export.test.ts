@@ -160,3 +160,25 @@ describe('a Goals-by-role exercise', () => {
     expect(buildExercisePrintDocument(opts)).toMatch(/per role, not a ranking/);
   });
 });
+
+describe('a sprint leaderboard, exported', () => {
+  const SPRINT_ROWS = [{
+    playerId: 'p1', recordingNumber: 12, name: 'Ashton Lanza', timed: true,
+    best: 5.05, avg: 5.1234, earned: 1, available: 1,
+    attempts: 2, metRuns: 0, shortRuns: 0, wins: 0, draws: 0, losses: 0
+  }];
+  const opts = { ...OPTS, exercise: '40m Sprint', measure: 'time_low', rows: SPRINT_ROWS };
+
+  it('writes the best and average in decimal seconds, keeping the hundredths', () => {
+    const html = buildExercisePrintDocument(opts)!;
+    expect(html).toContain('5.05s');
+    expect(html).toContain('5.12s');
+    expect(html).not.toContain('0:05');
+  });
+
+  it('does the same in the spreadsheet', () => {
+    const text = JSON.stringify(exerciseSheet(opts));
+    expect(text).toContain('5.05s');
+    expect(text).toContain('5.12s');
+  });
+});

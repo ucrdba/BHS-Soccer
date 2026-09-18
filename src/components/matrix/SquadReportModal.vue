@@ -33,7 +33,7 @@ import { reportStandardSeconds, outcomeRecord } from '../../domain/report';
 import { sortSquadEntries, squadSortDescends } from '../../domain/squad-report';
 import { squadReportSheets, buildSquadReportPrintDocument } from '../../domain/squad-report-export';
 import { useOrganizationStore } from '../../stores/organization';
-import { formatSecondsAsTime } from '../../domain/time';
+import { formatTimeFor } from '../../domain/time';
 import { isThresholdMeasure } from '../../domain/matrix-threshold';
 import { progressSeries } from '../../domain/progress';
 import { sparkRange, sparkline, sparkLabel } from '../../domain/sparkline';
@@ -193,7 +193,7 @@ function onExcel(): void {
 }
 
 const shown = (row: any, value: number | null) =>
-  value === null || value === undefined ? '—' : (row.timed ? formatSecondsAsTime(value) : String(value));
+  value === null || value === undefined ? '—' : (row.timed ? formatTimeFor(value, row.drill?.measure) : String(value));
 
 /** A player's graph for a timed exercise, or null when they have no reading. */
 const spark = (row: any, e: any) =>

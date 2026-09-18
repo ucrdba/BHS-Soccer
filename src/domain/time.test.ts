@@ -9,7 +9,7 @@
  * against a different band depending on which app recorded it.
  */
 import { describe, it, expect } from 'vitest';
-import { formatSecondsAsTime, parseTimeToSeconds } from './time';
+import { formatSecondsAsTime, parseTimeToSeconds, formatTimeFor } from './time';
 
 describe('formatSecondsAsTime', () => {
   it('reads seconds as minutes and seconds', () => {
@@ -118,5 +118,33 @@ describe('agreement with the Supabase client', () => {
       expect(formatSecondsAsTime(s), String(s))
         .toEqual(supabaseService.formatSecondsAsTime(s));
     }
+  });
+});
+
+describe('formatTimeFor', () => {
+  // A sprint (time_low) is stored in decimal seconds, a banded run (time_bands)
+  // in whole seconds read as m:ss. Formatting a 5.05s sprint as m:ss gave
+  // "0:05" on every screen, and "5.40 to 5.05" read "0:05 to 0:05".
+  it('shows a sprint as decimal seconds, to the hundredth', () => {
+    expect(formatTimeFor(5.05, 'time_low')).toBe('5.05s');
+    expect(formatTimeFor(5.1, 'time_low')).toBe('5.10s');
+    expect(formatTimeFor(12, 'time_low')).toBe('12.00s');
+  });
+
+  it('keeps the hundredths of an average rather than rounding them away', () => {
+    expect(formatTimeFor(5.1234, 'time_low')).toBe('5.12s');
+  });
+
+  it('shows a banded run as minutes and seconds', () => {
+    expect(formatTimeFor(270, 'time_bands')).toBe('4:30');
+  });
+
+  it('reads an unknown measure as minutes and seconds, as before', () => {
+    expect(formatTimeFor(270, undefined)).toBe('4:30');
+  });
+
+  it('is empty for no value', () => {
+    expect(formatTimeFor(null, 'time_low')).toBe('');
+    expect(formatTimeFor('x', 'time_low')).toBe('');
   });
 });

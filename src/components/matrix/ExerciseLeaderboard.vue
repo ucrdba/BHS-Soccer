@@ -26,7 +26,7 @@ import { formatGoalDifference } from '../../domain/goal-score';
 import { percentLabel } from '../../domain/role-goal-score';
 import { exerciseSheet, buildExercisePrintDocument } from '../../domain/exercise-export';
 import { useOrganizationStore } from '../../stores/organization';
-import { formatSecondsAsTime } from '../../domain/time';
+import { formatTimeFor } from '../../domain/time';
 
 const matrix = useMatrixStore();
 
@@ -74,15 +74,20 @@ function best(row: any): string {
   return figure(row, row.best);
 }
 
-/** The same phrasing for the average, rounded: a mean second is spurious precision. */
+/**
+ * The same phrasing for the average, rounded: a mean second is spurious
+ * precision on a banded run. Not on a sprint, which is timed to the hundredth
+ * -- rounding 5.12 to 5 would say nothing -- and formatTimeFor rounds it there.
+ */
 function avg(row: any): string {
   if (row.avg === null || row.avg === undefined) return '—';
-  return figure(row, row.timed ? Math.round(row.avg) : Number(row.avg.toFixed(1)));
+  if (!row.timed) return figure(row, Number(row.avg.toFixed(1)));
+  return figure(row, matrix.measure === 'time_low' ? row.avg : Math.round(row.avg));
 }
 
 function figure(row: any, v: any): string {
   if (v === null || v === undefined) return '—';
-  return row.timed ? formatSecondsAsTime(v) : String(v);
+  return row.timed ? formatTimeFor(v, matrix.measure) : String(v);
 }
 
 const emit = defineEmits<{ openPlayer: [string] }>();

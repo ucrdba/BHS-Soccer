@@ -28,14 +28,16 @@ vi.mock('../../data/supabase', () => ({
 }));
 
 const TEAM = '11111111-2222-3333-4444-555555555555';
-const LAPS = 'd-laps';       // time_low — faster is better
+const LAPS = 'd-laps';       // time_bands — faster is better, read as m:ss
+const SPRINT = 'd-sprint';   // time_low — decimal seconds
 const COOPERS = 'd-coopers'; // count_high — more is better
 
 const PLAYERS = [{ id: 'p1', name: 'Cesar Alva' }, { id: 'p2', name: 'Tom Budde' }];
 const DRILLS = [
-  { id: LAPS, name: '3 Laps', measure: 'time_low' },
+  { id: LAPS, name: '3 Laps', measure: 'time_bands' },
   { id: COOPERS, name: 'Coopers', measure: 'count_high' },
-  { id: 'd-goals', name: '1v1 Attack', measure: 'role_goals' }
+  { id: 'd-goals', name: '1v1 Attack', measure: 'role_goals' },
+  { id: SPRINT, name: '40m Sprint', measure: 'time_low' }
 ];
 
 /** Three sessions: p1 improves, and misses the middle one. */
@@ -225,5 +227,28 @@ describe('Goals by role', () => {
     const offered = w.find('[data-progress-drill]').findAll('option').map((o: any) => o.text());
     expect(offered).not.toContain('1v1 Attack');
     expect(offered).toContain('Coopers');
+  });
+});
+
+describe('a sprint', () => {
+  // Decimal seconds: read as m:ss, 5.40 and 5.05 both showed as "0:05".
+  const SPRINTS = [
+    { drillId: SPRINT, playerId: 'p1', attendance: 'present', rawValue: 5.4, occurredOn: '2026-09-01' },
+    { drillId: SPRINT, playerId: 'p1', attendance: 'present', rawValue: 5.05, occurredOn: '2026-09-08' }
+  ];
+
+  it('shows each reading in decimal seconds', async () => {
+    const w = await mountProgress(SPRINTS);
+    await w.find('[data-progress-drill]').setValue(SPRINT);
+    await w.vm.$nextTick();
+    expect(readings(w).join(' ')).toContain('5.40s');
+    expect(readings(w).join(' ')).toContain('5.05s');
+  });
+
+  it('states the trend in decimal seconds', async () => {
+    const w = await mountProgress(SPRINTS);
+    await w.find('[data-progress-drill]').setValue(SPRINT);
+    await w.vm.$nextTick();
+    expect(w.find('[data-progress-trend]').text()).toContain('5.40s to 5.05s');
   });
 });

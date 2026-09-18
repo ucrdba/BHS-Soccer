@@ -8,7 +8,7 @@
  *
  * Extracted from public/js/views/matrix-session.view.js during Phase 3.
  */
-import { formatSecondsAsTime } from './time';
+import { formatSecondsAsTime, formatTimeFor } from './time';
 import { isTimedExercise } from './matrix-session';
 import { roleLabel, type PositionRole } from './position';
 import { formatGoalDifference } from './goal-score';
@@ -85,7 +85,8 @@ export function breakdownDetail(
   // Only the drill knows which it is, and 2800 metres and 2800 seconds want
   // very different formatting.
   if (row.kind === 'measured' && isTimedExercise(row, drillsBank)) {
-    return formatSecondsAsTime(row.raw_value);
+    const drill = (drillsBank || []).find((d: any) => d.id === row.drill_id);
+    return formatTimeFor(row.raw_value, drill?.measure);
   }
 
   return String(Number(row.raw_value));

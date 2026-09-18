@@ -12,7 +12,8 @@ import { breakdownDetail, resultVerdict, resultLabel } from './matrix-breakdown'
 
 const names = new Map([['p2', 'Tom Budde'], ['p3', 'Alain Renteria']]);
 const drills = [
-  { id: 'd-laps', measure: 'time_low' },
+  { id: 'd-laps', measure: 'time_bands' },
+  { id: 'd-sprint', measure: 'time_low' },
   { id: 'd-coopers', measure: 'count_high' }
 ];
 
@@ -179,3 +180,10 @@ describe('a player who was there but did not do the exercise', () => {
   });
 });
 
+
+describe('a sprint in the breakdown', () => {
+  it('reads in decimal seconds, not as m:ss', () => {
+    // 5.05 formatted as m:ss was "0:05".
+    expect(detail({ kind: 'measured', drill_id: 'd-sprint', raw_value: 5.05 })).toBe('5.05s');
+  });
+});
