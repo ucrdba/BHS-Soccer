@@ -52,8 +52,10 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
 };
 
-async function mountQuiz(opts: { questions?: any; guest?: boolean; rosterEntry?: string | null } = {}) {
-  const { questions = QUESTIONS, guest = false, rosterEntry = 'p1' } = opts;
+async function mountQuiz(
+  opts: { questions?: any; guest?: boolean; rosterEntry?: string | null; role?: string } = {}
+) {
+  const { questions = QUESTIONS, guest = false, rosterEntry = 'p1', role = 'player' } = opts;
   fetchTeamQuiz.mockResolvedValue(questions);
 
   const w = mount(QuizView, {
@@ -72,7 +74,7 @@ async function mountQuiz(opts: { questions?: any; guest?: boolean; rosterEntry?:
             // id is the ACCOUNT; playerId is the roster entry an attempt is
             // recorded against. They are different ids, and the attempt takes
             // the roster one -- quiz_attempts.player_id points at players.
-            user: guest ? null : { id: 'u1', name: 'Ana Ruiz', playerId: rosterEntry }
+            user: guest ? null : { id: 'u1', name: 'Ana Ruiz', playerId: rosterEntry, role }
           }
         }
       })]
@@ -258,12 +260,29 @@ describe('an account with no roster entry', () => {
   // A coach, or a player whose account is not linked yet. quiz_attempts names
   // a roster entry, so there is nothing to record the score against -- and
   // saying "not recorded" would read as a fault rather than as the reason.
-  it('is told why, in its own words', async () => {
-    const w = await mountQuiz({ rosterEntry: null });
+  it('tells a player their coach can link it, which is true for them', async () => {
+    const w = await mountQuiz({ rosterEntry: null, role: 'player' });
     await answer(w, 'q1', 'B');
     await w.find('[data-quiz-submit]').trigger('click');
     await flush();
-    expect(w.find('[data-quiz-notice]').text()).toMatch(/not linked to a roster entry/i);
+    const said = w.find('[data-quiz-notice]').text();
+    expect(said).toMatch(/not linked to a roster entry/i);
+    expect(said).toMatch(/coach can link/i);
+  });
+
+  it('tells a coach or an admin the reason without advice they cannot take', async () => {
+    // Nobody links a coach to a roster entry: they are not on the squad.
+    for (const role of ['coach', 'admin']) {
+      const w = await mountQuiz({ rosterEntry: null, role });
+      await answer(w, 'q1', 'B');
+      await w.find('[data-quiz-submit]').trigger('click');
+      await flush();
+      const said = w.find('[data-quiz-notice]').text();
+      expect(said).toMatch(/coaches and admins have no roster entry/i);
+      expect(said).not.toMatch(/coach can link/i);
+      expect(w.find('[data-quiz-score]').exists()).toBe(true);
+      w.unmount();
+    }
   });
 
   it('is marked all the same, and nothing is sent', async () => {

@@ -85,8 +85,15 @@ async function onSubmit(): Promise<void> {
   // so say that, rather than reporting a fault.
   const user = auth.user;
   if (!user?.playerId) {
-    notice.value = 'Your account is not linked to a roster entry, so there is nothing to '
-      + 'record the score against. Your coach can link it from your bio.';
+    // Said differently by role: a coach or an admin is not on the squad, so
+    // "your coach can link it" is advice they cannot take. A player's account
+    // really can be linked, and that is the sentence that helps them.
+    const staff = user?.role === 'coach' || user?.role === 'admin';
+    notice.value = staff
+      ? 'Coaches and admins have no roster entry, so a score is not recorded. '
+        + 'Your answers were still marked.'
+      : 'Your account is not linked to a roster entry, so there is nothing to '
+        + 'record the score against. Your coach can link it from your bio.';
     return;
   }
 
