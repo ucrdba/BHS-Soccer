@@ -4134,7 +4134,10 @@ class SupabaseService {
       return null;
     }
 
-    const percentage = Math.round((score / (totalQuestions || 1)) * 100);
+    // No percentage: quiz_attempts has no such column -- the quiz_results view
+    // works it out from score and total_questions. Sending it made PostgREST
+    // refuse the insert, so every attempt was lost and the player was told
+    // "Scored here, but the attempt was not recorded".
     const attemptPayload: Record<string, any> = {
       player_id: playerData.id,
       player_name: playerData.name,
@@ -4142,7 +4145,6 @@ class SupabaseService {
       completed_at: new Date().toISOString(),
       score: score,
       total_questions: totalQuestions,
-      percentage: percentage,
       // Nullable on purpose. Unlike a fixture or a plan, an unscoped attempt is
       // not lost -- it still names a person and shows on their own history --
       // so a missing team is worth recording rather than refusing.

@@ -14,8 +14,13 @@
  *
  * Nothing renders when no message is set. An empty box on the front page,
  * every day, teaches the squad to stop looking at it.
+ *
+ * **The quiz is reached from here and nowhere else.** It is not in the nav,
+ * because what it asks about is this message -- so the link sits under the
+ * message, and only when there is one to be asked about.
  */
 import { ref, computed, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import { useThoughtsStore } from '../../stores/thoughts';
 
 const props = defineProps<{ teamId: string | null; canEdit: boolean }>();
@@ -111,6 +116,11 @@ async function onCopy(t: any): Promise<void> {
       <h2 class="thought__h">{{ active.title || "Coach's message" }}</h2>
       <p class="thought__text" data-thought-text>{{ active.thoughts_text }}</p>
       <p v-if="active.coach_name" class="thought__by sr-only" data-thought-by>{{ active.coach_name }}</p>
+      <p class="thought__quiz">
+        <RouterLink to="/quiz" class="thought__quizlink" data-thought-quiz>
+          Take the quiz on this
+        </RouterLink>
+      </p>
     </template>
 
     <template v-if="canEdit">
@@ -190,6 +200,21 @@ async function onCopy(t: any): Promise<void> {
 }
 
 .thought__kicker { color: var(--ink-muted); }
+
+.thought__quiz { margin: var(--space-3) 0 0; }
+
+.thought__quizlink {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.thought__quizlink:hover { border-color: var(--rule-strong); color: var(--mark); }
+.thought__quizlink:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
 
 .thought__h {
   margin: var(--space-2) 0 0;

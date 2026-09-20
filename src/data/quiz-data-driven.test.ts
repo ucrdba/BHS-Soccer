@@ -233,3 +233,22 @@ describe('recording an attempt', () => {
     expect(attempt.team_id).toBeNull();
   });
 });
+
+describe('the columns an attempt is written with', () => {
+  const player = { id: 'player-1', name: 'Kai Nakamura' };
+  const answers = [{ questionId: Q1, selectedOption: 'B', isCorrect: true }];
+
+  it('sends no percentage: quiz_attempts has no such column, and quiz_results derives it', async () => {
+    // Sending it made PostgREST refuse every insert, so a player was told
+    // "Scored here, but the attempt was not recorded" and nothing was kept.
+    await supabaseService.saveQuizAttempt(player, answers, 1, 2, TEAM);
+    const attempt = inserted.find(r => r.table === 'quiz_attempts');
+    expect(attempt).not.toHaveProperty('percentage');
+  });
+
+  it('still records the score and how many questions there were', async () => {
+    await supabaseService.saveQuizAttempt(player, answers, 1, 2, TEAM);
+    const attempt = inserted.find(r => r.table === 'quiz_attempts');
+    expect(attempt).toMatchObject({ score: 1, total_questions: 2, player_name: 'Kai Nakamura' });
+  });
+});

@@ -59,7 +59,8 @@ async function mountThought(opts: { rows?: any; canEdit?: boolean } = {}) {
   const w = mount(DailyThought, {
     props: { teamId: TEAM, canEdit },
     global: {
-      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })]
+      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: false })],
+      stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } }
     },
     attachTo: document.body
   });
@@ -222,5 +223,23 @@ describe('when the read fails', () => {
   it('says so rather than looking like no message was written', async () => {
     const w = await mountThought({ rows: null });
     expect(w.find('[data-thought-error]').exists()).toBe(true);
+  });
+});
+
+describe('the way to the quiz', () => {
+  // The quiz is not in the nav: it is asked about the message it tests, so
+  // this is the only way a player reaches it.
+  it('offers the quiz beneath the active message', async () => {
+    const w = await mountThought({ canEdit: false });
+    const link = w.find('[data-thought-quiz]');
+    expect(link.exists()).toBe(true);
+    expect(link.attributes('href')).toBe('/quiz');
+  });
+
+  it('offers nothing to take when no message is set', async () => {
+    // The section only renders at all for a coach then, and an empty message
+    // with a quiz link under it reads as a quiz about nothing.
+    const w = await mountThought({ rows: [], canEdit: true });
+    expect(w.find('[data-thought-quiz]').exists()).toBe(false);
   });
 });
