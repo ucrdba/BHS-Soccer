@@ -52,8 +52,8 @@ const flush = async () => {
   await new Promise(r => setTimeout(r, 0));
 };
 
-async function mountQuiz(opts: { questions?: any; guest?: boolean } = {}) {
-  const { questions = QUESTIONS, guest = false } = opts;
+async function mountQuiz(opts: { questions?: any; guest?: boolean; rosterEntry?: string | null } = {}) {
+  const { questions = QUESTIONS, guest = false, rosterEntry = 'p1' } = opts;
   fetchTeamQuiz.mockResolvedValue(questions);
 
   const w = mount(QuizView, {
@@ -69,7 +69,10 @@ async function mountQuiz(opts: { questions?: any; guest?: boolean } = {}) {
           },
           auth: {
             isGuest: guest,
-            user: guest ? null : { id: 'u1', name: 'Ana Ruiz' }
+            // id is the ACCOUNT; playerId is the roster entry an attempt is
+            // recorded against. They are different ids, and the attempt takes
+            // the roster one -- quiz_attempts.player_id points at players.
+            user: guest ? null : { id: 'u1', name: 'Ana Ruiz', playerId: rosterEntry }
           }
         }
       })]
@@ -221,7 +224,9 @@ describe('recording the attempt', () => {
     await flush();
 
     const [player, answers, score, total, teamId] = saveQuizAttempt.mock.calls[0];
-    expect(player).toEqual({ id: 'u1', name: 'Ana Ruiz' });
+    // The roster entry, not the account: player_id points at players, so the
+    // account's id was refused by the foreign key and every attempt was lost.
+    expect(player).toEqual({ id: 'p1', name: 'Ana Ruiz' });
     expect(answers).toHaveLength(2);
     expect(score).toBe(1);
     expect(total).toBe(2);
@@ -246,5 +251,27 @@ describe('recording the attempt', () => {
     await flush();
 
     expect(w.find('[data-quiz-again]').exists()).toBe(true);
+  });
+});
+
+describe('an account with no roster entry', () => {
+  // A coach, or a player whose account is not linked yet. quiz_attempts names
+  // a roster entry, so there is nothing to record the score against -- and
+  // saying "not recorded" would read as a fault rather than as the reason.
+  it('is told why, in its own words', async () => {
+    const w = await mountQuiz({ rosterEntry: null });
+    await answer(w, 'q1', 'B');
+    await w.find('[data-quiz-submit]').trigger('click');
+    await flush();
+    expect(w.find('[data-quiz-notice]').text()).toMatch(/not linked to a roster entry/i);
+  });
+
+  it('is marked all the same, and nothing is sent', async () => {
+    const w = await mountQuiz({ rosterEntry: null });
+    await answer(w, 'q1', 'B');
+    await w.find('[data-quiz-submit]').trigger('click');
+    await flush();
+    expect(w.find('[data-quiz-score]').exists()).toBe(true);
+    expect(saveQuizAttempt).not.toHaveBeenCalled();
   });
 });

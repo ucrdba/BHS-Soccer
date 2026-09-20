@@ -77,11 +77,23 @@ async function onSubmit(): Promise<void> {
   const marked = markQuiz(questions.value, chosen.value);
   result.value = marked;
 
+  // An attempt is recorded against a ROSTER ENTRY (quiz_attempts.player_id
+  // points at players), not against the account. They are different ids, and
+  // sending the account's was refused by that foreign key: every attempt was
+  // lost and the player was told only that it "was not recorded". A coach, or
+  // a player whose account is not linked yet, has no roster entry at all --
+  // so say that, rather than reporting a fault.
+  const user = auth.user;
+  if (!user?.playerId) {
+    notice.value = 'Your account is not linked to a roster entry, so there is nothing to '
+      + 'record the score against. Your coach can link it from your bio.';
+    return;
+  }
+
   submitting.value = true;
   try {
-    const user = auth.user;
     const saved = await supabaseService.saveQuizAttempt(
-      { id: user?.id, name: user?.name }, marked.answers,
+      { id: user.playerId, name: user.name }, marked.answers,
       marked.score, marked.total, org.activeTeamId);
 
     notice.value = saved

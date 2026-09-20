@@ -4147,6 +4147,14 @@ class SupabaseService {
     // back to a demo player, which wrote attempts to the database attributed to
     // somebody who does not exist. The UI guards this too; this is the layer
     // that actually touches the table, so it guards independently.
+    // A roster entry, which is a uuid: quiz_attempts.player_id points at
+    // players. The account's id is a different uuid and the foreign key
+    // refuses it, so an id of any other shape is refused here instead.
+    if (playerData?.id && !this.isUuid(String(playerData.id))) {
+      report('saveQuizAttempt', 'An attempt is recorded against a roster entry, not an account.');
+      return null;
+    }
+
     if (!playerData?.id || !playerData?.name) {
       report('saveQuizAttempt', 'no signed-in player to attribute the attempt to.');
       return null;

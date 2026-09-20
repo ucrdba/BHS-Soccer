@@ -189,7 +189,8 @@ describe('where the options come from', () => {
 });
 
 describe('recording an attempt', () => {
-  const player = { id: 'player-1', name: 'Kai Nakamura' };
+  // A roster entry, not an account: quiz_attempts.player_id points at players.
+  const player = { id: '33333333-3333-3333-3333-333333333333', name: 'Kai Nakamura' };
   const answers = [
     { questionId: Q1, selectedOption: 'B', isCorrect: true },
     { questionId: Q2, selectedOption: 'C', isCorrect: false }
@@ -235,7 +236,8 @@ describe('recording an attempt', () => {
 });
 
 describe('the columns an attempt is written with', () => {
-  const player = { id: 'player-1', name: 'Kai Nakamura' };
+  // A roster entry, not an account: quiz_attempts.player_id points at players.
+  const player = { id: '33333333-3333-3333-3333-333333333333', name: 'Kai Nakamura' };
   const answers = [{ questionId: Q1, selectedOption: 'B', isCorrect: true }];
 
   it('sends no percentage: quiz_attempts has no such column, and quiz_results derives it', async () => {
@@ -276,5 +278,25 @@ describe('reading a squad\'s attempts', () => {
   it('reads nothing as an empty squad, not as a failure', async () => {
     tables.quiz_attempts = [];
     expect(await supabaseService.fetchTeamQuizAttempts(TEAM)).toEqual([]);
+  });
+});
+
+describe('the player an attempt is recorded against', () => {
+  const answers = [{ questionId: Q1, selectedOption: 'B', isCorrect: true }];
+  const ROSTER_ENTRY = '33333333-3333-3333-3333-333333333333';
+
+  it('is a roster entry, which is a uuid', async () => {
+    const res = await supabaseService.saveQuizAttempt(
+      { id: ROSTER_ENTRY, name: 'Ana Ruiz' }, answers, 1, 2, TEAM);
+    expect(res).not.toBeNull();
+    expect(inserted.find(r => r.table === 'quiz_attempts').player_id).toBe(ROSTER_ENTRY);
+  });
+
+  it('refuses an id that is not one, rather than letting the table refuse it', async () => {
+    // The view sent the ACCOUNT's id, which player_id's foreign key refused --
+    // every attempt was lost, and the player was told only "not recorded".
+    expect(await supabaseService.saveQuizAttempt({ id: 'u1', name: 'Ana Ruiz' }, answers, 1, 2, TEAM))
+      .toBeNull();
+    expect(inserted).toHaveLength(0);
   });
 });
