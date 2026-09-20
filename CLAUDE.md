@@ -18,13 +18,13 @@ Vue 3 with `<script setup>`, Vue Router and Pinia, built by Vite. Backend is Sup
 npm run dev        # vite dev server, opens browser
 npm run build      # vue-tsc (typecheck) + vite build -> dist/
 npm run typecheck  # vue-tsc --noEmit over src/, components included
-npm test           # vitest — 3,884 tests, config in vitest.config.mts
+npm test           # vitest — 3,917 tests, config in vitest.config.mts
 npm run preview    # serve dist/
 ```
 
 Verification is three gates, and each covers a different slice:
 
-- `npm test` — Vitest (3,884 tests across 212 files), including Vue component and database tests.
+- `npm test` — Vitest (3,917 tests across 215 files), including Vue component and database tests.
 - `npm run typecheck` — `vue-tsc --noEmit`, which checks a single-file component's script block **and its template**.
 - `npm run build` — **mandatory**, and the only check that exercises real module resolution. Typecheck and tests can both pass while an import is unresolvable at bundle time.
 
@@ -303,7 +303,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0038_attendance_dnp.sql`.
+8. …through `supabase/migrations/0040_quiz_results_security.sql`.
 9. `supabase/migrations/0039_org_scoped_writes.sql` — replaces the role-only write policy item 4's section 6 left on `schools`, `players`, `schedule`, `drills_bank`, `coaches` and `quiz_questions`, and that `0002` and `0019` copied onto `matrix_logs` and `quiz_answers`. It refuses to finish while any other permissive write policy remains on those tables, since one left over would undo it.
 
 Prefer adding a new dated migration over editing an already-applied script.
