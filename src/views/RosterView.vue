@@ -16,6 +16,8 @@ import PlayerCard from '../components/roster/PlayerCard.vue';
 import PlayerDetailModal from '../components/roster/PlayerDetailModal.vue';
 import PlayerFormModal from '../components/roster/PlayerFormModal.vue';
 import RecordingNumbersModal from '../components/roster/RecordingNumbersModal.vue';
+import BulkInviteModal from '../components/roster/BulkInviteModal.vue';
+import { demoConfig } from '../demo';
 import { useRosterStore, type PlayerForm } from '../stores/roster';
 import { useOrganizationStore } from '../stores/organization';
 import { useAuthStore } from '../stores/auth';
@@ -43,6 +45,9 @@ const canSeeRatings = computed(() => canSeeTeamRatings({
 }));
 
 const numbersOpen = ref(false);
+/** The demo's accounts are shared and public; nobody real is invited from it. */
+const demo = demoConfig();
+const bulkInviteOpen = ref(false);
 
 const detailFor = ref<Player | null>(null);
 const editing = ref<Player | null>(null);
@@ -117,6 +122,10 @@ async function onRemove(p: Player): Promise<void> {
         </p>
       </div>
       <div v-if="canEdit" class="roster__acts">
+        <button
+          v-if="!demo.enabled" type="button" class="btn"
+          data-open-bulk-invite @click="bulkInviteOpen = true"
+        >Invite the squad</button>
         <button type="button" class="btn" data-open-numbers @click="numbersOpen = true">Recording numbers</button>
         <button type="button" class="btn btn--go" data-add-player @click="openAdd">Add player</button>
       </div>
@@ -181,6 +190,12 @@ async function onRemove(p: Player): Promise<void> {
       v-if="canEdit"
       :open="formOpen" :player="editing" :busy="busy" :error="formError"
       @close="formOpen = false" @save="onSave" />
+
+    <BulkInviteModal
+      v-if="canEdit && !demo.enabled"
+      :open="bulkInviteOpen" :team-id="org.activeTeamId"
+      @close="bulkInviteOpen = false"
+      @invited="(n: number) => { notice = `${n} ${n === 1 ? 'player' : 'players'} invited.`; }" />
 
     <RecordingNumbersModal
       v-if="canEdit"

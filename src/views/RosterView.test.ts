@@ -195,3 +195,16 @@ describe('resetting the sort', () => {
     expect(useRosterStore().resetSort).toHaveBeenCalled();
   });
 });
+
+describe('inviting the squad', () => {
+  it('offers a coach one way to invite everybody', async () => {
+    const w = mountRoster({ coach: true });
+    expect(w.find('[data-open-bulk-invite]').text()).toBe('Invite the squad');
+    await w.find('[data-open-bulk-invite]').trigger('click');
+    expect(w.findComponent({ name: 'BulkInviteModal' }).props('open')).toBe(true);
+  });
+
+  it('offers it to nobody else: an invitation is a coach\'s to give', () => {
+    expect(mountRoster({ coach: false }).find('[data-open-bulk-invite]').exists()).toBe(false);
+  });
+});
