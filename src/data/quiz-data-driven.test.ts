@@ -252,3 +252,29 @@ describe('the columns an attempt is written with', () => {
     expect(attempt).toMatchObject({ score: 1, total_questions: 2, player_name: 'Kai Nakamura' });
   });
 });
+
+describe('reading a squad\'s attempts', () => {
+  const ATTEMPTS = [
+    { attempt_id: 'a1', player_id: 'p1', player_name: 'Cesar Alva', score: 4, total_questions: 5,
+      completed_at: '2026-09-18T18:00:00Z', started_at: '2026-09-18T17:58:00Z', team_id: TEAM },
+    { attempt_id: 'a2', player_id: 'p2', player_name: 'Tom Budde', score: 3, total_questions: 5,
+      completed_at: '2026-09-17T18:00:00Z', started_at: '2026-09-17T17:58:00Z', team_id: 'other-team' }
+  ];
+
+  it('reads only this squad\'s, so another team\'s scores cannot leak in', async () => {
+    tables.quiz_attempts = ATTEMPTS;
+    const rows = await supabaseService.fetchTeamQuizAttempts(TEAM);
+    expect(rows!.map((r: any) => r.attempt_id)).toEqual(['a1']);
+    expect(queries.find(q => q.table === 'quiz_attempts')!.filters.team_id).toBe(TEAM);
+  });
+
+  it('refuses a team that is not a uuid rather than asking for everything', async () => {
+    expect(await supabaseService.fetchTeamQuizAttempts('bhs')).toBeNull();
+    expect(await supabaseService.fetchTeamQuizAttempts('')).toBeNull();
+  });
+
+  it('reads nothing as an empty squad, not as a failure', async () => {
+    tables.quiz_attempts = [];
+    expect(await supabaseService.fetchTeamQuizAttempts(TEAM)).toEqual([]);
+  });
+});

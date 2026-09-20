@@ -443,6 +443,24 @@ class SupabaseService {
     return (data || []) as Invitation[];
   }
 
+  /**
+   * A squad's quiz attempts, for the coach's view of who has taken it.
+   *
+   * quiz_attempts directly rather than the quiz_results view: the view carries
+   * no team_id, and 0040 leaves it to service_role and an invoker's own rights
+   * anyway. The percentage is worked out in the browser (domain/quiz-attempts).
+   */
+  async fetchTeamQuizAttempts(teamId: string): Promise<any[] | null> {
+    if (!this.isConfigured() || !this.isUuid(teamId)) return null;
+    const { data, error } = await this.client!
+      .from('quiz_attempts')
+      .select('attempt_id, player_id, player_name, score, total_questions, started_at, completed_at')
+      .eq('team_id', teamId)
+      .order('completed_at', { ascending: false });
+    if (error) { report('fetchTeamQuizAttempts', error.message); return null; }
+    return data || [];
+  }
+
   /** Which of a team's roster entries already have an account. */
   async fetchLinkedPlayerIds(teamId: string): Promise<string[] | null> {
     const res = await this.accountRpc<{ player_id: string }[]>('team_linked_players', { p_team_id: teamId });

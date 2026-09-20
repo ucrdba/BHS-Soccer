@@ -29,6 +29,7 @@ import TeamsSection from '../components/admin/TeamsSection.vue';
 import UnassignedPlayersSection from '../components/admin/UnassignedPlayersSection.vue';
 import CategoriesSection from '../components/admin/CategoriesSection.vue';
 import QuizBankSection from '../components/admin/QuizBankSection.vue';
+import QuizAttemptsSection from '../components/admin/QuizAttemptsSection.vue';
 import SchoolProfileSection from '../components/admin/SchoolProfileSection.vue';
 import DiagnosticsSection from '../components/admin/DiagnosticsSection.vue';
 import ImportExportSection from '../components/admin/ImportExportSection.vue';
@@ -81,6 +82,10 @@ const lockedOut = computed(() => isAdmin.value && !can('can_access_admin_dashboa
     <QuizBankSection
       v-if="isCoach"
       :school-id="schoolId" :teams="org.teams" data-admin-quiz />
+
+    <QuizAttemptsSection
+      v-if="isCoach"
+      :team-id="org.activeTeamId" data-admin-quiz-attempts />
 
     <!-- Not merely hidden: an admin whose roles table did not load would
          otherwise see a page that looks complete and is missing half of

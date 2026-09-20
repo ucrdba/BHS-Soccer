@@ -58,7 +58,10 @@ vi.mock('../data/supabase', () => ({
     isConfigured: vi.fn().mockReturnValue(true),
     // ApprovalsSection reads this on mount; an incomplete mock leaves an
     // unhandled rejection, which exits non-zero while every test "passes".
-    fetchPendingRequests: vi.fn().mockResolvedValue([])
+    fetchPendingRequests: vi.fn().mockResolvedValue([]),
+    // QuizAttemptsSection reads both on mount, for the same reason.
+    fetchTeamRoster: vi.fn().mockResolvedValue([]),
+    fetchTeamQuizAttempts: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -218,3 +221,15 @@ describe('after an import', () => {
   });
 });
 
+
+describe('the quiz attempts section', () => {
+  it('is shown to a coach, beside the bank they write the questions in', async () => {
+    const w = await mountAdmin({ coach: true, admin: false });
+    expect(w.find('[data-admin-quiz-attempts]').exists()).toBe(true);
+  });
+
+  it('is not shown to someone who is neither coach nor admin', async () => {
+    const w = await mountAdmin({ coach: false, admin: false });
+    expect(w.find('[data-admin-quiz-attempts]').exists()).toBe(false);
+  });
+});
