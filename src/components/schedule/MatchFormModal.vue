@@ -16,6 +16,12 @@ import BaseModal from '../ui/BaseModal.vue';
 import { formatDisplayDateToIso } from '../../domain/schedule-view';
 import type { MatchForm } from '../../stores/schedule';
 import type { Match } from '../../domain/schedule-row';
+import { MATCH_STATUSES } from '../../types';
+
+/** In the table's words, with the coach's beside them. */
+const STATUS_LABELS: Record<string, string> = {
+  UPCOMING: 'Upcoming', COMPLETED: 'Completed', CANCELLED: 'Cancelled'
+};
 
 const props = defineProps<{
   open: boolean;
@@ -31,7 +37,7 @@ const f = ref<MatchForm>(blank());
 function blank(): MatchForm {
   return {
     date: '', time: '', opponent: '', location: '',
-    venueAddress: '', status: 'SCHEDULED', isHome: true, score: ''
+    venueAddress: '', status: 'UPCOMING', isHome: true, score: ''
   };
 }
 
@@ -46,7 +52,7 @@ watch(() => [props.open, props.match], () => {
         opponent: m.opponent || '',
         location: m.location || '',
         venueAddress: m.venueAddress || '',
-        status: m.status || 'SCHEDULED',
+        status: m.status || 'UPCOMING',
         isHome: m.isHome !== false,
         score: m.score || ''
       }
@@ -86,9 +92,7 @@ const isCompleted = computed(() => f.value.status === 'COMPLETED');
       <label class="field">
         <span class="kicker">Status</span>
         <select v-model="f.status" class="input" data-field="status">
-          <option value="SCHEDULED">Scheduled</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="CANCELLED">Cancelled</option>
+          <option v-for="s in MATCH_STATUSES" :key="s" :value="s">{{ STATUS_LABELS[s] }}</option>
         </select>
       </label>
 

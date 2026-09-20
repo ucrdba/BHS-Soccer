@@ -105,7 +105,7 @@ describe('AppHeader', () => {
         { status: 'COMPLETED', score: '3-1' },
         { status: 'COMPLETED', score: '1-1' },
         { status: 'COMPLETED', score: '0-2' },
-        { status: 'SCHEDULED' }
+        { status: 'UPCOMING' }
       ]
     });
     // Vue condenses the whitespace between the spans, so compare without it.

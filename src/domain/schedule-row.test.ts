@@ -18,7 +18,7 @@ const row = (over: any = {}) => ({
   opponent: 'Yucaipa',
   location: 'Home Field',
   venue_address: '123 Cougar Way',
-  status: 'SCHEDULED',
+  status: 'UPCOMING',
   is_home: true,
   score: null,
   result: null,
@@ -36,7 +36,7 @@ describe('toMatch', () => {
       opponent: 'Yucaipa',
       location: 'Home Field',
       venueAddress: '123 Cougar Way',
-      status: 'SCHEDULED',
+      status: 'UPCOMING',
       isHome: true,
       score: null,
       result: null

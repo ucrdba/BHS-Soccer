@@ -49,7 +49,14 @@ export interface Player {
 
 // ─── Schedule ─────────────────────────────────────────────────────────────────
 
-export type MatchStatus = 'UPCOMING' | 'COMPLETED' | 'CANCELLED';
+/**
+  * What `schedule_status_check` allows, and the only words the fixture form may
+  * send. The form once offered "SCHEDULED", which the table refuses -- and
+  * nothing in the app reads the word (every filter asks only whether a match is
+  * COMPLETED), so the refusal reached the coach rather than a test.
+  */
+export const MATCH_STATUSES = ['UPCOMING', 'COMPLETED', 'CANCELLED'] as const;
+export type MatchStatus = typeof MATCH_STATUSES[number];
 export type MatchResult = 'WIN' | 'LOSS' | 'DRAW';
 
 export interface Match {

@@ -7,7 +7,7 @@ import { mount } from '@vue/test-utils';
 import ComingUp from './ComingUp.vue';
 
 const m = (id: string, opponent: string, isHome: boolean) =>
-  ({ id, opponent, isHome, date: 'DEC 11 2026', time: '6:00 PM', matchOn: '2026-12-11', status: 'SCHEDULED' });
+  ({ id, opponent, isHome, date: 'DEC 11 2026', time: '6:00 PM', matchOn: '2026-12-11', status: 'UPCOMING' });
 
 const mountList = (over: Record<string, any> = {}) => {
   const defaultProps = { matches: [], total: 0, ...over };

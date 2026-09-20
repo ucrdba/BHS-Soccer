@@ -73,8 +73,8 @@ describe('matchDateTime', () => {
 
 describe('getNextMatch', () => {
   const sched = [
-    { id: 'later', date: 'SEP 11 2026', time: '6:00 PM', status: 'SCHEDULED' },
-    { id: 'sooner', date: 'SEP 4 2026', time: '6:00 PM', status: 'SCHEDULED' },
+    { id: 'later', date: 'SEP 11 2026', time: '6:00 PM', status: 'UPCOMING' },
+    { id: 'sooner', date: 'SEP 4 2026', time: '6:00 PM', status: 'UPCOMING' },
     { id: 'done', date: 'AUG 28 2026', time: '6:00 PM', status: 'COMPLETED' }
   ];
 
@@ -96,7 +96,7 @@ describe('getNextMatch', () => {
   });
 
   it('falls back to an unparseable fixture rather than declaring the season over', () => {
-    const odd = [{ id: 'odd', date: 'sometime in spring', status: 'SCHEDULED' }];
+    const odd = [{ id: 'odd', date: 'sometime in spring', status: 'UPCOMING' }];
     expect(getNextMatch(odd, at('2026-09-01T12:00:00')).id).toBe('odd');
   });
 
@@ -110,7 +110,7 @@ describe('scheduleState', () => {
   const now = at('2026-09-01T12:00:00');
 
   it('is "upcoming" when a fixture lies ahead', () => {
-    expect(scheduleState([{ ...past, date: 'SEP 4 2026', status: 'SCHEDULED' }], now))
+    expect(scheduleState([{ ...past, date: 'SEP 4 2026', status: 'UPCOMING' }], now))
       .toBe('upcoming');
   });
 
@@ -124,7 +124,7 @@ describe('scheduleState', () => {
 
   it('is "stale" when past fixtures were never marked complete', () => {
     // The season is not over; the schedule has just run out.
-    expect(scheduleState([{ ...past, status: 'SCHEDULED' }], now)).toBe('stale');
+    expect(scheduleState([{ ...past, status: 'UPCOMING' }], now)).toBe('stale');
   });
 });
 
@@ -143,7 +143,7 @@ describe('lastPlayedMatch', () => {
 });
 
 describe('nextMatchCountdown', () => {
-  const sched = [{ id: 'n', date: 'SEP 4 2026', time: '6:00 PM', status: 'SCHEDULED' }];
+  const sched = [{ id: 'n', date: 'SEP 4 2026', time: '6:00 PM', status: 'UPCOMING' }];
 
   it('counts down in zero-padded days, hours and minutes', () => {
     expect(nextMatchCountdown(sched, new Date(2026, 8, 2, 16, 30)))
@@ -193,7 +193,7 @@ describe('lastCompletedMatch', () => {
     // lastPlayedMatch answers "what was the latest fixture on the calendar",
     // which includes next week. A result is only a completed fixture.
     const done = m({ id: 'done' });
-    const next = m({ id: 'next', status: 'SCHEDULED', score: null, date: 'SEP 4 2026', matchOn: '2026-09-04' });
+    const next = m({ id: 'next', status: 'UPCOMING', score: null, date: 'SEP 4 2026', matchOn: '2026-09-04' });
     expect(lastCompletedMatch([next, done])?.id).toBe('done');
   });
 
@@ -204,7 +204,7 @@ describe('lastCompletedMatch', () => {
   });
 
   it('is null with nothing completed', () => {
-    expect(lastCompletedMatch([m({ status: 'SCHEDULED' })])).toBeNull();
+    expect(lastCompletedMatch([m({ status: 'UPCOMING' })])).toBeNull();
     expect(lastCompletedMatch([])).toBeNull();
   });
 
@@ -220,10 +220,10 @@ describe('lastCompletedMatch', () => {
 
 describe('upcomingMatches', () => {
   const sched = [
-    { id: 'later', date: 'SEP 11 2026', time: '6:00 PM', status: 'SCHEDULED' },
-    { id: 'sooner', date: 'SEP 4 2026', time: '6:00 PM', status: 'SCHEDULED' },
+    { id: 'later', date: 'SEP 11 2026', time: '6:00 PM', status: 'UPCOMING' },
+    { id: 'sooner', date: 'SEP 4 2026', time: '6:00 PM', status: 'UPCOMING' },
     { id: 'done', date: 'AUG 28 2026', time: '6:00 PM', status: 'COMPLETED' },
-    { id: 'odd', date: 'sometime in spring', status: 'SCHEDULED' }
+    { id: 'odd', date: 'sometime in spring', status: 'UPCOMING' }
   ];
 
   it('lists what is still ahead, soonest first, not in row order', () => {

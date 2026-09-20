@@ -35,12 +35,12 @@ const row = (over: any = {}) => ({
   id: 'm1', match_date: 'SEP 4 2026', match_time: '6:00 PM',
   match_on: '2026-09-04', kickoff_time: '18:00:00',
   opponent: 'Yucaipa', location: 'Home Field', venue_address: null,
-  status: 'SCHEDULED', is_home: true, score: null, result: null, ...over
+  status: 'UPCOMING', is_home: true, score: null, result: null, ...over
 });
 
 const form = {
   date: '2026-09-04', time: '18:00', opponent: 'Yucaipa',
-  location: 'Home Field', status: 'SCHEDULED', isHome: true
+  location: 'Home Field', status: 'UPCOMING', isHome: true
 };
 
 beforeEach(() => {
@@ -119,7 +119,7 @@ describe('adding a fixture', () => {
 
     vi.clearAllMocks();
     upsertMatch.mockResolvedValue({ id: 'm1' });
-    await s.addMatch({ ...form, status: 'SCHEDULED', score: '' } as any, 't1');
+    await s.addMatch({ ...form, status: 'UPCOMING', score: '' } as any, 't1');
     expect(upsertMatch).toHaveBeenCalledWith('t1',
       expect.objectContaining({ result: null, score: null }));
   });

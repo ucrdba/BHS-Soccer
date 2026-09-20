@@ -51,7 +51,7 @@ describe('seasonRecord', () => {
   });
 
   it('ignores a fixture that is not completed', () => {
-    expect(seasonRecord([match('3 - 1', 'SCHEDULED')]).gamesPlayed).toBe(0);
+    expect(seasonRecord([match('3 - 1', 'UPCOMING')]).gamesPlayed).toBe(0);
   });
 
   it('ignores a completed fixture with no score', () => {

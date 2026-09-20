@@ -21,7 +21,7 @@ const row = (over: any = {}) => toMatch({
   id: 'm1', match_date: 'SEP 4, 2026', match_time: '6:00 PM',
   match_on: '2026-09-04', kickoff_time: '18:00:00',
   opponent: 'Yucaipa', location: 'Home Field', venue_address: null,
-  status: 'SCHEDULED', is_home: true, score: null, result: null, ...over
+  status: 'UPCOMING', is_home: true, score: null, result: null, ...over
 });
 
 const FIXTURES = [

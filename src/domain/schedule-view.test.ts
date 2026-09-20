@@ -173,7 +173,7 @@ describe('matchOutcome', () => {
   });
 
   it('says nothing for a fixture not yet played or with no readable score', () => {
-    expect(matchOutcome({ status: 'SCHEDULED', score: null })).toBeNull();
+    expect(matchOutcome({ status: 'UPCOMING', score: null })).toBeNull();
     expect(matchOutcome({ status: 'COMPLETED', score: 'W' })).toBeNull();
     expect(matchOutcome(null)).toBeNull();
   });
@@ -200,7 +200,7 @@ describe('recentForm', () => {
   it('counts only completed fixtures', () => {
     expect(recentForm([
       done('a', '2026-08-01', '3 - 1'),
-      { id: 'n', status: 'SCHEDULED', score: null, date: 'x', matchOn: '2026-09-04' }
+      { id: 'n', status: 'UPCOMING', score: null, date: 'x', matchOn: '2026-09-04' }
     ])).toEqual(['W']);
   });
 
