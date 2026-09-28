@@ -88,6 +88,22 @@ describe('buildSquadReportPrintDocument', () => {
     expect(html).toContain('Cesar Alva');
   });
 
+  it('starts each exercise on a fresh page, and the first printed section on the first', () => {
+    const html = buildSquadReportPrintDocument(OPTS)!;
+    const sections = html.match(/<section class="[^"]*">/g) || [];
+    expect(sections).toEqual(['<section class="sec">', '<section class="sec sec--page">']);
+  });
+
+  it('starts every exercise after the overall ratings on its own page', () => {
+    const overall = [{
+      playerId: 'p1', name: 'Cesar Alva', recordingNumber: 7, rank: 1, exercises: 2,
+      wins: 1, draws: 1, losses: 1, earned: 3, available: 4, share: 75
+    }];
+    const html = buildSquadReportPrintDocument({ ...OPTS, overall })!;
+    expect((html.match(/<section class="sec sec--page">/g) || [])).toHaveLength(2);
+    expect(html.indexOf('<section class="sec">')).toBeLessThan(html.indexOf('Overall ratings</h2>'));
+  });
+
   it('carries the standard and how many are short of it', () => {
     const html = buildSquadReportPrintDocument(OPTS)!;
     expect(html).toContain('standard 4:30');

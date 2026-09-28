@@ -115,7 +115,8 @@ export function squadReportSheets(
  * The printable document, or null when nothing has been recorded.
  *
  * Every exercise in one document, in the order the report shows them, so a
- * coach hands over one sheet rather than one per exercise.
+ * coach prints once rather than once per exercise -- but each exercise starts
+ * its own page, so Attitude and Flying Fours can be handed out separately.
  */
 export function buildSquadReportPrintDocument(options: SquadReportExportOptions): string | null {
   const overall: PrintSection = {
@@ -144,6 +145,7 @@ export function buildSquadReportPrintDocument(options: SquadReportExportOptions)
     style: `
   table { width: auto; min-width: 55%; }
   th, td { padding: 2mm 5mm; }`,
-    sections
+    sections,
+    pageBreaks: true
   });
 }
