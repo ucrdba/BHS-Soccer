@@ -65,10 +65,35 @@ describe('a new drill', () => {
 });
 
 describe('the three-way arithmetic', () => {
-  it('fills the end when a duration is picked', async () => {
+  it('fills the end when a duration is typed', async () => {
     const w = mountForm();
-    await w.find('[data-drill-duration]').setValue('45 min');
+    await w.find('[data-drill-duration]').setValue('45');
     expect((w.find('[data-drill-end]').element as HTMLInputElement).value).toBe('16:45');
+  });
+
+  it('takes any whole number of minutes, not just steps of five', async () => {
+    // A two-minute water break is a real slot in a session.
+    const w = mountForm();
+    await w.find('[data-drill-duration]').setValue('2');
+    expect((w.find('[data-drill-end]').element as HTMLInputElement).value).toBe('16:02');
+    expect(w.find('[data-drill-slot]').text()).toContain('2 min');
+  });
+
+  it('leaves the end alone for a blank or zero duration', async () => {
+    // Half-typed, the box is briefly empty; a drill that ends as it starts
+    // is never what was meant.
+    const w = mountForm();
+    await w.find('[data-drill-duration]').setValue('');
+    await w.find('[data-drill-duration]').setValue('0');
+    expect((w.find('[data-drill-end]').element as HTMLInputElement).value).toBe('16:20');
+  });
+
+  it('offers the usual lengths as suggestions', () => {
+    const w = mountForm();
+    const list = w.find('[data-drill-duration]').attributes('list');
+    const options = [...document.querySelectorAll(`#${list} option`)].map(o => (o as HTMLOptionElement).value);
+    expect(options).toContain('20');
+    expect(options).toContain('45');
   });
 
   it('reads the duration back out of the times', async () => {
@@ -83,13 +108,13 @@ describe('the three-way arithmetic', () => {
     expect(w.find('[data-drill-slot]').text()).toContain('4:00 PM - 4:20 PM');
   });
 
-  it('selects custom for a duration the list does not hold', async () => {
+  it('shows the minutes the times add up to, whatever they are', async () => {
     // Snapping to the nearest preset would quietly change the drill the coach
     // just timed.
     const w = mountForm();
     await w.find('[data-drill-end]').setValue('16:37');
     await w.find('[data-drill-end]').trigger('change');
-    expect((w.find('[data-drill-duration]').element as HTMLSelectElement).value).toBe('custom');
+    expect((w.find('[data-drill-duration]').element as HTMLInputElement).value).toBe('37');
   });
 
   it('rolls over midnight rather than going negative', async () => {
@@ -180,6 +205,7 @@ describe('starting from the library', () => {
     const w = mountForm();
     await w.find('[data-drill-library]').setValue('d1');
     expect((w.find('[data-drill-end]').element as HTMLInputElement).value).toBe('16:15');
+    expect((w.find('[data-drill-duration]').element as HTMLInputElement).value).toBe('15');
   });
 
   it('brings the diagram with it', async () => {

@@ -34,7 +34,8 @@ const name = ref('');
 const notes = ref('');
 const start = ref('16:00');
 const end = ref('16:20');
-const durationChoice = ref('20 min');
+/** The "Runs for" box, in whole minutes. */
+const minutes = ref<number | ''>(20);
 const fromLibrary = ref('');
 const error = ref<string | null>(null);
 
@@ -79,25 +80,28 @@ watch(() => [props.open, props.index] as const, () => {
 }, { immediate: true });
 
 /**
- * Keep the preset picker honest.
- *
- * A duration the list does not hold selects "custom" rather than the nearest
- * preset, which would quietly change the drill the coach just timed.
+ * Show the minutes the times add up to, exactly — never the nearest preset,
+ * which would quietly change the drill the coach just timed.
  */
 function syncChoice(): void {
-  const mins = slot.value?.duration || '';
-  durationChoice.value = DURATION_PRESETS.includes(mins) ? mins : 'custom';
+  minutes.value = slot.value ? slot.value.minutes : '';
 }
 
 function onTimesChanged(): void {
   syncChoice();
 }
 
-function onDurationPicked(value: string): void {
-  durationChoice.value = value;
-  if (value === 'custom') return;
+/**
+ * Any whole number of minutes moves the end to match. A blank or zero box —
+ * half-typed, usually — leaves the end where it was, since a drill that ends
+ * as it starts is never what was meant.
+ */
+function onDurationTyped(value: string): void {
+  const mins = Number(value);
+  minutes.value = value === '' ? '' : mins;
+  if (!Number.isInteger(mins) || mins < 1) return;
 
-  const next = endFromDuration(start.value, value);
+  const next = endFromDuration(start.value, `${mins} min`);
   if (next) end.value = next;
 }
 
@@ -109,7 +113,11 @@ function onPickFromLibrary(id: string): void {
 
   name.value = drill.name || '';
   notes.value = drill.coach_notes || drill.coachNotes || '';
-  if (drill.duration) onDurationPicked(formatDuration(drill.duration));
+  if (drill.duration) {
+    const next = endFromDuration(start.value, formatDuration(drill.duration));
+    if (next) end.value = next;
+    syncChoice();
+  }
 }
 
 function onSave(): void {
@@ -174,15 +182,18 @@ function onSave(): void {
       </label>
 
       <label class="field">
-        <span class="fld__label kicker">Runs for</span>
-        <select
-          class="input" data-drill-duration
-          :value="durationChoice"
-          @change="onDurationPicked(($event.target as HTMLSelectElement).value)"
-        >
-          <option v-for="d in DURATION_PRESETS" :key="d" :value="d">{{ d }}</option>
-          <option value="custom">Custom</option>
-        </select>
+        <span class="fld__label kicker">Runs for (min)</span>
+        <!-- Typed, so a two-minute water break fits; the usual lengths are
+             still a tap away as suggestions. -->
+        <input
+          type="number" min="1" max="240" step="1" inputmode="numeric"
+          class="input" data-drill-duration list="drill-duration-presets"
+          :value="minutes"
+          @input="onDurationTyped(($event.target as HTMLInputElement).value)"
+        />
+        <datalist id="drill-duration-presets">
+          <option v-for="d in DURATION_PRESETS" :key="d" :value="parseInt(d, 10)" />
+        </datalist>
       </label>
     </div>
 
