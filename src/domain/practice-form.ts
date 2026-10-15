@@ -133,8 +133,36 @@ function noteFor(drill: any, standards: Record<string, number | null>): string |
   return parts.length ? parts.join(' · ') : undefined;
 }
 
+/** A drill's sheet, with the bare drill name the header of a later page carries. */
+export interface PracticeFormSection extends PrintSection {
+  drillName: string;
+}
+
+/**
+ * How many players fit a printed page, at the row height `ROW_MM` fixes.
+ *
+ * A browser breaks a long table wherever it runs out of paper, and nothing it
+ * offers can put a drill's name and "Page 2 of 3" at the top of the page it
+ * broke onto. So the sheet is split here instead, into pages that fit.
+ * Measured on US Letter, the shorter of Letter and A4, with a few millimetres
+ * to spare: a page that overflows loses its header to the browser's own break.
+ */
+const ROWS_FIRST_PAGE = 27;
+/** Under WON / TIE / LOST, whose writing space takes a third of the page. */
+const ROWS_FIRST_PAGE_UNDER_LINES = 16;
+/** A later page: only the one-line header and the column heads above the rows. */
+const ROWS_LATER_PAGE = 30;
+const ROW_MM = 7.5;
+
+/** A sheet's rows, cut into the pages they print on. */
+function pagesOf<T>(rows: T[], first: number): T[][] {
+  const pages = [rows.slice(0, first)];
+  for (let i = first; i < rows.length; i += ROWS_LATER_PAGE) pages.push(rows.slice(i, i + ROWS_LATER_PAGE));
+  return pages;
+}
+
 /** One printable section per drill: its heading, its note, and the blank rows. */
-export function practiceFormSections(options: PracticeFormOptions): PrintSection[] {
+export function practiceFormSections(options: PracticeFormOptions): PracticeFormSection[] {
   const players = squad(options?.players || []);
   if (players.length === 0) return [];
 
@@ -143,6 +171,7 @@ export function practiceFormSections(options: PracticeFormOptions): PrintSection
     // different answer to the same session.
     .filter(d => d?.measure !== 'head_to_head')
     .map(d => ({
+      drillName: d?.name || 'Exercise',
       heading: `${d?.name || 'Exercise'} — ${MEASURE_LABEL[d?.measure] || 'Exercise'}`,
       note: noteFor(d, options.standards || {}),
       preamble: d?.measure === 'win_loss' ? outcomeLines() : undefined,
@@ -163,7 +192,10 @@ function longDate(date: string): string {
  * Every sheet for every day, or null when there is nothing to print.
  *
  * A day at a time, each sheet carrying its own date, so a week printed in one
- * press cannot be shuffled into the wrong practice.
+ * press cannot be shuffled into the wrong practice. A sheet too long for one
+ * page carries on over the next, each later page headed "Page 2 of 3 · drill ·
+ * date" -- counted within the sheet, so a page that comes loose from the
+ * clipboard still says which sheet it belongs to and where.
  */
 export function buildPracticeFormsDocument(options: PracticeFormOptions): string | null {
   const dates = (options?.dates || []).filter(Boolean);
@@ -172,11 +204,17 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
 
   const sections: PrintSection[] = [];
   dates.forEach(date => {
-    perDay.forEach(section => {
-      sections.push({
-        ...section,
-        heading: section.heading,
-        note: [longDate(date), section.note].filter(Boolean).join(' · ')
+    const day = longDate(date);
+    perDay.forEach(({ drillName, ...section }) => {
+      const pages = pagesOf(section.rows,
+        section.preamble ? ROWS_FIRST_PAGE_UNDER_LINES : ROWS_FIRST_PAGE);
+      pages.forEach((rows, i) => {
+        sections.push(i === 0
+          ? { ...section, rows, note: [day, section.note].filter(Boolean).join(' · ') }
+          : {
+            ...section, rows, preamble: undefined,
+            runningHead: `Page ${i + 1} of ${pages.length} · ${drillName} · ${day}`
+          });
       });
     });
   });
@@ -193,7 +231,10 @@ export function buildPracticeFormsDocument(options: PracticeFormOptions): string
     topLine: '<p class="fill">Date: <span class="fill__rule"></span></p>',
     pageBreaks: true,
     sections,
+    // A fixed row height is what lets the pages above be counted in rows.
     style: `
+  tbody tr { height: ${ROW_MM}mm; }
+  th, td { padding: 1mm 3mm; }
   .lines { margin: 0 0 4mm; border-top: 0.4pt solid #b8b5b5; }
   .box { padding: 1.5mm 0 0; min-height: 14mm; border-bottom: 0.4pt solid #b8b5b5; }
   .box--tall { min-height: 22mm; }

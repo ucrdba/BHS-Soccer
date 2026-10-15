@@ -157,6 +157,57 @@ describe('the document', () => {
     expect(buildPracticeFormsDocument(opts({ dates: [] }))).toBeNull();
   });
 
+  it('heads every page after a sheet’s first with the page, the drill and the date', () => {
+    const big = Array.from({ length: 60 }, (_, i) => ({
+      id: `p${i}`, name: `Player ${String(i + 1).padStart(2, '0')}`, recordingNumber: i + 1, position: null
+    }));
+    const html = buildPracticeFormsDocument(opts({
+      players: big, drills: [drill({ name: 'Coopers' })]
+    }))!;
+
+    const heads = (html.match(/<p class="runhead">([^<]*)<\/p>/g) || [])
+      .map(h => h.replace(/<\/?p[^>]*>/g, ''));
+    expect(heads).toEqual([
+      'Page 2 of 3 · Coopers · Thursday, September 17, 2026',
+      'Page 3 of 3 · Coopers · Thursday, September 17, 2026'
+    ]);
+    // The first page keeps its own heading, once; the others start fresh pages.
+    expect((html.match(/<h2>/g) || [])).toHaveLength(1);
+    expect((html.match(/class="sec sec--page"/g) || [])).toHaveLength(2);
+    // Every player once, in order, across the pages.
+    const names = (html.match(/Player \d\d/g) || []);
+    expect(names).toEqual(big.map(p => p.name));
+  });
+
+  it('counts pages per sheet, so each day’s sheet starts again at page 1', () => {
+    const big = Array.from({ length: 40 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, recordingNumber: i + 1 }));
+    const html = buildPracticeFormsDocument(opts({
+      players: big, dates: ['2026-09-17', '2026-09-18'], drills: [drill({ name: 'Coopers' })]
+    }))!;
+    const heads = (html.match(/<p class="runhead">([^<]*)<\/p>/g) || [])
+      .map(h => h.replace(/<\/?p[^>]*>/g, ''));
+    expect(heads).toEqual([
+      'Page 2 of 2 · Coopers · Thursday, September 17, 2026',
+      'Page 2 of 2 · Coopers · Friday, September 18, 2026'
+    ]);
+  });
+
+  it('fits fewer names under a small-sided game’s writing space', () => {
+    const squadOf = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}`, recordingNumber: i + 1 }));
+    const pages = (measure: string, n: number) => {
+      const html = buildPracticeFormsDocument(opts({ players: squadOf(n), drills: [drill({ measure })] }))!;
+      return 1 + (html.match(/class="runhead"/g) || []).length;
+    };
+    // The same squad fits one counted sheet and needs two under WON/TIE/LOST.
+    expect(pages('count_high', 22)).toBe(1);
+    expect(pages('win_loss', 22)).toBe(2);
+  });
+
+  it('prints no page header on a sheet that fits one page', () => {
+    const html = buildPracticeFormsDocument(opts({}))!;
+    expect(html).not.toContain('runhead">');
+  });
+
   it('escapes a drill name a coach typed', () => {
     const html = buildPracticeFormsDocument(opts({
       drills: [drill({ name: '<script>alert(1)</script>' })]

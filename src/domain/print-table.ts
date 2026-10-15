@@ -46,6 +46,12 @@ export interface PrintSection {
    */
   markup?: Set<string>;
   rows: Record<string, any>[];
+  /**
+   * A page that carries on a section the page before began: this line --
+   * "Page 2 of 3 · Coopers · Thursday" -- stands in for the heading, note and
+   * preamble, which the first page already printed.
+   */
+  runningHead?: string;
 }
 
 function cell(v: any, numeric: boolean, raw = false): string {
@@ -78,6 +84,7 @@ const STYLE = `
   .when { margin: 1mm 0 6mm; color: #605d5d; font-size: 9pt; }
   .note { margin: 0 0 6mm; font-size: 9pt; color: #605d5d; line-height: 1.5; max-width: 60em; }
   .secnote { margin: 0 0 2mm; font-size: 9pt; color: #605d5d; }
+  .runhead { margin: 0 0 3mm; font-size: 9pt; color: #605d5d; }
   .sec { margin-bottom: 8mm; }
   /* One sheet per section, for forms a coach carries page by page. */
   .sec--page { break-before: page; page-break-before: always; }
@@ -156,9 +163,9 @@ export function printSectionsDocument(options: {
   if (sections.length === 0) return null;
 
   const body = sections.map((s, i) => `<section class="sec${options.pageBreaks && i > 0 ? ' sec--page' : ''}">
-<h2>${escapeHtml(s.heading)}</h2>
+${s.runningHead ? `<p class="runhead">${escapeHtml(s.runningHead)}</p>` : `<h2>${escapeHtml(s.heading)}</h2>
 ${s.note ? `<p class="secnote">${escapeHtml(s.note)}</p>` : ''}
-${s.preamble || ''}
+${s.preamble || ''}`}
 ${table(s.rows, s.textual || new Set<string>(), s.markup)}
 </section>`).join('\n');
 
