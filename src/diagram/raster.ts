@@ -52,6 +52,32 @@ function parse(data: any): Parsed | null {
 }
 
 /**
+ * Whether anything is drawn on the diagram, on any step.
+ *
+ * `practice_plans.diagram_data` defaults to `'{}'`, so a drill nobody drew on
+ * still carries a diagram — and a board saved untouched carries an empty
+ * one. Either printed as a bare pitch, which reads as a drill whose diagram
+ * failed to draw.
+ */
+export function hasDrawing(data: any): boolean {
+  const parsed = parse(data);
+  if (!parsed) return false;
+
+  const boards = [{ elements: parsed.elements, drawings: parsed.drawings }, ...parsed.keyframes];
+  return boards.some(b =>
+    (Array.isArray(b?.elements) && b.elements.length > 0)
+    || (Array.isArray(b?.drawings) && b.drawings.length > 0));
+}
+
+/** Whether the blob is a board at all, rather than the `{}` column default. */
+function hasBoard(data: any): boolean {
+  let value = data;
+  if (typeof value === 'string') { try { value = JSON.parse(value); } catch { return false; } }
+  return !!value && typeof value === 'object'
+    && ['keyframes', 'elements', 'drawings'].some(k => k in value);
+}
+
+/**
  * One step of a diagram.
  *
  * A step index past the end falls back to the top-level `elements` and
@@ -121,10 +147,16 @@ export function diagramsForPlan(items: any[]): Record<string, RasterStep[]> {
   (items || []).forEach(drill => {
     if (!drill?.name) return;
 
-    const steps = renderAllSteps(drill.diagramData);
-    if (steps.length) { out[drill.name] = steps; return; }
+    const drawn = hasDrawing(drill.diagramData);
+    if (drawn) {
+      const steps = renderAllSteps(drill.diagramData);
+      if (steps.length) { out[drill.name] = steps; return; }
+    }
 
-    if (drill.diagramImage) {
+    // The thumbnail stands in when the board cannot be rendered, or when the
+    // drill was stored as a picture alone. A board saved with nothing on it
+    // has a thumbnail of nothing, so it does not.
+    if (drill.diagramImage && (drawn || !hasBoard(drill.diagramData))) {
       out[drill.name] = [{ dataUrl: drill.diagramImage, label: 'Tactical diagram' }];
     }
   });

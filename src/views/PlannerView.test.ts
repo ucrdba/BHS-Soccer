@@ -453,6 +453,28 @@ describe('diagrams', () => {
     expect(w.findAll('[data-drill-diagram]')).toHaveLength(2);
   });
 
+  it('offers to add a diagram when the stored one is the column default, {}', async () => {
+    // diagram_data defaults to '{}'; read as "has a diagram", the button
+    // said Diagram for a drill nobody had drawn on.
+    const blank = ROWS.map(r => ({ ...r, diagram_data: {} }));
+    const w = await mountPlanner({ rows: blank });
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    expect(w.findAll('[data-drill-diagram]').map(b => b.text())).toEqual(['+ Diagram', '+ Diagram']);
+  });
+
+  it('says Diagram for a drill with something drawn', async () => {
+    const drawn = ROWS.map((r, i) => (i === 0
+      ? { ...r, diagram_data: { elements: [{ id: 1, type: 'ball', x: 5, y: 5 }], drawings: [] } }
+      : r));
+    const w = await mountPlanner({ rows: drawn });
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    expect(w.findAll('[data-drill-diagram]').map(b => b.text())).toEqual(['Diagram', '+ Diagram']);
+  });
+
   it('shows the thumbnail of a drill that has one', async () => {
     // What the timeline can show without instantiating a board.
     const w = await mountPlanner({ rows: withDiagram });
@@ -487,7 +509,8 @@ describe('printing a plan with diagrams', () => {
     const rows = [{
       ...planRow(),
       diagram_image: 'data:image/png;base64,SAVED',
-      diagram_data: { pitchType: 'full', keyframes: [], elements: [], drawings: [] }
+      // Something on it: a board saved blank prints nothing at all.
+      diagram_data: { pitchType: 'full', keyframes: [], elements: [{ id: 1, type: 'ball', x: 5, y: 5 }], drawings: [] }
     }];
     const win = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() };
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(win as any);

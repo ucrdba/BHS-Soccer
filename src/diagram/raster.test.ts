@@ -185,6 +185,50 @@ describe('a whole plan', () => {
     expect(out.Rondo).toHaveLength(2);
   });
 
+  it('leaves out a drill whose diagram is the column default, {}', () => {
+    // practice_plans.diagram_data defaults to '{}', so a drill nobody drew
+    // on arrives with it -- and printed a bare pitch.
+    stubCanvas();
+    expect(diagramsForPlan([drill({ diagramData: {} })])).toEqual({});
+  });
+
+  it('leaves out a board saved with nothing on it, thumbnail and all', () => {
+    stubCanvas();
+    const blank = {
+      keyframes: [{ time: 0, label: 'Time 0', elements: [], drawings: [] }],
+      elements: [], drawings: [], pitchType: 'full'
+    };
+    const out = diagramsForPlan([
+      drill({ diagramData: blank, diagramImage: 'data:image/png;base64,EMPTY_PITCH' })
+    ]);
+    expect(out).toEqual({});
+  });
+
+  it('prints a drill drawn only with lines', () => {
+    stubCanvas();
+    const lines = { elements: [], drawings: [{ type: 'line', points: [[0, 0], [5, 5]] }] };
+    expect(Object.keys(diagramsForPlan([drill({ diagramData: lines })]))).toEqual(['Rondo']);
+  });
+
+  it('prints something drawn only on a later step', () => {
+    stubCanvas();
+    const later = {
+      keyframes: [
+        { time: 0, elements: [], drawings: [] },
+        { time: 1, elements: [{ id: 1, type: 'ball', x: 5, y: 5 }], drawings: [] }
+      ],
+      elements: [], drawings: []
+    };
+    expect(diagramsForPlan([drill({ diagramData: later })]).Rondo).toHaveLength(2);
+  });
+
+  it('still prints a drill stored as a picture alone', () => {
+    // Older rows carry only the thumbnail, with the column default beside it.
+    stubCanvas();
+    const out = diagramsForPlan([drill({ diagramData: {}, diagramImage: 'data:image/png;base64,SAVED' })]);
+    expect(out.Rondo).toEqual([{ dataUrl: 'data:image/png;base64,SAVED', label: 'Tactical diagram' }]);
+  });
+
   it('copes with an empty plan', () => {
     expect(diagramsForPlan([])).toEqual({});
     expect(diagramsForPlan(null as any)).toEqual({});

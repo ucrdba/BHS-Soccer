@@ -19,6 +19,7 @@ import { ref, computed, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { supabaseService } from '../../data/supabase';
 import { usePlannerStore } from '../../stores/planner';
+import { hasDrawing } from '../../diagram/raster';
 
 const props = defineProps<{ open: boolean; schoolId: string | null }>();
 const emit = defineEmits<{ close: []; use: [any]; draw: [any] }>();
@@ -136,7 +137,7 @@ async function onDelete(drill: any): Promise<void> {
           Use in this plan
         </button>
         <button type="button" class="mini" data-library-draw @click="emit('draw', d)">
-          {{ d.diagram_data || d.diagramData ? 'Diagram' : '+ Diagram' }}
+          {{ hasDrawing(d.diagram_data || d.diagramData) ? 'Diagram' : '+ Diagram' }}
         </button>
         <button type="button" class="mini" data-library-edit @click="startEdit(d)">Edit</button>
         <button type="button" class="mini mini--danger" data-library-delete @click="onDelete(d)">

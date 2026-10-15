@@ -80,6 +80,21 @@ describe('the list', () => {
   });
 });
 
+describe('the diagram button', () => {
+  it('offers to add one when the stored diagram is the column default, {}', () => {
+    // drills_bank.diagram_data defaults to '{}': not a diagram anyone drew.
+    const w = mountBank({ library: [{ id: 'd1', name: 'Rondo', diagram_data: {} }] });
+    expect(w.find('[data-library-draw]').text()).toBe('+ Diagram');
+  });
+
+  it('says Diagram when something is drawn', () => {
+    const w = mountBank({ library: [{
+      id: 'd1', name: 'Rondo', diagram_data: { elements: [{ id: 1, type: 'ball', x: 5, y: 5 }], drawings: [] }
+    }] });
+    expect(w.find('[data-library-draw]').text()).toBe('Diagram');
+  });
+});
+
 describe('the matrix weight', () => {
   it('is shown, because it decides how the Matrix scores the drill', () => {
     const w = mountBank();

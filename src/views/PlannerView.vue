@@ -26,7 +26,7 @@ import { useRosterStore } from '../stores/roster';
 import { useAuthStore } from '../stores/auth';
 import { buildPrintDocument } from '../domain/plan-print';
 import PrintFormsModal from '../components/planner/PrintFormsModal.vue';
-import { diagramsForPlan } from '../diagram/raster';
+import { diagramsForPlan, hasDrawing } from '../diagram/raster';
 
 const planner = usePlannerStore();
 const org = useOrganizationStore();
@@ -340,7 +340,7 @@ async function onDrop(index: number): Promise<void> {
           <button
             type="button" class="mini" data-drill-diagram
             @click.stop="openDiagram(i)"
-          >{{ d.diagramData ? 'Diagram' : '+ Diagram' }}</button>
+          >{{ hasDrawing(d.diagramData) ? 'Diagram' : '+ Diagram' }}</button>
           <button
             type="button" class="mini" data-drill-edit
             @click.stop="openEdit(i)"
