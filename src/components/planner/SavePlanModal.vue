@@ -45,6 +45,13 @@ watch(() => props.open, async (open) => {
 const willReplace = computed(() =>
   planner.savedPlans.some(p => p.name === name.value.trim()));
 
+/** A saved plan written under a new name is copied, not renamed. */
+const copyingFrom = computed(() => {
+  const active = planner.activePlanName;
+  const to = name.value.trim();
+  return active && to && to !== active ? active : null;
+});
+
 function report(res: { ok: boolean; error?: string }, done: string): void {
   if (res?.ok) { notice.value = done; error.value = null; }
   else { error.value = res?.error || 'That did not work.'; notice.value = null; }
@@ -104,6 +111,9 @@ async function onCopy(): Promise<void> {
       <p v-if="willReplace" class="note" data-plan-replace>
         A plan called "{{ name.trim() }}" already exists on this team. Saving
         replaces it.
+      </p>
+      <p v-if="copyingFrom" class="note" data-plan-copy-note>
+        Saves a copy under the new name. "{{ copyingFrom }}" stays as it is.
       </p>
       <button
         type="button" class="btn btn--go" :disabled="busy"

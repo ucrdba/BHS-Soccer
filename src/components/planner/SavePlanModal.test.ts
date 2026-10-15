@@ -103,6 +103,26 @@ describe('saving under a name', () => {
     expect(w.find('[data-plan-replace]').exists()).toBe(false);
   });
 
+  it('says a new name saves a copy and leaves the open plan as it is', async () => {
+    const w = await mountSave({ active: 'Tuesday Session' });
+    await w.find('[data-plan-name]').setValue('GK Shot Stopping');
+
+    const note = w.find('[data-plan-copy-note]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain('Tuesday Session');
+  });
+
+  it('does not talk about a copy when saving the open plan in place', async () => {
+    const w = await mountSave({ active: 'Tuesday Session' });
+    expect(w.find('[data-plan-copy-note]').exists()).toBe(false);
+  });
+
+  it('does not talk about a copy for a session that was never named', async () => {
+    const w = await mountSave();
+    await w.find('[data-plan-name]').setValue('GK Shot Stopping');
+    expect(w.find('[data-plan-copy-note]').exists()).toBe(false);
+  });
+
   it('saves, and reports success on what the client returns', async () => {
     // saveFullPracticePlan reports { success }, not { ok }.
     const w = await mountSave();

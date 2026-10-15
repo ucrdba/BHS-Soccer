@@ -206,18 +206,49 @@ export const usePlannerStore = defineStore('planner', () => {
     if (items.value.length === 0) return { ok: false, error: 'Add a drill before saving the plan.' };
     if (!teamId) return { ok: false, error: 'Choose a team first.' };
 
+    // A saved plan written under another name is a copy. Its rows keep their
+    // ids otherwise, and the upsert renames them — the original plan is gone.
+    // An unsaved session has no plan of its own yet, so it names its rows.
+    const copying = !!activePlanName.value && activePlanName.value !== planName;
+    const written = recalculateTimeline(items.value)
+      .map(d => (copying ? { ...d, id: undefined } : d));
+
+    // Saving under another plan's name replaces that plan, so its old rows
+    // go — after the write, so a refused save loses nothing.
+    const keep = new Set(written.map(d => d.id).filter(Boolean));
+    const replaced = (savedPlans.value.find(p => p.name === planName)?.drills || [])
+      .map(d => d.id).filter(id => id && !keep.has(id));
+
     const res = await supabaseService.saveFullPracticePlan(
-      teamId, { name: planName, items: recalculateTimeline(items.value) });
+      teamId, { name: planName, items: written });
 
     if (!res?.success) {
       saveError.value = res?.error || 'Could not save that plan.';
       return { ok: false, error: saveError.value! };
     }
 
+    for (const id of replaced) await supabaseService.deletePracticePlanItem(id);
+
+    // The copy's own ids, so the next edit writes to it and not the original.
+    if (copying) {
+      const ids = (res.data || []).map((r: any) => r.id);
+      items.value = written.map((d, i) => ({ ...d, id: ids[i] }));
+    }
+
     saveError.value = null;
     activePlanName.value = planName;
     await readPlans(teamId);
     return { ok: true };
+  }
+
+  /**
+   * Start an empty session. Nothing to write: every drill is saved as it is
+   * added, so the plan that was open is already in the picker.
+   */
+  function newPlan(): void {
+    items.value = [];
+    activePlanName.value = '';
+    selectedIndex.value = 0;
   }
 
   function loadPlan(planId: string): void {
@@ -276,6 +307,6 @@ export const usePlannerStore = defineStore('planner', () => {
     loading, loadError, saveError, totalTime, copyablePlan,
     load, loadDrillsBank, loadCopyTargets,
     addDrill, editDrill, removeDrill, move,
-    savePlan, loadPlan, renamePlan, deletePlan, copyToTeam
+    savePlan, newPlan, loadPlan, renamePlan, deletePlan, copyToTeam
   };
 });

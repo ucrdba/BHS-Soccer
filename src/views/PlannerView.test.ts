@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import PlannerView from './PlannerView.vue';
+import { usePlannerStore } from '../stores/planner';
 
 const svc = {
   fetchPracticePlans: vi.fn(),
@@ -243,6 +244,48 @@ describe('removing a drill', () => {
     expect(svc.deletePracticePlanItem).toHaveBeenCalledWith(ROW_A);
     expect(drillNames(w)).toEqual(['Shooting']);
     confirmSpy.mockRestore();
+  });
+});
+
+describe('starting a new plan', () => {
+  it('empties a loaded plan without asking, since it is already saved', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    await w.find('[data-new-plan]').trigger('click');
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(drillNames(w)).toEqual([]);
+    expect(w.text()).toContain('Unsaved session');
+    confirmSpy.mockRestore();
+  });
+
+  it('asks first when the session has drills but no name', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountPlanner();
+    // Set after mounting: the planner's own load empties the timeline.
+    usePlannerStore().items = [{ id: ROW_A, name: 'Diving', time: '', duration: '20 min' } as any];
+    await flush();
+
+    await w.find('[data-new-plan]').trigger('click');
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(drillNames(w)).toEqual(['Diving']);
+    confirmSpy.mockRestore();
+  });
+
+  it('writes nothing', async () => {
+    const w = await mountPlanner();
+    await w.find('[data-load-plan]').trigger('click');
+    await w.findAll('[data-plan-choice]')[0].trigger('click');
+
+    await w.find('[data-new-plan]').trigger('click');
+    await flush();
+
+    expect(svc.saveFullPracticePlan).not.toHaveBeenCalled();
+    expect(svc.deletePracticePlanItem).not.toHaveBeenCalled();
   });
 });
 

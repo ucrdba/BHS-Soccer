@@ -192,6 +192,8 @@ The original export shipped a hardcoded sample quiz question, a fabricated match
 - **Plan rows carry ids that belong to a team.** Merging another team's plans into the picker let a coach load one, which copied that team's row ids into the working plan — and the next edit upserted on those ids under the new team, *moving* the other team's rows. An empty team must show an empty picker. Never merge.
 - **`saveFullPracticePlan` returns `{ success }`, not `{ ok }`**, and `savePracticePlanItem` returns the row or `null`. Reading `res.ok` on either is always `undefined`, so every successful save reports as a failure.
 
+**Saving a loaded plan under another name is a copy.** Written with its ids, the upsert renames the original's rows and the original is gone, so `savePlan` strips the ids, writes, and adopts the ids `saveFullPracticePlan` returns — keeping the old ones would make the next edit move the original's rows after all. An unsaved session (no active name) keeps its ids, since its rows are already filed under "Current Practice Session" and naming them is the point. Saving over a *different* plan's name deletes that plan's old rows, after the write succeeds. **New plan** only clears the timeline: every drill is saved as it is added, so there is nothing to write.
+
 A fifth is not the table's fault but bites the same way: a newly added drill must be written with `savePracticePlanItem`, because that is what returns its id. Added through the full-plan save it has none, so the *next* save inserts a second copy — visible only after a reload.
 
 ### A setup store must not return plain helper functions

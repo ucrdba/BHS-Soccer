@@ -264,6 +264,127 @@ describe('saving a plan', () => {
   });
 });
 
+describe('saving a loaded plan under another name', () => {
+  const NEW_A = '0aaaaaaa-0000-0000-0000-000000000001';
+  const NEW_B = '0bbbbbbb-0000-0000-0000-000000000002';
+
+  async function loaded() {
+    const s = usePlannerStore();
+    await s.load(TEAM, 's1');
+    s.loadPlan(s.savedPlans[0].id);
+    vi.clearAllMocks();
+    saveFullPracticePlan.mockResolvedValue({ success: true, data: [{ id: NEW_A }, { id: NEW_B }] });
+    fetchPracticePlans.mockResolvedValue(ROWS);
+    return s;
+  }
+
+  it('writes a copy: no row ids, so the original\'s rows are not moved', async () => {
+    const s = await loaded();
+    await s.savePlan(TEAM, 'GK Shot Stopping');
+
+    const [, plan] = saveFullPracticePlan.mock.calls[0];
+    expect(plan.name).toBe('GK Shot Stopping');
+    expect(plan.items.map((d: any) => d.name)).toEqual(['Rondo', 'Shooting']);
+    expect(plan.items.every((d: any) => d.id === undefined)).toBe(true);
+  });
+
+  it('leaves the original plan\'s rows alone', async () => {
+    const s = await loaded();
+    await s.savePlan(TEAM, 'GK Shot Stopping');
+    expect(deletePracticePlanItem).not.toHaveBeenCalled();
+  });
+
+  it('carries on editing the copy, with the ids the database gave it', async () => {
+    // Keeping the original's ids would make the next edit move its rows.
+    const s = await loaded();
+    await s.savePlan(TEAM, 'GK Shot Stopping');
+
+    expect(s.activePlanName).toBe('GK Shot Stopping');
+    expect(s.items.map(d => d.id)).toEqual([NEW_A, NEW_B]);
+  });
+
+  it('saves in place, ids and all, under the plan\'s own name', async () => {
+    const s = await loaded();
+    await s.savePlan(TEAM, 'Tuesday Session');
+
+    const [, plan] = saveFullPracticePlan.mock.calls[0];
+    expect(plan.items.map((d: any) => d.id)).toEqual([ROW_A, ROW_B]);
+    expect(deletePracticePlanItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('saving over another plan', () => {
+  const GK = [
+    planRow({ id: 'cccccccc-0000-0000-0000-000000000001', name: 'GK', drill: 'Diving' }),
+    planRow({ id: 'cccccccc-0000-0000-0000-000000000002', name: 'GK', drill: 'Crosses' })
+  ];
+
+  it('replaces it: its old rows go once the new ones are written', async () => {
+    fetchPracticePlans.mockResolvedValue([...ROWS, ...GK]);
+    const s = usePlannerStore();
+    await s.load(TEAM, 's1');
+    s.loadPlan(s.savedPlans[0].id);
+    saveFullPracticePlan.mockResolvedValue({ success: true, data: [{ id: 'n1' }, { id: 'n2' }] });
+
+    await s.savePlan(TEAM, 'GK');
+
+    expect(deletePracticePlanItem.mock.calls.map(c => c[0]))
+      .toEqual(GK.map(r => r.id));
+  });
+
+  it('deletes nothing when the write is refused', async () => {
+    fetchPracticePlans.mockResolvedValue([...ROWS, ...GK]);
+    const s = usePlannerStore();
+    await s.load(TEAM, 's1');
+    s.loadPlan(s.savedPlans[0].id);
+    saveFullPracticePlan.mockResolvedValue({ success: false, error: 'no' });
+
+    await s.savePlan(TEAM, 'GK');
+    expect(deletePracticePlanItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('naming an unsaved session', () => {
+  it('names the rows it already has rather than copying them', async () => {
+    // Each added drill is already a row; a copy would leave the originals
+    // behind as "Current Practice Session".
+    const s = usePlannerStore();
+    s.items = [drill({ id: ROW_A })];
+    await s.savePlan(TEAM, 'GK Footwork');
+
+    const [, plan] = saveFullPracticePlan.mock.calls[0];
+    expect(plan.items[0].id).toBe(ROW_A);
+  });
+});
+
+describe('starting a new plan', () => {
+  it('empties the timeline and forgets the active name', async () => {
+    const s = usePlannerStore();
+    await s.load(TEAM, 's1');
+    s.loadPlan(s.savedPlans[0].id);
+    s.selectedIndex = 1;
+
+    s.newPlan();
+
+    expect(s.items).toEqual([]);
+    expect(s.activePlanName).toBe('');
+    expect(s.selectedIndex).toBe(0);
+  });
+
+  it('writes and deletes nothing — the old plan is already saved', async () => {
+    const s = usePlannerStore();
+    await s.load(TEAM, 's1');
+    s.loadPlan(s.savedPlans[0].id);
+    vi.clearAllMocks();
+
+    s.newPlan();
+
+    expect(saveFullPracticePlan).not.toHaveBeenCalled();
+    expect(deletePracticePlanItem).not.toHaveBeenCalled();
+    expect(s.savedPlans).toHaveLength(1);
+  });
+});
+
 describe('loading a saved plan', () => {
   it('replaces the timeline and names the plan', async () => {
     const s = usePlannerStore();

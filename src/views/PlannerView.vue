@@ -170,6 +170,24 @@ function onPrint(): void {
   win.print();
 }
 
+/**
+ * Clear the timeline for a new plan. A named plan is already saved, drill by
+ * drill, so only a session that was never named is worth a question.
+ */
+function onNewPlan(): void {
+  if (!planner.activePlanName && items.value.length > 0) {
+    const ok = window.confirm(
+      'This session has not been saved under a name.\n\n'
+      + 'Start a new plan anyway? Its drills are kept as "Current Practice Session". '
+      + 'To name it first, use Save & share.'
+    );
+    if (!ok) return;
+  }
+  planner.newPlan();
+  picking.value = false;
+  notice.value = null;
+}
+
 function onChoosePlan(planId: string): void {
   planner.loadPlan(planId);
   picking.value = false;
@@ -204,6 +222,9 @@ async function onDrop(index: number): Promise<void> {
       </div>
 
       <div v-if="isCoach" class="planner__acts">
+        <button type="button" class="act" data-new-plan @click="onNewPlan">
+          New plan
+        </button>
         <button type="button" class="act act--go" data-add-drill @click="openAdd">
           Add a drill
         </button>
