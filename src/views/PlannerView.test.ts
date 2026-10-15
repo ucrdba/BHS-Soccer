@@ -276,6 +276,28 @@ describe('starting a new plan', () => {
     confirmSpy.mockRestore();
   });
 
+  it('says it started one, even on the empty session the planner opens on', async () => {
+    // The planner opens empty, so clearing it changes nothing on screen;
+    // without a word the button looks broken.
+    const w = await mountPlanner();
+    await w.find('[data-new-plan]').trigger('click');
+
+    expect(w.find('[data-notice]').text()).toMatch(/new plan started/i);
+  });
+
+  it('says the session was kept when the coach declines', async () => {
+    // A browser told to block dialogs answers "no" without showing one.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const w = await mountPlanner();
+    usePlannerStore().items = [{ id: ROW_A, name: 'Diving', time: '', duration: '20 min' } as any];
+    await flush();
+
+    await w.find('[data-new-plan]').trigger('click');
+
+    expect(w.find('[data-notice]').text()).toMatch(/kept/i);
+    confirmSpy.mockRestore();
+  });
+
   it('writes nothing', async () => {
     const w = await mountPlanner();
     await w.find('[data-load-plan]').trigger('click');

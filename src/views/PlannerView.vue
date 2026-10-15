@@ -173,6 +173,11 @@ function onPrint(): void {
 /**
  * Clear the timeline for a new plan. A named plan is already saved, drill by
  * drill, so only a session that was never named is worth a question.
+ *
+ * Both outcomes are said out loud. The planner opens on an empty session, so
+ * clearing it changes nothing on screen, and a browser told to block dialogs
+ * answers the question "no" without showing it: silent, the button looks
+ * broken either way.
  */
 function onNewPlan(): void {
   if (!planner.activePlanName && items.value.length > 0) {
@@ -181,11 +186,14 @@ function onNewPlan(): void {
       + 'Start a new plan anyway? Its drills are kept as "Current Practice Session". '
       + 'To name it first, use Save & share.'
     );
-    if (!ok) return;
+    if (!ok) {
+      notice.value = 'Kept the current session. Use Save & share to name it, then start a new plan.';
+      return;
+    }
   }
   planner.newPlan();
   picking.value = false;
-  notice.value = null;
+  notice.value = 'New plan started. Add drills, then name it with Save & share.';
 }
 
 function onChoosePlan(planId: string): void {
