@@ -103,8 +103,8 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
       const rows = await supabaseService.fetchStatEvents(res.id);
       if (rows) {
         events.value = rows.map((r: any) => ({
-          id: r.id, kind: r.kind, playerId: r.player_id,
-          atSeconds: r.at_seconds, period: r.period
+          id: r.id, kind: r.kind, playerId: r.playerId ?? null,
+          atSeconds: Number(r.atSeconds) || 0, period: r.period
         }));
         // The clock picks up where the log left it, rather than at zero.
         const last = events.value[events.value.length - 1];

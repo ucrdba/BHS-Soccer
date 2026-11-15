@@ -450,8 +450,8 @@ describe('opening a session', () => {
 
   it('reads back what was already recorded', async () => {
     fetchStatEvents.mockResolvedValue([
-      { id: 'e1', kind: 'clock_start', player_id: null, at_seconds: 0, period: 1 },
-      { id: 'e2', kind: 'plus', player_id: 'p1', at_seconds: 300, period: 1 }
+      { id: 'e1', kind: 'clock_start', playerId: null, atSeconds: 0, period: 1 },
+      { id: 'e2', kind: 'plus', playerId: 'p1', atSeconds: 300, period: 1 }
     ]);
     const s = await opened();
 
@@ -459,9 +459,22 @@ describe('opening a session', () => {
     expect(kinds(s)).toContain('plus');
   });
 
+  it('keeps the player and the clock time of every event it reloads', async () => {
+    // fetchStatEvents returns camelCase. Reading snake_case lost both, so a
+    // reopened match showed every plus against nobody at 0:00.
+    fetchStatEvents.mockResolvedValue([
+      { id: 'e1', kind: 'clock_start', playerId: null, atSeconds: 0, period: 1 },
+      { id: 'e2', kind: 'on', playerId: 'p1', atSeconds: 0, period: 1 },
+      { id: 'e3', kind: 'plus', playerId: 'p1', atSeconds: 300, period: 1 }
+    ]);
+    const s = await opened();
+    expect(s.events[2]).toMatchObject({ kind: 'plus', playerId: 'p1', atSeconds: 300 });
+    expect(s.clockBase).toBe(300);
+  });
+
   it('picks the clock up where the log left it, not at zero', async () => {
     fetchStatEvents.mockResolvedValue([
-      { id: 'e1', kind: 'clock_stop', player_id: null, at_seconds: 2400, period: 1 }
+      { id: 'e1', kind: 'clock_stop', playerId: null, atSeconds: 2400, period: 1 }
     ]);
     const s = await opened();
 
