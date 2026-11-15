@@ -85,6 +85,12 @@ Every plus/minus event is stamped with the match clock, and playing time and goa
 
 **Team goals are inside it**, and were the one statistic that escaped until the demo made it visible. `goal_for` and `goal_against` move the differential of *every* player on the pitch, so one tapped while the clock is stopped credits whoever is on at that point in the log — and `endPeriod` leaves the clock stopped, so half-time is exactly when that happens: the eleven who came on are credited for a goal the eleven who went off were on for.
 
+### Packing: video replaces live, and live is clock-gated
+
+Since `0041_packing.sql`. Packing counts opponents bypassed (1–11) by a completed pass or dribble. Live taps are `packing` events in `stat_events` with `bypassed`, so they go through `append()`'s gate and the one undo. Video tags are rows in `packing_tags` under the same `stat_matches` row, because they are entered after the fact and the replay orders the log by when an event was recorded.
+
+**Once a match has any non-deleted tag, every report counts the tags and ignores the live taps** — `domain/packing.ts` (`packingSource`, `matchPacking`) is the only place that rule lives, so read a match through it. A live-sourced match reports received and the pass/dribble split as **null, not 0**: live entry never asked. The season rate divides only packing earned in matches where the player has logged minutes, because a video-only match has no minutes. Video players are typed by **shirt** number.
+
 ### Low-minute players are the audience for the reports, not noise in them
 
 Held by the season report, the plus/minus sheet, the squad report and the progress chart alike — each asserts the inclusion rather than assuming it. NFHS rules allow unlimited substitution and re-entry, so much of the roster finishes any fixture well under a full match, and a coach reads these views to decide who to give more minutes to. **Filtering out the fringe players removes exactly the players the decision is about, invisibly.** Show the minutes beside the rate instead.
@@ -305,7 +311,7 @@ Applied by hand in the Supabase SQL editor, in this order:
 5. `supabase/migrations/0005_multi_team_schema.sql` — teams, memberships, team-scoped RLS.
 6. `supabase/migrations/0008_schedule_real_date.sql` — `match_on`/`kickoff_time` derived by a trigger.
 7. `supabase/migrations/0009_weighted_matrix_scoring.sql` — drill weights, `measure`, the `matrix_session*` tables, the rewritten `matrix_standings`.
-8. …through `supabase/migrations/0040_quiz_results_security.sql`.
+8. …through `supabase/migrations/0041_packing.sql`.
 9. `supabase/migrations/0039_org_scoped_writes.sql` — replaces the role-only write policy item 4's section 6 left on `schools`, `players`, `schedule`, `drills_bank`, `coaches` and `quiz_questions`, and that `0002` and `0019` copied onto `matrix_logs` and `quiz_answers`. It refuses to finish while any other permissive write policy remains on those tables, since one left over would undo it.
 
 Prefer adding a new dated migration over editing an already-applied script.

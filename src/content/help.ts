@@ -239,6 +239,24 @@ export function helpSections(): HelpSection[] {
             the match and the clock, the period and every figure come back.</p>`)}`
       },
       {
+        id: 'packing', part: 'Match day', title: 'Packing points', roles: [COACH],
+        body: `
+          <p>Packing counts the opponents a completed pass or dribble takes out of play.</p>
+          <h4>On the touchline</h4>
+          <p>With the clock running, press <b>Packing</b>, tap the player, then press how many
+          opponents were bypassed. <b>Undo</b> removes it like any other tap.</p>
+          <h4>From video</h4>
+          ${P('Schedule', 'Packing')}
+          <p>Open <b>Packing</b> on the fixture in the Schedule. Type the video time if you want to
+          find the clip again, choose Pass or Dribble, then type the shirt numbers and the count.
+          Enter moves to the next box and saves from the last.</p>
+          ${N('Video replaces live', `<p>Once a match has any video tag, the reports count the video
+            tags instead of the live taps. The taps are kept, and removing every tag brings them
+            back.</p>`)}
+          <p>The season report rates packing per full match only over matches with a live
+          substitution log, and says how many that covers.</p>`
+      },
+      {
         id: 'season', part: 'Match day', title: 'Season plus/minus', roles: [COACH],
         body: `
           <p>Every tracked match added up, and a chart per player showing whether they are getting
