@@ -193,6 +193,19 @@ describe('the list and the summary', () => {
     expect(w.findAll('[data-pt-tag]')).toHaveLength(1);
   });
 
+  it('drops the old fixture’s tags when the next one fails to load', async () => {
+    fetchPackingTags.mockResolvedValue([
+      { id: 't2', playerId: 'p11', receiverId: 'p9', action: 'pass', bypassed: 4, videoSeconds: 90 }
+    ]);
+    const w = await mountTags();
+    expect(w.findAll('[data-pt-tag]')).toHaveLength(1);
+    findStatMatch.mockResolvedValue({ ok: false, error: 'x' });
+    await w.setProps({ matchId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' });
+    await flush();
+    expect(w.findAll('[data-pt-tag]')).toHaveLength(0);
+    expect(w.find('[data-pt-load-error]').text()).toContain('x');
+  });
+
   it('lists every player in the summary, including those with nothing', async () => {
     fetchPackingTags.mockResolvedValue([
       { id: 't2', playerId: 'p11', receiverId: 'p9', action: 'pass', bypassed: 4, videoSeconds: 90 }

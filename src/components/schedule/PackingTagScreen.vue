@@ -91,6 +91,10 @@ const notice = computed(() => {
 
 async function load(): Promise<void> {
   loadError.value = null;
+  // A failed load must not leave the previous fixture's tags on screen.
+  statMatchId.value = null;
+  liveEvents.value = [];
+  tags.value = [];
   if (!props.teamId || !props.matchId) { loadError.value = 'Choose a fixture first.'; return; }
   const found = await supabaseService.findStatMatch(props.teamId, props.matchId);
   if (!found.ok) { loadError.value = found.error || 'Could not open that fixture.'; return; }
