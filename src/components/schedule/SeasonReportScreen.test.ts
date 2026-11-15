@@ -265,4 +265,29 @@ describe('packing', () => {
     expect(w.find('[data-season-packing-coverage]').text())
       .toContain('Rate covers 1 of 2 matches');
   });
+
+  it('shows the coverage notes only with the table, not beside a failed read', async () => {
+    fetchSeasonStats.mockResolvedValue({
+      sessions: [...SESSION.sessions, { id: 's2', match_id: null, label: 'vs Yucaipa', created_at: '2026-09-08T00:00:00Z' }],
+      eventsBySession: { ...SESSION.eventsBySession, s1: [...SESSION.eventsBySession.s1, { kind: 'packing', playerId: 'p1', bypassed: 2, atSeconds: 700, period: 1 }], s2: [] },
+      tagsBySession: { s1: [], s2: [{ id: 't', playerId: 'p1', receiverId: null, action: 'dribble', bypassed: 3, videoSeconds: null }] }
+    });
+    const w = await mountSeason();
+    expect(w.find('[data-season-packing-coverage]').exists()).toBe(true);
+    expect(w.find('[data-season-packing-video]').exists()).toBe(true);
+
+    fetchSeasonStats.mockResolvedValue(null);
+    await w.setProps({ teamId: '99999999-2222-3333-4444-555555555555' });
+    await flush();
+    expect(w.find('[data-season-error]').exists()).toBe(true);
+    expect(w.find('[data-season-packing-coverage]').exists()).toBe(false);
+    expect(w.find('[data-season-packing-video]').exists()).toBe(false);
+  });
+});
+
+describe('the lede', () => {
+  it('says every player on the roster, since video-only players appear too', async () => {
+    const w = await mountSeason();
+    expect(w.find('.lede').text()).toContain('Every player on the roster');
+  });
 });

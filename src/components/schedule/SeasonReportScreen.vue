@@ -40,6 +40,8 @@ const loading = ref(false);
 const loadError = ref<string | null>(null);
 const columns = seasonColumns();
 const seasonMatches = ref<MatchStats[]>([]);
+/** The table is on screen: loaded, no error, at least one row. */
+const showTable = computed(() => !loading.value && !loadError.value && rows.value.length > 0);
 const coverage = computed(() => seasonPackingCoverage(seasonMatches.value));
 
 // Minutes, most first, until the coach sorts it otherwise on this device.
@@ -137,20 +139,20 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
     :back-to="{ name: 'schedule' }" back-label="Schedule"
   >
     <p class="lede">
-      Every player who has taken the pitch this season. Per-match rates are
+      Every player on the roster. Per-match rates are
       scaled to this squad's own {{ fullMatch }}-minute match, and the minutes
       behind each one are in the Mins column — a rate built on five minutes
       swings, and it is worth reading it as such.
     </p>
 
-    <p v-if="coverage.withPacking > 0 && coverage.timed < coverage.withPacking"
+    <p v-if="showTable && coverage.withPacking > 0 && coverage.timed < coverage.withPacking"
        class="lede" data-season-packing-coverage>
       Rate covers {{ coverage.timed }} of {{ coverage.withPacking }} matches.
       {{ coverage.withPacking - coverage.timed }} were tagged from video with no
       live log, so they have no minutes to divide by. Their packing is in the
       totals.
     </p>
-    <p v-if="coverage.video > 0" class="lede" data-season-packing-video>
+    <p v-if="showTable && coverage.video > 0" class="lede" data-season-packing-video>
       Recv, Pass and Dribble come from {{ coverage.video }} video-tagged
       match{{ coverage.video === 1 ? '' : 'es' }}.
     </p>
