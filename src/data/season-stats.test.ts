@@ -361,6 +361,14 @@ describe('packing across the season', () => {
     expect(t.get('a')!.byDribble).toBe(0);
   });
 
+  it('does not divide by minutes from matches that recorded no packing', () => {
+    const none = pkMatch('m3', { a: 80 }, matchPacking([], [], ['a']));
+    expect(none.packing!.source).toBe('none');
+    const t = seasonTotals([live, none], 80);
+    expect(t.get('a')!.packingPerMatch).toBeCloseTo(8, 6);
+    expect(t.get('a')!.minutes).toBe(160);
+  });
+
   it('counts how many packing matches the rate could cover', () => {
     expect(seasonPackingCoverage([live, videoOnly])).toEqual({ withPacking: 2, timed: 1, video: 1 });
   });

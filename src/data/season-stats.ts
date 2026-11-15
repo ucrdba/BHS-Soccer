@@ -175,6 +175,8 @@ export function seasonTotals(
   });
   /** Packing from matches where the player has minutes: the rate's numerator. */
   const timedPacking = new Map<string, number>();
+  /** Minutes from matches that recorded packing at all: the rate's denominator. */
+  const timedPackingMinutes = new Map<string, number>();
   const add = (a: number | null, b: number | null) => (b === null ? a : (a ?? 0) + b);
 
   for (const m of matches || []) {
@@ -191,6 +193,9 @@ export function seasonTotals(
       t.shots     += s.shots || 0;
       t.goals     += s.goals || 0;
       t.assists   += s.assists || 0;
+      if (minutes > 0 && m.packing && m.packing.source !== 'none') {
+        timedPackingMinutes.set(playerId, (timedPackingMinutes.get(playerId) || 0) + minutes);
+      }
     });
 
     m.packing?.players.forEach((p, playerId) => {
@@ -211,7 +216,7 @@ export function seasonTotals(
     // Only the packing earned while minutes were being logged is divided by
     // those minutes. A video-only match has packing and no minutes; dividing
     // its packing by somebody else's minutes would inflate the rate.
-    t.packingPerMatch  = perMatch(timedPacking.get(t.playerId) || 0, t.minutes, fullMatch);
+    t.packingPerMatch  = perMatch(timedPacking.get(t.playerId) || 0, timedPackingMinutes.get(t.playerId) || 0, fullMatch);
   });
   return out;
 }
