@@ -19,6 +19,7 @@ import { reportFailure, reportConnection } from '../domain/notices';
 import { isPublishableAnonKey } from './anon-key';
 import { resolveCredential } from './credentials';
 import type { JoinableTeam, PendingRequest, Invitation, AccountResult } from '../types';
+import type { PackingTag } from '../domain/packing';
 
 // ─── Credential resolution ──────────────────────────────────────────────────
 
@@ -2390,6 +2391,7 @@ class SupabaseService {
   async fetchSeasonStats(teamId: string): Promise<{
     sessions: Record<string, any>[];
     eventsBySession: Record<string, Record<string, any>[]>;
+    tagsBySession: Record<string, PackingTag[]>;
   } | null> {
     if (!this.isConfigured() || !teamId || !this.isUuid(teamId)) return null;
 
@@ -2399,7 +2401,7 @@ class SupabaseService {
       .eq('team_id', teamId)
       .eq('is_deleted', false);
     if (sErr) { report('fetchSeasonStats', sErr.message); return null; }
-    if (!sessions || sessions.length === 0) return { sessions: [], eventsBySession: {} };
+    if (!sessions || sessions.length === 0) return { sessions: [], eventsBySession: {}, tagsBySession: {} };
 
     const ids = sessions.map(s => s.id);
     const { data: events, error: eErr } = await this.client!
@@ -2419,7 +2421,25 @@ class SupabaseService {
       });
     });
 
-    return { sessions, eventsBySession };
+    const { data: tags, error: tErr } = await this.client!
+      .from('packing_tags')
+      .select('id, match_id, player_id, receiver_id, action, bypassed, video_seconds, created_at')
+      .in('match_id', ids)
+      .eq('is_deleted', false)
+      .order('created_at');
+    if (tErr) { report('fetchSeasonStats', tErr.message); return null; }
+
+    const tagsBySession: Record<string, PackingTag[]> = {};
+    ids.forEach(id => { tagsBySession[id] = []; });
+    (tags || []).forEach(r => {
+      (tagsBySession[r.match_id] ||= []).push({
+        id: r.id, playerId: r.player_id, receiverId: r.receiver_id ?? null,
+        action: r.action, bypassed: Number(r.bypassed),
+        videoSeconds: r.video_seconds ?? null, createdAt: r.created_at
+      });
+    });
+
+    return { sessions, eventsBySession, tagsBySession };
   }
 
   /** Every event of a tracked match, oldest first. */
@@ -2485,6 +2505,73 @@ class SupabaseService {
       .from('stat_events').update({ is_deleted: true }).eq('id', eventId).select();
     if (error) { report('undoStatEvent', error.message); return { ok: false, error: error.message }; }
     if (!data || data.length === 0) return { ok: false, error: 'The database refused that undo.' };
+    return { ok: true };
+  }
+
+  /**
+   * The tracking session for a fixture, if there is one — without creating it.
+   *
+   * The video screen opens without writing anything; the first saved tag
+   * calls openStatMatch, which creates the row.
+   */
+  async findStatMatch(teamId: string, matchId: string): Promise<{ ok: boolean; error?: string; id: string | null }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.', id: null };
+    if (!teamId || !this.isUuid(teamId) || !matchId || !this.isUuid(matchId)) {
+      return { ok: false, error: 'No fixture selected.', id: null };
+    }
+    const { data, error } = await this.client!
+      .from('stat_matches').select('id')
+      .eq('team_id', teamId).eq('match_id', matchId).eq('is_deleted', false)
+      .maybeSingle();
+    if (error) { report('findStatMatch', error.message); return { ok: false, error: error.message, id: null }; }
+    return { ok: true, id: data?.id ?? null };
+  }
+
+  /** Every video tag of a tracked match, in the order entered. Null on failure. */
+  async fetchPackingTags(statMatchId: string): Promise<PackingTag[] | null> {
+    if (!this.isConfigured() || !statMatchId || !this.isUuid(statMatchId)) return null;
+    const { data, error } = await this.client!
+      .from('packing_tags')
+      .select('id, player_id, receiver_id, action, bypassed, video_seconds, created_at')
+      .eq('match_id', statMatchId)
+      .eq('is_deleted', false)
+      .order('created_at');
+    if (error) { report('fetchPackingTags', error.message); return null; }
+    return (data || []).map(r => ({
+      id: r.id, playerId: r.player_id, receiverId: r.receiver_id ?? null,
+      action: r.action, bypassed: Number(r.bypassed),
+      videoSeconds: r.video_seconds ?? null, createdAt: r.created_at
+    }));
+  }
+
+  async addPackingTag(statMatchId: string, tag: PackingTag): Promise<{ ok: boolean; error?: string; id?: string; createdAt?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!statMatchId || !this.isUuid(statMatchId)) return { ok: false, error: 'No match is being tagged.' };
+    const { data, error } = await this.client!
+      .from('packing_tags')
+      .insert([{
+        match_id: statMatchId,
+        player_id: tag.playerId,
+        receiver_id: tag.action === 'pass' ? tag.receiverId : null,
+        action: tag.action,
+        bypassed: tag.bypassed,
+        video_seconds: tag.videoSeconds,
+        is_deleted: false
+      }])
+      .select('id, created_at');
+    if (error) { report('addPackingTag', error.message); return { ok: false, error: error.message }; }
+    if (!data || !data[0]) return { ok: false, error: 'The database refused that tag. You must coach this team.' };
+    return { ok: true, id: data[0].id, createdAt: data[0].created_at };
+  }
+
+  /** Soft-deleted, like an undone event, so a removed tag is still in the record. */
+  async removePackingTag(tagId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
+    if (!tagId || !this.isUuid(tagId)) return { ok: false, error: 'Nothing to remove.' };
+    const { data, error } = await this.client!
+      .from('packing_tags').update({ is_deleted: true }).eq('id', tagId).select('id');
+    if (error) { report('removePackingTag', error.message); return { ok: false, error: error.message }; }
+    if (!data || data.length === 0) return { ok: false, error: 'The database refused that.' };
     return { ok: true };
   }
 
