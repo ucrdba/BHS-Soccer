@@ -22,6 +22,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { supabaseService } from '../data/supabase';
+import { validBypassed } from '../domain/packing';
 import {
   pmClock, pmClockRunning, pmClockEverStarted, pmMaxOnPitch,
   pmStartersFromLineup
@@ -43,7 +44,7 @@ export interface WriteResult { ok: boolean; error?: string }
  * who came on, for a goal the eleven who went off were on for.
  */
 const CLOCK_GATED: StatKind[] = [
-  'plus', 'minus', 'shot', 'goal', 'assist', 'goal_for', 'goal_against'
+  'plus', 'minus', 'shot', 'goal', 'assist', 'packing', 'goal_for', 'goal_against'
 ];
 
 export const usePlusMinusStore = defineStore('plusMinus', () => {
@@ -104,7 +105,8 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
       if (rows) {
         events.value = rows.map((r: any) => ({
           id: r.id, kind: r.kind, playerId: r.playerId ?? null,
-          atSeconds: Number(r.atSeconds) || 0, period: r.period
+          atSeconds: Number(r.atSeconds) || 0, period: r.period,
+          ...(r.bypassed != null ? { bypassed: Number(r.bypassed) } : {})
         }));
         // The clock picks up where the log left it, rather than at zero.
         const last = events.value[events.value.length - 1];
@@ -124,13 +126,20 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
    * immediately, and is rolled back off if the write is refused. A board
    * showing a plus the database rejected is worse than a slow one.
    */
-  async function append(kind: StatKind, playerId?: string | null): Promise<WriteResult> {
+  async function append(kind: StatKind, playerId?: string | null, bypassed?: number): Promise<WriteResult> {
     // THE RULE. See the module comment.
     if (CLOCK_GATED.includes(kind) && !running.value) {
       say(everStarted.value
-        ? 'The clock is stopped. Start it to record goals, plus and minus.'
-        : 'Please start the clock to record goals, plus and minus — before kick-off '
+        ? 'The clock is stopped. Start it to record goals, plus, minus and packing.'
+        : 'Please start the clock to record goals, plus, minus and packing — before kick-off '
           + 'they stamp at 0:00 and nobody is credited any minutes.');
+      return { ok: false, error: notice.value };
+    }
+
+    // Here rather than left to the database, so the board never shows a tap
+    // the write would refuse.
+    if (kind === 'packing' && !validBypassed(bypassed)) {
+      say('Pick how many opponents that took out, from 1 to 11.');
       return { ok: false, error: notice.value };
     }
 
@@ -156,7 +165,8 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
       playerId: playerId || null,
       atSeconds: clock.value,
       period: period.value,
-      seq: (seq.value += 1)
+      seq: (seq.value += 1),
+      ...(kind === 'packing' ? { bypassed } : {})
     };
     events.value = events.value.concat([event]);
 

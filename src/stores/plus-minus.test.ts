@@ -529,3 +529,52 @@ describe('the figures on the board', () => {
     expect(replay(orderEvents(s.events), ['p1']).get('p1')!.plus).toBe(0);
   });
 });
+
+describe('packing', () => {
+  it('is refused while the clock is stopped, like every other statistic', async () => {
+    const s = await opened();
+    await s.movePlayer('p1', true);
+    const res = await s.append('packing', 'p1', 3);
+    expect(res.ok).toBe(false);
+    expect(s.notice).toMatch(/start the clock/i);
+    expect(kinds(s)).not.toContain('packing');
+    expect(appendStatEvent).not.toHaveBeenCalledWith('sm1', expect.objectContaining({ kind: 'packing' }));
+  });
+
+  it('is refused without a count from 1 to 11, before anything reaches the board', async () => {
+    const s = await running();
+    await s.movePlayer('p1', true);
+    for (const bad of [undefined, 0, 12, 2.5]) {
+      const res = await s.append('packing', 'p1', bad as any);
+      expect(res.ok).toBe(false);
+    }
+    expect(kinds(s)).not.toContain('packing');
+    expect(s.notice).toMatch(/1 to 11/);
+  });
+
+  it('records the count and sends it to the database', async () => {
+    const s = await running();
+    await s.movePlayer('p1', true);
+    const res = await s.append('packing', 'p1', 4);
+    expect(res.ok).toBe(true);
+    expect(s.events[s.events.length - 1]).toMatchObject({ kind: 'packing', playerId: 'p1', bypassed: 4 });
+    expect(appendStatEvent).toHaveBeenLastCalledWith('sm1', expect.objectContaining({ kind: 'packing', bypassed: 4 }));
+    expect(replay(orderEvents(s.events), ['p1']).get('p1')!.packing).toBe(4);
+  });
+
+  it('is undone like any other tap', async () => {
+    const s = await running();
+    await s.movePlayer('p1', true);
+    await s.append('packing', 'p1', 4);
+    await s.undo();
+    expect(kinds(s)).not.toContain('packing');
+  });
+
+  it('keeps the count of a tap it reloads', async () => {
+    fetchStatEvents.mockResolvedValue([
+      { id: 'e1', kind: 'packing', playerId: 'p1', atSeconds: 120, period: 1, bypassed: 3 }
+    ]);
+    const s = await opened();
+    expect(s.events[0]).toMatchObject({ kind: 'packing', bypassed: 3 });
+  });
+});

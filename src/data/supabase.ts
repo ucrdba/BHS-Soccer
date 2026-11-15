@@ -2404,7 +2404,7 @@ class SupabaseService {
     const ids = sessions.map(s => s.id);
     const { data: events, error: eErr } = await this.client!
       .from('stat_events')
-      .select('id, match_id, kind, player_id, at_seconds, period, created_at')
+      .select('id, match_id, kind, player_id, at_seconds, period, bypassed, created_at')
       .in('match_id', ids)
       .eq('is_deleted', false)
       .order('created_at');
@@ -2415,7 +2415,7 @@ class SupabaseService {
     (events || []).forEach(r => {
       (eventsBySession[r.match_id] ||= []).push({
         id: r.id, kind: r.kind, playerId: r.player_id,
-        atSeconds: r.at_seconds, period: r.period, createdAt: r.created_at
+        atSeconds: r.at_seconds, period: r.period, bypassed: r.bypassed, createdAt: r.created_at
       });
     });
 
@@ -2427,14 +2427,14 @@ class SupabaseService {
     if (!this.isConfigured() || !statMatchId || !this.isUuid(statMatchId)) return null;
     const { data, error } = await this.client!
       .from('stat_events')
-      .select('id, kind, player_id, at_seconds, period, created_at')
+      .select('id, kind, player_id, at_seconds, period, bypassed, created_at')
       .eq('match_id', statMatchId)
       .eq('is_deleted', false)
       .order('created_at');
     if (error) { report('fetchStatEvents', error.message); return null; }
     return (data || []).map(r => ({
       id: r.id, kind: r.kind, playerId: r.player_id,
-      atSeconds: r.at_seconds, period: r.period, createdAt: r.created_at
+      atSeconds: r.at_seconds, period: r.period, bypassed: r.bypassed, createdAt: r.created_at
     }));
   }
 
@@ -2447,7 +2447,7 @@ class SupabaseService {
    */
   async appendStatEvent(
     statMatchId: string,
-    event: { kind: string; playerId?: string | null; atSeconds: number; period?: number }
+    event: { kind: string; playerId?: string | null; atSeconds: number; period?: number; bypassed?: number | null }
   ): Promise<{ ok: boolean; error?: string; id?: string }> {
     if (!this.isConfigured()) return { ok: false, error: 'Cloud database is not configured.' };
     if (!statMatchId || !this.isUuid(statMatchId)) return { ok: false, error: 'No match is being tracked.' };
@@ -2460,6 +2460,7 @@ class SupabaseService {
         player_id: event.playerId || null,
         at_seconds: Math.max(0, Math.round(Number(event.atSeconds) || 0)),
         period: event.period || 1,
+        bypassed: event.kind === 'packing' ? event.bypassed ?? null : null,
         is_deleted: false
       }])
       .select();
