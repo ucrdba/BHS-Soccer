@@ -24,6 +24,7 @@ export type StatKind =
   | 'on' | 'off'
   | 'plus' | 'minus'
   | 'shot' | 'goal' | 'assist'
+  | 'packing'
   | 'goal_for' | 'goal_against'
   | 'clock_start' | 'clock_stop'
   | 'period';
@@ -34,6 +35,8 @@ export interface StatEvent {
   playerId?: string | null;
   atSeconds: number;
   period?: number;
+  /** Opponents bypassed, 1–11. Only on a 'packing' event. */
+  bypassed?: number | null;
   /** Ordering within the same clock second. Insertion order is the fallback. */
   seq?: number;
 }
@@ -49,6 +52,8 @@ export interface PlayerStats {
   shots: number;
   goals: number;
   assists: number;
+  /** Opponents bypassed, from live taps only. The reports use domain/packing.ts. */
+  packing: number;
   onPitch: boolean;
 }
 
@@ -77,7 +82,7 @@ export function orderEvents(events: StatEvent[]): StatEvent[] {
 
 const blank = (playerId: string): PlayerStats => ({
   playerId, plus: 0, minus: 0, score: 0, goalDiff: 0,
-  secondsPlayed: 0, shots: 0, goals: 0, assists: 0, onPitch: false
+  secondsPlayed: 0, shots: 0, goals: 0, assists: 0, packing: 0, onPitch: false
 });
 
 /**
@@ -163,6 +168,12 @@ export function replay(events: StatEvent[], playerIds: string[] = []): Map<strin
 
       case 'assist':
         if (e.playerId) ensure(e.playerId).assists += 1;
+        break;
+
+      // Live packing. Changes nothing else: it is not a goal, a plus or a
+      // substitution, so minutes and differential must not notice it.
+      case 'packing':
+        if (e.playerId) ensure(e.playerId).packing += Number(e.bypassed) || 0;
         break;
 
       // A team goal moves the differential of everyone on the pitch AT THAT

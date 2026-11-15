@@ -27,7 +27,7 @@ import type { PlayerStats } from './plus-minus';
 
 const stats = (over: Partial<PlayerStats> & { playerId: string }): PlayerStats => ({
   plus: 0, minus: 0, score: 0, goalDiff: 0, secondsPlayed: 0,
-  shots: 0, goals: 0, assists: 0, onPitch: false, ...over
+  shots: 0, goals: 0, assists: 0, packing: 0, onPitch: false, ...over
 });
 
 /** A tracked fixture. `mins` is per player, for readability. */

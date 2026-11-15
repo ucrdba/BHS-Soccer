@@ -66,7 +66,12 @@ export function pmClockEverStarted(events: any[]): boolean {
  * pointer behaviour is not.
  */
 export function pmResolveTap({ armed, fingers, rightClick, onPitch }: TapContext): any {
-  if (armed) return { kind: armed, disarm: true };
+  if (armed) {
+    // Armed wins, except that packing needs somebody on the pitch: a bench
+    // player cannot have taken anyone out of the game.
+    if (armed === 'packing' && !onPitch) return { kind: null };
+    return { kind: armed, disarm: true };
+  }
   // Two fingers, or the mouse's second button, is the minus gesture.
   if (fingers >= 2 || rightClick) return onPitch ? { kind: 'minus' } : { kind: null };
   // A plain tap only counts for someone actually on the pitch: a bench
@@ -276,7 +281,8 @@ export function pmColumns(): PmColumn[] {
     { key: 'mins',    label: 'Mins',    desc: true,  text: false, get: (p, s) => s.secondsPlayed || 0 },
     { key: 'shots',   label: 'Shots',   desc: true,  text: false, get: (p, s) => s.shots || 0 },
     { key: 'goals',   label: 'Goals',   desc: true,  text: false, get: (p, s) => s.goals || 0 },
-    { key: 'assists', label: 'Assists', desc: true,  text: false, get: (p, s) => s.assists || 0 }
+    { key: 'assists', label: 'Assists', desc: true,  text: false, get: (p, s) => s.assists || 0 },
+    { key: 'packing', label: 'Pack',    desc: true,  text: false, get: (p, s) => s.packing || 0 }
   ];
 }
 

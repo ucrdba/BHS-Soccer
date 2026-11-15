@@ -295,9 +295,9 @@ describe('the sheet', () => {
     ['p3', { plus: 0, minus: 0, score: 0, secondsPlayed: 0, goals: 0 }]
   ]);
 
-  it('offers the ten columns the sheet draws', () => {
+  it('offers the eleven columns the sheet draws', () => {
     expect(pmColumns().map(c => c.key)).toEqual(
-      ['number', 'name', 'plus', 'minus', 'score', 'gd', 'mins', 'shots', 'goals', 'assists']);
+      ['number', 'name', 'plus', 'minus', 'score', 'gd', 'mins', 'shots', 'goals', 'assists', 'packing']);
   });
 
   it('sorts by minutes played by default, most first', () => {
@@ -339,5 +339,17 @@ describe('the sheet', () => {
   it('copes with a player who has no statistics row yet', () => {
     const partial = new Map<string, any>([['p1', { secondsPlayed: 10 }]]);
     expect(() => pmSortedRows(partial, squad, 'mins', false)).not.toThrow();
+  });
+});
+
+describe('an armed packing tap', () => {
+  it('reaches a player on the pitch', () => {
+    expect(pmResolveTap({ armed: 'packing', fingers: 1, rightClick: false, onPitch: true }))
+      .toEqual({ kind: 'packing', disarm: true });
+  });
+
+  it('refuses a bench player, who cannot have bypassed anyone', () => {
+    expect(pmResolveTap({ armed: 'packing', fingers: 1, rightClick: false, onPitch: false }))
+      .toEqual({ kind: null });
   });
 });

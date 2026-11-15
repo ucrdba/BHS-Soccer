@@ -362,3 +362,40 @@ describe('reading the numbers', () => {
     expect(minutesPlayed(91)).toBe(2);
   });
 });
+
+describe('packing in the replay', () => {
+  const base = [
+    { kind: 'clock_start', atSeconds: 0, seq: 1 },
+    { kind: 'on', playerId: 'a', atSeconds: 0, seq: 2 },
+    { kind: 'on', playerId: 'b', atSeconds: 0, seq: 3 },
+    { kind: 'plus', playerId: 'a', atSeconds: 100, seq: 4 },
+    { kind: 'goal_for', atSeconds: 200, seq: 5 },
+    { kind: 'off', playerId: 'b', atSeconds: 300, seq: 6 },
+    { kind: 'clock_stop', atSeconds: 600, seq: 7 }
+  ] as any[];
+
+  it('sums the opponents bypassed per player', () => {
+    const s = replay([
+      ...base,
+      { kind: 'packing', playerId: 'a', bypassed: 3, atSeconds: 150, seq: 8 },
+      { kind: 'packing', playerId: 'a', bypassed: 2, atSeconds: 160, seq: 9 }
+    ] as any, ['a', 'b']);
+    expect(s.get('a')!.packing).toBe(5);
+    expect(s.get('b')!.packing).toBe(0);
+  });
+
+  it('leaves every other figure exactly as it was', () => {
+    const without = replay(base, ['a', 'b']);
+    const withPacking = replay([
+      ...base.slice(0, 4),
+      { kind: 'packing', playerId: 'a', bypassed: 4, atSeconds: 150, seq: 4.5 },
+      { kind: 'packing', playerId: 'b', bypassed: 1, atSeconds: 250, seq: 5.5 },
+      ...base.slice(4)
+    ] as any, ['a', 'b']);
+    for (const id of ['a', 'b']) {
+      const { packing: _p, ...rest } = withPacking.get(id)!;
+      const { packing: _q, ...was } = without.get(id)!;
+      expect(rest).toEqual(was);
+    }
+  });
+});
