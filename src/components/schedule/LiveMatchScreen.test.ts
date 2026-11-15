@@ -471,3 +471,89 @@ describe('the screen at its own URL', () => {
     expect(w.find('[data-pm-arm="goal"]').classes()).toContain('is-armed');
   });
 });
+
+describe('packing', () => {
+  async function liveWithP1On() {
+    // Other tests never unmount their screens, so the ambient pinia can be
+    // another test's: mount with our own and reassert it before the lookup.
+    const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: false });
+    const w = mount(LiveMatchScreen, {
+      props: { matchId: MATCH, matchLabel: 'vs Redlands', teamId: TEAM, schoolId: 's1', players: PLAYERS },
+      global: { plugins: [pinia], stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } } },
+      attachTo: document.body
+    });
+    await flush();
+    setActivePinia(pinia);
+    const pm = usePlusMinusStore(pinia as any);
+    await openSettled(pm);
+    // statMatchId lands before the events are fetched, and that fetch replaces
+    // the log: wait for open() to finish or the player sent on is wiped.
+    for (let i = 0; i < 20 && pm.loading; i++) await flush();
+    await pm.movePlayer('p1', true);
+    await pm.toggleClock();
+    for (let i = 0; i < 20 && !w.find('[data-pm-player="p1"]').exists(); i++) await flush();
+    await flush();
+    return { w, pm };
+  }
+
+  it('records arm, player, count as one packing tap and disarms', async () => {
+    const { w, pm } = await liveWithP1On();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(true);
+
+    await w.find('[data-pm-count="3"]').trigger('click');
+    await flush();
+    expect(pm.events.filter((e: any) => e.kind === 'packing'))
+      .toEqual([expect.objectContaining({ playerId: 'p1', bypassed: 3 })]);
+    expect(pm.armed).toBeNull();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(false);
+    expect(w.find('[data-pm-packing-for="p1"]').text()).toContain('3');
+  });
+
+  it('offers eleven counts and nothing else', async () => {
+    const { w } = await liveWithP1On();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    expect(w.findAll('[data-pm-count]').map(b => b.attributes('data-pm-count')))
+      .toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']);
+  });
+
+  it('records nothing when Cancel is pressed, or Packing is pressed again', async () => {
+    const { w, pm } = await liveWithP1On();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    await w.find('[data-pm-count-cancel]').trigger('click');
+    await flush();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(false);
+    expect(pm.armed).toBeNull();
+
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await flush();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(false);
+    expect(pm.events.some((e: any) => e.kind === 'packing')).toBe(false);
+  });
+
+  it('says the clock is stopped instead of arming while it is', async () => {
+    const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: false });
+    const w = mount(LiveMatchScreen, {
+      props: { matchId: MATCH, matchLabel: 'vs Redlands', teamId: TEAM, schoolId: 's1', players: PLAYERS },
+      global: { plugins: [pinia], stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } } },
+      attachTo: document.body
+    });
+    await flush();
+    setActivePinia(pinia);
+    const pm = usePlusMinusStore(pinia as any);
+    await openSettled(pm);
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await flush();
+    expect(pm.armed).toBeNull();
+    expect(w.find('[data-pm-notice]').text()).toMatch(/start the clock/i);
+  });
+});

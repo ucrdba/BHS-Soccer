@@ -23,6 +23,7 @@ import { usePlusMinusTable } from './use-plus-minus-table';
 import { pmResolveTap, pmMaxOnPitch } from '../../domain/plus-minus-court';
 import { lineupShortName } from '../../domain/lineup';
 import { replay, orderEvents } from '../../data/plus-minus';
+import { PACKING_MIN, PACKING_MAX } from '../../domain/packing';
 
 const props = defineProps<{
   matchId: string | null;
@@ -82,16 +83,37 @@ const held = computed(() => !pm.running);
 const EVENT_KINDS = [
   { kind: 'shot' as const, label: 'Shot' },
   { kind: 'goal' as const, label: 'Goal' },
-  { kind: 'assist' as const, label: 'Assist' }
+  { kind: 'assist' as const, label: 'Assist' },
+  { kind: 'packing' as const, label: 'Packing' }
 ];
+
+const COUNTS = Array.from({ length: PACKING_MAX - PACKING_MIN + 1 }, (_, i) => PACKING_MIN + i);
+
+/** The player whose packing count is being chosen, between the tap and the count. */
+const packingFor = ref<string | null>(null);
+
+// Pressing Packing again disarms it, and that has to close the count row too.
+watch(() => pm.armed, (k) => { if (k !== 'packing') packingFor.value = null; });
 
 /**
  * Arming a kind while the clock is stopped is refused by the store's own
  * door, so the screen asks it rather than deciding for itself.
  */
-async function onArm(kind: 'shot' | 'goal' | 'assist'): Promise<void> {
+async function onArm(kind: 'shot' | 'goal' | 'assist' | 'packing'): Promise<void> {
   if (!pm.running) { await pm.append(kind); return; }
   pm.arm(kind);
+}
+
+async function onCount(n: number): Promise<void> {
+  const id = packingFor.value;
+  packingFor.value = null;
+  pm.arm(null);
+  if (id) await pm.append('packing', id, n);
+}
+
+function onCountCancel(): void {
+  packingFor.value = null;
+  pm.arm(null);
 }
 
 const benchEl = ref<HTMLElement | null>(null);
@@ -117,7 +139,7 @@ onMounted(() => { ticker = setInterval(() => pm.tick(), 1000); });
 onBeforeUnmount(() => { if (ticker) clearInterval(ticker); });
 
 function statOf(playerId: string) {
-  return stats.value.get(playerId) || { plus: 0, minus: 0, score: 0, goalDiff: 0, secondsPlayed: 0 };
+  return stats.value.get(playerId) || { plus: 0, minus: 0, score: 0, goalDiff: 0, secondsPlayed: 0, packing: 0 };
 }
 
 /**
@@ -137,6 +159,9 @@ async function onTapPlayer(playerId: string, e: MouseEvent | TouchEvent, rightCl
   });
 
   if (!decision?.kind) return;
+  // Packing needs a count before anything is recorded; stay armed until it
+  // is chosen or cancelled.
+  if (decision.kind === 'packing') { packingFor.value = playerId; return; }
   if (decision.disarm) pm.arm(null);
   await pm.append(decision.kind, playerId);
 }
@@ -208,6 +233,7 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
           <span class="row__stat tnum" :data-pm-score-for="p.id">
             {{ Math.round((statOf(p.id).secondsPlayed || 0) / 60) }}′ on ·
             net {{ statOf(p.id).score > 0 ? '+' : '' }}{{ statOf(p.id).score }}
+            <span :data-pm-packing-for="p.id"> · pack {{ statOf(p.id).packing || 0 }}</span>
           </span>
         </span>
         <button
@@ -223,6 +249,16 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
         <button type="button" class="off" :data-pm-off="p.id" @click.stop="pm.movePlayer(p.id, false)">
           Off
         </button>
+      </div>
+      <div v-if="packingFor" class="countrow" data-pm-count-row role="group" aria-label="Opponents bypassed">
+        <span class="countrow__label">
+          Opponents bypassed — {{ shortName(byId.get(packingFor)) }}
+        </span>
+        <button
+          v-for="n in COUNTS" :key="n" type="button" class="countrow__n tnum"
+          :data-pm-count="n" @click="onCount(n)"
+        >{{ n }}</button>
+        <button type="button" class="minor" data-pm-count-cancel @click="onCountCancel">Cancel</button>
       </div>
     </div>
 
@@ -392,6 +428,24 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
 .row__who { flex: 1; min-width: 0; }
 .row__name { display: block; font-size: 13px; line-height: 1.2; }
 .row__stat { display: block; font-size: 10.5px; color: var(--ink-muted); }
+.countrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.countrow__label { flex-basis: 100%; font-size: 12.5px; color: var(--ink-muted); }
+.countrow__n {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1.5px solid var(--mark);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 17px;
+}
 .row--bench .row__name { flex: 1; }
 .row__on { margin-left: auto; font-size: 11px; color: var(--live); }
 
