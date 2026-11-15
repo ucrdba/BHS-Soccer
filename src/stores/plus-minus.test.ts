@@ -552,6 +552,19 @@ describe('packing', () => {
     expect(s.notice).toMatch(/1 to 11/);
   });
 
+  it('is refused for a player on the bench, never sent on or sent off', async () => {
+    const s = await running();
+    let res = await s.append('packing', 'p1', 3);
+    expect(res.ok).toBe(false);
+    await s.movePlayer('p1', true);
+    await s.movePlayer('p1', false);
+    res = await s.append('packing', 'p1', 3);
+    expect(res.ok).toBe(false);
+    expect(s.notice).toMatch(/on the pitch/i);
+    expect(kinds(s)).not.toContain('packing');
+    expect(appendStatEvent).not.toHaveBeenCalledWith('sm1', expect.objectContaining({ kind: 'packing' }));
+  });
+
   it('records the count and sends it to the database', async () => {
     const s = await running();
     await s.movePlayer('p1', true);

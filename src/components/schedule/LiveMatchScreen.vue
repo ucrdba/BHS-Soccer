@@ -95,6 +95,15 @@ const packingFor = ref<string | null>(null);
 // Pressing Packing again disarms it, and that has to close the count row too.
 watch(() => pm.armed, (k) => { if (k !== 'packing') packingFor.value = null; });
 
+// A player sent off while their count row is open can no longer take
+// opponents out of the game: close the row rather than offer a refusal.
+watch(() => pm.onPitch.slice(), (ids) => {
+  if (packingFor.value && !ids.includes(packingFor.value)) {
+    packingFor.value = null;
+    pm.arm(null);
+  }
+});
+
 /**
  * Arming a kind while the clock is stopped is refused by the store's own
  * door, so the screen asks it rather than deciding for itself.
@@ -221,8 +230,8 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
     </p>
 
     <div class="rows">
+      <template v-for="p in onPitch" :key="p.id">
       <div
-        v-for="p in onPitch" :key="p.id"
         class="row" :data-pm-player="p.id"
         @click="onTapPlayer(p.id, $event)"
         @contextmenu.prevent="onTapPlayer(p.id, $event, true)"
@@ -250,9 +259,9 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
           Off
         </button>
       </div>
-      <div v-if="packingFor" class="countrow" data-pm-count-row role="group" aria-label="Opponents bypassed">
+      <div v-if="packingFor === p.id" class="countrow" data-pm-count-row role="group" aria-label="Opponents bypassed">
         <span class="countrow__label">
-          Opponents bypassed — {{ shortName(byId.get(packingFor)) }}
+          Opponents bypassed — {{ shortName(p) }}
         </span>
         <button
           v-for="n in COUNTS" :key="n" type="button" class="countrow__n tnum"
@@ -260,6 +269,7 @@ const { columns, sortKey, reversed, rows, sortBy, sortChanged, resetSort } = use
         >{{ n }}</button>
         <button type="button" class="minor" data-pm-count-cancel @click="onCountCancel">Cancel</button>
       </div>
+      </template>
     </div>
 
     <p ref="benchEl" class="kicker sec">Bench</p>

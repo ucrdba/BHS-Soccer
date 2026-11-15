@@ -143,6 +143,11 @@ export const usePlusMinusStore = defineStore('plusMinus', () => {
       return { ok: false, error: notice.value };
     }
 
+    if (kind === 'packing' && !onPitch.value.includes(playerId as string)) {
+      say('Only a player on the pitch can take opponents out of the game.');
+      return { ok: false, error: notice.value };
+    }
+
     // Here as well as on the drag, because a twelfth player is wrong however
     // they got on — and afterwards the minutes and goal difference of
     // everyone on the pitch are quietly wrong.

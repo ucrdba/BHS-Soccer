@@ -540,6 +540,33 @@ describe('packing', () => {
     expect(pm.events.some((e: any) => e.kind === 'packing')).toBe(false);
   });
 
+  it('closes the count row when its player is sent off, recording nothing', async () => {
+    const { w, pm } = await liveWithP1On();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(true);
+
+    await w.find('[data-pm-off="p1"]').trigger('click');
+    await flush();
+    expect(w.find('[data-pm-count-row]').exists()).toBe(false);
+    expect(pm.armed).toBeNull();
+    expect(pm.events.some((e: any) => e.kind === 'packing')).toBe(false);
+  });
+
+  it('puts the count row directly beside the tapped player', async () => {
+    const { w, pm } = await liveWithP1On();
+    await pm.movePlayer('p2', true);
+    await flush();
+    await w.find('[data-pm-arm="packing"]').trigger('click');
+    await w.find('[data-pm-player="p1"]').trigger('click');
+    await flush();
+    const row = w.find('[data-pm-player="p1"]').element;
+    const count = w.find('[data-pm-count-row]').element;
+    expect(row.nextElementSibling).toBe(count);
+    expect(count.nextElementSibling).toBe(w.find('[data-pm-player="p2"]').element);
+  });
+
   it('says the clock is stopped instead of arming while it is', async () => {
     const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: false });
     const w = mount(LiveMatchScreen, {
