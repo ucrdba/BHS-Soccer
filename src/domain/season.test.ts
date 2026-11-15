@@ -87,6 +87,11 @@ describe('the report columns', () => {
     expect(col('mins').get({ minutes: 34 })).toBe(34);
   });
 
+  it('reads null, not zero, for received when no match was tagged from video', () => {
+    expect(col('recv').get({ received: null })).toBeNull();
+    expect(col('pack').get({ packing: 0 })).toBe(0);
+  });
+
   it('sorts the player column as text and the rest descending', () => {
     expect(col('player').text).toBe(true);
     expect(col('player').desc).toBe(false);

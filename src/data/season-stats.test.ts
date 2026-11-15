@@ -13,8 +13,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   perMatch, toMinutes, orderMatches, seasonTotals, seasonSeries,
-  pointWeight, seasonTrend, DEFAULT_FULL_MATCH_MINUTES, type MatchStats
+  pointWeight, seasonTrend, DEFAULT_FULL_MATCH_MINUTES, seasonPackingCoverage, type MatchStats
 } from './season-stats';
+import { matchPacking } from '../domain/packing';
 
 /**
  * Eighty minutes, because that is a high school match: two forty-minute
@@ -315,5 +316,52 @@ describe('the trend arrow', () => {
 
   it('can read goal differential instead', () => {
     expect(seasonTrend(series(0, 1, 2, 3), 'goalDiffPerMatchToDate')).toBe('up');
+  });
+});
+
+const pkStats = (entries: Record<string, number>) =>
+  new Map(Object.entries(entries).map(([id, secs]) => [id, {
+    playerId: id, plus: 0, minus: 0, score: 0, goalDiff: 0, secondsPlayed: secs,
+    shots: 0, goals: 0, assists: 0, packing: 0, onPitch: false
+  }])) as any;
+
+const pkMatch = (id: string, minutes: Record<string, number>, packing: ReturnType<typeof matchPacking>): MatchStats => ({
+  statMatchId: id, matchId: null, date: '', sortKey: null, opponent: '',
+  stats: pkStats(Object.fromEntries(Object.entries(minutes).map(([k, m]) => [k, m * 60]))),
+  packing
+});
+
+describe('packing across the season', () => {
+  const live = pkMatch('m1', { a: 80, b: 10 },
+    matchPacking([{ kind: 'packing', playerId: 'a', bypassed: 8 }, { kind: 'packing', playerId: 'b', bypassed: 2 }] as any, [], ['a', 'b']));
+  const videoOnly = pkMatch('m2', {},
+    matchPacking([], [{ playerId: 'a', receiverId: 'b', action: 'pass', bypassed: 5, videoSeconds: null }] as any, ['a', 'b']));
+
+  it('totals every match, video-only ones included', () => {
+    const t = seasonTotals([live, videoOnly], 80);
+    expect(t.get('a')!.packing).toBe(13);
+  });
+
+  it('rates only over matches with minutes, and keeps a ten-minute player in', () => {
+    const t = seasonTotals([live, videoOnly], 80);
+    expect(t.get('a')!.packingPerMatch).toBeCloseTo(8, 6);
+    expect(t.get('b')!.packingPerMatch).toBeCloseTo(16, 6);
+    expect(t.get('b')!.minutes).toBe(10);
+  });
+
+  it('scales to the team’s own match length', () => {
+    expect(seasonTotals([live], 70).get('a')!.packingPerMatch).toBeCloseTo(7, 6);
+  });
+
+  it('reports received and the split only from video, null when there is none', () => {
+    expect(seasonTotals([live], 80).get('b')!.received).toBeNull();
+    const t = seasonTotals([live, videoOnly], 80);
+    expect(t.get('b')!.received).toBe(5);
+    expect(t.get('a')!.byPass).toBe(5);
+    expect(t.get('a')!.byDribble).toBe(0);
+  });
+
+  it('counts how many packing matches the rate could cover', () => {
+    expect(seasonPackingCoverage([live, videoOnly])).toEqual({ withPacking: 2, timed: 1, video: 1 });
   });
 });

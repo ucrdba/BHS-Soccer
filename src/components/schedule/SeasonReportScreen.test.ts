@@ -52,7 +52,8 @@ const SESSION = {
       { kind: 'off', playerId: 'p2', atSeconds: 4800, period: 2 },
       { kind: 'clock_stop', atSeconds: 4800, period: 2 }
     ]
-  }
+  },
+  tagsBySession: {}
 };
 
 const flush = async () => {
@@ -129,7 +130,7 @@ describe('reading a noisy rate', () => {
 
   it('shows a dash rather than a zero when there is no rate at all', async () => {
     // No rate means not enough play for one, which is not the worst rate.
-    fetchSeasonStats.mockResolvedValue({ sessions: [], eventsBySession: {} });
+    fetchSeasonStats.mockResolvedValue({ sessions: [], eventsBySession: {}, tagsBySession: {} });
     const w = await mountSeason();
     expect(w.find('[data-season-empty]').exists()).toBe(true);
   });
@@ -226,7 +227,7 @@ describe('when the read fails', () => {
   });
 
   it('distinguishes no matches from a failed read', async () => {
-    fetchSeasonStats.mockResolvedValue({ sessions: [], eventsBySession: {} });
+    fetchSeasonStats.mockResolvedValue({ sessions: [], eventsBySession: {}, tagsBySession: {} });
     const w = await mountSeason();
 
     expect(w.find('[data-season-empty]').text()).toMatch(/plus\/minus/i);
@@ -238,5 +239,30 @@ describe('the frame', () => {
   it('offers a way back to the schedule', async () => {
     const w = await mountSeason();
     expect(w.find('[data-tool-back]').exists()).toBe(true);
+  });
+});
+
+describe('packing', () => {
+  it('shows a live-only season’s received as a dash, not 0', async () => {
+    fetchSeasonStats.mockResolvedValue({
+      ...SESSION,
+      eventsBySession: { s1: [...SESSION.eventsBySession.s1, { kind: 'packing', playerId: 'p1', bypassed: 4, atSeconds: 700, period: 1 }] },
+      tagsBySession: { s1: [] }
+    });
+    const w = await mountSeason();
+    const row = w.findAll('[data-season-row]').find((r: any) => r.text().includes('Cesar Alva'))!;
+    expect(row.find('[data-season-pack]').text()).toBe('4');
+    expect(row.find('[data-season-recv]').text()).toBe('—');
+  });
+
+  it('says how many matches the rate covers when some were tagged without a live log', async () => {
+    fetchSeasonStats.mockResolvedValue({
+      sessions: [...SESSION.sessions, { id: 's2', match_id: null, label: 'vs Yucaipa', created_at: '2026-09-08T00:00:00Z' }],
+      eventsBySession: { ...SESSION.eventsBySession, s1: [...SESSION.eventsBySession.s1, { kind: 'packing', playerId: 'p1', bypassed: 2, atSeconds: 700, period: 1 }], s2: [] },
+      tagsBySession: { s1: [], s2: [{ id: 't', playerId: 'p1', receiverId: null, action: 'dribble', bypassed: 3, videoSeconds: null }] }
+    });
+    const w = await mountSeason();
+    expect(w.find('[data-season-packing-coverage]').text())
+      .toContain('Rate covers 1 of 2 matches');
   });
 });

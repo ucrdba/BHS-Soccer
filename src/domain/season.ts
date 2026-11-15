@@ -41,6 +41,11 @@ export function seasonColumns(): SeasonColumn[] {
     { key: 'net',     label: 'Net',     desc: true,  get: t => t.score || 0 },
     { key: 'gd',      label: 'GD',      desc: true,  get: t => t.goalDiff || 0 },
     { key: 'netrate', label: 'Net',     desc: true,  get: t => t.scorePerMatch },
-    { key: 'gdrate',  label: 'GD',      desc: true,  get: t => t.goalDiffPerMatch }
+    { key: 'gdrate',  label: 'GD',      desc: true,  get: t => t.goalDiffPerMatch },
+    { key: 'pack',      label: 'Pack',      desc: true,  get: t => t.packing || 0 },
+    { key: 'packrate',  label: 'Pack',      desc: true,  get: t => t.packingPerMatch ?? null },
+    { key: 'recv',      label: 'Recv',      desc: true,  get: t => t.received ?? null },
+    { key: 'bypass',    label: 'Pass',      desc: true,  get: t => t.byPass ?? null },
+    { key: 'bydribble', label: 'Dribble',   desc: true,  get: t => t.byDribble ?? null }
   ];
 }

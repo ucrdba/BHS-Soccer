@@ -26,7 +26,8 @@ import ToolScreen from '../layout/ToolScreen.vue';
 import { supabaseService } from '../../data/supabase';
 import { seasonColumns, seasonFullMatchMinutes } from '../../domain/season';
 import { replay, orderEvents } from '../../data/plus-minus';
-import { seasonTotals, toMinutes, type MatchStats } from '../../data/season-stats';
+import { seasonTotals, seasonPackingCoverage, toMinutes, type MatchStats } from '../../data/season-stats';
+import { matchPacking } from '../../domain/packing';
 
 const props = defineProps<{
   teamId: string | null;
@@ -38,6 +39,8 @@ const rows = ref<any[]>([]);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
 const columns = seasonColumns();
+const seasonMatches = ref<MatchStats[]>([]);
+const coverage = computed(() => seasonPackingCoverage(seasonMatches.value));
 
 // Minutes, most first, until the coach sorts it otherwise on this device.
 const saved = readSort('season-report', columns.map(c => c.key), { by: 'mins', reversed: false });
@@ -68,8 +71,13 @@ async function load(): Promise<void> {
       id: s.id,
       label: s.label,
       createdAt: s.created_at,
-      stats: replay(orderEvents((data.eventsBySession[s.id] || []) as any), playerIds)
+      stats: replay(orderEvents((data.eventsBySession[s.id] || []) as any), playerIds),
+      packing: matchPacking(
+        (data.eventsBySession[s.id] || []) as any,
+        ((data as any).tagsBySession || {})[s.id] || [],
+        playerIds)
     })) as any;
+    seasonMatches.value = matches;
 
     const totals = seasonTotals(matches, fullMatch.value);
     rows.value = Array.from(totals.values())
@@ -119,6 +127,7 @@ function resetSort(): void {
   clearSort('season-report');
 }
 
+const count = (v: any) => (v === null || v === undefined ? '—' : String(v));
 const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFixed(2));
 </script>
 
@@ -132,6 +141,18 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
       scaled to this squad's own {{ fullMatch }}-minute match, and the minutes
       behind each one are in the Mins column — a rate built on five minutes
       swings, and it is worth reading it as such.
+    </p>
+
+    <p v-if="coverage.withPacking > 0 && coverage.timed < coverage.withPacking"
+       class="lede" data-season-packing-coverage>
+      Rate covers {{ coverage.timed }} of {{ coverage.withPacking }} matches.
+      {{ coverage.withPacking - coverage.timed }} were tagged from video with no
+      live log, so they have no minutes to divide by. Their packing is in the
+      totals.
+    </p>
+    <p v-if="coverage.video > 0" class="lede" data-season-packing-video>
+      Recv, Pass and Dribble come from {{ coverage.video }} video-tagged
+      match{{ coverage.video === 1 ? '' : 'es' }}.
     </p>
 
     <p v-if="loading" class="state">Loading…</p>
@@ -171,6 +192,11 @@ const fmt = (v: any) => (v === null || v === undefined ? '—' : Number(v).toFix
             <td class="tabular">{{ r.goalDiff }}</td>
             <td class="tabular" data-season-netrate>{{ fmt(r.scorePerMatch) }}</td>
             <td class="tabular">{{ fmt(r.goalDiffPerMatch) }}</td>
+            <td class="tabular" data-season-pack>{{ r.packing }}</td>
+            <td class="tabular" data-season-packrate>{{ fmt(r.packingPerMatch) }}</td>
+            <td class="tabular" data-season-recv>{{ count(r.received) }}</td>
+            <td class="tabular">{{ count(r.byPass) }}</td>
+            <td class="tabular">{{ count(r.byDribble) }}</td>
           </tr>
         </tbody>
       </table>

@@ -40,6 +40,7 @@
  */
 
 import type { PlayerStats } from './plus-minus';
+import type { MatchPacking } from '../domain/packing';
 
 /** One tracked fixture, after its events have been replayed. */
 export interface MatchStats {
@@ -54,6 +55,8 @@ export interface MatchStats {
   opponent: string;
   /** Replayed statistics, by player id. */
   stats: Map<string, PlayerStats>;
+  /** Packing for the match, from video when tagged, else live taps. */
+  packing?: MatchPacking;
 }
 
 /** What one player did across the whole season. */
@@ -72,6 +75,14 @@ export interface SeasonTotals {
   /** Net score per full match, or null when they never played. */
   scorePerMatch: number | null;
   goalDiffPerMatch: number | null;
+  /** Packing across every match, video-only ones included. */
+  packing: number;
+  /** Packing per full match, over matches where this player has minutes. */
+  packingPerMatch: number | null;
+  /** Null until a video-tagged match exists. */
+  received: number | null;
+  byPass: number | null;
+  byDribble: number | null;
 }
 
 /** One point on a player's chart. */
@@ -159,8 +170,12 @@ export function seasonTotals(
   const blank = (playerId: string): SeasonTotals => ({
     playerId, appearances: 0, minutes: 0, plus: 0, minus: 0, score: 0,
     goalDiff: 0, shots: 0, goals: 0, assists: 0,
-    scorePerMatch: null, goalDiffPerMatch: null
+    scorePerMatch: null, goalDiffPerMatch: null,
+    packing: 0, packingPerMatch: null, received: null, byPass: null, byDribble: null
   });
+  /** Packing from matches where the player has minutes: the rate's numerator. */
+  const timedPacking = new Map<string, number>();
+  const add = (a: number | null, b: number | null) => (b === null ? a : (a ?? 0) + b);
 
   for (const m of matches || []) {
     m.stats.forEach((s, playerId) => {
@@ -177,13 +192,48 @@ export function seasonTotals(
       t.goals     += s.goals || 0;
       t.assists   += s.assists || 0;
     });
+
+    m.packing?.players.forEach((p, playerId) => {
+      if (!out.has(playerId)) out.set(playerId, blank(playerId));
+      const t = out.get(playerId)!;
+      t.packing  += p.packing;
+      t.received  = add(t.received, p.received);
+      t.byPass    = add(t.byPass, p.byPass);
+      t.byDribble = add(t.byDribble, p.byDribble);
+      const secs = m.stats.get(playerId)?.secondsPlayed || 0;
+      if (secs > 0) timedPacking.set(playerId, (timedPacking.get(playerId) || 0) + p.packing);
+    });
   }
 
   out.forEach(t => {
     t.scorePerMatch    = perMatch(t.score, t.minutes, fullMatch);
     t.goalDiffPerMatch = perMatch(t.goalDiff, t.minutes, fullMatch);
+    // Only the packing earned while minutes were being logged is divided by
+    // those minutes. A video-only match has packing and no minutes; dividing
+    // its packing by somebody else's minutes would inflate the rate.
+    t.packingPerMatch  = perMatch(timedPacking.get(t.playerId) || 0, t.minutes, fullMatch);
   });
   return out;
+}
+
+/**
+ * How much of the season a packing rate can speak for.
+ *
+ * `withPacking` matches recorded any packing; `timed` of those have minutes
+ * logged by anybody (a live substitution log); `video` were tagged from video.
+ * The report says "Rate covers timed of withPacking" when they differ.
+ */
+export function seasonPackingCoverage(matches: MatchStats[]): { withPacking: number; timed: number; video: number } {
+  let withPacking = 0, timed = 0, video = 0;
+  for (const m of matches || []) {
+    if (!m.packing || m.packing.source === 'none') continue;
+    withPacking += 1;
+    if (m.packing.source === 'video') video += 1;
+    let anyMinutes = false;
+    m.stats.forEach(s => { if ((s.secondsPlayed || 0) > 0) anyMinutes = true; });
+    if (anyMinutes) timed += 1;
+  }
+  return { withPacking, timed, video };
 }
 
 /**

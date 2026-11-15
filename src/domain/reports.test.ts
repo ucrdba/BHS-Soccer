@@ -198,9 +198,10 @@ describe('season', () => {
     expect(seasonFullMatchMinutes([{ id: 't1', match_minutes: null }], 't1')).toBe(fallback);
   });
 
-  it('offers the nine columns the report draws', () => {
+  it('offers the columns the report draws', () => {
     expect(seasonColumns().map(c => c.key)).toEqual(
-      ['player', 'apps', 'mins', 'plus', 'minus', 'net', 'gd', 'netrate', 'gdrate']);
+      ['player', 'apps', 'mins', 'plus', 'minus', 'net', 'gd', 'netrate', 'gdrate',
+       'pack', 'packrate', 'recv', 'bypass', 'bydribble']);
   });
 });
 
