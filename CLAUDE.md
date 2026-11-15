@@ -89,7 +89,7 @@ Every plus/minus event is stamped with the match clock, and playing time and goa
 
 Since `0041_packing.sql`. Packing counts opponents bypassed (1–11) by a completed pass or dribble. Live taps are `packing` events in `stat_events` with `bypassed`, so they go through `append()`'s gate and the one undo. Video tags are rows in `packing_tags` under the same `stat_matches` row, because they are entered after the fact and the replay orders the log by when an event was recorded.
 
-**Once a match has any non-deleted tag, every report counts the tags and ignores the live taps** — `domain/packing.ts` (`packingSource`, `matchPacking`) is the only place that rule lives, so read a match through it. A live-sourced match reports received and the pass/dribble split as **null, not 0**: live entry never asked. The season rate divides only packing earned in matches where the player has logged minutes, because a video-only match has no minutes. Video players are typed by **shirt** number.
+**Once a match has any non-deleted tag, every report counts the tags and ignores the live taps** — `domain/packing.ts` (`packingSource`, `matchPacking`) is the only place that rule lives, so read a match through it. A live-sourced match reports received and the pass/dribble split as **null, not 0**: live entry never asked. The season rate divides the packing a player earned in matches that recorded packing *and* where they logged minutes by their minutes in those same matches — a video-only match has no minutes, and minutes from a match nobody recorded packing in (every match before this feature) would dilute the rate. Video players are typed by **shirt** number.
 
 ### Low-minute players are the audience for the reports, not noise in them
 
