@@ -72,12 +72,13 @@ describe('the router', () => {
     const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
     expect(byName.get('lineup')?.meta.ground).toBe('pitch');
     expect(byName.get('live')?.meta.ground).toBe('pitch');
+    expect(byName.get('packing')?.meta.ground).toBe('pitch');
     expect(byName.get('season-report')?.meta.ground).toBe('ledger');
   });
 
   it('marks all three as tool chrome, so the shell steps aside', () => {
     const byName = new Map(router.getRoutes().map(r => [String(r.name || ''), r]));
-    for (const name of ['lineup', 'live', 'season-report']) {
+    for (const name of ['lineup', 'live', 'packing', 'season-report']) {
       expect(byName.get(name)?.meta.chrome, name).toBe('tool');
     }
   });
@@ -86,6 +87,7 @@ describe('the router', () => {
     const paths = router.getRoutes().map(r => r.path);
     expect(paths).toContain('/schedule/lineup/:matchId?');
     expect(paths).toContain('/schedule/:matchId/live');
+    expect(paths).toContain('/schedule/:matchId/packing');
     expect(paths).toContain('/schedule/report');
   });
 

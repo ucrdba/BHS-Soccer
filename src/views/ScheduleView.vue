@@ -165,6 +165,8 @@ async function onRemove(m: Match): Promise<void> {
               </RouterLink>
               <RouterLink class="textlink" data-fixture-pm
                           :to="{ name: 'live', params: { matchId: schedule.nextMatch.id } }">Live ±</RouterLink>
+              <RouterLink class="textlink" data-fixture-packing
+                          :to="{ name: 'packing', params: { matchId: schedule.nextMatch.id } }">Packing</RouterLink>
               <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(schedule.nextMatch)">Delete</button>
             </template>
           </div>
@@ -186,6 +188,8 @@ async function onRemove(m: Match): Promise<void> {
                   </RouterLink>
                   <RouterLink class="textlink" data-fixture-pm
                               :to="{ name: 'live', params: { matchId: m.id } }">Live ±</RouterLink>
+                  <RouterLink class="textlink" data-fixture-packing
+                              :to="{ name: 'packing', params: { matchId: m.id } }">Packing</RouterLink>
                   <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
                 </template>
               </div>
@@ -213,6 +217,8 @@ async function onRemove(m: Match): Promise<void> {
                 </RouterLink>
                 <RouterLink class="textlink" data-fixture-pm
                             :to="{ name: 'live', params: { matchId: m.id } }">Live ±</RouterLink>
+                <RouterLink class="textlink" data-fixture-packing
+                            :to="{ name: 'packing', params: { matchId: m.id } }">Packing</RouterLink>
                 <button type="button" class="textlink textlink--danger" data-match-remove @click="onRemove(m)">Delete</button>
               </div>
             </div>

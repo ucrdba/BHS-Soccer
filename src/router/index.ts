@@ -25,6 +25,7 @@ import AdminView from '../views/AdminView.vue';
 import QuizView from '../views/QuizView.vue';
 import LineupView from '../views/LineupView.vue';
 import LiveMatchView from '../views/LiveMatchView.vue';
+import PackingTagView from '../views/PackingTagView.vue';
 import SeasonReportView from '../views/SeasonReportView.vue';
 import SessionEntryView from '../views/SessionEntryView.vue';
 import { groundFor, applyGround } from './ground';
@@ -115,6 +116,8 @@ export const router: Router = createRouter({
     { path: '/schedule/lineup/:matchId?', name: 'lineup', component: LineupView,
       meta: { ground: 'pitch', chrome: 'tool' } },
     { path: '/schedule/:matchId/live', name: 'live', component: LiveMatchView,
+      meta: { ground: 'pitch', chrome: 'tool' } },
+    { path: '/schedule/:matchId/packing', name: 'packing', component: PackingTagView,
       meta: { ground: 'pitch', chrome: 'tool' } },
     { path: '/schedule/report', name: 'season-report', component: SeasonReportView,
       meta: { ground: 'ledger', chrome: 'tool' } },
